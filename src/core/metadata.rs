@@ -9,6 +9,92 @@ pub struct Metadata {
     pub keywords: Vec<String>,
 }
 
+impl Metadata {
+    /// Check if a keyword exists (case-insensitive)
+    pub fn has_keyword(&self, keyword: &str) -> bool {
+        let lower = keyword.to_lowercase();
+        self.keywords.iter().any(|k| k.to_lowercase() == lower)
+    }
+
+    /// Add a keyword (avoids duplicates)
+    pub fn add_keyword(&mut self, keyword: &str) {
+        if !self.has_keyword(keyword) {
+            self.keywords.push(keyword.to_string());
+        }
+    }
+
+    /// Remove a keyword (case-insensitive)
+    pub fn remove_keyword(&mut self, keyword: &str) {
+        let lower = keyword.to_lowercase();
+        self.keywords.retain(|k| k.to_lowercase() != lower);
+    }
+
+    /// Get a custom field value by name
+    pub fn get_custom_field(&self, name: &str) -> Option<&CustomFieldValue> {
+        self.custom_metadata
+            .iter()
+            .find(|f| f.name == name)
+            .map(|f| &f.value)
+    }
+
+    /// Set a custom field value, updating if it already exists
+    pub fn set_custom_field(&mut self, name: &str, value: CustomFieldValue) {
+        if let Some(field) = self.custom_metadata.iter_mut().find(|f| f.name == name) {
+            field.value = value;
+        } else {
+            self.custom_metadata.push(CustomField {
+                name: name.to_string(),
+                value,
+            });
+        }
+    }
+
+    /// Remove a custom field by name
+    pub fn remove_custom_field(&mut self, name: &str) {
+        self.custom_metadata.retain(|f| f.name != name);
+    }
+
+    /// Get the label name, if set
+    pub fn label_name(&self) -> Option<&str> {
+        self.label.as_ref().map(|l| l.name.as_str())
+    }
+
+    /// Get the status name, if set
+    pub fn status_name(&self) -> Option<&str> {
+        self.status.as_ref().map(|s| s.name.as_str())
+    }
+
+    /// Check if any metadata is set
+    pub fn is_empty(&self) -> bool {
+        self.label.is_none()
+            && self.status.is_none()
+            && self.custom_metadata.is_empty()
+            && self.keywords.is_empty()
+    }
+
+    /// Summary string for display
+    pub fn summary(&self) -> String {
+        let mut parts = Vec::new();
+        if let Some(ref label) = self.label {
+            parts.push(format!("Label: {}", label.name));
+        }
+        if let Some(ref status) = self.status {
+            parts.push(format!("Status: {}", status.name));
+        }
+        if !self.keywords.is_empty() {
+            parts.push(format!("Keywords: {}", self.keywords.join(", ")));
+        }
+        if !self.custom_metadata.is_empty() {
+            parts.push(format!("{} custom field(s)", self.custom_metadata.len()));
+        }
+        if parts.is_empty() {
+            "No metadata".to_string()
+        } else {
+            parts.join(" | ")
+        }
+    }
+}
+
 /// Color-coded label for organizing items
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Label {
@@ -47,6 +133,40 @@ impl LabelColor {
         let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(128) as f32 / 255.0;
         let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(128) as f32 / 255.0;
         iced::Color::from_rgb(r, g, b)
+    }
+
+    /// All predefined colors
+    pub fn all_predefined() -> Vec<Self> {
+        vec![
+            LabelColor::Red,
+            LabelColor::Orange,
+            LabelColor::Yellow,
+            LabelColor::Green,
+            LabelColor::Blue,
+            LabelColor::Purple,
+        ]
+    }
+
+    /// Display name for the color
+    pub fn display_name(&self) -> &str {
+        match self {
+            LabelColor::Red => "Red",
+            LabelColor::Orange => "Orange",
+            LabelColor::Yellow => "Yellow",
+            LabelColor::Green => "Green",
+            LabelColor::Blue => "Blue",
+            LabelColor::Purple => "Purple",
+            LabelColor::Custom(_) => "Custom",
+        }
+    }
+}
+
+impl Label {
+    pub fn new(name: &str, color: LabelColor) -> Self {
+        Self {
+            name: name.to_string(),
+            color,
+        }
     }
 }
 
@@ -89,6 +209,64 @@ pub enum CustomFieldValue {
     Checkbox(bool),
     Date(String),
     List(Vec<String>),
+}
+
+impl CustomFieldValue {
+    /// Get the type name as a string
+    pub fn type_name(&self) -> &str {
+        match self {
+            CustomFieldValue::Text(_) => "Text",
+            CustomFieldValue::Number(_) => "Number",
+            CustomFieldValue::Checkbox(_) => "Checkbox",
+            CustomFieldValue::Date(_) => "Date",
+            CustomFieldValue::List(_) => "List",
+        }
+    }
+
+    /// Display value as string
+    pub fn display(&self) -> String {
+        match self {
+            CustomFieldValue::Text(s) => s.clone(),
+            CustomFieldValue::Number(n) => format!("{}", n),
+            CustomFieldValue::Checkbox(b) => if *b { "Yes" } else { "No" }.to_string(),
+            CustomFieldValue::Date(d) => d.clone(),
+            CustomFieldValue::List(items) => items.join(", "),
+        }
+    }
+
+    /// Check if the value is empty/default
+    pub fn is_empty(&self) -> bool {
+        match self {
+            CustomFieldValue::Text(s) => s.is_empty(),
+            CustomFieldValue::Number(n) => *n == 0.0,
+            CustomFieldValue::Checkbox(b) => !*b,
+            CustomFieldValue::Date(d) => d.is_empty(),
+            CustomFieldValue::List(items) => items.is_empty(),
+        }
+    }
+}
+
+impl CustomField {
+    pub fn text(name: &str, value: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            value: CustomFieldValue::Text(value.to_string()),
+        }
+    }
+
+    pub fn number(name: &str, value: f64) -> Self {
+        Self {
+            name: name.to_string(),
+            value: CustomFieldValue::Number(value),
+        }
+    }
+
+    pub fn checkbox(name: &str, value: bool) -> Self {
+        Self {
+            name: name.to_string(),
+            value: CustomFieldValue::Checkbox(value),
+        }
+    }
 }
 
 /// Project-level settings

@@ -13,6 +13,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
             output.push_str(&format!("Author: {}\n", options.author));
         }
         output.push_str(&format!("Draft date: {}\n", chrono::Utc::now().format("%Y-%m-%d")));
+        output.push_str("Contact:\n");
         output.push('\n');
     }
 
@@ -24,16 +25,77 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
             }
             output.push_str(&format!("# {}\n\n", content.title.to_uppercase()));
         } else {
-            // Text documents — output as-is (assume Fountain-formatted)
-            // Or convert basic prose to Fountain format
+            // Try to detect Fountain formatting, otherwise convert prose
             if !content.text.is_empty() {
-                output.push_str(&content.text);
+                let converted = prose_to_fountain(&content.text);
+                output.push_str(&converted);
                 output.push_str("\n\n");
             }
         }
     }
 
     Ok(output)
+}
+
+/// Attempt basic prose-to-Fountain conversion
+fn prose_to_fountain(text: &str) -> String {
+    let mut output = String::new();
+    let lines: Vec<&str> = text.lines().collect();
+    let mut i = 0;
+
+    while i < lines.len() {
+        let line = lines[i].trim();
+
+        if line.is_empty() {
+            output.push('\n');
+            i += 1;
+            continue;
+        }
+
+        // Already a scene heading
+        if is_scene_heading(line) {
+            output.push_str(line);
+            output.push('\n');
+        }
+        // Already a transition (ends with TO:)
+        else if is_transition(line) {
+            output.push_str(line);
+            output.push('\n');
+        }
+        // ALL CAPS line followed by non-empty = character cue
+        else if is_character_cue(line) && i + 1 < lines.len() && !lines[i + 1].trim().is_empty() {
+            output.push_str(line);
+            output.push('\n');
+        }
+        // Centered text
+        else if line.starts_with('>') && line.ends_with('<') {
+            output.push_str(line);
+            output.push('\n');
+        }
+        // Parenthetical
+        else if line.starts_with('(') && line.ends_with(')') {
+            output.push_str(line);
+            output.push('\n');
+        }
+        // Note
+        else if line.starts_with("[[") && line.ends_with("]]") {
+            output.push_str(line);
+            output.push('\n');
+        }
+        // Page break
+        else if line == "===" || line == "---" {
+            output.push_str("===\n");
+        }
+        // Regular action text
+        else {
+            output.push_str(line);
+            output.push('\n');
+        }
+
+        i += 1;
+    }
+
+    output
 }
 
 /// Parse a Fountain document into structured sections.
@@ -67,6 +129,57 @@ pub fn parse_fountain(input: &str) -> Vec<(String, String)> {
     sections
 }
 
+/// Extract title page metadata from a Fountain document
+pub fn parse_title_page(input: &str) -> Vec<(String, String)> {
+    let mut meta = Vec::new();
+    for line in input.lines() {
+        // Title page ends at first blank line
+        if line.trim().is_empty() {
+            break;
+        }
+        if let Some(colon_pos) = line.find(':') {
+            let key = line[..colon_pos].trim().to_string();
+            let value = line[colon_pos + 1..].trim().to_string();
+            if !key.is_empty() {
+                meta.push((key, value));
+            }
+        }
+    }
+    meta
+}
+
+/// Count scenes in a Fountain document
+pub fn scene_count(input: &str) -> usize {
+    input.lines().filter(|l| is_scene_heading(l.trim())).count()
+}
+
+/// Extract all character names from a Fountain document
+pub fn extract_characters(input: &str) -> Vec<String> {
+    let mut characters = Vec::new();
+    let lines: Vec<&str> = input.lines().collect();
+
+    for (i, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+        if is_character_cue(trimmed) {
+            // Verify next line exists and is not empty (i.e. dialogue follows)
+            if i + 1 < lines.len() && !lines[i + 1].trim().is_empty() {
+                // Strip parenthetical extensions like (V.O.), (O.S.), (CONT'D)
+                let name = trimmed
+                    .split('(')
+                    .next()
+                    .unwrap_or(trimmed)
+                    .trim()
+                    .to_string();
+                if !name.is_empty() && !characters.contains(&name) {
+                    characters.push(name);
+                }
+            }
+        }
+    }
+
+    characters
+}
+
 /// Check if a line is a Fountain scene heading
 fn is_scene_heading(line: &str) -> bool {
     let upper = line.to_uppercase();
@@ -78,4 +191,28 @@ fn is_scene_heading(line: &str) -> bool {
         || upper.starts_with("I/E.")
         || upper.starts_with("I/E ")
         || line.starts_with('.')
+}
+
+/// Check if a line is a transition (e.g. CUT TO:, FADE OUT.)
+fn is_transition(line: &str) -> bool {
+    let upper = line.trim().to_uppercase();
+    upper.ends_with("TO:")
+        || upper == "FADE OUT."
+        || upper == "FADE IN:"
+        || upper == "SMASH CUT:"
+        || upper.starts_with('>')
+}
+
+/// Check if a line looks like a character cue (ALL CAPS, not a scene heading)
+fn is_character_cue(line: &str) -> bool {
+    let trimmed = line.trim();
+    if trimmed.is_empty() || trimmed.len() < 2 {
+        return false;
+    }
+    if is_scene_heading(trimmed) || is_transition(trimmed) {
+        return false;
+    }
+    // Must be all uppercase letters (allowing spaces, periods, parentheses)
+    let alpha_chars: Vec<char> = trimmed.chars().filter(|c| c.is_alphabetic()).collect();
+    !alpha_chars.is_empty() && alpha_chars.iter().all(|c| c.is_uppercase())
 }
