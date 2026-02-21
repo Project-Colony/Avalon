@@ -231,3 +231,85 @@ pub fn built_in_templates() -> Vec<Template> {
         },
     ]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_built_in_templates() {
+        let templates = built_in_templates();
+        assert!(templates.len() >= 15);
+    }
+
+    #[test]
+    fn test_find_template() {
+        let novel = find_template("novel");
+        assert!(novel.is_some());
+        assert_eq!(novel.unwrap().name, "Novel");
+
+        let missing = find_template("nonexistent");
+        assert!(missing.is_none());
+    }
+
+    #[test]
+    fn test_templates_by_category() {
+        let fiction = templates_by_category(&TemplateCategory::Fiction);
+        assert!(fiction.len() >= 3);
+        for t in &fiction {
+            assert_eq!(t.category, TemplateCategory::Fiction);
+        }
+
+        let scripts = templates_by_category(&TemplateCategory::Scriptwriting);
+        assert!(scripts.len() >= 2);
+    }
+
+    #[test]
+    fn test_template_count() {
+        let count = template_count();
+        assert!(count >= 15);
+        assert_eq!(count, built_in_templates().len());
+    }
+
+    #[test]
+    fn test_template_summary() {
+        let t = find_template("novel").unwrap();
+        let summary = t.summary();
+        assert!(summary.contains("Novel"));
+        assert!(summary.contains("Fiction"));
+    }
+
+    #[test]
+    fn test_template_matches_query() {
+        let t = find_template("novel").unwrap();
+        assert!(t.matches_query("novel"));
+        assert!(t.matches_query("Novel"));
+        assert!(t.matches_query("chapters"));
+        assert!(!t.matches_query("zzz"));
+    }
+
+    #[test]
+    fn test_template_category_all() {
+        let all = TemplateCategory::all();
+        assert_eq!(all.len(), 6);
+    }
+
+    #[test]
+    fn test_template_category_descriptions() {
+        for cat in TemplateCategory::all() {
+            assert!(!cat.description().is_empty());
+            assert!(!cat.icon().is_empty());
+            assert!(!cat.to_string().is_empty());
+        }
+    }
+
+    #[test]
+    fn test_unique_template_ids() {
+        let templates = built_in_templates();
+        let mut ids: Vec<&str> = templates.iter().map(|t| t.template_id.as_str()).collect();
+        let original_len = ids.len();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), original_len, "Template IDs must be unique");
+    }
+}

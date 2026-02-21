@@ -527,3 +527,181 @@ impl BinderItemKind {
         matches!(self, BinderItemKind::Text)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_binder_default_structure() {
+        let binder = Binder::default_structure();
+        assert_eq!(binder.draft.title, "Draft");
+        assert_eq!(binder.research.title, "Research");
+        assert_eq!(binder.trash.title, "Trash");
+    }
+
+    #[test]
+    fn test_new_text_item() {
+        let item = BinderItem::new_text("Chapter 1");
+        assert_eq!(item.title, "Chapter 1");
+        assert!(matches!(item.kind, BinderItemKind::Text));
+        assert!(item.document.is_some());
+        assert!(item.children.is_empty());
+    }
+
+    #[test]
+    fn test_new_folder_item() {
+        let item = BinderItem::new_folder("Part I");
+        assert_eq!(item.title, "Part I");
+        assert!(matches!(item.kind, BinderItemKind::Folder));
+        assert!(item.document.is_none());
+    }
+
+    #[test]
+    fn test_add_and_find_child() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("Scene 1");
+        let id = item.id;
+        binder.draft.add_child(item);
+
+        assert!(binder.find_item(&id).is_some());
+        assert_eq!(binder.find_item(&id).unwrap().title, "Scene 1");
+    }
+
+    #[test]
+    fn test_find_item_by_title() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("Important Scene");
+        binder.draft.add_child(item);
+
+        assert!(binder.find_item_by_title("Important Scene").is_some());
+        assert!(binder.find_item_by_title("Nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_move_to_trash() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("Delete Me");
+        let id = item.id;
+        binder.draft.add_child(item);
+
+        assert!(binder.move_to_trash(&id));
+        // Should now be in trash, not in draft
+        assert!(binder.draft.find(&id).is_none());
+        assert!(binder.trash.find(&id).is_some());
+    }
+
+    #[test]
+    fn test_all_items() {
+        let mut binder = Binder::default_structure();
+        binder.draft.add_child(BinderItem::new_text("A"));
+        binder.draft.add_child(BinderItem::new_text("B"));
+        binder.research.add_child(BinderItem::new_text("Ref"));
+
+        let all = binder.all_items();
+        // Draft + A + B + Research + Ref + Trash
+        assert!(all.len() >= 6);
+    }
+
+    #[test]
+    fn test_item_word_count() {
+        let mut item = BinderItem::new_text("Test");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "one two three four five".to_string();
+        }
+        assert_eq!(item.total_word_count(), 5);
+    }
+
+    #[test]
+    fn test_nested_structure() {
+        let mut binder = Binder::default_structure();
+        let mut folder = BinderItem::new_folder("Chapter 1");
+        folder.add_child(BinderItem::new_text("Scene 1"));
+        folder.add_child(BinderItem::new_text("Scene 2"));
+        binder.draft.add_child(folder);
+
+        let all = binder.all_items();
+        // Draft, Chapter1, Scene1, Scene2, Research, Trash
+        assert!(all.len() >= 6);
+    }
+
+    #[test]
+    fn test_binder_item_has_children() {
+        let mut folder = BinderItem::new_folder("Folder");
+        assert!(!folder.has_children());
+        folder.add_child(BinderItem::new_text("Child"));
+        assert!(folder.has_children());
+        assert_eq!(folder.child_count(), 1);
+    }
+
+    #[test]
+    fn test_item_kinds() {
+        assert_eq!(BinderItemKind::Text.label(), "Text");
+        assert_eq!(BinderItemKind::Folder.label(), "Folder");
+        assert!(BinderItemKind::Text.is_editable());
+        assert!(!BinderItemKind::Folder.is_editable());
+    }
+
+    #[test]
+    fn test_folder_count_and_item_count() {
+        let mut binder = Binder::default_structure();
+        binder.draft.add_child(BinderItem::new_text("A"));
+        binder.draft.add_child(BinderItem::new_text("B"));
+        binder.draft.add_child(BinderItem::new_folder("Ch1"));
+
+        assert!(binder.item_count() > 0);
+        assert!(binder.folder_count() > 0);
+    }
+
+    #[test]
+    fn test_text_items() {
+        let mut binder = Binder::default_structure();
+        binder.draft.add_child(BinderItem::new_text("A"));
+        binder.draft.add_child(BinderItem::new_folder("F"));
+        binder.draft.add_child(BinderItem::new_text("B"));
+
+        let texts = binder.text_items();
+        assert_eq!(texts.len(), 2);
+    }
+
+    #[test]
+    fn test_trash_is_empty() {
+        let binder = Binder::default_structure();
+        assert!(binder.trash_is_empty());
+        assert_eq!(binder.trash_count(), 0);
+    }
+
+    #[test]
+    fn test_binder_item_snapshots() {
+        let item = BinderItem::new_text("Test");
+        assert!(!item.has_snapshots());
+        assert_eq!(item.snapshot_count(), 0);
+    }
+
+    #[test]
+    fn test_binder_item_synopsis() {
+        let mut item = BinderItem::new_text("Test");
+        assert!(!item.has_synopsis());
+        item.synopsis = "A brief overview".to_string();
+        assert!(item.has_synopsis());
+    }
+
+    #[test]
+    fn test_remove_child() {
+        let mut folder = BinderItem::new_folder("Parent");
+        let child = BinderItem::new_text("Child");
+        let id = child.id;
+        folder.add_child(child);
+        assert_eq!(folder.child_count(), 1);
+
+        let removed = folder.remove_child(&id);
+        assert!(removed.is_some());
+        assert_eq!(folder.child_count(), 0);
+    }
+
+    #[test]
+    fn test_include_in_compile_default() {
+        let item = BinderItem::new_text("Test");
+        assert!(item.include_in_compile);
+    }
+}

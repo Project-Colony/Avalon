@@ -202,7 +202,7 @@ pub struct CustomField {
     pub value: CustomFieldValue,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum CustomFieldValue {
     Text(String),
     Number(f64),
@@ -369,5 +369,119 @@ impl ProjectSettings {
                     (deadline - today).num_days()
                 })
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_metadata_keywords() {
+        let mut meta = Metadata::default();
+        assert!(!meta.has_keyword("test"));
+
+        meta.add_keyword("test");
+        assert!(meta.has_keyword("test"));
+        assert!(meta.has_keyword("TEST"));
+
+        meta.add_keyword("test"); // duplicate
+        assert_eq!(meta.keywords.len(), 1);
+
+        meta.remove_keyword("Test");
+        assert!(!meta.has_keyword("test"));
+    }
+
+    #[test]
+    fn test_custom_fields() {
+        let mut meta = Metadata::default();
+        meta.set_custom_field("POV", CustomFieldValue::Text("First Person".to_string()));
+        assert_eq!(
+            meta.get_custom_field("POV"),
+            Some(&CustomFieldValue::Text("First Person".to_string()))
+        );
+
+        meta.set_custom_field("POV", CustomFieldValue::Text("Third Person".to_string()));
+        assert_eq!(meta.custom_metadata.len(), 1);
+
+        meta.remove_custom_field("POV");
+        assert!(meta.get_custom_field("POV").is_none());
+    }
+
+    #[test]
+    fn test_label_color() {
+        let label = Label {
+            name: "Chapter".to_string(),
+            color: LabelColor::Red,
+        };
+        assert_eq!(label.color.to_hex(), "#e74c3c");
+    }
+
+    #[test]
+    fn test_label_color_all_predefined() {
+        let all = LabelColor::all_predefined();
+        assert!(all.len() >= 6);
+    }
+
+    #[test]
+    fn test_project_settings_default() {
+        let settings = ProjectSettings::default();
+        assert_eq!(settings.editor_font_size, 16.0);
+        assert_eq!(settings.editor_zoom, 1.0);
+        assert!(settings.show_word_count);
+        assert!(!settings.labels.is_empty());
+        assert!(!settings.statuses.is_empty());
+    }
+
+    #[test]
+    fn test_find_label_and_status() {
+        let settings = ProjectSettings::default();
+        let label = settings.find_label("Chapter");
+        assert!(label.is_some());
+
+        let status = settings.find_status("First Draft");
+        assert!(status.is_some());
+    }
+
+    #[test]
+    fn test_label_and_status_names() {
+        let settings = ProjectSettings::default();
+        let label_names = settings.label_names();
+        assert!(!label_names.is_empty());
+        assert!(label_names.contains(&"Chapter"));
+
+        let status_names = settings.status_names();
+        assert!(!status_names.is_empty());
+    }
+
+    #[test]
+    fn test_target_progress() {
+        let mut settings = ProjectSettings::default();
+        assert!(settings.target_progress(5000).is_none());
+
+        settings.target_word_count = Some(10000);
+        let progress = settings.target_progress(5000).unwrap();
+        assert!((progress - 50.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_custom_field_value_types() {
+        assert_eq!(CustomFieldValue::Text("hello".into()).type_name(), "Text");
+        assert_eq!(CustomFieldValue::Number(42.0).type_name(), "Number");
+        assert_eq!(CustomFieldValue::Checkbox(true).type_name(), "Checkbox");
+        assert_eq!(CustomFieldValue::Date("2024-01-01".into()).type_name(), "Date");
+        assert_eq!(CustomFieldValue::List(vec!["a".into()]).type_name(), "List");
+    }
+
+    #[test]
+    fn test_metadata_label_and_status() {
+        let mut meta = Metadata::default();
+        assert!(meta.label_name().is_none());
+        assert!(meta.status_name().is_none());
+
+        meta.label = Some(Label { name: "Scene".into(), color: LabelColor::Blue });
+        meta.status = Some(Status { name: "Done".into() });
+        assert_eq!(meta.label_name(), Some("Scene"));
+        assert_eq!(meta.status_name(), Some("Done"));
     }
 }

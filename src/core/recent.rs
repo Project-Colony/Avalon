@@ -174,3 +174,134 @@ impl RecentProjects {
         sorted
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_recent_projects_new() {
+        let recent = RecentProjects::new();
+        assert!(recent.projects.is_empty());
+        assert_eq!(recent.count(), 0);
+    }
+
+    #[test]
+    fn test_add_project() {
+        let mut recent = RecentProjects::new();
+        recent.add("Test Project", PathBuf::from("/tmp/test.scx"));
+        assert_eq!(recent.count(), 1);
+        assert_eq!(recent.projects[0].title, "Test Project");
+    }
+
+    #[test]
+    fn test_add_moves_to_front() {
+        let mut recent = RecentProjects::new();
+        recent.add("First", PathBuf::from("/tmp/first.scx"));
+        recent.add("Second", PathBuf::from("/tmp/second.scx"));
+        assert_eq!(recent.projects[0].title, "Second");
+    }
+
+    #[test]
+    fn test_add_deduplicates_by_path() {
+        let mut recent = RecentProjects::new();
+        let path = PathBuf::from("/tmp/project.scx");
+        recent.add("V1", path.clone());
+        recent.add("V2", path.clone());
+        assert_eq!(recent.count(), 1);
+        assert_eq!(recent.projects[0].title, "V2");
+    }
+
+    #[test]
+    fn test_remove() {
+        let mut recent = RecentProjects::new();
+        let path = PathBuf::from("/tmp/test.scx");
+        recent.add("Test", path.clone());
+        recent.remove(&path);
+        assert_eq!(recent.count(), 0);
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut recent = RecentProjects::new();
+        recent.add("A", PathBuf::from("/tmp/a.scx"));
+        recent.add("B", PathBuf::from("/tmp/b.scx"));
+        recent.clear();
+        assert_eq!(recent.count(), 0);
+    }
+
+    #[test]
+    fn test_most_recent() {
+        let mut recent = RecentProjects::new();
+        assert!(recent.most_recent().is_none());
+        recent.add("Latest", PathBuf::from("/tmp/latest.scx"));
+        assert_eq!(recent.most_recent().unwrap().title, "Latest");
+    }
+
+    #[test]
+    fn test_find_by_title() {
+        let mut recent = RecentProjects::new();
+        recent.add("My Novel", PathBuf::from("/tmp/novel.scx"));
+        assert!(recent.find_by_title("my novel").is_some());
+        assert!(recent.find_by_title("MY NOVEL").is_some());
+        assert!(recent.find_by_title("nope").is_none());
+    }
+
+    #[test]
+    fn test_contains_path() {
+        let mut recent = RecentProjects::new();
+        let path = PathBuf::from("/tmp/test.scx");
+        recent.add("Test", path.clone());
+        assert!(recent.contains_path(&path));
+        assert!(!recent.contains_path(&PathBuf::from("/tmp/other.scx")));
+    }
+
+    #[test]
+    fn test_sorted_by_title() {
+        let mut recent = RecentProjects::new();
+        recent.add("Zebra", PathBuf::from("/tmp/z.scx"));
+        recent.add("Alpha", PathBuf::from("/tmp/a.scx"));
+        recent.add("Middle", PathBuf::from("/tmp/m.scx"));
+        let sorted = recent.sorted_by_title();
+        assert_eq!(sorted[0].title, "Alpha");
+        assert_eq!(sorted[1].title, "Middle");
+        assert_eq!(sorted[2].title, "Zebra");
+    }
+
+    #[test]
+    fn test_max_20_entries() {
+        let mut recent = RecentProjects::new();
+        for i in 0..25 {
+            recent.add(&format!("P{}", i), PathBuf::from(format!("/tmp/{}.scx", i)));
+        }
+        assert_eq!(recent.count(), 20);
+    }
+
+    #[test]
+    fn test_unique_paths() {
+        let mut recent = RecentProjects::new();
+        recent.add("A", PathBuf::from("/tmp/a.scx"));
+        recent.add("B", PathBuf::from("/tmp/b.scx"));
+        assert_eq!(recent.unique_paths(), 2);
+    }
+
+    #[test]
+    fn test_recent_project_age_string() {
+        let project = RecentProject {
+            title: "Test".to_string(),
+            path: PathBuf::from("/tmp/test.scx"),
+            last_opened: Utc::now(),
+        };
+        assert_eq!(project.age_string(), "just now");
+    }
+
+    #[test]
+    fn test_recent_project_extension() {
+        let project = RecentProject {
+            title: "Test".to_string(),
+            path: PathBuf::from("/tmp/test.scx"),
+            last_opened: Utc::now(),
+        };
+        assert_eq!(project.extension(), "scx");
+    }
+}
