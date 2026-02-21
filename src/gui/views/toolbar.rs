@@ -51,6 +51,9 @@ pub fn view(
     let links_btn = panel_button("Links", BottomPanel::DocLinks, bottom_panel);
     let backups_btn = panel_button("Bkups", BottomPanel::Backups, bottom_panel);
     let spell_btn = panel_button("Spell", BottomPanel::SpellCheck, bottom_panel);
+    let timer_btn = panel_button("Timer", BottomPanel::Timer, bottom_panel);
+    let valid_btn = panel_button("Valid", BottomPanel::Validation, bottom_panel);
+    let templ_btn = panel_button("Tmpl", BottomPanel::Templates, bottom_panel);
 
     let sep4 = text(" | ").size(14).color(Theme::TEXT_MUTED);
 
@@ -94,6 +97,9 @@ pub fn view(
         links_btn,
         backups_btn,
         spell_btn,
+        timer_btn,
+        valid_btn,
+        templ_btn,
         sep4,
         compose_btn,
         stats_dialog_btn,

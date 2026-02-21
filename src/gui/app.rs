@@ -48,6 +48,9 @@ pub enum BottomPanel {
     DocLinks,
     Backups,
     SpellCheck,
+    Timer,
+    Validation,
+    Templates,
 }
 
 /// Application state
@@ -161,6 +164,12 @@ pub struct ScrineverApp {
 
     // === Spell check results ===
     pub spell_check_results: Vec<crate::spelling::SpellSuggestion>,
+
+    // === Writing timer ===
+    pub writing_timer: crate::core::timer::WritingTimer,
+
+    // === Validation results ===
+    pub validation_result: Option<crate::core::validation::ProjectValidation>,
 }
 
 /// Messages for the application
@@ -415,6 +424,42 @@ pub enum Message {
     SettingsSetCompWidth(String),
     SettingsSetCompBgColor(String),
 
+    // Editor text operations
+    TransposeChars,
+    SortLines,
+    RemoveDuplicateLines,
+    JoinLines,
+    MoveLineUp,
+    MoveLineDown,
+    DeleteLine,
+    DuplicateLine,
+    IndentLine,
+    UnindentLine,
+    ToggleComment,
+
+    // Insert operations
+    InsertListItem(String),
+    InsertTable(usize, usize),
+    InsertCodeBlock(String),
+    InsertPageBreak,
+    InsertComment,
+    InsertDateTime(String),
+    SmartPaste(String),
+
+    // Document templates
+    NewDocFromTemplate(String),
+
+    // Writing timer
+    TimerStart,
+    TimerPause,
+    TimerResume,
+    TimerStop,
+    TimerReset,
+    TimerSetPreset(String),
+
+    // Project validation
+    ShowValidation,
+
     // Misc
     Tick,
     DismissNotification,
@@ -485,6 +530,8 @@ impl ScrineverApp {
             composition_mode: false,
             selected_snapshot: None,
             spell_check_results: Vec::new(),
+            writing_timer: crate::core::timer::WritingTimer::new(),
+            validation_result: None,
         };
 
         (app, IcedTask::none())
@@ -2492,6 +2539,279 @@ impl ScrineverApp {
                 }
             }
 
+            // ========== Editor text operations ==========
+            Message::TransposeChars => {
+                self.editor.push_undo();
+                self.editor.transpose_chars();
+                self.sync_editor_to_project();
+            }
+
+            Message::SortLines => {
+                self.editor.push_undo();
+                self.editor.sort_lines();
+                self.sync_editor_to_project();
+            }
+
+            Message::RemoveDuplicateLines => {
+                self.editor.push_undo();
+                self.editor.remove_duplicate_lines();
+                self.sync_editor_to_project();
+            }
+
+            Message::JoinLines => {
+                self.editor.push_undo();
+                self.editor.join_lines();
+                self.sync_editor_to_project();
+            }
+
+            Message::MoveLineUp => {
+                self.editor.push_undo();
+                self.editor.move_line_up();
+                self.sync_editor_to_project();
+            }
+
+            Message::MoveLineDown => {
+                self.editor.push_undo();
+                self.editor.move_line_down();
+                self.sync_editor_to_project();
+            }
+
+            Message::DeleteLine => {
+                self.editor.push_undo();
+                self.editor.delete_line();
+                self.sync_editor_to_project();
+            }
+
+            Message::DuplicateLine => {
+                self.editor.push_undo();
+                self.editor.duplicate_line();
+                self.sync_editor_to_project();
+            }
+
+            Message::IndentLine => {
+                self.editor.push_undo();
+                self.editor.indent_line();
+                self.sync_editor_to_project();
+            }
+
+            Message::UnindentLine => {
+                self.editor.push_undo();
+                self.editor.unindent_line();
+                self.sync_editor_to_project();
+            }
+
+            Message::ToggleComment => {
+                self.editor.push_undo();
+                self.editor.toggle_comment();
+                self.sync_editor_to_project();
+            }
+
+            // ========== Insert operations ==========
+            Message::InsertListItem(style) => {
+                let prefix = match style.as_str() {
+                    "numbered" => "1. ",
+                    "checkbox" => "- [ ] ",
+                    _ => "- ",
+                };
+                self.editor.content.perform(
+                    iced::widget::text_editor::Action::Edit(
+                        iced::widget::text_editor::Edit::Paste(
+                            std::sync::Arc::new(format!("\n{}", prefix))
+                        )
+                    )
+                );
+                self.editor.mark_dirty();
+            }
+
+            Message::InsertTable(rows, cols) => {
+                let mut table = String::new();
+                // Header row
+                table.push('|');
+                for c in 0..cols {
+                    table.push_str(&format!(" Column {} |", c + 1));
+                }
+                table.push('\n');
+                // Separator
+                table.push('|');
+                for _ in 0..cols {
+                    table.push_str("----------|");
+                }
+                table.push('\n');
+                // Data rows
+                for _ in 0..rows {
+                    table.push('|');
+                    for _ in 0..cols {
+                        table.push_str("          |");
+                    }
+                    table.push('\n');
+                }
+                self.editor.content.perform(
+                    iced::widget::text_editor::Action::Edit(
+                        iced::widget::text_editor::Edit::Paste(
+                            std::sync::Arc::new(table)
+                        )
+                    )
+                );
+                self.editor.mark_dirty();
+            }
+
+            Message::InsertCodeBlock(lang) => {
+                let block = if lang.is_empty() {
+                    "\n```\n\n```\n".to_string()
+                } else {
+                    format!("\n```{}\n\n```\n", lang)
+                };
+                self.editor.content.perform(
+                    iced::widget::text_editor::Action::Edit(
+                        iced::widget::text_editor::Edit::Paste(
+                            std::sync::Arc::new(block)
+                        )
+                    )
+                );
+                self.editor.mark_dirty();
+            }
+
+            Message::InsertPageBreak => {
+                self.editor.content.perform(
+                    iced::widget::text_editor::Action::Edit(
+                        iced::widget::text_editor::Edit::Paste(
+                            std::sync::Arc::new("\n\n---\n\n<!-- page break -->\n\n".to_string())
+                        )
+                    )
+                );
+                self.editor.mark_dirty();
+            }
+
+            Message::InsertComment => {
+                self.editor.content.perform(
+                    iced::widget::text_editor::Action::Edit(
+                        iced::widget::text_editor::Edit::Paste(
+                            std::sync::Arc::new("<!-- comment -->".to_string())
+                        )
+                    )
+                );
+                self.editor.mark_dirty();
+            }
+
+            Message::InsertDateTime(format) => {
+                use crate::editor::actions::DateTimeFormat;
+                let fmt = match format.as_str() {
+                    "time" => DateTimeFormat::TimeOnly,
+                    "datetime" => DateTimeFormat::DateTime,
+                    "iso" => DateTimeFormat::Iso8601,
+                    _ => DateTimeFormat::DateOnly,
+                };
+                let text = fmt.format_now();
+                self.editor.content.perform(
+                    iced::widget::text_editor::Action::Edit(
+                        iced::widget::text_editor::Edit::Paste(
+                            std::sync::Arc::new(text)
+                        )
+                    )
+                );
+                self.editor.mark_dirty();
+            }
+
+            Message::SmartPaste(text) => {
+                // Clean up pasted text: normalize whitespace, fix smart quotes, etc.
+                let cleaned = text
+                    .replace('\u{201C}', "\"")  // left double quote
+                    .replace('\u{201D}', "\"")  // right double quote
+                    .replace('\u{2018}', "'")   // left single quote
+                    .replace('\u{2019}', "'")   // right single quote
+                    .replace('\u{2013}', "--")  // en dash
+                    .replace('\u{2014}', "---") // em dash
+                    .replace('\u{2026}', "...") // ellipsis
+                    .replace("\r\n", "\n")       // Windows line endings
+                    .replace('\r', "\n");        // Old Mac line endings
+                self.editor.content.perform(
+                    iced::widget::text_editor::Action::Edit(
+                        iced::widget::text_editor::Edit::Paste(
+                            std::sync::Arc::new(cleaned)
+                        )
+                    )
+                );
+                self.editor.mark_dirty();
+            }
+
+            // ========== Document templates ==========
+            Message::NewDocFromTemplate(template_id) => {
+                if let Some(ref mut project) = self.project {
+                    if let Some(template) = crate::core::doc_templates::find_template(&template_id) {
+                        let item = template.create_item(&template.name);
+                        let new_id = item.id;
+
+                        if let Some(sel_id) = self.selected_item {
+                            if let Some(parent) = project.binder.find_item_mut(&sel_id) {
+                                if parent.kind == BinderItemKind::Folder {
+                                    parent.add_child(item);
+                                } else {
+                                    project.binder.draft.add_child(item);
+                                }
+                            } else {
+                                project.binder.draft.add_child(item);
+                            }
+                        } else {
+                            project.binder.draft.add_child(item);
+                        }
+
+                        self.selected_item = Some(new_id);
+                        if let Some(new_item) = project.binder.find_item(&new_id) {
+                            if let Some(ref doc) = new_item.document {
+                                self.editor.load_document(doc);
+                                self.notes_text = doc.notes.clone();
+                            }
+                        }
+                        self.notification = Some(format!("Created '{}' from template", template.name));
+                    }
+                }
+            }
+
+            // ========== Writing timer ==========
+            Message::TimerStart => {
+                let word_count = self.current_word_count();
+                self.writing_timer.start(word_count);
+                self.notification = Some(format!("Timer started: {}", self.writing_timer.preset.label()));
+            }
+
+            Message::TimerPause => {
+                self.writing_timer.pause();
+            }
+
+            Message::TimerResume => {
+                self.writing_timer.resume();
+            }
+
+            Message::TimerStop => {
+                let word_count = self.current_word_count();
+                self.writing_timer.stop(word_count);
+                self.notification = Some(format!("Timer stopped. {}", self.writing_timer.summary()));
+            }
+
+            Message::TimerReset => {
+                self.writing_timer.reset();
+            }
+
+            Message::TimerSetPreset(preset_name) => {
+                use crate::core::timer::TimerPreset;
+                let preset = match preset_name.as_str() {
+                    "sprint" => TimerPreset::Sprint,
+                    "long" => TimerPreset::LongSession,
+                    "hour" => TimerPreset::HourSession,
+                    _ => TimerPreset::Pomodoro,
+                };
+                self.writing_timer.set_preset(preset);
+            }
+
+            // ========== Project validation ==========
+            Message::ShowValidation => {
+                if let Some(ref project) = self.project {
+                    let result = crate::core::validation::validate_project(&project.binder);
+                    self.notification = Some(result.display());
+                    self.validation_result = Some(result);
+                }
+            }
+
             // ========== Misc ==========
             Message::Tick => {
                 // Auto-save
@@ -2528,6 +2848,13 @@ impl ScrineverApp {
                         if let Some(ref mut project) = self.project {
                             project.writing_history.record(current_words, 60);
                         }
+                    }
+                }
+
+                // Writing focus timer tick
+                if self.writing_timer.is_running() {
+                    if self.writing_timer.tick() {
+                        self.notification = Some("Timer completed! Great writing session!".to_string());
                     }
                 }
 
@@ -2945,7 +3272,7 @@ impl ScrineverApp {
                 Some(views::writing_goals_panel::view(&data))
             }
             BottomPanel::DocLinks => {
-                // Find outgoing links from current document
+                // Use the links module for proper link parsing and validation
                 let mut outgoing = Vec::new();
                 let mut incoming = Vec::new();
                 let current_title = self.selected_item
@@ -2955,19 +3282,16 @@ impl ScrineverApp {
 
                 if let Some(item_id) = self.selected_item {
                     if let Some(item) = project.binder.find_item(&item_id) {
-                        if let Some(ref doc) = item.document {
-                            // Parse [[links]] from content
-                            let re_pattern = "\\[\\[([^\\]]+)\\]\\]";
-                            if let Ok(re) = regex::Regex::new(re_pattern) {
-                                for cap in re.captures_iter(&doc.content) {
-                                    let link_title = cap[1].to_string();
-                                    if let Some(target) = project.binder.find_item_by_title(&link_title) {
-                                        outgoing.push(views::doc_links_panel::DocLink {
-                                            target_title: target.title.clone(),
-                                            target_id: target.id,
-                                            link_text: link_title,
-                                        });
-                                    }
+                        // Use links module to extract and validate outgoing links
+                        let validations = crate::core::links::validate_document_links(item, &project.binder);
+                        for v in &validations {
+                            if let crate::core::links::LinkStatus::Valid(target_id) = &v.status {
+                                if let Some(target) = project.binder.find_item(target_id) {
+                                    outgoing.push(views::doc_links_panel::DocLink {
+                                        target_title: target.title.clone(),
+                                        target_id: *target_id,
+                                        link_text: v.link.link_text.clone(),
+                                    });
                                 }
                             }
                         }
@@ -2977,12 +3301,16 @@ impl ScrineverApp {
                     for other_item in project.binder.all_items() {
                         if other_item.id == item_id { continue; }
                         if let Some(ref doc) = other_item.document {
-                            if doc.content.contains(&format!("[[{}]]", current_title)) {
-                                incoming.push(views::doc_links_panel::DocLink {
-                                    target_title: other_item.title.clone(),
-                                    target_id: other_item.id,
-                                    link_text: format!("[[{}]]", current_title),
-                                });
+                            let links = crate::core::links::extract_links(&doc.content);
+                            for link in &links {
+                                if link.link_text == current_title {
+                                    incoming.push(views::doc_links_panel::DocLink {
+                                        target_title: other_item.title.clone(),
+                                        target_id: other_item.id,
+                                        link_text: format!("[[{}]]", current_title),
+                                    });
+                                    break; // one entry per source document
+                                }
                             }
                         }
                     }
@@ -3009,6 +3337,16 @@ impl ScrineverApp {
                     self.spell_checker.active,
                     self.spell_checker.dictionary_size(),
                 ))
+            }
+            BottomPanel::Timer => {
+                Some(views::timer_panel::view(&self.writing_timer))
+            }
+            BottomPanel::Validation => {
+                Some(views::validation_panel::view(self.validation_result.as_ref()))
+            }
+            BottomPanel::Templates => {
+                let templates = crate::core::doc_templates::builtin_templates();
+                Some(views::templates_panel::view(&templates))
             }
             BottomPanel::None => None,
         };
