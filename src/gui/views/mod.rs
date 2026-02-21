@@ -26,3 +26,5 @@ pub mod quick_reference_panel;
 pub mod find_replace_panel;
 pub mod project_stats_dialog;
 pub mod writing_goals_panel;
+pub mod doc_links_panel;
+pub mod backup_panel;

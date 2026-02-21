@@ -18,8 +18,9 @@ pub fn view(
 
     let progress = stats.progress_string(target_words);
     let extra = format!(
-        "Chars: {} | Pages: {:.1} | Docs: {}",
-        stats.char_count, stats.page_count, stats.document_count
+        "Chars: {} | Sentences: {} | Para: {} | Pages: {:.1} | Docs: {}",
+        stats.char_count, stats.sentence_count, stats.paragraph_count,
+        stats.page_count, stats.document_count
     );
 
     let session_indicator = if session_active {

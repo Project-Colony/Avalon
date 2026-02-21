@@ -45,6 +45,8 @@ pub enum BottomPanel {
     QuickRef,
     FindReplace,
     WritingGoals,
+    DocLinks,
+    Backups,
 }
 
 /// Application state
@@ -2132,6 +2134,17 @@ impl ScrineverApp {
             return views::project_stats_dialog::view(&data);
         }
 
+        // Composition mode (distraction-free writing)
+        if self.composition_mode {
+            let title = self.selected_item
+                .and_then(|id| project.binder.find_item(&id))
+                .map(|item| item.title.as_str())
+                .unwrap_or("");
+            let word_count = self.editor.document.word_count();
+            let session_words = if self.session_active { self.session_stats.words_written } else { 0 };
+            return views::editor_view::view_composition(&self.editor, title, word_count, session_words);
+        }
+
         // Fullscreen editor mode
         if self.fullscreen_editor {
             let title = self.selected_item
@@ -2394,6 +2407,65 @@ impl ScrineverApp {
                     days_this_week: project.writing_history.recent(7).len(),
                 };
                 Some(views::writing_goals_panel::view(&data))
+            }
+            BottomPanel::DocLinks => {
+                // Find outgoing links from current document
+                let mut outgoing = Vec::new();
+                let mut incoming = Vec::new();
+                let current_title = self.selected_item
+                    .and_then(|id| project.binder.find_item(&id))
+                    .map(|item| item.title.clone())
+                    .unwrap_or_default();
+
+                if let Some(item_id) = self.selected_item {
+                    if let Some(item) = project.binder.find_item(&item_id) {
+                        if let Some(ref doc) = item.document {
+                            // Parse [[links]] from content
+                            let re_pattern = "\\[\\[([^\\]]+)\\]\\]";
+                            if let Ok(re) = regex::Regex::new(re_pattern) {
+                                for cap in re.captures_iter(&doc.content) {
+                                    let link_title = cap[1].to_string();
+                                    if let Some(target) = project.binder.find_item_by_title(&link_title) {
+                                        outgoing.push(views::doc_links_panel::DocLink {
+                                            target_title: target.title.clone(),
+                                            target_id: target.id,
+                                            link_text: link_title,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Find incoming links (docs that link to current)
+                    for other_item in project.binder.all_items() {
+                        if other_item.id == item_id { continue; }
+                        if let Some(ref doc) = other_item.document {
+                            if doc.content.contains(&format!("[[{}]]", current_title)) {
+                                incoming.push(views::doc_links_panel::DocLink {
+                                    target_title: other_item.title.clone(),
+                                    target_id: other_item.id,
+                                    link_text: format!("[[{}]]", current_title),
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // Available docs for quick insertion
+                let available: Vec<(uuid::Uuid, String)> = project.binder.all_items()
+                    .iter()
+                    .filter(|i| i.document.is_some() && Some(i.id) != self.selected_item)
+                    .map(|i| (i.id, i.title.clone()))
+                    .collect();
+
+                Some(views::doc_links_panel::view(&outgoing, &incoming, &available))
+            }
+            BottomPanel::Backups => {
+                let backups = crate::core::backup::BackupManager::list_backups(
+                    &project.title.replace(' ', "_")
+                ).unwrap_or_default();
+                Some(views::backup_panel::view(&backups, &project.title))
             }
             BottomPanel::None => None,
         };

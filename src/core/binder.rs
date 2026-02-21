@@ -67,6 +67,11 @@ impl Binder {
         items
     }
 
+    /// Find an item by title
+    pub fn find_item_by_title(&self, title: &str) -> Option<&BinderItem> {
+        self.all_items().into_iter().find(|item| item.title == title)
+    }
+
     /// Move an item to trash
     pub fn move_to_trash(&mut self, id: &Uuid) -> bool {
         if let Some(item) = self.draft.remove_child(id) {

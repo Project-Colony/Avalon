@@ -48,11 +48,13 @@ pub fn view(
     let annot_btn = panel_button("Annot", BottomPanel::Annotations, bottom_panel);
     let find_btn = panel_button("Find", BottomPanel::FindReplace, bottom_panel);
     let goals_btn = panel_button("Goals", BottomPanel::WritingGoals, bottom_panel);
+    let links_btn = panel_button("Links", BottomPanel::DocLinks, bottom_panel);
+    let backups_btn = panel_button("Bkups", BottomPanel::Backups, bottom_panel);
 
     let sep4 = text(" | ").size(14).color(Theme::TEXT_MUTED);
 
+    let compose_btn = tool_button("Compose", Message::ToggleCompositionMode);
     let stats_dialog_btn = tool_button("ProjStats", Message::ShowProjectStats);
-    let backup_btn = tool_button("Backup", Message::CreateBackup);
     let import_opml_btn = tool_button("Import+", Message::ImportOpml);
     let export_opml_btn = tool_button("OPML", Message::ExportOpml);
     let settings_btn = tool_button("Settings", Message::ShowSettings);
@@ -86,9 +88,11 @@ pub fn view(
         annot_btn,
         find_btn,
         goals_btn,
+        links_btn,
+        backups_btn,
         sep4,
+        compose_btn,
         stats_dialog_btn,
-        backup_btn,
         import_opml_btn,
         export_opml_btn,
         Space::with_width(Length::Fill),
