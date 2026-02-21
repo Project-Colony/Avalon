@@ -17,4 +17,5 @@ pub mod watcher;
 pub mod indexer;
 pub mod targets;
 pub mod autosave;
+pub mod links;
 
