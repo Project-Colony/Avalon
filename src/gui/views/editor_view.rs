@@ -1,4 +1,4 @@
-use iced::widget::{button, column, container, row, text, text_editor, Space};
+use iced::widget::{button, column, container, row, scrollable, text, text_editor, Space};
 use iced::{Element, Length, Padding};
 
 use crate::editor::EditorState;
@@ -54,29 +54,46 @@ pub fn view<'a>(
 
     // Formatting toolbar
     let format_bar = container(
-        row![
-            fmt_btn("B", Message::InsertBold),
-            fmt_btn("I", Message::InsertItalic),
-            fmt_btn("U", Message::InsertUnderline),
-            fmt_btn("S", Message::InsertStrikethrough),
-            Space::with_width(8),
-            fmt_btn("H1", Message::InsertHeading(1)),
-            fmt_btn("H2", Message::InsertHeading(2)),
-            fmt_btn("H3", Message::InsertHeading(3)),
-            Space::with_width(8),
-            fmt_btn(">", Message::InsertBlockQuote),
-            fmt_btn("Fn", Message::InsertFootnote),
-            fmt_btn("--", Message::InsertHRule),
-            Space::with_width(Length::Fill),
-            fmt_btn("UPPER", Message::TextToUppercase),
-            fmt_btn("lower", Message::TextToLowercase),
-            fmt_btn("Title", Message::TextToTitleCase),
-            Space::with_width(8),
-            fmt_btn("CpMD", Message::CopyAsMarkdown),
-            fmt_btn("CpHTML", Message::CopyAsHtml),
-            fmt_btn("CpTxt", Message::CopyAsPlainText),
-        ]
-        .spacing(2)
+        scrollable(
+            row![
+                fmt_btn("B", Message::InsertBold),
+                fmt_btn("I", Message::InsertItalic),
+                fmt_btn("U", Message::InsertUnderline),
+                fmt_btn("S", Message::InsertStrikethrough),
+                Space::with_width(6),
+                fmt_btn("H1", Message::InsertHeading(1)),
+                fmt_btn("H2", Message::InsertHeading(2)),
+                fmt_btn("H3", Message::InsertHeading(3)),
+                Space::with_width(6),
+                fmt_btn(">", Message::InsertBlockQuote),
+                fmt_btn("Fn", Message::InsertFootnote),
+                fmt_btn("--", Message::InsertHRule),
+                fmt_btn("```", Message::InsertCodeBlock(String::new())),
+                fmt_btn("PgBrk", Message::InsertPageBreak),
+                fmt_btn("<!--", Message::InsertComment),
+                Space::with_width(6),
+                fmt_btn("List", Message::InsertListItem("bullet".to_string())),
+                fmt_btn("1.", Message::InsertListItem("numbered".to_string())),
+                fmt_btn("[ ]", Message::InsertListItem("checkbox".to_string())),
+                fmt_btn("Table", Message::InsertTable(3, 3)),
+                fmt_btn("Date", Message::InsertDateTime("date".to_string())),
+                Space::with_width(6),
+                fmt_btn("Dup", Message::DuplicateLine),
+                fmt_btn("Del", Message::DeleteLine),
+                fmt_btn("Join", Message::JoinLines),
+                fmt_btn("Sort", Message::SortLines),
+                Space::with_width(Length::Fill),
+                fmt_btn("UPPER", Message::TextToUppercase),
+                fmt_btn("lower", Message::TextToLowercase),
+                fmt_btn("Title", Message::TextToTitleCase),
+                Space::with_width(6),
+                fmt_btn("CpMD", Message::CopyAsMarkdown),
+                fmt_btn("CpHTML", Message::CopyAsHtml),
+                fmt_btn("CpTxt", Message::CopyAsPlainText),
+            ]
+            .spacing(2)
+        )
+        .direction(scrollable::Direction::Horizontal(scrollable::Scrollbar::new()))
     )
     .padding(Padding::from([2, 16]));
 

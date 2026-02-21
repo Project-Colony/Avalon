@@ -3405,6 +3405,8 @@ impl ScrineverApp {
             let ctrl = modifiers.control() || modifiers.command();
             let shift = modifiers.shift();
 
+            let alt = modifiers.alt();
+
             if ctrl && shift {
                 // Ctrl+Shift shortcuts
                 match key {
@@ -3417,6 +3419,9 @@ impl ScrineverApp {
                             "s" | "S" => Some(Message::ShowProjectStats),
                             "g" | "G" => Some(Message::ShowBottomPanel(BottomPanel::WritingGoals)),
                             "t" | "T" => Some(Message::ToggleScriptMode),
+                            "k" | "K" => Some(Message::DeleteLine),
+                            "d" | "D" => Some(Message::DuplicateLine),
+                            "j" | "J" => Some(Message::JoinLines),
                             _ => None,
                         }
                     }
@@ -3440,12 +3445,24 @@ impl ScrineverApp {
                             "h" => Some(Message::ShowBottomPanel(BottomPanel::FindReplace)),
                             "d" => Some(Message::ShowBottomPanel(BottomPanel::Annotations)),
                             "g" => Some(Message::ShowBottomPanel(BottomPanel::WritingGoals)),
+                            "t" => Some(Message::TransposeChars),
+                            "/" => Some(Message::ToggleComment),
                             "1" => Some(Message::SwitchView(ViewMode::Editor)),
                             "2" => Some(Message::SwitchView(ViewMode::Corkboard)),
                             "3" => Some(Message::SwitchView(ViewMode::Outliner)),
                             "4" => Some(Message::SwitchView(ViewMode::Scrivenings)),
                             _ => None,
                         }
+                    }
+                    _ => None,
+                }
+            } else if alt {
+                match key {
+                    keyboard::Key::Named(keyboard::key::Named::ArrowUp) => {
+                        Some(Message::MoveLineUp)
+                    }
+                    keyboard::Key::Named(keyboard::key::Named::ArrowDown) => {
+                        Some(Message::MoveLineDown)
                     }
                     _ => None,
                 }
