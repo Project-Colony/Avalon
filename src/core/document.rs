@@ -209,6 +209,154 @@ impl Document {
     }
 }
 
+impl Document {
+    /// Get all unique words in the document
+    pub fn unique_words(&self) -> Vec<String> {
+        let mut words: Vec<String> = self.content.split_whitespace()
+            .map(|w| w.chars().filter(|c| c.is_alphanumeric() || *c == '\'').collect::<String>())
+            .filter(|w| !w.is_empty())
+            .map(|w| w.to_lowercase())
+            .collect();
+        words.sort();
+        words.dedup();
+        words
+    }
+
+    /// Get word frequency map (word -> count)
+    pub fn word_frequency(&self) -> std::collections::HashMap<String, usize> {
+        let mut freq = std::collections::HashMap::new();
+        for word in self.content.split_whitespace() {
+            let clean: String = word.chars()
+                .filter(|c| c.is_alphanumeric() || *c == '\'')
+                .collect::<String>()
+                .to_lowercase();
+            if !clean.is_empty() {
+                *freq.entry(clean).or_insert(0) += 1;
+            }
+        }
+        freq
+    }
+
+    /// Get the N most frequent words
+    pub fn most_frequent_words(&self, n: usize) -> Vec<(String, usize)> {
+        let freq = self.word_frequency();
+        let mut pairs: Vec<(String, usize)> = freq.into_iter().collect();
+        pairs.sort_by(|a, b| b.1.cmp(&a.1));
+        pairs.truncate(n);
+        pairs
+    }
+
+    /// Count occurrences of a word (case-insensitive)
+    pub fn count_word(&self, word: &str) -> usize {
+        let lower = word.to_lowercase();
+        self.content.split_whitespace()
+            .filter(|w| {
+                w.chars()
+                    .filter(|c| c.is_alphanumeric() || *c == '\'')
+                    .collect::<String>()
+                    .to_lowercase() == lower
+            })
+            .count()
+    }
+
+    /// Get a text excerpt around a byte position
+    pub fn excerpt_around(&self, pos: usize, radius: usize) -> String {
+        let start = pos.saturating_sub(radius);
+        let end = (pos + radius).min(self.content.len());
+        let snippet = &self.content[start..end];
+        if start > 0 && end < self.content.len() {
+            format!("...{}...", snippet)
+        } else if start > 0 {
+            format!("...{}", snippet)
+        } else if end < self.content.len() {
+            format!("{}...", snippet)
+        } else {
+            snippet.to_string()
+        }
+    }
+
+    /// Check if the document contains a substring (case-insensitive)
+    pub fn contains_text(&self, query: &str) -> bool {
+        self.content.to_lowercase().contains(&query.to_lowercase())
+    }
+
+    /// Get the first N characters as a preview
+    pub fn preview(&self, max_chars: usize) -> String {
+        if self.content.len() <= max_chars {
+            self.content.clone()
+        } else {
+            let truncated = &self.content[..max_chars];
+            format!("{}...", truncated.trim_end())
+        }
+    }
+
+    /// Count the number of annotations
+    pub fn annotation_count(&self) -> usize {
+        self.annotations.len()
+    }
+
+    /// Count open (unresolved) annotations
+    pub fn open_annotation_count(&self) -> usize {
+        self.annotations.iter().filter(|a| !a.resolved).count()
+    }
+
+    /// Count footnotes
+    pub fn footnote_count(&self) -> usize {
+        self.footnotes.len()
+    }
+
+    /// Check if the document has any formatting spans
+    pub fn has_formatting(&self) -> bool {
+        !self.spans.is_empty()
+    }
+
+    /// Check if the document has notes
+    pub fn has_notes(&self) -> bool {
+        !self.notes.trim().is_empty()
+    }
+
+    /// Check if the document is empty
+    pub fn is_empty(&self) -> bool {
+        self.content.trim().is_empty()
+    }
+
+    /// Get a summary string
+    pub fn summary(&self) -> String {
+        let wc = self.word_count();
+        let lc = self.line_count();
+        let pc = self.paragraph_count();
+        format!("{} words, {} lines, {} paragraphs", wc, lc, pc)
+    }
+
+    /// Vocabulary richness (unique words / total words)
+    pub fn vocabulary_richness(&self) -> f64 {
+        let total = self.word_count();
+        if total == 0 {
+            return 0.0;
+        }
+        self.unique_word_count() as f64 / total as f64
+    }
+
+    /// Average paragraph length in words
+    pub fn avg_paragraph_length(&self) -> f64 {
+        let para = self.paragraph_count();
+        if para == 0 {
+            return 0.0;
+        }
+        self.word_count() as f64 / para as f64
+    }
+
+    /// Find all positions of a substring (case-insensitive)
+    pub fn find_positions(&self, query: &str) -> Vec<usize> {
+        if query.is_empty() {
+            return Vec::new();
+        }
+        let lower = self.content.to_lowercase();
+        let lower_query = query.to_lowercase();
+        lower.match_indices(&lower_query).map(|(pos, _)| pos).collect()
+    }
+}
+
 impl Default for Document {
     fn default() -> Self {
         Self::new()
