@@ -31,15 +31,31 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
         .padding(4)
         .width(Length::FillPortion(3));
 
+    let match_info = if data.match_count > 0 {
+        format!("{} match(es) found", data.match_count)
+    } else if !data.find_text.is_empty() {
+        "No matches".to_string()
+    } else {
+        "Type to search...".to_string()
+    };
+
+    let match_color = if data.match_count > 0 {
+        Theme::SUCCESS
+    } else if !data.find_text.is_empty() {
+        Theme::WARNING
+    } else {
+        Theme::TEXT_MUTED
+    };
+
     let find_row = row![
         find_input,
         Space::with_width(4),
-        button(text("Next").size(11).color(Theme::TEXT_ACCENT))
-            .on_press(Message::DocFindNext)
-            .padding(Padding::from([4, 8])),
-        Space::with_width(4),
         button(text("Prev").size(11).color(Theme::TEXT_ACCENT))
             .on_press(Message::DocFindPrev)
+            .padding(Padding::from([4, 8])),
+        Space::with_width(2),
+        button(text("Next").size(11).color(Theme::TEXT_ACCENT))
+            .on_press(Message::DocFindNext)
             .padding(Padding::from([4, 8])),
     ]
     .align_y(iced::Alignment::Center);
@@ -50,20 +66,20 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
         button(text("Replace").size(11).color(Theme::TEXT_ACCENT))
             .on_press(Message::DocReplaceCurrent)
             .padding(Padding::from([4, 8])),
-        Space::with_width(4),
-        button(text("All").size(11).color(Theme::TEXT_ACCENT))
+        Space::with_width(2),
+        button(text("Replace All").size(11).color(Theme::WARNING))
             .on_press(Message::DocReplaceAll)
             .padding(Padding::from([4, 8])),
     ]
     .align_y(iced::Alignment::Center);
 
     let info = row![
-        text(format!("{} match(es)", data.match_count))
+        text(match_info)
             .size(10)
-            .color(Theme::TEXT_MUTED),
+            .color(match_color),
         Space::with_width(Length::Fill),
         toggler(data.case_sensitive)
-            .label("Case sensitive")
+            .label("Aa")
             .on_toggle(|_| Message::DocFindToggleCase),
     ];
 

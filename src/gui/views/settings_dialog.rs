@@ -123,17 +123,14 @@ pub fn view(
     let comp_width_label = text("Text Width (%)").size(12).color(Theme::TEXT_MUTED);
     let comp_width_str = format!("{:.0}", settings.fullscreen_text_width);
     let comp_width_input = text_input("60", &comp_width_str)
-        .on_input(|val| {
-            if let Ok(w) = val.parse::<f32>() {
-                if (10.0..=100.0).contains(&w) {
-                    // Accept valid width — handled in settings
-                }
-            }
-            Message::SettingsSetFont(val) // placeholder
-        })
+        .on_input(|val| Message::SettingsSetCompWidth(val))
         .size(12)
         .padding(4)
         .width(Length::Fixed(60.0));
+
+    let line_spacing_label = text("Line Spacing").size(12).color(Theme::TEXT_MUTED);
+    let line_spacing_str = format!("{:.1}x", settings.line_spacing);
+    let line_spacing_display = text(line_spacing_str).size(12).color(Theme::TEXT_PRIMARY);
 
     // Script mode
     let script_header = text("Script Mode").size(14).color(Theme::TEXT_SECONDARY);
@@ -195,6 +192,9 @@ pub fn view(
         comp_header,
         comp_width_label,
         comp_width_input,
+        Space::with_height(6),
+        line_spacing_label,
+        line_spacing_display,
         Space::with_height(16),
         script_header,
         script_toggle,

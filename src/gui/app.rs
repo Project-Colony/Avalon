@@ -409,6 +409,10 @@ pub enum Message {
     // Smart collection refresh
     RefreshSmartCollections,
 
+    // Composition mode settings
+    SettingsSetCompWidth(String),
+    SettingsSetCompBgColor(String),
+
     // Misc
     Tick,
     DismissNotification,
@@ -2354,6 +2358,23 @@ impl ScrineverApp {
                     if total_refreshed > 0 {
                         self.notification = Some(format!("Refreshed {} smart collection(s)", total_refreshed));
                     }
+                }
+            }
+
+            // ========== Composition mode settings ==========
+            Message::SettingsSetCompWidth(val) => {
+                if let Ok(w) = val.parse::<f32>() {
+                    if (10.0..=100.0).contains(&w) {
+                        if let Some(ref mut project) = self.project {
+                            project.settings.fullscreen_text_width = w;
+                        }
+                    }
+                }
+            }
+
+            Message::SettingsSetCompBgColor(color) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.composition_bg_color = Some(color);
                 }
             }
 

@@ -85,6 +85,102 @@ impl Document {
         self.word_count() as f64 / 250.0
     }
 
+    /// Reading time estimate in minutes (250 WPM)
+    pub fn reading_time_minutes(&self) -> f64 {
+        self.word_count() as f64 / 250.0
+    }
+
+    /// Speaking time estimate in minutes (150 WPM)
+    pub fn speaking_time_minutes(&self) -> f64 {
+        self.word_count() as f64 / 150.0
+    }
+
+    /// Unique word count
+    pub fn unique_word_count(&self) -> usize {
+        let mut seen = std::collections::HashSet::new();
+        for word in self.content.split_whitespace() {
+            let clean: String = word.chars()
+                .filter(|c| c.is_alphanumeric() || *c == '\'')
+                .collect();
+            if !clean.is_empty() {
+                seen.insert(clean.to_lowercase());
+            }
+        }
+        seen.len()
+    }
+
+    /// Average word length in characters
+    pub fn avg_word_length(&self) -> f64 {
+        let words: Vec<&str> = self.content.split_whitespace().collect();
+        if words.is_empty() {
+            return 0.0;
+        }
+        let total_chars: usize = words.iter()
+            .map(|w| w.chars().filter(|c| c.is_alphanumeric()).count())
+            .sum();
+        total_chars as f64 / words.len() as f64
+    }
+
+    /// Average sentence length in words (approximate)
+    pub fn avg_sentence_length(&self) -> f64 {
+        let sentences = self.sentence_count();
+        if sentences == 0 {
+            return 0.0;
+        }
+        self.word_count() as f64 / sentences as f64
+    }
+
+    /// Count syllables in a word (approximate English syllable counter)
+    fn count_syllables(word: &str) -> usize {
+        let word = word.to_lowercase();
+        if word.len() <= 3 {
+            return 1;
+        }
+        let mut count = 0;
+        let mut prev_vowel = false;
+        let vowels = ['a', 'e', 'i', 'o', 'u', 'y'];
+        for ch in word.chars() {
+            let is_vowel = vowels.contains(&ch);
+            if is_vowel && !prev_vowel {
+                count += 1;
+            }
+            prev_vowel = is_vowel;
+        }
+        // Adjust: silent 'e' at end
+        if word.ends_with('e') && count > 1 {
+            count -= 1;
+        }
+        count.max(1)
+    }
+
+    /// Flesch-Kincaid readability grade level
+    /// Higher = more difficult reading; typical novel is 7-9
+    pub fn readability_grade(&self) -> f64 {
+        let words = self.word_count() as f64;
+        let sentences = self.sentence_count() as f64;
+        if words == 0.0 || sentences == 0.0 {
+            return 0.0;
+        }
+        let syllables: usize = self.content.split_whitespace()
+            .map(|w| Self::count_syllables(w))
+            .sum();
+        // Flesch-Kincaid Grade Level formula
+        0.39 * (words / sentences) + 11.8 * (syllables as f64 / words) - 15.59
+    }
+
+    /// Flesch Reading Ease score (0-100, higher = easier to read)
+    pub fn reading_ease(&self) -> f64 {
+        let words = self.word_count() as f64;
+        let sentences = self.sentence_count() as f64;
+        if words == 0.0 || sentences == 0.0 {
+            return 0.0;
+        }
+        let syllables: usize = self.content.split_whitespace()
+            .map(|w| Self::count_syllables(w))
+            .sum();
+        206.835 - 1.015 * (words / sentences) - 84.6 * (syllables as f64 / words)
+    }
+
     /// Update content and refresh modification time
     pub fn set_content(&mut self, content: String) {
         self.content = content;

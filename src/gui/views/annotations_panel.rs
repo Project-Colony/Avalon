@@ -11,10 +11,14 @@ pub fn view(
     annotations: &[Annotation],
     new_annotation_text: &str,
 ) -> Element<'static, Message> {
+    let total = annotations.len();
+    let resolved_count = annotations.iter().filter(|a| a.resolved).count();
+    let open_count = total - resolved_count;
+
     let header = row![
         text("ANNOTATIONS / COMMENTS").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(Length::Fill),
-        text(format!("{} comment(s)", annotations.len()))
+        text(format!("{} open, {} resolved", open_count, resolved_count))
             .size(10)
             .color(Theme::TEXT_MUTED),
     ];
@@ -48,15 +52,25 @@ pub fn view(
 
     for ann in annotations {
         let ann_id = ann.id;
-        let resolved_label = if ann.resolved { "[resolved] " } else { "" };
-        let _color_str = ann.color.to_hex();
+        let color = ann.color.to_iced_color();
+
+        // Color indicator dot + text
+        let resolved_icon = if ann.resolved { " [done]" } else { "" };
+
+        let text_color = if ann.resolved {
+            Theme::TEXT_MUTED
+        } else {
+            Theme::TEXT_PRIMARY
+        };
 
         let ann_row = container(
             column![
                 row![
-                    text(format!("{}{}", resolved_label, ann.text.clone()))
+                    // Color indicator
+                    text("\u{25CF} ").size(12).color(color),
+                    text(format!("{}{}", ann.text.clone(), resolved_icon))
                         .size(12)
-                        .color(Theme::TEXT_PRIMARY),
+                        .color(text_color),
                     Space::with_width(Length::Fill),
                     text(ann.created_at.format("%H:%M %m/%d").to_string())
                         .size(9)

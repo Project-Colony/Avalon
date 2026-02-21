@@ -108,6 +108,10 @@ pub struct ProjectSettings {
     pub fullscreen_bg_color: String,
     #[serde(default = "default_fullscreen_width")]
     pub fullscreen_text_width: f32,
+    #[serde(default)]
+    pub composition_bg_color: Option<String>,
+    #[serde(default = "default_line_spacing")]
+    pub line_spacing: f32,
 }
 
 fn default_fullscreen_bg() -> String {
@@ -116,6 +120,10 @@ fn default_fullscreen_bg() -> String {
 
 fn default_fullscreen_width() -> f32 {
     60.0
+}
+
+fn default_line_spacing() -> f32 {
+    1.5
 }
 
 impl Default for ProjectSettings {
@@ -139,6 +147,8 @@ impl Default for ProjectSettings {
             auto_save_seconds: 30,
             fullscreen_bg_color: default_fullscreen_bg(),
             fullscreen_text_width: default_fullscreen_width(),
+            composition_bg_color: None,
+            line_spacing: default_line_spacing(),
         }
     }
 }
