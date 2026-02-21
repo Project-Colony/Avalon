@@ -99,6 +99,14 @@ pub fn view(options: &CompileOptions, presets: &[(String, CompileOptions)]) -> E
         .label("Page break between chapters")
         .on_toggle(|val| Message::CompileSetPageBreaks(val));
 
+    let toc_toggle = toggler(options.include_toc)
+        .label("Include table of contents")
+        .on_toggle(|val| Message::CompileSetToc(val));
+
+    let placeholders_toggle = toggler(options.replace_placeholders)
+        .label("Replace placeholders (<$n>, <$date>, etc.)")
+        .on_toggle(|val| Message::CompileSetPlaceholders(val));
+
     // Buttons
     let compile_btn = button(
         text("  Compile  ").size(14).color(Theme::TEXT_PRIMARY),
@@ -178,6 +186,10 @@ pub fn view(options: &CompileOptions, presets: &[(String, CompileOptions)]) -> E
         compile_marked_toggle,
         Space::with_height(6),
         page_break_toggle,
+        Space::with_height(6),
+        toc_toggle,
+        Space::with_height(6),
+        placeholders_toggle,
         Space::with_height(24),
         row![
             compile_btn,

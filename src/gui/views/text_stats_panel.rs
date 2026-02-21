@@ -63,6 +63,57 @@ pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
         );
     }
 
+    // Overused words (words appearing much more than average)
+    let avg_freq = if !analysis.most_common_words.is_empty() {
+        analysis.most_common_words.iter().map(|(_, c)| *c).sum::<usize>() as f64
+            / analysis.most_common_words.len() as f64
+    } else {
+        1.0
+    };
+    let overused: Vec<&(String, usize)> = analysis.most_common_words.iter()
+        .filter(|(_, c)| *c as f64 > avg_freq * 2.0)
+        .take(5)
+        .collect();
+
+    let overused_row: Element<'static, Message> = if !overused.is_empty() {
+        let mut r = row![
+            text("Overused: ").size(11).color(Theme::WARNING),
+        ].spacing(4);
+        for (word, count) in overused {
+            r = r.push(
+                text(format!("{}({}x)", word, count)).size(10).color(Theme::WARNING)
+            );
+        }
+        r.into()
+    } else {
+        Space::with_height(0).into()
+    };
+
+    // Vocabulary richness (type-token ratio)
+    let ttr = if analysis.word_count > 0 {
+        analysis.unique_words as f64 / analysis.word_count as f64 * 100.0
+    } else {
+        0.0
+    };
+    let ttr_label = if ttr >= 70.0 { "Rich" }
+    else if ttr >= 50.0 { "Moderate" }
+    else { "Repetitive" };
+    let ttr_color = if ttr >= 70.0 { Theme::SUCCESS }
+    else if ttr >= 50.0 { Theme::WARNING }
+    else { Theme::ERROR };
+
+    let vocab_row = row![
+        text("Vocabulary:").size(11).color(Theme::TEXT_MUTED),
+        Space::with_width(4),
+        text(format!("{:.1}% unique", ttr)).size(11).color(ttr_color),
+        Space::with_width(4),
+        text(format!("({})", ttr_label)).size(11).color(Theme::TEXT_SECONDARY),
+        Space::with_width(16),
+        text(format!("Pages: {:.1}", analysis.word_count as f64 / 250.0))
+            .size(11).color(Theme::TEXT_MUTED),
+    ]
+    .align_y(iced::Alignment::Center);
+
     let content = column![
         header,
         Space::with_height(4),
@@ -72,7 +123,10 @@ pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
         Space::with_height(4),
         readability,
         Space::with_height(4),
+        vocab_row,
+        Space::with_height(4),
         scrollable(common_words),
+        overused_row,
     ]
     .padding(Padding::from([8, 12]));
 

@@ -83,6 +83,10 @@ pub struct CompileOptions {
     pub font_size: f32,
     /// Font family for output
     pub font_family: String,
+    /// Include table of contents
+    pub include_toc: bool,
+    /// Replace Scrivener-style placeholders (<$n>, <$date>, etc.)
+    pub replace_placeholders: bool,
 }
 
 impl Default for CompileOptions {
@@ -97,6 +101,8 @@ impl Default for CompileOptions {
             compile_marked_only: true,
             font_size: 12.0,
             font_family: "Times New Roman".to_string(),
+            include_toc: false,
+            replace_placeholders: true,
         }
     }
 }
@@ -118,7 +124,7 @@ impl Compiler {
     pub fn compile(binder: &Binder, options: &CompileOptions) -> Result<String> {
         let contents = Self::collect_contents(&binder.draft, options);
 
-        match options.format {
+        let mut output = match options.format {
             OutputFormat::PlainText => plain_text_compile(&contents, options),
             OutputFormat::Markdown => super::markdown::compile(&contents, options),
             OutputFormat::Html => super::html::compile(&contents, options),
@@ -135,7 +141,54 @@ impl Compiler {
             OutputFormat::Epub => {
                 Ok("ePub compilation requires save_to_file()".to_string())
             }
+        }?;
+
+        // Insert table of contents if enabled
+        if options.include_toc {
+            let sections: Vec<(String, usize)> = contents.iter()
+                .filter(|c| c.is_folder || !c.text.is_empty())
+                .map(|c| (c.title.clone(), c.depth))
+                .collect();
+
+            let toc = match options.format {
+                OutputFormat::Html => super::placeholders::generate_toc_html(&sections),
+                OutputFormat::Markdown => super::placeholders::generate_toc_markdown(&sections),
+                _ => super::placeholders::generate_toc(&sections),
+            };
+
+            // Insert TOC after front matter (or at start)
+            if options.include_front_matter {
+                // Find end of front matter (first double newline)
+                if let Some(pos) = output.find("\n\n") {
+                    output.insert_str(pos + 2, &toc);
+                } else {
+                    output = format!("{}\n{}", toc, output);
+                }
+            } else {
+                output = format!("{}{}", toc, output);
+            }
         }
+
+        // Replace placeholders if enabled
+        if options.replace_placeholders {
+            let total_words = contents.iter()
+                .map(|c| c.text.split_whitespace().count())
+                .sum::<usize>();
+            let total_chars = contents.iter()
+                .map(|c| c.text.len())
+                .sum::<usize>();
+
+            let context = super::placeholders::PlaceholderContext {
+                project_title: options.title.clone(),
+                author: options.author.clone(),
+                word_count: total_words,
+                char_count: total_chars,
+                page_count: (total_words / 250).max(1),
+            };
+            output = super::placeholders::replace_placeholders(&output, &context);
+        }
+
+        Ok(output)
     }
 
     /// Save compiled output to a file

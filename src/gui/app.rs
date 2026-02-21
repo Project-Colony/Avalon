@@ -150,6 +150,9 @@ pub struct ScrineverApp {
 
     // === Composition mode ===
     pub composition_mode: bool,
+
+    // === Snapshot comparison ===
+    pub selected_snapshot: Option<usize>,
 }
 
 /// Messages for the application
@@ -361,6 +364,14 @@ pub enum Message {
     // Smart collection
     CreateSmartCollection(String),
 
+    // Snapshot comparison
+    SelectSnapshot(usize),
+    CompareSnapshot(usize),
+
+    // Compile options (new)
+    CompileSetToc(bool),
+    CompileSetPlaceholders(bool),
+
     // Export OPML
     ExportOpml,
 
@@ -430,6 +441,7 @@ impl ScrineverApp {
             weekly_goal: 0,
             weekly_goal_text: String::new(),
             composition_mode: false,
+            selected_snapshot: None,
         };
 
         (app, IcedTask::none())
@@ -955,6 +967,28 @@ impl ScrineverApp {
                         }
                     }
                 }
+                self.selected_snapshot = None;
+            }
+
+            Message::SelectSnapshot(index) => {
+                self.selected_snapshot = if self.selected_snapshot == Some(index) {
+                    None
+                } else {
+                    Some(index)
+                };
+            }
+
+            Message::CompareSnapshot(index) => {
+                self.selected_snapshot = Some(index);
+            }
+
+            // ========== Compile options (new) ==========
+            Message::CompileSetToc(val) => {
+                self.compile_options.include_toc = val;
+            }
+
+            Message::CompileSetPlaceholders(val) => {
+                self.compile_options.replace_placeholders = val;
             }
 
             // ========== Search operations ==========
@@ -2229,7 +2263,12 @@ impl ScrineverApp {
                     .and_then(|id| project.binder.find_item(&id))
                     .map(|item| item.snapshots.as_slice())
                     .unwrap_or(&[]);
-                Some(views::snapshot_panel::view(snapshots))
+                let current_content = self.selected_item
+                    .and_then(|id| project.binder.find_item(&id))
+                    .and_then(|item| item.document.as_ref())
+                    .map(|doc| doc.content.as_str())
+                    .unwrap_or("");
+                Some(views::snapshot_panel::view(snapshots, current_content, self.selected_snapshot))
             }
             BottomPanel::Session => {
                 let session_data = views::session_panel::SessionData {
