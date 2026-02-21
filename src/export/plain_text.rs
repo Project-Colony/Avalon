@@ -181,3 +181,103 @@ pub fn word_count(contents: &[CompileContent]) -> usize {
 pub fn char_count(contents: &[CompileContent]) -> usize {
     contents.iter().map(|c| c.text.len()).sum()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::export::compiler::OutputFormat;
+
+    fn make_opts() -> CompileOptions {
+        CompileOptions {
+            format: OutputFormat::PlainText,
+            title: "Test Book".to_string(),
+            author: "Author Name".to_string(),
+            include_front_matter: false,
+            separator: SeparatorType::EmptyLine,
+            page_break_between_folders: false,
+            compile_marked_only: false,
+            font_size: 12.0,
+            font_family: "Times New Roman".to_string(),
+            include_toc: false,
+            replace_placeholders: false,
+        }
+    }
+
+    fn make_content(title: &str, text: &str, is_folder: bool, depth: usize) -> CompileContent {
+        CompileContent {
+            title: title.to_string(),
+            text: text.to_string(),
+            depth,
+            is_folder,
+        }
+    }
+
+    #[test]
+    fn test_compile_simple() {
+        let contents = vec![
+            make_content("Scene 1", "Hello world.", false, 1),
+        ];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("Hello world."));
+    }
+
+    #[test]
+    fn test_compile_with_front_matter() {
+        let mut opts = make_opts();
+        opts.include_front_matter = true;
+        let contents = vec![
+            make_content("Scene", "Content here.", false, 1),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("TEST BOOK"));
+        assert!(result.contains("Author Name"));
+    }
+
+    #[test]
+    fn test_compile_with_folders() {
+        let contents = vec![
+            make_content("Chapter One", "", true, 1),
+            make_content("Scene 1", "The story begins.", false, 2),
+        ];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("CHAPTER ONE"));
+        assert!(result.contains("The story begins."));
+    }
+
+    #[test]
+    fn test_strip_markdown() {
+        let bold = strip_markdown("**bold**");
+        assert!(bold.trim() == "bold");
+        let strike = strip_markdown("~~strikethrough~~");
+        assert!(strike.trim() == "strikethrough");
+        let heading = strip_markdown("# Heading");
+        assert!(heading.trim() == "Heading");
+    }
+
+    #[test]
+    fn test_word_wrap() {
+        let text = "This is a long line that should be wrapped at a certain width for readability";
+        let wrapped = word_wrap(text, 20);
+        for line in wrapped.lines() {
+            assert!(line.len() <= 25); // Allow some slack for long words
+        }
+    }
+
+    #[test]
+    fn test_word_count_and_char_count() {
+        let contents = vec![
+            make_content("A", "one two three", false, 0),
+            make_content("B", "four five", false, 0),
+        ];
+        assert_eq!(word_count(&contents), 5);
+        assert!(char_count(&contents) > 0);
+    }
+
+    #[test]
+    fn test_estimate_pages() {
+        let contents = vec![
+            make_content("A", &"word ".repeat(500), false, 0),
+        ];
+        assert_eq!(estimate_pages(&contents), 2);
+    }
+}

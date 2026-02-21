@@ -205,3 +205,140 @@ pub fn validate_opml(content: &str) -> Result<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_binder() -> Binder {
+        let mut binder = Binder::default_structure();
+        let mut ch1 = BinderItem::new_folder("Chapter 1");
+        let mut scene = BinderItem::new_text("Scene 1");
+        if let Some(ref mut doc) = scene.document {
+            doc.content = "The story begins here.".to_string();
+        }
+        ch1.add_child(scene);
+        binder.draft.add_child(ch1);
+        binder.draft.add_child(BinderItem::new_text("Epilogue"));
+        binder
+    }
+
+    #[test]
+    fn test_export_opml_structure() {
+        let binder = make_binder();
+        let opml = export_opml(&binder, "Test Novel").unwrap();
+        assert!(opml.contains("<?xml version=\"1.0\""));
+        assert!(opml.contains("<opml version=\"2.0\">"));
+        assert!(opml.contains("<title>Test Novel</title>"));
+        assert!(opml.contains("</opml>"));
+    }
+
+    #[test]
+    fn test_export_opml_content() {
+        let binder = make_binder();
+        let opml = export_opml(&binder, "My Book").unwrap();
+        assert!(opml.contains("Chapter 1"));
+        assert!(opml.contains("Scene 1"));
+        assert!(opml.contains("Epilogue"));
+    }
+
+    #[test]
+    fn test_import_opml_roundtrip() {
+        let binder = make_binder();
+        let opml = export_opml(&binder, "Test").unwrap();
+        let items = import_opml(&opml).unwrap();
+        // Should have Draft and Research as top-level items
+        assert!(items.len() >= 2);
+    }
+
+    #[test]
+    fn test_import_opml_simple() {
+        let opml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head><title>Test</title></head>
+  <body>
+    <outline text="Chapter 1">
+      <outline text="Scene A" _note="Content here"/>
+      <outline text="Scene B"/>
+    </outline>
+    <outline text="Chapter 2"/>
+  </body>
+</opml>"#;
+        let items = import_opml(opml).unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].title, "Chapter 1");
+        assert_eq!(items[0].children.len(), 2);
+        assert_eq!(items[0].children[0].title, "Scene A");
+    }
+
+    #[test]
+    fn test_escape_xml() {
+        assert_eq!(escape_xml("A & B"), "A &amp; B");
+        assert_eq!(escape_xml("<tag>"), "&lt;tag&gt;");
+        assert_eq!(escape_xml("\"quoted\""), "&quot;quoted&quot;");
+    }
+
+    #[test]
+    fn test_unescape_xml() {
+        assert_eq!(unescape_xml("A &amp; B"), "A & B");
+        assert_eq!(unescape_xml("&lt;tag&gt;"), "<tag>");
+    }
+
+    #[test]
+    fn test_extract_attr() {
+        let line = r#"<outline text="Hello World" _note="Some note"/>"#;
+        assert_eq!(extract_attr(line, "text"), Some("Hello World".to_string()));
+        assert_eq!(extract_attr(line, "_note"), Some("Some note".to_string()));
+        assert_eq!(extract_attr(line, "missing"), None);
+    }
+
+    #[test]
+    fn test_count_items() {
+        let mut root = BinderItem::new_folder("Root");
+        root.add_child(BinderItem::new_text("A"));
+        root.add_child(BinderItem::new_text("B"));
+        assert_eq!(count_items(&root), 3); // Root + A + B
+    }
+
+    #[test]
+    fn test_max_depth() {
+        let mut root = BinderItem::new_folder("Root");
+        let mut child = BinderItem::new_folder("Child");
+        child.add_child(BinderItem::new_text("Leaf"));
+        root.add_child(child);
+        assert_eq!(max_depth(&root), 2);
+    }
+
+    #[test]
+    fn test_flat_titles() {
+        let mut root = BinderItem::new_folder("Root");
+        root.add_child(BinderItem::new_text("A"));
+        root.add_child(BinderItem::new_text("B"));
+        let titles = flat_titles(&root, 0);
+        assert_eq!(titles.len(), 3);
+        assert_eq!(titles[0], (0, "Root".to_string()));
+        assert_eq!(titles[1], (1, "A".to_string()));
+    }
+
+    #[test]
+    fn test_validate_opml_valid() {
+        let valid = r#"<?xml version="1.0"?>
+<opml version="2.0">
+  <head><title>T</title></head>
+  <body></body>
+</opml>"#;
+        assert!(validate_opml(valid).is_ok());
+    }
+
+    #[test]
+    fn test_validate_opml_missing_head() {
+        let invalid = "<opml><body></body></opml>";
+        assert!(validate_opml(invalid).is_err());
+    }
+
+    #[test]
+    fn test_validate_opml_missing_body() {
+        let invalid = "<opml><head></head></opml>";
+        assert!(validate_opml(invalid).is_err());
+    }
+}
