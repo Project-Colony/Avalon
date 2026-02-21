@@ -36,6 +36,10 @@ pub fn view(
     let thesaurus_btn = panel_button("Thesaurus", BottomPanel::Thesaurus, bottom_panel);
     let snapshots_btn = panel_button("Snapshots", BottomPanel::Snapshots, bottom_panel);
     let session_btn = panel_button("Session", BottomPanel::Session, bottom_panel);
+    let history_btn = panel_button("History", BottomPanel::History, bottom_panel);
+    let stats_btn = panel_button("Stats", BottomPanel::TextStats, bottom_panel);
+    let names_btn = panel_button("Names", BottomPanel::NameGen, bottom_panel);
+    let notes_btn = panel_button("Notes", BottomPanel::ProjectNotes, bottom_panel);
 
     let sep4 = text(" | ").size(14).color(Theme::TEXT_MUTED);
 
@@ -59,6 +63,10 @@ pub fn view(
         thesaurus_btn,
         snapshots_btn,
         session_btn,
+        history_btn,
+        stats_btn,
+        names_btn,
+        notes_btn,
         sep4,
         Space::with_width(Length::Fill),
         settings_btn,

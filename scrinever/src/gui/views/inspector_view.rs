@@ -181,11 +181,43 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
         .spacing(2)
     };
 
-    // Keywords
-    let keywords_text = if data.keywords.is_empty() {
-        "None".to_string()
+    // Keywords editing
+    let keywords_label = text("Keywords").size(11).color(Theme::TEXT_MUTED);
+    let keywords_text = data.keywords.join(", ");
+    let keywords_input = text_input("keyword1, keyword2...", &keywords_text)
+        .on_input(move |val| Message::SetItemKeywords(id, val))
+        .size(11)
+        .padding(4);
+
+    // Convert to folder/text buttons
+    let convert_row: Element<'static, Message> = if data.is_document {
+        button(
+            text("Convert to Folder").size(10).color(Theme::TEXT_MUTED),
+        )
+        .on_press(Message::ConvertToFolder(id))
+        .padding(Padding::from([2, 6]))
+        .into()
     } else {
-        data.keywords.join(", ")
+        row![
+            button(
+                text("Merge Children").size(10).color(Theme::TEXT_MUTED),
+            )
+            .on_press(Message::MergeIntoParent)
+            .padding(Padding::from([2, 6])),
+        ]
+        .into()
+    };
+
+    // Split button (only for documents)
+    let split_btn: Element<'static, Message> = if data.is_document {
+        button(
+            text("Split at Midpoint").size(10).color(Theme::TEXT_MUTED),
+        )
+        .on_press(Message::SplitDocument)
+        .padding(Padding::from([2, 6]))
+        .into()
+    } else {
+        Space::with_height(0).into()
     };
 
     // Snapshots
@@ -226,12 +258,15 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
         Space::with_height(12),
         stats_header,
         stats_content,
-        Space::with_height(4),
-        text("Keywords").size(11).color(Theme::TEXT_MUTED),
-        text(keywords_text).size(11).color(Theme::TEXT_SECONDARY),
+        Space::with_height(8),
+        keywords_label,
+        keywords_input,
         Space::with_height(12),
         snapshots_header,
         snapshots_row,
+        Space::with_height(8),
+        convert_row,
+        split_btn,
     ]
     .padding(12)
     .width(Length::Fixed(240.0));

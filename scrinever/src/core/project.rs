@@ -6,7 +6,9 @@ use uuid::Uuid;
 use anyhow::{Context, Result};
 
 use super::binder::Binder;
+use super::collection::Collection;
 use super::document::Document;
+use super::history::WritingHistory;
 use super::snapshot::Snapshot;
 use super::metadata::ProjectSettings;
 
@@ -20,6 +22,15 @@ pub struct Project {
     pub modified_at: DateTime<Utc>,
     pub binder: Binder,
     pub settings: ProjectSettings,
+    /// Project-level notes (scratch pad)
+    #[serde(default)]
+    pub project_notes: String,
+    /// Collections (manual lists and saved searches)
+    #[serde(default)]
+    pub collections: Vec<Collection>,
+    /// Writing history (daily word counts)
+    #[serde(default)]
+    pub writing_history: WritingHistory,
     #[serde(skip)]
     pub path: Option<PathBuf>,
 }
@@ -35,6 +46,9 @@ impl Project {
             modified_at: now,
             binder: Binder::default_structure(),
             settings: ProjectSettings::default(),
+            project_notes: String::new(),
+            collections: Vec::new(),
+            writing_history: WritingHistory::new(),
             path: None,
         }
     }

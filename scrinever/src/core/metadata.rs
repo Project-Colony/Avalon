@@ -94,22 +94,28 @@ pub enum CustomFieldValue {
 /// Project-level settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectSettings {
-    /// Available labels for the project
     pub labels: Vec<Label>,
-    /// Available statuses for the project
     pub statuses: Vec<Status>,
-    /// Default text zoom level
     pub editor_zoom: f32,
-    /// Default font family
     pub editor_font: String,
-    /// Default font size
     pub editor_font_size: f32,
-    /// Whether to show word count in footer
     pub show_word_count: bool,
-    /// Target word count (for progress tracking)
     pub target_word_count: Option<usize>,
-    /// Auto-save interval in seconds (0 = disabled)
+    #[serde(default)]
+    pub target_deadline: Option<String>,
     pub auto_save_seconds: u32,
+    #[serde(default = "default_fullscreen_bg")]
+    pub fullscreen_bg_color: String,
+    #[serde(default = "default_fullscreen_width")]
+    pub fullscreen_text_width: f32,
+}
+
+fn default_fullscreen_bg() -> String {
+    "#1a1a1e".to_string()
+}
+
+fn default_fullscreen_width() -> f32 {
+    60.0
 }
 
 impl Default for ProjectSettings {
@@ -129,7 +135,10 @@ impl Default for ProjectSettings {
             editor_font_size: 16.0,
             show_word_count: true,
             target_word_count: None,
+            target_deadline: None,
             auto_save_seconds: 30,
+            fullscreen_bg_color: default_fullscreen_bg(),
+            fullscreen_text_width: default_fullscreen_width(),
         }
     }
 }

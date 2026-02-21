@@ -99,10 +99,140 @@ impl SessionStats {
     }
 
     pub fn update(&mut self, word_delta: i64, elapsed_seconds: u64) {
-        self.words_written += word_delta;
+        self.words_written = word_delta;
         self.time_elapsed_seconds = elapsed_seconds;
         if elapsed_seconds > 0 {
             self.words_per_minute = self.words_written as f64 / (elapsed_seconds as f64 / 60.0);
         }
     }
+}
+
+/// Detailed text analysis for the text statistics panel
+#[derive(Debug, Clone, Default)]
+pub struct TextAnalysis {
+    pub word_count: usize,
+    pub unique_words: usize,
+    pub char_count: usize,
+    pub char_no_spaces: usize,
+    pub sentence_count: usize,
+    pub paragraph_count: usize,
+    pub avg_word_length: f64,
+    pub avg_sentence_length: f64,
+    pub avg_paragraph_length: f64,
+    pub readability_score: f64,
+    pub reading_time_minutes: f64,
+    pub speaking_time_minutes: f64,
+    pub most_common_words: Vec<(String, usize)>,
+}
+
+impl TextAnalysis {
+    pub fn from_text(text: &str) -> Self {
+        if text.is_empty() {
+            return Self::default();
+        }
+
+        let words: Vec<&str> = text.split_whitespace().collect();
+        let word_count = words.len();
+        let char_count = text.len();
+        let char_no_spaces = text.chars().filter(|c| !c.is_whitespace()).count();
+
+        let sentence_count = text.chars()
+            .filter(|c| *c == '.' || *c == '!' || *c == '?')
+            .count()
+            .max(1);
+
+        let paragraph_count = text.split("\n\n")
+            .filter(|p| !p.trim().is_empty())
+            .count()
+            .max(1);
+
+        // Unique words
+        let mut word_freq = std::collections::HashMap::new();
+        for word in &words {
+            let lower = word.to_lowercase()
+                .trim_matches(|c: char| !c.is_alphanumeric())
+                .to_string();
+            if !lower.is_empty() {
+                *word_freq.entry(lower).or_insert(0usize) += 1;
+            }
+        }
+        let unique_words = word_freq.len();
+
+        // Most common words (exclude short words)
+        let mut word_list: Vec<(String, usize)> = word_freq.into_iter()
+            .filter(|(w, _)| w.len() > 3)
+            .collect();
+        word_list.sort_by(|a, b| b.1.cmp(&a.1));
+        word_list.truncate(20);
+
+        let avg_word_length = if word_count > 0 {
+            words.iter().map(|w| w.len()).sum::<usize>() as f64 / word_count as f64
+        } else {
+            0.0
+        };
+
+        let avg_sentence_length = word_count as f64 / sentence_count as f64;
+        let avg_paragraph_length = word_count as f64 / paragraph_count as f64;
+
+        // Flesch Reading Ease approximation
+        let syllables: usize = words.iter().map(|w| count_syllables(w)).sum();
+        let readability_score = if word_count > 0 && sentence_count > 0 {
+            206.835
+                - 1.015 * (word_count as f64 / sentence_count as f64)
+                - 84.6 * (syllables as f64 / word_count as f64)
+        } else {
+            0.0
+        };
+
+        let reading_time_minutes = word_count as f64 / 250.0;
+        let speaking_time_minutes = word_count as f64 / 150.0;
+
+        Self {
+            word_count,
+            unique_words,
+            char_count,
+            char_no_spaces,
+            sentence_count,
+            paragraph_count,
+            avg_word_length,
+            avg_sentence_length,
+            avg_paragraph_length,
+            readability_score,
+            reading_time_minutes,
+            speaking_time_minutes,
+            most_common_words: word_list,
+        }
+    }
+
+    pub fn readability_label(&self) -> &str {
+        if self.readability_score >= 90.0 { "Very Easy" }
+        else if self.readability_score >= 80.0 { "Easy" }
+        else if self.readability_score >= 70.0 { "Fairly Easy" }
+        else if self.readability_score >= 60.0 { "Standard" }
+        else if self.readability_score >= 50.0 { "Fairly Difficult" }
+        else if self.readability_score >= 30.0 { "Difficult" }
+        else { "Very Difficult" }
+    }
+}
+
+fn count_syllables(word: &str) -> usize {
+    let word = word.to_lowercase();
+    let vowels = "aeiouy";
+    let mut count = 0;
+    let mut prev_vowel = false;
+    for ch in word.chars() {
+        if vowels.contains(ch) {
+            if !prev_vowel {
+                count += 1;
+            }
+            prev_vowel = true;
+        } else {
+            prev_vowel = false;
+        }
+    }
+    // Handle silent 'e'
+    if word.ends_with('e') && count > 1 {
+        count -= 1;
+    }
+    count.max(1)
 }

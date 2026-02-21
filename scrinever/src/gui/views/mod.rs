@@ -12,3 +12,7 @@ pub mod thesaurus_panel;
 pub mod snapshot_panel;
 pub mod settings_dialog;
 pub mod session_panel;
+pub mod name_generator_panel;
+pub mod text_stats_panel;
+pub mod history_panel;
+pub mod project_notes_panel;

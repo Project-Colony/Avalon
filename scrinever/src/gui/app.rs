@@ -32,6 +32,10 @@ pub enum BottomPanel {
     Thesaurus,
     Snapshots,
     Session,
+    History,
+    TextStats,
+    NameGen,
+    ProjectNotes,
 }
 
 /// Application state
@@ -84,6 +88,13 @@ pub struct ScrineverApp {
     pub session_start_word_count: usize,
     pub session_goal: usize,
     pub session_goal_text: String,
+
+    // === Name generator ===
+    pub generated_names: Vec<String>,
+    pub name_gen_type: String,
+
+    // === Project notes (scratch pad) ===
+    pub project_notes_text: String,
 }
 
 /// Messages for the application
@@ -187,6 +198,16 @@ pub enum Message {
     // Import
     ImportFiles,
 
+    // Name generator
+    GenerateName(String),
+    GenerateNameBatch,
+
+    // Project notes
+    ProjectNotesChanged(String),
+
+    // Keywords
+    SetItemKeywords(Uuid, String),
+
     // Misc
     Tick,
     DismissNotification,
@@ -228,6 +249,9 @@ impl ScrineverApp {
             session_start_word_count: 0,
             session_goal: 0,
             session_goal_text: String::new(),
+            generated_names: Vec::new(),
+            name_gen_type: "male".to_string(),
+            project_notes_text: String::new(),
         };
 
         (app, IcedTask::none())
@@ -266,6 +290,8 @@ impl ScrineverApp {
                 self.project = Some(Project::new("Untitled Project"));
                 self.selected_item = None;
                 self.editor = EditorState::new();
+                self.project_notes_text.clear();
+                self.generated_names.clear();
                 if let Some(ref p) = self.project {
                     self.compile_options.title = p.title.clone();
                 }
@@ -275,6 +301,8 @@ impl ScrineverApp {
                 self.project = Some(Project::from_template("Untitled Project", &template_id));
                 self.selected_item = None;
                 self.editor = EditorState::new();
+                self.project_notes_text.clear();
+                self.generated_names.clear();
                 if let Some(ref p) = self.project {
                     self.compile_options.title = p.title.clone();
                 }
@@ -291,6 +319,8 @@ impl ScrineverApp {
                                 match Project::load(&path) {
                                     Ok(p) => {
                                         self.compile_options.title = p.title.clone();
+                                        self.project_notes_text = p.project_notes.clone();
+                                        self.generated_names.clear();
                                         self.project = Some(p);
                                         self.selected_item = None;
                                         self.editor = EditorState::new();
@@ -330,6 +360,8 @@ impl ScrineverApp {
             Message::ProjectLoaded(project) => {
                 if let Some(p) = project {
                     self.compile_options.title = p.title.clone();
+                    self.project_notes_text = p.project_notes.clone();
+                    self.generated_names.clear();
                     self.project = Some(p);
                     self.selected_item = None;
                     self.editor = EditorState::new();
@@ -1033,6 +1065,47 @@ impl ScrineverApp {
                 }
             }
 
+            // ========== Name generator ==========
+            Message::GenerateName(kind) => {
+                use crate::core::namegen::NameGenerator;
+                self.name_gen_type = kind.clone();
+                let name = match kind.as_str() {
+                    "male" => NameGenerator::male_name(),
+                    "female" => NameGenerator::female_name(),
+                    "fantasy" => NameGenerator::fantasy_name(),
+                    "place" => NameGenerator::place_name(),
+                    _ => NameGenerator::male_name(),
+                };
+                self.generated_names.push(name);
+            }
+
+            Message::GenerateNameBatch => {
+                use crate::core::namegen::NameGenerator;
+                let names = NameGenerator::generate_batch(&self.name_gen_type, 5);
+                self.generated_names.extend(names);
+            }
+
+            // ========== Project notes ==========
+            Message::ProjectNotesChanged(notes) => {
+                self.project_notes_text = notes.clone();
+                if let Some(ref mut project) = self.project {
+                    project.project_notes = notes;
+                }
+            }
+
+            // ========== Keywords ==========
+            Message::SetItemKeywords(id, keywords_str) => {
+                if let Some(ref mut project) = self.project {
+                    if let Some(item) = project.binder.find_item_mut(&id) {
+                        item.metadata.keywords = keywords_str
+                            .split(',')
+                            .map(|s| s.trim().to_string())
+                            .filter(|s| !s.is_empty())
+                            .collect();
+                    }
+                }
+            }
+
             // ========== Misc ==========
             Message::Tick => {
                 // Auto-save
@@ -1059,6 +1132,13 @@ impl ScrineverApp {
                     let current_words = self.current_word_count();
                     let word_delta = current_words as i64 - self.session_start_word_count as i64;
                     self.session_stats.update(word_delta, self.session_stats.time_elapsed_seconds + 1);
+
+                    // Record writing history every 60 seconds
+                    if self.session_stats.time_elapsed_seconds % 60 == 0 {
+                        if let Some(ref mut project) = self.project {
+                            project.writing_history.record(current_words, 60);
+                        }
+                    }
                 }
             }
 
@@ -1207,6 +1287,31 @@ impl ScrineverApp {
                     session_goal_text: self.session_goal_text.clone(),
                 };
                 Some(views::session_panel::view(&session_data))
+            }
+            BottomPanel::History => {
+                let history = self.project.as_ref()
+                    .map(|p| &p.writing_history)
+                    .cloned()
+                    .unwrap_or_default();
+                Some(views::history_panel::view(&history))
+            }
+            BottomPanel::TextStats => {
+                let text_content = self.selected_item
+                    .and_then(|id| {
+                        self.project.as_ref()
+                            .and_then(|p| p.binder.find_item(&id))
+                            .and_then(|item| item.document.as_ref())
+                            .map(|doc| doc.content.as_str())
+                    })
+                    .unwrap_or("");
+                let analysis = crate::core::stats::TextAnalysis::from_text(text_content);
+                Some(views::text_stats_panel::view(&analysis))
+            }
+            BottomPanel::NameGen => {
+                Some(views::name_generator_panel::view(&self.generated_names))
+            }
+            BottomPanel::ProjectNotes => {
+                Some(views::project_notes_panel::view(&self.project_notes_text))
             }
             BottomPanel::None => None,
         };

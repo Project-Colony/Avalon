@@ -5,4 +5,7 @@ pub mod metadata;
 pub mod snapshot;
 pub mod search;
 pub mod stats;
+pub mod collection;
+pub mod history;
+pub mod namegen;
 
