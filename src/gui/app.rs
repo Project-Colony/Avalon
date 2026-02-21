@@ -356,6 +356,14 @@ pub enum Message {
     // Composition mode
     ToggleCompositionMode,
 
+    // Copy special
+    CopyAsMarkdown,
+    CopyAsHtml,
+    CopyAsPlainText,
+
+    // Search results to collection
+    SaveSearchAsCollection,
+
     // Backup
     CreateBackup,
     RestoreBackup(std::path::PathBuf),
@@ -1821,6 +1829,75 @@ impl ScrineverApp {
                     if self.composition_mode { "Composition mode enabled".to_string() }
                     else { "Composition mode disabled".to_string() }
                 );
+            }
+
+            // ========== Copy special ==========
+            Message::CopyAsMarkdown => {
+                self.sync_editor_to_project();
+                if let (Some(ref project), Some(item_id)) = (&self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item(&item_id) {
+                        if let Some(ref doc) = item.document {
+                            let md = format!("# {}\n\n{}", item.title, doc.content);
+                            let _ = arboard::Clipboard::new()
+                                .and_then(|mut cb| cb.set_text(md));
+                            self.notification = Some("Copied as Markdown".to_string());
+                        }
+                    }
+                }
+            }
+
+            Message::CopyAsHtml => {
+                self.sync_editor_to_project();
+                if let (Some(ref project), Some(item_id)) = (&self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item(&item_id) {
+                        if let Some(ref doc) = item.document {
+                            let html = format!(
+                                "<html><body><h1>{}</h1>\n{}</body></html>",
+                                item.title,
+                                doc.content.split("\n\n")
+                                    .map(|p| format!("<p>{}</p>", p.replace('\n', "<br>")))
+                                    .collect::<Vec<_>>()
+                                    .join("\n")
+                            );
+                            let _ = arboard::Clipboard::new()
+                                .and_then(|mut cb| cb.set_text(html));
+                            self.notification = Some("Copied as HTML".to_string());
+                        }
+                    }
+                }
+            }
+
+            Message::CopyAsPlainText => {
+                self.sync_editor_to_project();
+                if let (Some(ref project), Some(item_id)) = (&self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item(&item_id) {
+                        if let Some(ref doc) = item.document {
+                            let _ = arboard::Clipboard::new()
+                                .and_then(|mut cb| cb.set_text(doc.content.clone()));
+                            self.notification = Some("Copied as plain text".to_string());
+                        }
+                    }
+                }
+            }
+
+            // ========== Search collection ==========
+            Message::SaveSearchAsCollection => {
+                if let Some(ref mut project) = self.project {
+                    if !self.search_results.is_empty() {
+                        let mut coll = crate::core::collection::Collection::new_search(
+                            &format!("Search: \"{}\"", self.search_query),
+                            &self.search_query,
+                        );
+                        for result in &self.search_results {
+                            coll.add_item(result.item_id);
+                        }
+                        project.collections.push(coll);
+                        self.notification = Some(format!(
+                            "Saved {} search results as collection",
+                            self.search_results.len()
+                        ));
+                    }
+                }
             }
 
             // ========== Backup ==========

@@ -48,6 +48,10 @@ pub fn view<'a>(
             fmt_btn("UPPER", Message::TextToUppercase),
             fmt_btn("lower", Message::TextToLowercase),
             fmt_btn("Title", Message::TextToTitleCase),
+            Space::with_width(8),
+            fmt_btn("CpMD", Message::CopyAsMarkdown),
+            fmt_btn("CpHTML", Message::CopyAsHtml),
+            fmt_btn("CpTxt", Message::CopyAsPlainText),
         ]
         .spacing(2)
     )

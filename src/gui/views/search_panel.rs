@@ -114,6 +114,37 @@ pub fn view(
         result_list = result_list.push(result_row);
     }
 
+    // Save as collection button
+    let save_coll_btn: Element<'static, Message> = if !results.is_empty() {
+        button(
+            text("Save as Collection").size(10).color(Theme::TEXT_ACCENT),
+        )
+        .on_press(Message::SaveSearchAsCollection)
+        .padding(Padding::from([2, 8]))
+        .into()
+    } else {
+        Space::with_height(0).into()
+    };
+
+    // Smart collection button
+    let smart_coll_btn: Element<'static, Message> = if !query.is_empty() {
+        button(
+            text("Create Smart Collection").size(10).color(Theme::TEXT_SECONDARY),
+        )
+        .on_press(Message::CreateSmartCollection(query.to_string()))
+        .padding(Padding::from([2, 8]))
+        .into()
+    } else {
+        Space::with_height(0).into()
+    };
+
+    let actions_row = row![
+        save_coll_btn,
+        Space::with_width(4),
+        smart_coll_btn,
+    ]
+    .spacing(2);
+
     let content = column![
         header,
         Space::with_height(4),
@@ -121,7 +152,7 @@ pub fn view(
         Space::with_height(4),
         replace_row,
         Space::with_height(4),
-        result_header,
+        row![result_header, Space::with_width(Length::Fill), actions_row],
         scrollable(result_list).height(Length::Fixed(120.0)),
     ]
     .padding(Padding::from([8, 12]));
