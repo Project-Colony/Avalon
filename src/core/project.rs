@@ -524,4 +524,96 @@ impl Project {
         }
         Ok(())
     }
+
+    /// Get the total word count across the entire project
+    pub fn total_word_count(&self) -> usize {
+        self.binder.total_word_count()
+    }
+
+    /// Get the total character count across the entire project
+    pub fn total_char_count(&self) -> usize {
+        self.binder.total_char_count()
+    }
+
+    /// Get the total document count
+    pub fn document_count(&self) -> usize {
+        self.binder.document_count()
+    }
+
+    /// Get the total folder count
+    pub fn folder_count(&self) -> usize {
+        self.binder.folder_count()
+    }
+
+    /// Estimate the total page count (250 words per page)
+    pub fn estimated_pages(&self) -> usize {
+        let words = self.total_word_count();
+        (words / 250).max(if words > 0 { 1 } else { 0 })
+    }
+
+    /// Get the project age as a human-readable string
+    pub fn age_string(&self) -> String {
+        let duration = Utc::now().signed_duration_since(self.created_at);
+        let days = duration.num_days();
+        if days == 0 {
+            "today".to_string()
+        } else if days == 1 {
+            "1 day".to_string()
+        } else if days < 30 {
+            format!("{} days", days)
+        } else if days < 365 {
+            format!("{} months", days / 30)
+        } else {
+            format!("{} years", days / 365)
+        }
+    }
+
+    /// Check if the project has been saved to disk
+    pub fn is_saved(&self) -> bool {
+        self.path.is_some()
+    }
+
+    /// Get the project directory name (without .scriv extension)
+    pub fn directory_name(&self) -> String {
+        format!("{}.scriv", self.title)
+    }
+
+    /// Get the number of collections
+    pub fn collection_count(&self) -> usize {
+        self.collections.len()
+    }
+
+    /// Find a collection by name
+    pub fn find_collection(&self, name: &str) -> Option<&Collection> {
+        self.collections.iter().find(|c| c.name == name)
+    }
+
+    /// Find a mutable collection by name
+    pub fn find_collection_mut(&mut self, name: &str) -> Option<&mut Collection> {
+        self.collections.iter_mut().find(|c| c.name == name)
+    }
+
+    /// Get a summary string for the project
+    pub fn summary(&self) -> String {
+        let words = self.total_word_count();
+        let docs = self.document_count();
+        let pages = self.estimated_pages();
+        format!(
+            "{}: {} words, {} documents, ~{} pages (created {})",
+            self.title, words, docs, pages, self.age_string()
+        )
+    }
+
+    /// Check if the project has any content
+    pub fn has_content(&self) -> bool {
+        self.total_word_count() > 0
+    }
+
+    /// Get the project file path as a string (if saved)
+    pub fn path_display(&self) -> String {
+        self.path
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "Unsaved".to_string())
+    }
 }
