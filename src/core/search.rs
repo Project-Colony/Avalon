@@ -279,4 +279,33 @@ impl SearchOptions {
         }
         scopes.join(", ")
     }
+
+    /// Create options for content-only search
+    pub fn content_only(query: &str) -> Self {
+        Self {
+            query: query.to_string(),
+            case_sensitive: false,
+            whole_word: false,
+            regex: false,
+            search_titles: false,
+            search_content: true,
+            search_notes: false,
+            search_synopsis: false,
+        }
+    }
+
+    /// Check if this search has any scope enabled
+    pub fn has_scope(&self) -> bool {
+        self.search_titles || self.search_content || self.search_notes || self.search_synopsis
+    }
+
+    /// Summary of search configuration
+    pub fn summary(&self) -> String {
+        let mut flags = Vec::new();
+        if self.case_sensitive { flags.push("case-sensitive"); }
+        if self.whole_word { flags.push("whole-word"); }
+        if self.regex { flags.push("regex"); }
+        format!("\"{}\" in {} {}", self.query, self.scope_description(),
+            if flags.is_empty() { String::new() } else { format!("({})", flags.join(", ")) })
+    }
 }

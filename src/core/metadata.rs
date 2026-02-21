@@ -330,3 +330,44 @@ impl Default for ProjectSettings {
         }
     }
 }
+
+impl ProjectSettings {
+    /// Find a label by name
+    pub fn find_label(&self, name: &str) -> Option<&Label> {
+        self.labels.iter().find(|l| l.name == name)
+    }
+
+    /// Find a status by name
+    pub fn find_status(&self, name: &str) -> Option<&Status> {
+        self.statuses.iter().find(|s| s.name == name)
+    }
+
+    /// Get all label names
+    pub fn label_names(&self) -> Vec<&str> {
+        self.labels.iter().map(|l| l.name.as_str()).collect()
+    }
+
+    /// Get all status names
+    pub fn status_names(&self) -> Vec<&str> {
+        self.statuses.iter().map(|s| s.name.as_str()).collect()
+    }
+
+    /// Check if a target is set and what percentage of progress
+    pub fn target_progress(&self, current_words: usize) -> Option<f64> {
+        self.target_word_count.map(|target| {
+            if target == 0 { 100.0 } else { current_words as f64 / target as f64 * 100.0 }
+        })
+    }
+
+    /// Days remaining until deadline (None if no deadline set)
+    pub fn days_to_deadline(&self) -> Option<i64> {
+        self.target_deadline.as_ref().and_then(|d| {
+            chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d")
+                .ok()
+                .map(|deadline| {
+                    let today = chrono::Utc::now().date_naive();
+                    (deadline - today).num_days()
+                })
+        })
+    }
+}
