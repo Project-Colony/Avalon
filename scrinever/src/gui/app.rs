@@ -4,11 +4,12 @@ use iced::{Element, Length, Padding, Subscription, Task as IcedTask};
 use uuid::Uuid;
 
 use crate::core::binder::{BinderItem, BinderItemKind};
+use crate::core::document::Document;
 use crate::core::project::Project;
 use crate::core::search::{self, SearchOptions};
-use crate::core::stats::Statistics;
+use crate::core::stats::{SessionStats, Statistics};
 use crate::editor::EditorState;
-use crate::export::compiler::{CompileOptions, OutputFormat};
+use crate::export::compiler::{CompileOptions, OutputFormat, SeparatorType};
 use crate::spelling::SpellChecker;
 use crate::thesaurus::Thesaurus;
 
@@ -30,6 +31,7 @@ pub enum BottomPanel {
     Search,
     Thesaurus,
     Snapshots,
+    Session,
 }
 
 /// Application state
@@ -45,8 +47,9 @@ pub struct ScrineverApp {
     pub fullscreen_editor: bool,
     pub bottom_panel: BottomPanel,
 
-    // === Compile ===
+    // === Dialogs ===
     pub show_compile_dialog: bool,
+    pub show_settings_dialog: bool,
     pub compile_options: CompileOptions,
 
     // === Search ===
@@ -74,6 +77,13 @@ pub struct ScrineverApp {
 
     // === Auto-save ===
     pub auto_save_counter: u32,
+
+    // === Writing session ===
+    pub session_active: bool,
+    pub session_stats: SessionStats,
+    pub session_start_word_count: usize,
+    pub session_goal: usize,
+    pub session_goal_text: String,
 }
 
 /// Messages for the application
@@ -95,6 +105,14 @@ pub enum Message {
     RenameItem(Uuid, String),
     UpdateSynopsis(Uuid, String),
     MoveItem { item_id: Uuid, target_id: Uuid, position: usize },
+    MoveItemUp(Uuid),
+    MoveItemDown(Uuid),
+    DuplicateItem(Uuid),
+    EmptyTrash,
+    ConvertToFolder(Uuid),
+    ConvertToText(Uuid),
+    SplitDocument,
+    MergeIntoParent,
 
     // Editor operations
     EditorAction(text_editor::Action),
@@ -113,6 +131,10 @@ pub enum Message {
     CompileSetAuthor(String),
     CompileSetFrontMatter(bool),
     CompileSetMarkedOnly(bool),
+    CompileSetPageBreaks(bool),
+    CompileSetFontFamily(String),
+    CompileSetFontSize(String),
+    CompileSetSeparator(String),
     DoCompile,
 
     // Snapshot operations
@@ -145,6 +167,26 @@ pub enum Message {
     SetItemLabel(Uuid, String),
     ToggleIncludeInCompile(Uuid),
 
+    // Settings dialog
+    ShowSettings,
+    HideSettings,
+    SettingsSetProjectTitle(String),
+    SettingsSetFont(String),
+    SettingsSetFontSize(String),
+    SettingsZoomIn,
+    SettingsZoomOut,
+    SettingsSetTarget(String),
+    SettingsSetAutoSave(String),
+    SettingsToggleWordCount(bool),
+
+    // Writing session
+    SessionToggle,
+    SessionReset,
+    SessionSetGoal(String),
+
+    // Import
+    ImportFiles,
+
     // Misc
     Tick,
     DismissNotification,
@@ -165,6 +207,7 @@ impl ScrineverApp {
             fullscreen_editor: false,
             bottom_panel: BottomPanel::None,
             show_compile_dialog: false,
+            show_settings_dialog: false,
             compile_options: CompileOptions::default(),
             search_query: String::new(),
             search_results: Vec::new(),
@@ -180,6 +223,11 @@ impl ScrineverApp {
             item_targets: std::collections::HashMap::new(),
             notification: None,
             auto_save_counter: 0,
+            session_active: false,
+            session_stats: SessionStats::new(),
+            session_start_word_count: 0,
+            session_goal: 0,
+            session_goal_text: String::new(),
         };
 
         (app, IcedTask::none())
@@ -204,6 +252,13 @@ impl ScrineverApp {
         }
     }
 
+    /// Get the current total word count for session tracking
+    fn current_word_count(&self) -> usize {
+        self.project.as_ref()
+            .map(|p| p.binder.total_word_count())
+            .unwrap_or(0)
+    }
+
     pub fn update(&mut self, message: Message) -> IcedTask<Message> {
         match message {
             // ========== Project operations ==========
@@ -226,11 +281,9 @@ impl ScrineverApp {
             }
 
             Message::OpenProject => {
-                // Try to load from default location
                 let home = dirs::home_dir().unwrap_or_default();
                 let projects_dir = home.join("Scrinever Projects");
                 if projects_dir.exists() {
-                    // Find the first .scriv directory
                     if let Ok(entries) = std::fs::read_dir(&projects_dir) {
                         for entry in entries.flatten() {
                             let path = entry.path();
@@ -318,6 +371,8 @@ impl ScrineverApp {
                         item.expanded = !item.expanded;
                     }
                 }
+                // Also select the item when toggling a folder
+                self.selected_item = Some(id);
             }
 
             Message::NewDocument => {
@@ -325,7 +380,6 @@ impl ScrineverApp {
                     let new_item = BinderItem::new_text("New Document");
                     let new_id = new_item.id;
 
-                    // Add under selected folder if possible, otherwise under draft
                     if let Some(sel_id) = self.selected_item {
                         if let Some(parent) = project.binder.find_item_mut(&sel_id) {
                             if parent.kind == BinderItemKind::Folder {
@@ -412,6 +466,124 @@ impl ScrineverApp {
                 }
             }
 
+            Message::MoveItemUp(id) => {
+                if let Some(ref mut project) = self.project {
+                    project.binder.move_item_up(&id);
+                }
+            }
+
+            Message::MoveItemDown(id) => {
+                if let Some(ref mut project) = self.project {
+                    project.binder.move_item_down(&id);
+                }
+            }
+
+            Message::DuplicateItem(id) => {
+                if let Some(ref mut project) = self.project {
+                    if let Some(new_id) = project.binder.duplicate_item(&id) {
+                        self.selected_item = Some(new_id);
+                        self.notification = Some("Item duplicated".to_string());
+                    }
+                }
+            }
+
+            Message::EmptyTrash => {
+                if let Some(ref mut project) = self.project {
+                    project.binder.empty_trash();
+                    self.notification = Some("Trash emptied".to_string());
+                }
+            }
+
+            Message::ConvertToFolder(id) => {
+                if let Some(ref mut project) = self.project {
+                    if project.binder.convert_to_folder(&id) {
+                        self.notification = Some("Converted to folder".to_string());
+                    }
+                }
+            }
+
+            Message::ConvertToText(id) => {
+                if let Some(ref mut project) = self.project {
+                    if project.binder.convert_to_text(&id) {
+                        self.notification = Some("Converted to text".to_string());
+                    }
+                }
+            }
+
+            Message::SplitDocument => {
+                self.sync_editor_to_project();
+                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                    let split_content = {
+                        project.binder.find_item(&item_id)
+                            .and_then(|item| item.document.as_ref())
+                            .map(|doc| doc.content.clone())
+                    };
+
+                    if let Some(content) = split_content {
+                        let mid = content.len() / 2;
+                        let split_pos = content[mid..].find("\n\n")
+                            .map(|p| p + mid)
+                            .unwrap_or(mid);
+
+                        if split_pos > 0 && split_pos < content.len() {
+                            let first_half = content[..split_pos].to_string();
+                            let second_half = content[split_pos..].trim_start().to_string();
+
+                            if let Some(item) = project.binder.find_item_mut(&item_id) {
+                                if let Some(ref mut doc) = item.document {
+                                    doc.content = first_half;
+                                }
+                            }
+
+                            let mut new_item = BinderItem::new_text("Split Document");
+                            if let Some(ref mut doc) = new_item.document {
+                                doc.content = second_half;
+                            }
+                            project.binder.draft.add_child(new_item);
+
+                            if let Some(item) = project.binder.find_item(&item_id) {
+                                if let Some(ref doc) = item.document {
+                                    self.editor.load_document(doc);
+                                }
+                            }
+
+                            self.notification = Some("Document split".to_string());
+                        }
+                    }
+                }
+            }
+
+            Message::MergeIntoParent => {
+                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                    let merged = {
+                        project.binder.find_item(&item_id)
+                            .filter(|item| item.kind == BinderItemKind::Folder && !item.children.is_empty())
+                            .map(|item| (item.title.clone(), item.merge_children_content()))
+                    };
+
+                    if let Some((title, merged_content)) = merged {
+                        if !merged_content.is_empty() {
+                            let mut new_item = BinderItem::new_text(&format!("{} (Merged)", title));
+                            if let Some(ref mut doc) = new_item.document {
+                                doc.content = merged_content;
+                            }
+                            let new_id = new_item.id;
+                            project.binder.draft.add_child(new_item);
+                            self.selected_item = Some(new_id);
+
+                            if let Some(item) = project.binder.find_item(&new_id) {
+                                if let Some(ref doc) = item.document {
+                                    self.editor.load_document(doc);
+                                    self.notes_text = doc.notes.clone();
+                                }
+                            }
+
+                            self.notification = Some("Children merged into new document".to_string());
+                        }
+                    }
+                }
+            }
+
             // ========== Editor operations ==========
             Message::EditorAction(action) => {
                 let is_edit = action.is_edit();
@@ -479,6 +651,32 @@ impl ScrineverApp {
 
             Message::CompileSetMarkedOnly(val) => {
                 self.compile_options.compile_marked_only = val;
+            }
+
+            Message::CompileSetPageBreaks(val) => {
+                self.compile_options.page_break_between_folders = val;
+            }
+
+            Message::CompileSetFontFamily(family) => {
+                self.compile_options.font_family = family;
+            }
+
+            Message::CompileSetFontSize(size_str) => {
+                if let Ok(size) = size_str.parse::<f32>() {
+                    if size > 0.0 && size <= 72.0 {
+                        self.compile_options.font_size = size;
+                    }
+                }
+            }
+
+            Message::CompileSetSeparator(sep_name) => {
+                self.compile_options.separator = match sep_name.as_str() {
+                    "Empty Line" => SeparatorType::EmptyLine,
+                    "Page Break" => SeparatorType::PageBreak,
+                    "Section Break" => SeparatorType::SectionBreak,
+                    "None" => SeparatorType::None,
+                    _ => SeparatorType::EmptyLine,
+                };
             }
 
             Message::DoCompile => {
@@ -631,7 +829,6 @@ impl ScrineverApp {
             }
 
             Message::InsertSynonym(word) => {
-                // Insert the synonym at the cursor in the editor
                 self.editor.content.perform(
                     iced::widget::text_editor::Action::Edit(
                         iced::widget::text_editor::Edit::Paste(
@@ -645,7 +842,6 @@ impl ScrineverApp {
             // ========== Document notes ==========
             Message::NotesChanged(notes) => {
                 self.notes_text = notes;
-                // Sync to document
                 if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
                     if let Some(item) = project.binder.find_item_mut(&item_id) {
                         if let Some(ref mut doc) = item.document {
@@ -683,7 +879,6 @@ impl ScrineverApp {
                         if label_name == "None" {
                             item.metadata.label = None;
                         } else {
-                            // Find the label from project settings
                             let label = project.settings.labels.iter()
                                 .find(|l| l.name == label_name)
                                 .cloned();
@@ -701,12 +896,152 @@ impl ScrineverApp {
                 }
             }
 
+            // ========== Settings dialog ==========
+            Message::ShowSettings => {
+                self.show_settings_dialog = true;
+            }
+
+            Message::HideSettings => {
+                self.show_settings_dialog = false;
+            }
+
+            Message::SettingsSetProjectTitle(title) => {
+                if let Some(ref mut project) = self.project {
+                    project.title = title;
+                }
+            }
+
+            Message::SettingsSetFont(font) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.editor_font = font;
+                }
+            }
+
+            Message::SettingsSetFontSize(size_str) => {
+                if let Ok(size) = size_str.parse::<f32>() {
+                    if size > 0.0 && size <= 72.0 {
+                        if let Some(ref mut project) = self.project {
+                            project.settings.editor_font_size = size;
+                        }
+                    }
+                }
+            }
+
+            Message::SettingsZoomIn => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.editor_zoom = (project.settings.editor_zoom + 0.1).min(3.0);
+                }
+            }
+
+            Message::SettingsZoomOut => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.editor_zoom = (project.settings.editor_zoom - 0.1).max(0.5);
+                }
+            }
+
+            Message::SettingsSetTarget(target_str) => {
+                if let Some(ref mut project) = self.project {
+                    if let Ok(target) = target_str.parse::<usize>() {
+                        project.settings.target_word_count = Some(target);
+                    } else if target_str.is_empty() {
+                        project.settings.target_word_count = None;
+                    }
+                }
+            }
+
+            Message::SettingsSetAutoSave(interval_str) => {
+                if let Some(ref mut project) = self.project {
+                    if let Ok(secs) = interval_str.parse::<u32>() {
+                        project.settings.auto_save_seconds = secs;
+                    }
+                }
+            }
+
+            Message::SettingsToggleWordCount(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.show_word_count = val;
+                }
+            }
+
+            // ========== Writing session ==========
+            Message::SessionToggle => {
+                self.session_active = !self.session_active;
+                if self.session_active {
+                    self.session_start_word_count = self.current_word_count();
+                    self.session_stats = SessionStats::new();
+                }
+            }
+
+            Message::SessionReset => {
+                self.session_active = false;
+                self.session_stats = SessionStats::new();
+                self.session_start_word_count = self.current_word_count();
+            }
+
+            Message::SessionSetGoal(goal_str) => {
+                self.session_goal_text = goal_str.clone();
+                if let Ok(goal) = goal_str.parse::<usize>() {
+                    self.session_goal = goal;
+                } else if goal_str.is_empty() {
+                    self.session_goal = 0;
+                }
+            }
+
+            // ========== Import ==========
+            Message::ImportFiles => {
+                if let Some(ref mut project) = self.project {
+                    let home = dirs::home_dir().unwrap_or_default();
+                    let import_dir = home.join("Scrinever Import");
+                    if import_dir.exists() {
+                        let mut count = 0;
+                        if let Ok(entries) = std::fs::read_dir(&import_dir) {
+                            for entry in entries.flatten() {
+                                let path = entry.path();
+                                if path.is_file() {
+                                    let ext = path.extension()
+                                        .and_then(|e| e.to_str())
+                                        .unwrap_or("")
+                                        .to_lowercase();
+                                    if ext == "txt" || ext == "md" || ext == "markdown" || ext == "rtf" {
+                                        if let Ok(content) = std::fs::read_to_string(&path) {
+                                            let title = path.file_stem()
+                                                .and_then(|s| s.to_str())
+                                                .unwrap_or("Imported")
+                                                .to_string();
+                                            let mut item = BinderItem::new_text(&title);
+                                            if let Some(ref mut doc) = item.document {
+                                                doc.content = content;
+                                            }
+                                            project.binder.draft.add_child(item);
+                                            count += 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if count > 0 {
+                            self.notification = Some(format!("Imported {} file(s) from ~/Scrinever Import/", count));
+                        } else {
+                            self.notification = Some("No .txt/.md files found in ~/Scrinever Import/".to_string());
+                        }
+                    } else {
+                        let _ = std::fs::create_dir_all(&import_dir);
+                        self.notification = Some("Created ~/Scrinever Import/ — place .txt or .md files there and import again.".to_string());
+                    }
+                } else {
+                    self.notification = Some("Create or open a project first.".to_string());
+                }
+            }
+
             // ========== Misc ==========
             Message::Tick => {
-                // Auto-save: every ~30 ticks
+                // Auto-save
                 if self.project.is_some() && self.editor.dirty {
                     self.auto_save_counter += 1;
-                    if self.auto_save_counter >= 30 {
+                    let interval = self.project.as_ref()
+                        .map(|p| p.settings.auto_save_seconds)
+                        .unwrap_or(30);
+                    if interval > 0 && self.auto_save_counter >= interval {
                         self.auto_save_counter = 0;
                         self.sync_editor_to_project();
                         if let Some(ref mut project) = self.project {
@@ -717,6 +1052,13 @@ impl ScrineverApp {
                             }
                         }
                     }
+                }
+
+                // Writing session timer
+                if self.session_active {
+                    let current_words = self.current_word_count();
+                    let word_delta = current_words as i64 - self.session_start_word_count as i64;
+                    self.session_stats.update(word_delta, self.session_stats.time_elapsed_seconds + 1);
                 }
             }
 
@@ -729,6 +1071,8 @@ impl ScrineverApp {
                     self.fullscreen_editor = false;
                 } else if self.show_compile_dialog {
                     self.show_compile_dialog = false;
+                } else if self.show_settings_dialog {
+                    self.show_settings_dialog = false;
                 } else if self.bottom_panel != BottomPanel::None {
                     self.bottom_panel = BottomPanel::None;
                 } else if self.notification.is_some() {
@@ -751,6 +1095,11 @@ impl ScrineverApp {
         // Compile dialog (overlay)
         if self.show_compile_dialog {
             return views::compile_dialog::view(&self.compile_options);
+        }
+
+        // Settings dialog (overlay)
+        if self.show_settings_dialog {
+            return views::settings_dialog::view(&project.settings, &project.title);
         }
 
         // Fullscreen editor mode
@@ -848,6 +1197,17 @@ impl ScrineverApp {
                     .unwrap_or(&[]);
                 Some(views::snapshot_panel::view(snapshots))
             }
+            BottomPanel::Session => {
+                let session_data = views::session_panel::SessionData {
+                    is_active: self.session_active,
+                    elapsed_seconds: self.session_stats.time_elapsed_seconds,
+                    words_written: self.session_stats.words_written,
+                    words_per_minute: self.session_stats.words_per_minute,
+                    session_goal: self.session_goal,
+                    session_goal_text: self.session_goal_text.clone(),
+                };
+                Some(views::session_panel::view(&session_data))
+            }
             BottomPanel::None => None,
         };
 
@@ -910,6 +1270,8 @@ impl ScrineverApp {
                             "n" => Some(Message::NewDocument),
                             "f" => Some(Message::ShowBottomPanel(BottomPanel::Search)),
                             "e" => Some(Message::ShowCompileDialog),
+                            "i" => Some(Message::ToggleInspector),
+                            "," => Some(Message::ShowSettings),
                             _ => None,
                         }
                     }
@@ -918,7 +1280,6 @@ impl ScrineverApp {
             } else {
                 match key {
                     keyboard::Key::Named(keyboard::key::Named::Escape) => {
-                        // Escape dismisses any overlay — handled generically
                         Some(Message::EscapePressed)
                     }
                     keyboard::Key::Named(keyboard::key::Named::F11) => {

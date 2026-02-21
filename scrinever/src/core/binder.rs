@@ -94,6 +94,62 @@ impl Binder {
             .map(|d| d.word_count())
             .sum()
     }
+
+    /// Move an item up in its parent's children list
+    pub fn move_item_up(&mut self, id: &Uuid) -> bool {
+        if self.draft.move_child_up(id) { return true; }
+        if self.research.move_child_up(id) { return true; }
+        self.trash.move_child_up(id)
+    }
+
+    /// Move an item down in its parent's children list
+    pub fn move_item_down(&mut self, id: &Uuid) -> bool {
+        if self.draft.move_child_down(id) { return true; }
+        if self.research.move_child_down(id) { return true; }
+        self.trash.move_child_down(id)
+    }
+
+    /// Empty the trash permanently
+    pub fn empty_trash(&mut self) {
+        self.trash.children.clear();
+    }
+
+    /// Duplicate an item (creates a copy next to the original)
+    pub fn duplicate_item(&mut self, id: &Uuid) -> Option<Uuid> {
+        if let Some(new_id) = self.draft.duplicate_child(id) {
+            return Some(new_id);
+        }
+        if let Some(new_id) = self.research.duplicate_child(id) {
+            return Some(new_id);
+        }
+        None
+    }
+
+    /// Convert a text item into a folder (keeps content as a child document)
+    pub fn convert_to_folder(&mut self, id: &Uuid) -> bool {
+        if let Some(item) = self.find_item_mut(id) {
+            if item.kind == BinderItemKind::Text {
+                item.kind = BinderItemKind::Folder;
+                item.expanded = true;
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Convert a folder into a text item (merges children content)
+    pub fn convert_to_text(&mut self, id: &Uuid) -> bool {
+        if let Some(item) = self.find_item_mut(id) {
+            if item.kind == BinderItemKind::Folder && item.children.is_empty() {
+                item.kind = BinderItemKind::Text;
+                if item.document.is_none() {
+                    item.document = Some(Document::new());
+                }
+                return true;
+            }
+        }
+        false
+    }
 }
 
 /// A single item in the Binder tree — can be a folder or a text document
@@ -241,6 +297,100 @@ impl BinderItem {
     /// Get the depth of this item in the tree (for indentation)
     pub fn depth(&self) -> usize {
         0 // This needs to be computed from context
+    }
+
+    /// Find the parent of a child item by ID
+    pub fn find_parent(&self, id: &Uuid) -> Option<(&BinderItem, usize)> {
+        for (i, child) in self.children.iter().enumerate() {
+            if &child.id == id {
+                return Some((self, i));
+            }
+            if let Some(result) = child.find_parent(id) {
+                return Some(result);
+            }
+        }
+        None
+    }
+
+    /// Move a direct or nested child up in its parent's children list
+    pub fn move_child_up(&mut self, id: &Uuid) -> bool {
+        // Check direct children
+        if let Some(pos) = self.children.iter().position(|c| &c.id == id) {
+            if pos > 0 {
+                self.children.swap(pos, pos - 1);
+                return true;
+            }
+            return false;
+        }
+        // Check nested children
+        for child in &mut self.children {
+            if child.move_child_up(id) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Move a direct or nested child down in its parent's children list
+    pub fn move_child_down(&mut self, id: &Uuid) -> bool {
+        // Check direct children
+        if let Some(pos) = self.children.iter().position(|c| &c.id == id) {
+            if pos < self.children.len() - 1 {
+                self.children.swap(pos, pos + 1);
+                return true;
+            }
+            return false;
+        }
+        // Check nested children
+        for child in &mut self.children {
+            if child.move_child_down(id) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Duplicate a child item (deep clone with new IDs), insert after original
+    pub fn duplicate_child(&mut self, id: &Uuid) -> Option<Uuid> {
+        // Check direct children
+        if let Some(pos) = self.children.iter().position(|c| &c.id == id) {
+            let mut clone = self.children[pos].deep_clone();
+            let new_id = clone.id;
+            clone.title = format!("{} (Copy)", clone.title);
+            self.children.insert(pos + 1, clone);
+            return Some(new_id);
+        }
+        // Check nested children
+        for child in &mut self.children {
+            if let Some(new_id) = child.duplicate_child(id) {
+                return Some(new_id);
+            }
+        }
+        None
+    }
+
+    /// Deep clone: clone item with new UUIDs for self and all children
+    pub fn deep_clone(&self) -> Self {
+        let mut item = self.clone();
+        item.id = Uuid::new_v4();
+        for child in &mut item.children {
+            *child = child.deep_clone();
+        }
+        item
+    }
+
+    /// Merge all children's content into a single string
+    pub fn merge_children_content(&self) -> String {
+        let mut merged = String::new();
+        for child in &self.children {
+            if let Some(ref doc) = child.document {
+                if !merged.is_empty() {
+                    merged.push_str("\n\n---\n\n");
+                }
+                merged.push_str(&format!("## {}\n\n{}", child.title, doc.content));
+            }
+        }
+        merged
     }
 }
 

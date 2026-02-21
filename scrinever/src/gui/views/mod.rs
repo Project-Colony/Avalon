@@ -10,3 +10,5 @@ pub mod compile_dialog;
 pub mod search_panel;
 pub mod thesaurus_panel;
 pub mod snapshot_panel;
+pub mod settings_dialog;
+pub mod session_panel;

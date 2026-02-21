@@ -54,7 +54,3 @@ tokio = { version = "1", features = ["full"] }
 # Regex for search
 regex = "1"
 
-[profile.release]
-opt-level = 3
-lto = true
-strip = true

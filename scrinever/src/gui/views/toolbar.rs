@@ -14,6 +14,7 @@ pub fn view(
     let new_btn = tool_button("New", Message::NewProject);
     let open_btn = tool_button("Open", Message::OpenProject);
     let save_btn = tool_button("Save", Message::SaveProject);
+    let import_btn = tool_button("Import", Message::ImportFiles);
 
     let sep1 = text(" | ").size(14).color(Theme::TEXT_MUTED);
 
@@ -23,8 +24,7 @@ pub fn view(
 
     let sep2 = text(" | ").size(14).color(Theme::TEXT_MUTED);
 
-    let inspector_label = if show_inspector { "Inspector" } else { "Inspector" };
-    let inspector_btn = toggle_tool_button(inspector_label, show_inspector, Message::ToggleInspector);
+    let inspector_btn = toggle_tool_button("Inspector", show_inspector, Message::ToggleInspector);
 
     let fullscreen_label = if fullscreen { "Exit Focus" } else { "Focus" };
     let fullscreen_btn = tool_button(fullscreen_label, Message::ToggleFullscreen);
@@ -35,13 +35,18 @@ pub fn view(
     let search_btn = panel_button("Search", BottomPanel::Search, bottom_panel);
     let thesaurus_btn = panel_button("Thesaurus", BottomPanel::Thesaurus, bottom_panel);
     let snapshots_btn = panel_button("Snapshots", BottomPanel::Snapshots, bottom_panel);
+    let session_btn = panel_button("Session", BottomPanel::Session, bottom_panel);
 
+    let sep4 = text(" | ").size(14).color(Theme::TEXT_MUTED);
+
+    let settings_btn = tool_button("Settings", Message::ShowSettings);
     let compile_btn = tool_button("Compile", Message::ShowCompileDialog);
 
     let toolbar_content = row![
         new_btn,
         open_btn,
         save_btn,
+        import_btn,
         sep1,
         editor_btn,
         corkboard_btn,
@@ -53,7 +58,10 @@ pub fn view(
         search_btn,
         thesaurus_btn,
         snapshots_btn,
+        session_btn,
+        sep4,
         Space::with_width(Length::Fill),
+        settings_btn,
         compile_btn,
     ]
     .spacing(4)
