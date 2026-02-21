@@ -319,9 +319,16 @@ impl NameGenerator {
         vec![
             ("male", "Male (English)"),
             ("female", "Female (English)"),
+            ("surname", "Surname"),
             ("fantasy", "Fantasy"),
             ("place", "Place"),
             ("scifi", "Sci-Fi"),
+            ("medieval", "Medieval"),
+            ("title", "Title/Honorific"),
+            ("nickname", "Nickname"),
+            ("company", "Company"),
+            ("vehicle", "Ship/Vehicle"),
+            ("tavern", "Tavern/Inn"),
             ("japanese_m", "Japanese (M)"),
             ("japanese_f", "Japanese (F)"),
             ("chinese_m", "Chinese (M)"),
@@ -333,5 +340,41 @@ impl NameGenerator {
             ("arabic_m", "Arabic (M)"),
             ("arabic_f", "Arabic (F)"),
         ]
+    }
+
+    /// Total number of name types available
+    pub fn type_count() -> usize {
+        Self::available_types().len()
+    }
+
+    /// Generate a full character name (first + surname)
+    pub fn full_name(category: &str) -> String {
+        let first_batch = Self::generate_batch(category, 1);
+        let surname_batch = Self::generate_batch("surname", 1);
+        let first = first_batch.first().cloned().unwrap_or_default();
+        let surname = surname_batch.first().cloned().unwrap_or_default();
+        format!("{} {}", first, surname)
+    }
+
+    /// Generate multiple full character names
+    pub fn full_names(category: &str, count: usize) -> Vec<String> {
+        let mut names = Vec::new();
+        for _ in 0..count {
+            let name = Self::full_name(category);
+            if !names.contains(&name) {
+                names.push(name);
+            }
+            std::thread::sleep(std::time::Duration::from_nanos(100));
+        }
+        names
+    }
+
+    /// Check if a name type is culture-specific
+    pub fn is_culture_type(name_type: &str) -> bool {
+        matches!(name_type,
+            "japanese_m" | "japanese_f" | "chinese_m" | "chinese_f"
+            | "spanish_m" | "spanish_f" | "indian_m" | "indian_f"
+            | "arabic_m" | "arabic_f"
+        )
     }
 }
