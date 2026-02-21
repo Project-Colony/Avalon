@@ -263,3 +263,85 @@ pub fn estimate_file_size(contents: &[CompileContent], options: &CompileOptions)
 pub fn word_count(contents: &[CompileContent]) -> usize {
     contents.iter().map(|c| c.text.split_whitespace().count()).sum()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_content(title: &str, text: &str, is_folder: bool, depth: usize) -> CompileContent {
+        CompileContent {
+            title: title.to_string(),
+            text: text.to_string(),
+            depth,
+            is_folder,
+        }
+    }
+
+    fn make_opts() -> CompileOptions {
+        CompileOptions {
+            format: crate::export::compiler::OutputFormat::Epub,
+            title: "Test ePub".to_string(),
+            author: "Author".to_string(),
+            include_front_matter: false,
+            separator: crate::export::compiler::SeparatorType::EmptyLine,
+            page_break_between_folders: false,
+            compile_marked_only: false,
+            font_size: 12.0,
+            font_family: "serif".to_string(),
+            include_toc: false,
+            replace_placeholders: false,
+        }
+    }
+
+    #[test]
+    fn test_escape_xml() {
+        assert_eq!(escape_xml("<tag>"), "&lt;tag&gt;");
+        assert_eq!(escape_xml("a&b"), "a&amp;b");
+        assert_eq!(escape_xml("\"quotes\""), "&quot;quotes&quot;");
+        assert_eq!(escape_xml("it's"), "it&apos;s");
+    }
+
+    #[test]
+    fn test_estimate_chapter_count_with_folders() {
+        let contents = vec![
+            make_content("Ch 1", "", true, 0),
+            make_content("Scene 1", "text", false, 1),
+            make_content("Ch 2", "", true, 0),
+            make_content("Scene 2", "text", false, 1),
+        ];
+        let count = estimate_chapter_count(&contents);
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_estimate_chapter_count_no_folders() {
+        let contents = vec![
+            make_content("A", "text", false, 0),
+            make_content("B", "text", false, 0),
+        ];
+        // No folders → all text is one chapter
+        assert_eq!(estimate_chapter_count(&contents), 1);
+    }
+
+    #[test]
+    fn test_estimate_chapter_count_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(estimate_chapter_count(&contents), 1); // min 1
+    }
+
+    #[test]
+    fn test_estimate_file_size() {
+        let contents = vec![make_content("A", "some text here", false, 0)];
+        let size = estimate_file_size(&contents, &make_opts());
+        assert!(size > 3000); // base overhead
+    }
+
+    #[test]
+    fn test_word_count() {
+        let contents = vec![
+            make_content("A", "one two three", false, 0),
+            make_content("B", "four", false, 0),
+        ];
+        assert_eq!(word_count(&contents), 4);
+    }
+}

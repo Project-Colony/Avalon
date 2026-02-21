@@ -199,3 +199,90 @@ pub fn estimate_pages(contents: &[CompileContent], options: &CompileOptions) -> 
 
     (total_lines / lines_per_page).max(1)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::export::compiler::OutputFormat;
+
+    fn make_content(title: &str, text: &str, is_folder: bool, depth: usize) -> CompileContent {
+        CompileContent {
+            title: title.to_string(),
+            text: text.to_string(),
+            depth,
+            is_folder,
+        }
+    }
+
+    fn make_opts() -> CompileOptions {
+        CompileOptions {
+            format: OutputFormat::Pdf,
+            title: "Test PDF".to_string(),
+            author: "Author".to_string(),
+            include_front_matter: false,
+            separator: SeparatorType::EmptyLine,
+            page_break_between_folders: false,
+            compile_marked_only: false,
+            font_size: 12.0,
+            font_family: "Times New Roman".to_string(),
+            include_toc: false,
+            replace_placeholders: false,
+        }
+    }
+
+    #[test]
+    fn test_strip_markdown_bold() {
+        assert_eq!(strip_markdown("**bold**"), "bold");
+    }
+
+    #[test]
+    fn test_strip_markdown_italic() {
+        assert_eq!(strip_markdown("*italic*"), "italic");
+    }
+
+    #[test]
+    fn test_strip_markdown_strikethrough() {
+        assert_eq!(strip_markdown("~~strike~~"), "strike");
+    }
+
+    #[test]
+    fn test_strip_markdown_heading() {
+        assert_eq!(strip_markdown("# Heading"), "Heading");
+        assert_eq!(strip_markdown("## Sub"), "Sub");
+    }
+
+    #[test]
+    fn test_strip_markdown_blockquote() {
+        assert_eq!(strip_markdown("> Quote text"), "Quote text");
+    }
+
+    #[test]
+    fn test_strip_markdown_plain() {
+        assert_eq!(strip_markdown("Plain text"), "Plain text");
+    }
+
+    #[test]
+    fn test_word_count() {
+        let contents = vec![
+            make_content("A", "one two three", false, 0),
+            make_content("B", "four", false, 0),
+        ];
+        assert_eq!(word_count(&contents), 4);
+    }
+
+    #[test]
+    fn test_char_count() {
+        let contents = vec![make_content("A", "hello", false, 0)];
+        assert_eq!(char_count(&contents), 5);
+    }
+
+    #[test]
+    fn test_estimate_pages() {
+        let contents = vec![
+            make_content("Ch1", "", true, 0),
+            make_content("A", &"Some text here.\n".repeat(100), false, 1),
+        ];
+        let pages = estimate_pages(&contents, &make_opts());
+        assert!(pages >= 1);
+    }
+}

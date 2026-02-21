@@ -223,3 +223,137 @@ pub fn extract_headings(contents: &[CompileContent]) -> Vec<(String, usize)> {
         .map(|c| (c.title.clone(), c.depth))
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::export::compiler::OutputFormat;
+
+    fn make_opts() -> CompileOptions {
+        CompileOptions {
+            format: OutputFormat::Html,
+            title: "Test Book".to_string(),
+            author: "Test Author".to_string(),
+            include_front_matter: false,
+            separator: SeparatorType::EmptyLine,
+            page_break_between_folders: false,
+            compile_marked_only: false,
+            font_size: 12.0,
+            font_family: "Times New Roman".to_string(),
+            include_toc: false,
+            replace_placeholders: false,
+        }
+    }
+
+    fn make_content(title: &str, text: &str, is_folder: bool, depth: usize) -> CompileContent {
+        CompileContent {
+            title: title.to_string(),
+            text: text.to_string(),
+            depth,
+            is_folder,
+        }
+    }
+
+    #[test]
+    fn test_compile_basic() {
+        let contents = vec![make_content("Scene 1", "Hello world.", false, 1)];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("<!DOCTYPE html>"));
+        assert!(result.contains("Hello world."));
+        assert!(result.contains("<title>Test Book</title>"));
+    }
+
+    #[test]
+    fn test_compile_with_front_matter() {
+        let mut opts = make_opts();
+        opts.include_front_matter = true;
+        let contents = vec![make_content("Scene", "Content.", false, 1)];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("<h1>Test Book</h1>"));
+        assert!(result.contains("Test Author"));
+    }
+
+    #[test]
+    fn test_compile_folder_heading() {
+        let contents = vec![
+            make_content("Chapter One", "", true, 0),
+            make_content("Scene 1", "Text here.", false, 1),
+        ];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("Chapter One"));
+        assert!(result.contains("<h1"));
+    }
+
+    #[test]
+    fn test_escape_html_special_chars() {
+        assert_eq!(escape_html("<script>"), "&lt;script&gt;");
+        assert_eq!(escape_html("a&b"), "a&amp;b");
+        assert_eq!(escape_html("\"quotes\""), "&quot;quotes&quot;");
+    }
+
+    #[test]
+    fn test_slug_generation() {
+        assert_eq!(slug("Chapter One"), "chapter-one");
+        assert_eq!(slug("Hello World!"), "hello-world");
+        assert_eq!(slug("test"), "test");
+    }
+
+    #[test]
+    fn test_separator_html_types() {
+        assert!(separator_html(&SeparatorType::EmptyLine).contains("<br>"));
+        assert!(separator_html(&SeparatorType::PageBreak).contains("page-break"));
+        assert!(separator_html(&SeparatorType::SectionBreak).contains("section-break"));
+        assert!(separator_html(&SeparatorType::Custom("***".to_string())).contains("***"));
+        assert!(separator_html(&SeparatorType::None).is_empty());
+    }
+
+    #[test]
+    fn test_generate_toc() {
+        let contents = vec![
+            make_content("Chapter 1", "", true, 0),
+            make_content("Scene 1", "Text.", false, 1),
+            make_content("Chapter 2", "", true, 0),
+        ];
+        let toc = generate_toc(&contents);
+        assert!(toc.contains("Table of Contents"));
+        assert!(toc.contains("Chapter 1"));
+        assert!(toc.contains("Chapter 2"));
+    }
+
+    #[test]
+    fn test_word_and_char_count() {
+        let contents = vec![
+            make_content("A", "one two three", false, 0),
+            make_content("B", "four five", false, 0),
+        ];
+        assert_eq!(word_count(&contents), 5);
+        assert!(char_count(&contents) > 0);
+    }
+
+    #[test]
+    fn test_estimate_output_size() {
+        let contents = vec![make_content("A", "Some text here", false, 0)];
+        let size = estimate_output_size(&contents, &make_opts());
+        assert!(size > 1500);
+    }
+
+    #[test]
+    fn test_strip_html_tags() {
+        assert_eq!(strip_html_tags("<p>Hello</p>"), "Hello");
+        assert_eq!(strip_html_tags("<b>bold</b> text"), "bold text");
+        assert_eq!(strip_html_tags("no tags"), "no tags");
+    }
+
+    #[test]
+    fn test_extract_headings() {
+        let contents = vec![
+            make_content("Chapter 1", "", true, 0),
+            make_content("Scene 1", "text", false, 1),
+            make_content("Chapter 2", "", true, 0),
+        ];
+        let headings = extract_headings(&contents);
+        assert_eq!(headings.len(), 2);
+        assert_eq!(headings[0].0, "Chapter 1");
+        assert_eq!(headings[1].0, "Chapter 2");
+    }
+}

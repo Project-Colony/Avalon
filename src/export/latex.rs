@@ -327,3 +327,127 @@ pub fn required_packages() -> Vec<&'static str> {
         "hyperref", "fancyhdr", "graphicx", "longtable", "enumitem",
     ]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::export::compiler::OutputFormat;
+
+    fn make_opts() -> CompileOptions {
+        CompileOptions {
+            format: OutputFormat::Latex,
+            title: "Test Book".to_string(),
+            author: "Author Name".to_string(),
+            include_front_matter: false,
+            separator: SeparatorType::EmptyLine,
+            page_break_between_folders: false,
+            compile_marked_only: false,
+            font_size: 12.0,
+            font_family: "Times New Roman".to_string(),
+            include_toc: false,
+            replace_placeholders: false,
+        }
+    }
+
+    fn make_content(title: &str, text: &str, is_folder: bool, depth: usize) -> CompileContent {
+        CompileContent {
+            title: title.to_string(),
+            text: text.to_string(),
+            depth,
+            is_folder,
+        }
+    }
+
+    #[test]
+    fn test_compile_basic() {
+        let contents = vec![make_content("Scene 1", "Hello world.", false, 1)];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("\\documentclass"));
+        assert!(result.contains("\\begin{document}"));
+        assert!(result.contains("\\end{document}"));
+        assert!(result.contains("Hello world."));
+    }
+
+    #[test]
+    fn test_compile_with_front_matter() {
+        let mut opts = make_opts();
+        opts.include_front_matter = true;
+        let contents = vec![make_content("Scene", "Text.", false, 1)];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("\\maketitle"));
+        assert!(result.contains("\\title{Test Book}"));
+        assert!(result.contains("\\author{Author Name}"));
+    }
+
+    #[test]
+    fn test_compile_folder_depths() {
+        let contents = vec![
+            make_content("L0", "", true, 0),
+            make_content("L1", "", true, 1),
+            make_content("L2", "", true, 2),
+            make_content("L3", "", true, 3),
+        ];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("\\section{L0}"));
+        assert!(result.contains("\\subsection{L1}"));
+        assert!(result.contains("\\subsubsection{L2}"));
+        assert!(result.contains("\\paragraph{L3}"));
+    }
+
+    #[test]
+    fn test_escape_latex() {
+        assert!(escape_latex("$100").contains("\\$"));
+        assert!(escape_latex("50%").contains("\\%"));
+        assert!(escape_latex("a&b").contains("\\&"));
+        assert!(escape_latex("c#d").contains("\\#"));
+        assert!(escape_latex("a_b").contains("\\_"));
+    }
+
+    #[test]
+    fn test_inline_bold() {
+        let result = convert_inline_formatting("**bold**");
+        assert!(result.contains("\\textbf{bold}"));
+    }
+
+    #[test]
+    fn test_inline_italic() {
+        let result = convert_inline_formatting("*italic*");
+        assert!(result.contains("\\textit{italic}"));
+    }
+
+    #[test]
+    fn test_inline_code() {
+        let result = convert_inline_formatting("`code`");
+        assert!(result.contains("\\texttt{code}"));
+    }
+
+    #[test]
+    fn test_parse_heading() {
+        assert!(parse_heading("# Title").unwrap().contains("\\section*{Title}"));
+        assert!(parse_heading("## Sub").unwrap().contains("\\subsection*{Sub}"));
+        assert!(parse_heading("Not heading").is_none());
+    }
+
+    #[test]
+    fn test_separator_types() {
+        assert!(separator_latex(&SeparatorType::EmptyLine).contains("\\bigskip"));
+        assert!(separator_latex(&SeparatorType::PageBreak).contains("\\newpage"));
+        assert!(separator_latex(&SeparatorType::SectionBreak).contains("\\ast"));
+        assert!(separator_latex(&SeparatorType::None).is_empty());
+    }
+
+    #[test]
+    fn test_word_count_and_pages() {
+        let contents = vec![make_content("A", &"word ".repeat(500), false, 0)];
+        assert_eq!(word_count(&contents), 500);
+        assert_eq!(estimate_pages(&contents), 2);
+    }
+
+    #[test]
+    fn test_required_packages() {
+        let pkgs = required_packages();
+        assert!(pkgs.contains(&"inputenc"));
+        assert!(pkgs.contains(&"hyperref"));
+        assert!(pkgs.len() >= 9);
+    }
+}

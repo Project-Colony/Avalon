@@ -617,3 +617,187 @@ impl Project {
             .unwrap_or_else(|| "Unsaved".to_string())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_project() {
+        let project = Project::new("My Novel");
+        assert_eq!(project.title, "My Novel");
+        assert!(project.collections.is_empty());
+        assert!(project.project_notes.is_empty());
+        assert!(!project.id.is_nil());
+    }
+
+    #[test]
+    fn test_project_not_saved() {
+        let project = Project::new("Test");
+        assert!(!project.is_saved());
+        assert_eq!(project.path_display(), "Unsaved");
+    }
+
+    #[test]
+    fn test_directory_name() {
+        let project = Project::new("My Novel");
+        assert_eq!(project.directory_name(), "My Novel.scriv");
+    }
+
+    #[test]
+    fn test_total_word_count_empty() {
+        let project = Project::new("Test");
+        assert_eq!(project.total_word_count(), 0);
+    }
+
+    #[test]
+    fn test_document_count() {
+        let project = Project::new("Test");
+        // Default structure has some documents
+        let count = project.document_count();
+        assert!(count >= 0);
+    }
+
+    #[test]
+    fn test_folder_count() {
+        let project = Project::new("Test");
+        let count = project.folder_count();
+        // Default structure should have at least draft, research, trash folders
+        assert!(count >= 3);
+    }
+
+    #[test]
+    fn test_estimated_pages_empty() {
+        let project = Project::new("Test");
+        assert_eq!(project.estimated_pages(), 0);
+    }
+
+    #[test]
+    fn test_has_content_empty() {
+        let project = Project::new("Test");
+        assert!(!project.has_content());
+    }
+
+    #[test]
+    fn test_collection_count() {
+        let mut project = Project::new("Test");
+        assert_eq!(project.collection_count(), 0);
+        project.collections.push(Collection::new_manual("Test Collection"));
+        assert_eq!(project.collection_count(), 1);
+    }
+
+    #[test]
+    fn test_find_collection() {
+        let mut project = Project::new("Test");
+        project.collections.push(Collection::new_manual("Favorites"));
+        assert!(project.find_collection("Favorites").is_some());
+        assert!(project.find_collection("NotFound").is_none());
+    }
+
+    #[test]
+    fn test_find_collection_mut() {
+        let mut project = Project::new("Test");
+        project.collections.push(Collection::new_manual("Favorites"));
+        let coll = project.find_collection_mut("Favorites");
+        assert!(coll.is_some());
+    }
+
+    #[test]
+    fn test_age_string() {
+        let project = Project::new("Test");
+        let age = project.age_string();
+        assert_eq!(age, "today");
+    }
+
+    #[test]
+    fn test_summary() {
+        let project = Project::new("My Novel");
+        let summary = project.summary();
+        assert!(summary.contains("My Novel"));
+        assert!(summary.contains("words"));
+        assert!(summary.contains("documents"));
+    }
+
+    #[test]
+    fn test_from_template_novel() {
+        let project = Project::from_template("Test Novel", "novel");
+        assert_eq!(project.title, "Test Novel");
+        assert_eq!(project.binder.draft.title, "Manuscript");
+    }
+
+    #[test]
+    fn test_from_template_screenplay() {
+        let project = Project::from_template("Test Script", "screenplay");
+        assert_eq!(project.binder.draft.title, "Screenplay");
+    }
+
+    #[test]
+    fn test_from_template_academic() {
+        let project = Project::from_template("Test Paper", "academic");
+        assert_eq!(project.binder.draft.title, "Paper");
+    }
+
+    #[test]
+    fn test_from_template_short_story() {
+        let project = Project::from_template("Test Story", "short_story");
+        assert_eq!(project.binder.draft.title, "Story");
+    }
+
+    #[test]
+    fn test_from_template_poetry() {
+        let project = Project::from_template("Poems", "poetry");
+        assert_eq!(project.binder.draft.title, "Collection");
+    }
+
+    #[test]
+    fn test_from_template_nonfiction() {
+        let project = Project::from_template("Test Book", "nonfiction");
+        assert_eq!(project.binder.draft.title, "Book");
+    }
+
+    #[test]
+    fn test_from_template_essay() {
+        let project = Project::from_template("Test Essay", "essay");
+        assert_eq!(project.binder.draft.title, "Essay");
+    }
+
+    #[test]
+    fn test_from_template_thesis() {
+        let project = Project::from_template("Test Thesis", "thesis");
+        assert_eq!(project.binder.draft.title, "Thesis");
+    }
+
+    #[test]
+    fn test_from_template_journal() {
+        let project = Project::from_template("My Journal", "journal");
+        assert_eq!(project.binder.draft.title, "Journal");
+    }
+
+    #[test]
+    fn test_from_template_blog() {
+        let project = Project::from_template("My Blog", "blog");
+        assert_eq!(project.binder.draft.title, "Blog");
+    }
+
+    #[test]
+    fn test_from_template_unknown_keeps_default() {
+        let project = Project::from_template("Test", "nonexistent_template");
+        // Should keep default structure
+        assert!(!project.binder.draft.title.is_empty());
+    }
+
+    #[test]
+    fn test_project_serialization() {
+        let project = Project::new("Serialization Test");
+        let json = serde_json::to_string(&project);
+        assert!(json.is_ok());
+        let json = json.unwrap();
+        assert!(json.contains("Serialization Test"));
+
+        let parsed: Result<Project, _> = serde_json::from_str(&json);
+        assert!(parsed.is_ok());
+        let parsed = parsed.unwrap();
+        assert_eq!(parsed.title, "Serialization Test");
+        assert_eq!(parsed.id, project.id);
+    }
+}

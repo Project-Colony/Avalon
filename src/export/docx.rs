@@ -287,3 +287,91 @@ pub fn paragraph_count(contents: &[CompileContent]) -> usize {
         .map(|c| c.text.split("\n\n").filter(|p| !p.trim().is_empty()).count())
         .sum()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_content(title: &str, text: &str, is_folder: bool, depth: usize) -> CompileContent {
+        CompileContent {
+            title: title.to_string(),
+            text: text.to_string(),
+            depth,
+            is_folder,
+        }
+    }
+
+    #[test]
+    fn test_parse_md_heading() {
+        let h1 = parse_md_heading("# Title");
+        assert!(h1.is_some());
+        let (level, text) = h1.unwrap();
+        assert_eq!(level, 1);
+        assert_eq!(text, "Title");
+
+        let h2 = parse_md_heading("## Subtitle");
+        assert_eq!(h2.unwrap().0, 2);
+
+        assert!(parse_md_heading("Not a heading").is_none());
+        assert!(parse_md_heading("# ").is_none()); // Empty heading
+    }
+
+    #[test]
+    fn test_parse_inline_runs_plain() {
+        let runs = parse_inline_runs("Hello world", 12.0);
+        assert!(!runs.is_empty());
+    }
+
+    #[test]
+    fn test_parse_inline_runs_bold() {
+        let runs = parse_inline_runs("before **bold** after", 12.0);
+        assert!(runs.len() >= 3); // before, bold, after
+    }
+
+    #[test]
+    fn test_parse_inline_runs_italic() {
+        let runs = parse_inline_runs("before *italic* after", 12.0);
+        assert!(runs.len() >= 3);
+    }
+
+    #[test]
+    fn test_find_closing_double() {
+        let chars: Vec<char> = "hello**".chars().collect();
+        assert_eq!(find_closing_double(&chars, 0, '*'), Some(5));
+    }
+
+    #[test]
+    fn test_find_closing_single() {
+        let chars: Vec<char> = "hello*".chars().collect();
+        assert_eq!(find_closing_single(&chars, 0, '*'), Some(5));
+    }
+
+    #[test]
+    fn test_estimate_pages() {
+        let contents = vec![make_content("A", &"word ".repeat(500), false, 0)];
+        assert_eq!(estimate_pages(&contents), 2);
+    }
+
+    #[test]
+    fn test_word_count() {
+        let contents = vec![
+            make_content("A", "one two three", false, 0),
+            make_content("B", "four five", false, 0),
+        ];
+        assert_eq!(word_count(&contents), 5);
+    }
+
+    #[test]
+    fn test_char_count() {
+        let contents = vec![make_content("A", "hello", false, 0)];
+        assert_eq!(char_count(&contents), 5);
+    }
+
+    #[test]
+    fn test_paragraph_count() {
+        let contents = vec![
+            make_content("A", "First paragraph.\n\nSecond paragraph.", false, 0),
+        ];
+        assert_eq!(paragraph_count(&contents), 2);
+    }
+}

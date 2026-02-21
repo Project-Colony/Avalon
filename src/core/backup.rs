@@ -266,3 +266,126 @@ impl BackupEntry {
             .unwrap_or_else(|| self.name.clone())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_entry(name: &str, timestamp: &str, size: u64) -> BackupEntry {
+        BackupEntry {
+            path: PathBuf::from(format!("/backups/{}", name)),
+            name: name.to_string(),
+            timestamp: timestamp.to_string(),
+            size_bytes: size,
+        }
+    }
+
+    #[test]
+    fn test_display_size_bytes() {
+        let entry = make_entry("test.backup.json", "20260101_120000", 500);
+        assert_eq!(entry.display_size(), "500 B");
+    }
+
+    #[test]
+    fn test_display_size_kilobytes() {
+        let entry = make_entry("test.backup.json", "20260101_120000", 2048);
+        assert_eq!(entry.display_size(), "2.0 KB");
+    }
+
+    #[test]
+    fn test_display_size_megabytes() {
+        let entry = make_entry("test.backup.json", "20260101_120000", 5 * 1024 * 1024);
+        assert_eq!(entry.display_size(), "5.0 MB");
+    }
+
+    #[test]
+    fn test_display_size_gigabytes() {
+        let entry = make_entry("test.backup.json", "20260101_120000", 2 * 1024 * 1024 * 1024);
+        assert_eq!(entry.display_size(), "2.00 GB");
+    }
+
+    #[test]
+    fn test_display_timestamp_valid() {
+        let entry = make_entry("test.backup.json", "20260215_143022", 100);
+        assert_eq!(entry.display_timestamp(), "2026-02-15 14:30:22");
+    }
+
+    #[test]
+    fn test_display_timestamp_short() {
+        let entry = make_entry("test.backup.json", "short", 100);
+        assert_eq!(entry.display_timestamp(), "short");
+    }
+
+    #[test]
+    fn test_parsed_timestamp_valid() {
+        let entry = make_entry("test.backup.json", "20260115_093045", 100);
+        let ts = entry.parsed_timestamp();
+        assert!(ts.is_some());
+        let ts = ts.unwrap();
+        assert_eq!(ts.date().to_string(), "2026-01-15");
+    }
+
+    #[test]
+    fn test_parsed_timestamp_invalid() {
+        let entry = make_entry("test.backup.json", "bad", 100);
+        assert!(entry.parsed_timestamp().is_none());
+    }
+
+    #[test]
+    fn test_age_string_returns_something() {
+        // Use a recent timestamp so we get a valid age
+        let entry = make_entry("test.backup.json", "20260220_120000", 100);
+        let age = entry.age_string();
+        // Should not be empty since the timestamp is valid
+        assert!(!age.is_empty());
+    }
+
+    #[test]
+    fn test_age_string_invalid_timestamp() {
+        let entry = make_entry("test.backup.json", "x", 100);
+        assert_eq!(entry.age_string(), "");
+    }
+
+    #[test]
+    fn test_format_bytes_static() {
+        assert_eq!(BackupEntry::format_bytes(0), "0 B");
+        assert_eq!(BackupEntry::format_bytes(512), "512 B");
+        assert_eq!(BackupEntry::format_bytes(1024), "1.0 KB");
+        assert_eq!(BackupEntry::format_bytes(1024 * 1024), "1.0 MB");
+    }
+
+    #[test]
+    fn test_is_from_today() {
+        // Build a timestamp for today
+        let now = chrono::Utc::now();
+        let ts = now.format("%Y%m%d_%H%M%S").to_string();
+        let entry = make_entry("test.backup.json", &ts, 100);
+        assert!(entry.is_from_today());
+    }
+
+    #[test]
+    fn test_is_not_from_today() {
+        let entry = make_entry("test.backup.json", "20200101_120000", 100);
+        assert!(!entry.is_from_today());
+    }
+
+    #[test]
+    fn test_project_name_from_filename() {
+        let entry = make_entry("MyNovel_20260101_120000.backup.json", "20260101_120000", 100);
+        assert_eq!(entry.project_name(), "MyNovel");
+    }
+
+    #[test]
+    fn test_exists_returns_false_for_fake_path() {
+        let entry = make_entry("nonexistent.backup.json", "20260101_120000", 100);
+        assert!(!entry.exists());
+    }
+
+    #[test]
+    fn test_backup_dir_path() {
+        let path = BackupManager::backup_dir_path();
+        assert!(path.is_ok());
+        let path = path.unwrap();
+        assert!(path.to_str().unwrap().contains("Scrinever Backups"));
+    }
+}

@@ -253,3 +253,157 @@ pub fn screenplay_summary(input: &str) -> String {
         scenes, chars.len(), dialogues, pages
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::export::compiler::OutputFormat;
+
+    fn make_opts() -> CompileOptions {
+        CompileOptions {
+            format: OutputFormat::Fountain,
+            title: "Test Screenplay".to_string(),
+            author: "Screenwriter".to_string(),
+            include_front_matter: false,
+            separator: crate::export::compiler::SeparatorType::EmptyLine,
+            page_break_between_folders: false,
+            compile_marked_only: false,
+            font_size: 12.0,
+            font_family: "Courier".to_string(),
+            include_toc: false,
+            replace_placeholders: false,
+        }
+    }
+
+    fn make_content(title: &str, text: &str, is_folder: bool, depth: usize) -> CompileContent {
+        CompileContent {
+            title: title.to_string(),
+            text: text.to_string(),
+            depth,
+            is_folder,
+        }
+    }
+
+    #[test]
+    fn test_compile_basic() {
+        let contents = vec![make_content("Scene 1", "Some action text.", false, 1)];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("Some action text."));
+    }
+
+    #[test]
+    fn test_compile_with_front_matter() {
+        let mut opts = make_opts();
+        opts.include_front_matter = true;
+        let contents = vec![make_content("Scene", "Text.", false, 1)];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("Title: Test Screenplay"));
+        assert!(result.contains("Author: Screenwriter"));
+    }
+
+    #[test]
+    fn test_compile_folder_as_act() {
+        let contents = vec![
+            make_content("Act I", "", true, 0),
+            make_content("Scene 1", "Action.", false, 1),
+        ];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("# ACT I"));
+    }
+
+    #[test]
+    fn test_is_scene_heading() {
+        assert!(is_scene_heading("INT. OFFICE - DAY"));
+        assert!(is_scene_heading("EXT. PARK - NIGHT"));
+        assert!(is_scene_heading("EST. CITY SKYLINE"));
+        assert!(is_scene_heading("I/E. CAR - MOVING"));
+        assert!(is_scene_heading(".FLASHBACK"));
+        assert!(!is_scene_heading("Regular text"));
+    }
+
+    #[test]
+    fn test_is_transition() {
+        assert!(is_transition("CUT TO:"));
+        assert!(is_transition("FADE OUT."));
+        assert!(is_transition("FADE IN:"));
+        assert!(is_transition("SMASH CUT:"));
+        assert!(!is_transition("Regular text"));
+    }
+
+    #[test]
+    fn test_is_character_cue() {
+        assert!(is_character_cue("JOHN"));
+        assert!(is_character_cue("MARY JANE"));
+        assert!(!is_character_cue("hello"));
+        assert!(!is_character_cue("INT. OFFICE"));
+        assert!(!is_character_cue(""));
+        assert!(!is_character_cue("A")); // Too short
+    }
+
+    #[test]
+    fn test_scene_count() {
+        let input = "INT. OFFICE - DAY\n\nSome action.\n\nEXT. PARK - NIGHT\n\nMore action.";
+        assert_eq!(scene_count(input), 2);
+    }
+
+    #[test]
+    fn test_scene_count_empty() {
+        assert_eq!(scene_count("No scenes here."), 0);
+    }
+
+    #[test]
+    fn test_extract_characters() {
+        let input = "INT. OFFICE - DAY\n\nJOHN\nHello there.\n\nMARY\nHi John.\n\nJOHN\nHow are you?";
+        let chars = extract_characters(input);
+        assert!(chars.contains(&"JOHN".to_string()));
+        assert!(chars.contains(&"MARY".to_string()));
+        assert_eq!(chars.len(), 2); // JOHN should not be duplicated
+    }
+
+    #[test]
+    fn test_dialogue_count() {
+        let input = "INT. OFFICE\n\nJOHN\nHello.\n\nMARY\nHi.\n";
+        assert_eq!(dialogue_count(input), 2);
+    }
+
+    #[test]
+    fn test_parse_fountain() {
+        let input = "INT. OFFICE - DAY\n\nSome action.\n\nEXT. PARK\n\nMore action.";
+        let sections = parse_fountain(input);
+        assert!(sections.len() >= 2);
+    }
+
+    #[test]
+    fn test_parse_title_page() {
+        let input = "Title: My Script\nAuthor: Writer\nDraft date: 2026-01-01\n\nINT. OFFICE";
+        let meta = parse_title_page(input);
+        assert_eq!(meta.len(), 3);
+        assert_eq!(meta[0].0, "Title");
+        assert_eq!(meta[0].1, "My Script");
+        assert_eq!(meta[1].0, "Author");
+    }
+
+    #[test]
+    fn test_estimate_page_count() {
+        // 56 lines per page
+        let input = (0..120).map(|i| format!("Line {}", i)).collect::<Vec<_>>().join("\n");
+        let pages = estimate_page_count(&input);
+        assert!(pages >= 2);
+    }
+
+    #[test]
+    fn test_transition_count() {
+        let input = "INT. OFFICE\n\nAction.\n\nCUT TO:\n\nEXT. PARK\n\nFADE OUT.";
+        assert_eq!(transition_count(input), 2);
+    }
+
+    #[test]
+    fn test_screenplay_summary() {
+        let input = "INT. OFFICE - DAY\n\nJOHN\nHello.\n\nCUT TO:\n\nEXT. PARK\n\nMARY\nHi.";
+        let summary = screenplay_summary(input);
+        assert!(summary.contains("scenes"));
+        assert!(summary.contains("characters"));
+        assert!(summary.contains("dialogue blocks"));
+        assert!(summary.contains("pages"));
+    }
+}
