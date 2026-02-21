@@ -229,4 +229,132 @@ impl EditorAction {
             _ => "",
         }
     }
+
+    /// Whether this action is a cursor movement (no text modification)
+    pub fn is_movement(&self) -> bool {
+        matches!(
+            self,
+            EditorAction::MoveToLineStart
+                | EditorAction::MoveToLineEnd
+                | EditorAction::MoveToDocStart
+                | EditorAction::MoveToDocEnd
+                | EditorAction::MoveWordForward
+                | EditorAction::MoveWordBackward
+                | EditorAction::GoToLine(_)
+        )
+    }
+
+    /// Whether this action is a selection action
+    pub fn is_selection(&self) -> bool {
+        matches!(
+            self,
+            EditorAction::SelectAll
+                | EditorAction::SelectWord
+                | EditorAction::SelectLine
+                | EditorAction::SelectParagraph
+        )
+    }
+
+    /// Whether this action is a formatting toggle
+    pub fn is_formatting(&self) -> bool {
+        matches!(
+            self,
+            EditorAction::ToggleBold
+                | EditorAction::ToggleItalic
+                | EditorAction::ToggleUnderline
+                | EditorAction::ToggleStrikethrough
+                | EditorAction::ToggleComment
+                | EditorAction::ToUppercase
+                | EditorAction::ToLowercase
+                | EditorAction::ToTitleCase
+        )
+    }
+
+    /// Whether this action inserts content
+    pub fn is_insertion(&self) -> bool {
+        matches!(
+            self,
+            EditorAction::Insert(_)
+                | EditorAction::InsertHeading(_)
+                | EditorAction::InsertBlockQuote
+                | EditorAction::InsertHorizontalRule
+                | EditorAction::InsertFootnote(_)
+                | EditorAction::InsertCodeBlock(_)
+                | EditorAction::InsertLink { .. }
+                | EditorAction::InsertImage { .. }
+                | EditorAction::InsertComment(_)
+                | EditorAction::InsertPageBreak
+                | EditorAction::InsertListItem(_)
+                | EditorAction::InsertTable { .. }
+                | EditorAction::InsertDateTime(_)
+                | EditorAction::SmartPaste(_)
+        )
+    }
+
+    /// Whether this action can be undone
+    pub fn is_undoable(&self) -> bool {
+        self.is_editing()
+    }
+
+    /// Category string for grouping in menus
+    pub fn category(&self) -> &str {
+        if self.is_movement() {
+            "Navigation"
+        } else if self.is_selection() {
+            "Selection"
+        } else if self.is_formatting() {
+            "Formatting"
+        } else if self.is_insertion() {
+            "Insert"
+        } else if matches!(self, EditorAction::Undo | EditorAction::Redo) {
+            "History"
+        } else if matches!(self, EditorAction::Find(_) | EditorAction::Replace { .. } | EditorAction::ReplaceAll { .. }) {
+            "Find & Replace"
+        } else {
+            "Edit"
+        }
+    }
+}
+
+impl ListStyle {
+    /// Markdown prefix for this list style
+    pub fn prefix(&self) -> &str {
+        match self {
+            ListStyle::Bullet => "- ",
+            ListStyle::Numbered => "1. ",
+            ListStyle::Checkbox => "- [ ] ",
+        }
+    }
+
+    /// Human-readable label
+    pub fn label(&self) -> &str {
+        match self {
+            ListStyle::Bullet => "Bullet List",
+            ListStyle::Numbered => "Numbered List",
+            ListStyle::Checkbox => "Checkbox List",
+        }
+    }
+}
+
+impl DateTimeFormat {
+    /// Format the current date/time according to this format
+    pub fn format_now(&self) -> String {
+        let now = chrono::Local::now();
+        match self {
+            DateTimeFormat::DateOnly => now.format("%Y-%m-%d").to_string(),
+            DateTimeFormat::TimeOnly => now.format("%H:%M").to_string(),
+            DateTimeFormat::DateTime => now.format("%Y-%m-%d %H:%M").to_string(),
+            DateTimeFormat::Iso8601 => now.format("%Y-%m-%dT%H:%M:%S%z").to_string(),
+        }
+    }
+
+    /// Human-readable label
+    pub fn label(&self) -> &str {
+        match self {
+            DateTimeFormat::DateOnly => "Date Only",
+            DateTimeFormat::TimeOnly => "Time Only",
+            DateTimeFormat::DateTime => "Date & Time",
+            DateTimeFormat::Iso8601 => "ISO 8601",
+        }
+    }
 }

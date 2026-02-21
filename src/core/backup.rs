@@ -214,4 +214,55 @@ impl BackupManager {
         let backups = Self::list_backups(project_name)?;
         Ok(backups.len())
     }
+
+    /// Get the most recent backup for a project
+    pub fn latest_backup(project_name: &str) -> Result<Option<BackupEntry>> {
+        let backups = Self::list_backups(project_name)?;
+        Ok(backups.into_iter().next())
+    }
+
+    /// Get the backup directory path (public accessor)
+    pub fn backup_dir_path() -> Result<PathBuf> {
+        Self::backup_directory()
+    }
+
+    /// Get total backup size as a human-readable string
+    pub fn total_backup_size_display(project_name: &str) -> Result<String> {
+        let total = Self::total_backup_size(project_name)?;
+        Ok(BackupEntry::format_bytes(total))
+    }
+}
+
+impl BackupEntry {
+    /// Format bytes into human-readable size string
+    pub fn format_bytes(bytes: u64) -> String {
+        if bytes < 1024 {
+            format!("{} B", bytes)
+        } else if bytes < 1024 * 1024 {
+            format!("{:.1} KB", bytes as f64 / 1024.0)
+        } else if bytes < 1024 * 1024 * 1024 {
+            format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+        } else {
+            format!("{:.2} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
+        }
+    }
+
+    /// Check if this backup is from today
+    pub fn is_from_today(&self) -> bool {
+        if let Some(ts) = self.parsed_timestamp() {
+            let today = chrono::Utc::now().naive_utc().date();
+            ts.date() == today
+        } else {
+            false
+        }
+    }
+
+    /// Get the project name from the backup filename
+    pub fn project_name(&self) -> String {
+        self.name
+            .rsplit_once('_')
+            .and_then(|(prefix, _)| prefix.rsplit_once('_'))
+            .map(|(name, _)| name.to_string())
+            .unwrap_or_else(|| self.name.clone())
+    }
 }

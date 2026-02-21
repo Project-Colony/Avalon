@@ -270,3 +270,20 @@ pub fn estimate_pages(contents: &[CompileContent]) -> usize {
     let total_words: usize = contents.iter().map(|c| c.text.split_whitespace().count()).sum();
     (total_words / 250).max(1)
 }
+
+/// Count total words across all content sections
+pub fn word_count(contents: &[CompileContent]) -> usize {
+    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+}
+
+/// Count total characters across all content sections
+pub fn char_count(contents: &[CompileContent]) -> usize {
+    contents.iter().map(|c| c.text.len()).sum()
+}
+
+/// Count the number of paragraphs across all content sections
+pub fn paragraph_count(contents: &[CompileContent]) -> usize {
+    contents.iter()
+        .map(|c| c.text.split("\n\n").filter(|p| !p.trim().is_empty()).count())
+        .sum()
+}

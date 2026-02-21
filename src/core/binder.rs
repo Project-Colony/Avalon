@@ -399,6 +399,96 @@ impl BinderItem {
     }
 }
 
+impl Binder {
+    /// Count total folders in the binder
+    pub fn folder_count(&self) -> usize {
+        self.all_items().iter()
+            .filter(|i| i.kind == BinderItemKind::Folder)
+            .count()
+    }
+
+    /// Count total characters across all documents
+    pub fn total_char_count(&self) -> usize {
+        self.all_items().iter()
+            .filter_map(|i| i.document.as_ref())
+            .map(|d| d.char_count())
+            .sum()
+    }
+
+    /// Total number of items (documents + folders) in the entire binder
+    pub fn item_count(&self) -> usize {
+        self.all_items().len()
+    }
+
+    /// Get all text items (documents only)
+    pub fn text_items(&self) -> Vec<&BinderItem> {
+        self.all_items().into_iter()
+            .filter(|i| i.kind == BinderItemKind::Text)
+            .collect()
+    }
+
+    /// Get the item with the most words
+    pub fn longest_document(&self) -> Option<&BinderItem> {
+        self.all_items().into_iter()
+            .filter(|i| i.kind == BinderItemKind::Text)
+            .max_by_key(|i| i.document.as_ref().map(|d| d.word_count()).unwrap_or(0))
+    }
+
+    /// Check if the trash is empty
+    pub fn trash_is_empty(&self) -> bool {
+        self.trash.children.is_empty()
+    }
+
+    /// Number of items in the trash
+    pub fn trash_count(&self) -> usize {
+        self.trash.children.len()
+    }
+}
+
+impl BinderItem {
+    /// Count direct children of this item
+    pub fn child_count(&self) -> usize {
+        self.children.len()
+    }
+
+    /// Check if this item has any children
+    pub fn has_children(&self) -> bool {
+        !self.children.is_empty()
+    }
+
+    /// Get the age of this item since creation
+    pub fn age_string(&self) -> String {
+        let duration = Utc::now().signed_duration_since(self.created_at);
+        let days = duration.num_days();
+        if days == 0 {
+            "today".to_string()
+        } else if days == 1 {
+            "yesterday".to_string()
+        } else if days < 7 {
+            format!("{} days ago", days)
+        } else if days < 30 {
+            format!("{} weeks ago", days / 7)
+        } else {
+            format!("{} months ago", days / 30)
+        }
+    }
+
+    /// Check if this item has a synopsis
+    pub fn has_synopsis(&self) -> bool {
+        !self.synopsis.is_empty()
+    }
+
+    /// Check if this item has snapshots
+    pub fn has_snapshots(&self) -> bool {
+        !self.snapshots.is_empty()
+    }
+
+    /// Get the number of snapshots
+    pub fn snapshot_count(&self) -> usize {
+        self.snapshots.len()
+    }
+}
+
 /// The type of a binder item
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BinderItemKind {
@@ -407,4 +497,33 @@ pub enum BinderItemKind {
     Image,
     Pdf,
     WebPage,
+}
+
+impl BinderItemKind {
+    /// Human-readable label
+    pub fn label(&self) -> &str {
+        match self {
+            BinderItemKind::Folder => "Folder",
+            BinderItemKind::Text => "Text",
+            BinderItemKind::Image => "Image",
+            BinderItemKind::Pdf => "PDF",
+            BinderItemKind::WebPage => "Web Page",
+        }
+    }
+
+    /// Icon character for UI display
+    pub fn icon(&self) -> &str {
+        match self {
+            BinderItemKind::Folder => "\u{1F4C1}",
+            BinderItemKind::Text => "\u{1F4C4}",
+            BinderItemKind::Image => "\u{1F5BC}",
+            BinderItemKind::Pdf => "\u{1F4D1}",
+            BinderItemKind::WebPage => "\u{1F310}",
+        }
+    }
+
+    /// Whether this kind supports text editing
+    pub fn is_editable(&self) -> bool {
+        matches!(self, BinderItemKind::Text)
+    }
 }

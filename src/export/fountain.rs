@@ -216,3 +216,40 @@ fn is_character_cue(line: &str) -> bool {
     let alpha_chars: Vec<char> = trimmed.chars().filter(|c| c.is_alphabetic()).collect();
     !alpha_chars.is_empty() && alpha_chars.iter().all(|c| c.is_uppercase())
 }
+
+/// Count dialogue blocks in a Fountain document
+pub fn dialogue_count(input: &str) -> usize {
+    let lines: Vec<&str> = input.lines().collect();
+    let mut count = 0;
+    for (i, line) in lines.iter().enumerate() {
+        let trimmed = line.trim();
+        if is_character_cue(trimmed) && i + 1 < lines.len() && !lines[i + 1].trim().is_empty() {
+            count += 1;
+        }
+    }
+    count
+}
+
+/// Estimate page count for a screenplay (industry standard: ~1 page per minute)
+/// Uses the rough heuristic of ~56 lines per page
+pub fn estimate_page_count(input: &str) -> usize {
+    let line_count = input.lines().count();
+    (line_count / 56).max(1)
+}
+
+/// Count transitions in a Fountain document
+pub fn transition_count(input: &str) -> usize {
+    input.lines().filter(|l| is_transition(l.trim())).count()
+}
+
+/// Get a summary of the screenplay structure
+pub fn screenplay_summary(input: &str) -> String {
+    let scenes = scene_count(input);
+    let chars = extract_characters(input);
+    let dialogues = dialogue_count(input);
+    let pages = estimate_page_count(input);
+    format!(
+        "{} scenes, {} characters, {} dialogue blocks, ~{} pages",
+        scenes, chars.len(), dialogues, pages
+    )
+}

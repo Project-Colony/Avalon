@@ -225,3 +225,41 @@ fn escape_xml(s: &str) -> String {
         .replace('"', "&quot;")
         .replace('\'', "&apos;")
 }
+
+/// Estimate the number of chapters that would be generated
+pub fn estimate_chapter_count(contents: &[CompileContent]) -> usize {
+    let mut count = 0;
+    let mut has_pending_content = false;
+    for content in contents {
+        if content.is_folder {
+            if has_pending_content {
+                count += 1;
+            }
+            has_pending_content = false;
+        } else {
+            has_pending_content = true;
+        }
+    }
+    if has_pending_content {
+        count += 1;
+    }
+    count.max(1)
+}
+
+/// Estimate the output ePub file size in bytes
+pub fn estimate_file_size(contents: &[CompileContent], options: &CompileOptions) -> usize {
+    // ePub overhead: mimetype, container.xml, content.opf, toc.xhtml ~3KB
+    let overhead = 3000;
+    let front_matter = if options.include_front_matter { 500 } else { 0 };
+    // XHTML wrapping roughly doubles content + ~500 bytes per chapter for boilerplate
+    let chapters = estimate_chapter_count(contents);
+    let content_size: usize = contents.iter()
+        .map(|c| c.text.len() * 2 + c.title.len() + 50)
+        .sum();
+    overhead + front_matter + content_size + chapters * 500
+}
+
+/// Count total words across all ePub content
+pub fn word_count(contents: &[CompileContent]) -> usize {
+    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+}

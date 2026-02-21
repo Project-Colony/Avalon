@@ -191,3 +191,25 @@ fn convert_basic_markdown(text: &str) -> String {
 
     result
 }
+
+/// Estimate the output size in bytes for an RTF compilation
+pub fn estimate_output_size(contents: &[CompileContent], options: &CompileOptions) -> usize {
+    // RTF header + font table + color table ~300 bytes
+    let base = 300;
+    let front_matter = if options.include_front_matter { 150 } else { 0 };
+    // RTF control words roughly triple the content size
+    let content_size: usize = contents.iter()
+        .map(|c| c.text.len() * 3 + c.title.len() + 80)
+        .sum();
+    base + front_matter + content_size
+}
+
+/// Count total words across all content sections
+pub fn word_count(contents: &[CompileContent]) -> usize {
+    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+}
+
+/// Count total characters across all content sections
+pub fn char_count(contents: &[CompileContent]) -> usize {
+    contents.iter().map(|c| c.text.len()).sum()
+}

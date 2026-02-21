@@ -166,6 +166,16 @@ fn strip_markdown(text: &str) -> String {
     result
 }
 
+/// Count total words across all content sections
+pub fn word_count(contents: &[CompileContent]) -> usize {
+    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+}
+
+/// Count total characters across all content sections
+pub fn char_count(contents: &[CompileContent]) -> usize {
+    contents.iter().map(|c| c.text.len()).sum()
+}
+
 /// Estimate the number of pages for a given set of content
 pub fn estimate_pages(contents: &[CompileContent], options: &CompileOptions) -> usize {
     let chars_per_line = (160.0 / (options.font_size * 0.2)) as usize;

@@ -296,3 +296,34 @@ fn find_closing_single(chars: &[char], start: usize, c: char) -> Option<usize> {
     }
     None
 }
+
+/// Count total words across all content sections
+pub fn word_count(contents: &[CompileContent]) -> usize {
+    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+}
+
+/// Estimate page count (LaTeX with double spacing, A4, 1-inch margins ~ 250 words/page)
+pub fn estimate_pages(contents: &[CompileContent]) -> usize {
+    let total_words = word_count(contents);
+    (total_words / 250).max(1)
+}
+
+/// Estimate the output size in bytes for a LaTeX compilation
+pub fn estimate_output_size(contents: &[CompileContent], options: &CompileOptions) -> usize {
+    // LaTeX preamble ~600 bytes
+    let base = 600;
+    let front_matter = if options.include_front_matter { 100 } else { 0 };
+    // LaTeX escaping and commands roughly double the content size
+    let content_size: usize = contents.iter()
+        .map(|c| c.text.len() * 2 + c.title.len() + 40)
+        .sum();
+    base + front_matter + content_size
+}
+
+/// List all LaTeX packages used in the preamble
+pub fn required_packages() -> Vec<&'static str> {
+    vec![
+        "inputenc", "fontenc", "geometry", "setspace",
+        "hyperref", "fancyhdr", "graphicx", "longtable", "enumitem",
+    ]
+}

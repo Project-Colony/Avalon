@@ -188,3 +188,38 @@ pub fn word_count(contents: &[CompileContent]) -> usize {
 pub fn char_count(contents: &[CompileContent]) -> usize {
     contents.iter().map(|c| c.text.len()).sum()
 }
+
+/// Estimate the output size in bytes for an HTML compilation
+pub fn estimate_output_size(contents: &[CompileContent], options: &CompileOptions) -> usize {
+    // Base HTML boilerplate + CSS is roughly 1500 bytes
+    let base = 1500;
+    let front_matter = if options.include_front_matter { 200 } else { 0 };
+    // HTML tags roughly double the content size
+    let content_size: usize = contents.iter()
+        .map(|c| c.text.len() * 2 + c.title.len() + 50)
+        .sum();
+    base + front_matter + content_size
+}
+
+/// Strip HTML tags from a string, returning plain text
+pub fn strip_html_tags(html: &str) -> String {
+    let mut result = String::with_capacity(html.len());
+    let mut in_tag = false;
+    for ch in html.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => result.push(ch),
+            _ => {}
+        }
+    }
+    result
+}
+
+/// Extract all heading texts from the compiled content
+pub fn extract_headings(contents: &[CompileContent]) -> Vec<(String, usize)> {
+    contents.iter()
+        .filter(|c| c.is_folder)
+        .map(|c| (c.title.clone(), c.depth))
+        .collect()
+}
