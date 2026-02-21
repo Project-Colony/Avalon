@@ -334,3 +334,182 @@ impl OutputFormat {
 fn plain_text_compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
     super::plain_text::compile(contents, options)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_output_format_extension() {
+        assert_eq!(OutputFormat::PlainText.extension(), "txt");
+        assert_eq!(OutputFormat::Markdown.extension(), "md");
+        assert_eq!(OutputFormat::Html.extension(), "html");
+        assert_eq!(OutputFormat::Pdf.extension(), "pdf");
+        assert_eq!(OutputFormat::Latex.extension(), "tex");
+        assert_eq!(OutputFormat::Docx.extension(), "docx");
+        assert_eq!(OutputFormat::Epub.extension(), "epub");
+    }
+
+    #[test]
+    fn test_output_format_display_name() {
+        assert_eq!(OutputFormat::PlainText.display_name(), "Plain Text");
+        assert_eq!(OutputFormat::Html.display_name(), "HTML");
+        assert_eq!(OutputFormat::Docx.display_name(), "Word (DOCX)");
+    }
+
+    #[test]
+    fn test_all_formats() {
+        let all = OutputFormat::all();
+        assert_eq!(all.len(), 10);
+    }
+
+    #[test]
+    fn test_is_binary() {
+        assert!(OutputFormat::Pdf.is_binary());
+        assert!(OutputFormat::Docx.is_binary());
+        assert!(OutputFormat::Epub.is_binary());
+        assert!(!OutputFormat::Html.is_binary());
+        assert!(!OutputFormat::Markdown.is_binary());
+    }
+
+    #[test]
+    fn test_mime_types() {
+        assert_eq!(OutputFormat::Html.mime_type(), "text/html");
+        assert_eq!(OutputFormat::Pdf.mime_type(), "application/pdf");
+        assert_eq!(OutputFormat::Markdown.mime_type(), "text/markdown");
+    }
+
+    #[test]
+    fn test_compile_options_default() {
+        let opts = CompileOptions::default();
+        assert_eq!(opts.format, OutputFormat::Markdown);
+        assert!(opts.include_front_matter);
+        assert!(opts.compile_marked_only);
+        assert_eq!(opts.font_size, 12.0);
+    }
+
+    #[test]
+    fn test_compile_content() {
+        let content = CompileContent {
+            title: "Test Chapter".to_string(),
+            text: "Hello world this is content".to_string(),
+            depth: 0,
+            is_folder: false,
+        };
+        assert_eq!(content.word_count(), 5);
+        assert!(!content.is_empty());
+    }
+
+    #[test]
+    fn test_compile_content_empty() {
+        let content = CompileContent {
+            title: "Empty".to_string(),
+            text: "  \n  ".to_string(),
+            depth: 0,
+            is_folder: false,
+        };
+        assert!(content.is_empty());
+    }
+
+    #[test]
+    fn test_separator_type_labels() {
+        assert_eq!(SeparatorType::EmptyLine.label(), "Empty Line");
+        assert_eq!(SeparatorType::PageBreak.label(), "Page Break");
+        assert_eq!(SeparatorType::None.label(), "None");
+    }
+
+    #[test]
+    fn test_separator_all_standard() {
+        let all = SeparatorType::all_standard();
+        assert_eq!(all.len(), 4);
+    }
+
+    #[test]
+    fn test_collect_contents() {
+        let mut binder = Binder::default_structure();
+        let mut item1 = BinderItem::new_text("Chapter 1");
+        if let Some(ref mut doc) = item1.document {
+            doc.content = "Hello world".to_string();
+        }
+        item1.include_in_compile = true;
+        binder.draft.add_child(item1);
+
+        let mut item2 = BinderItem::new_text("Chapter 2");
+        if let Some(ref mut doc) = item2.document {
+            doc.content = "Second chapter".to_string();
+        }
+        item2.include_in_compile = true;
+        binder.draft.add_child(item2);
+
+        let opts = CompileOptions::default();
+        let contents = Compiler::collect_contents(&binder.draft, &opts);
+        // Draft folder + 2 chapters
+        assert!(contents.len() >= 2);
+    }
+
+    #[test]
+    fn test_compile_plain_text() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Test");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Hello world".to_string();
+        }
+        item.include_in_compile = true;
+        binder.draft.add_child(item);
+
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::PlainText;
+        opts.include_front_matter = false;
+        opts.include_toc = false;
+        opts.replace_placeholders = false;
+
+        let result = Compiler::compile(&binder, &opts);
+        assert!(result.is_ok());
+        let text = result.unwrap();
+        assert!(text.contains("Hello world"));
+    }
+
+    #[test]
+    fn test_compile_markdown() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Chapter One");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "The story begins.".to_string();
+        }
+        item.include_in_compile = true;
+        binder.draft.add_child(item);
+
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::Markdown;
+        opts.title = "My Book".to_string();
+        opts.include_front_matter = true;
+        opts.include_toc = false;
+        opts.replace_placeholders = false;
+
+        let result = Compiler::compile(&binder, &opts);
+        assert!(result.is_ok());
+        let text = result.unwrap();
+        assert!(text.contains("The story begins"));
+    }
+
+    #[test]
+    fn test_compile_html() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Scene");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Some text here.".to_string();
+        }
+        item.include_in_compile = true;
+        binder.draft.add_child(item);
+
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::Html;
+        opts.include_toc = false;
+        opts.replace_placeholders = false;
+
+        let result = Compiler::compile(&binder, &opts);
+        assert!(result.is_ok());
+        let html = result.unwrap();
+        assert!(html.contains("<") && html.contains(">"));
+    }
+}

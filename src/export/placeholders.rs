@@ -247,3 +247,166 @@ fn to_word(num: usize) -> String {
         _ => num.to_string(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_context() -> PlaceholderContext {
+        PlaceholderContext {
+            project_title: "My Novel".to_string(),
+            author: "John Doe".to_string(),
+            word_count: 50000,
+            char_count: 250000,
+            page_count: 200,
+        }
+    }
+
+    #[test]
+    fn test_replace_project_placeholders() {
+        let ctx = make_context();
+        let result = replace_placeholders("Title: <$projecttitle> by <$author>", &ctx);
+        assert_eq!(result, "Title: My Novel by John Doe");
+    }
+
+    #[test]
+    fn test_replace_stats_placeholders() {
+        let ctx = make_context();
+        let result = replace_placeholders("Words: <$wc>, Chars: <$cc>, Pages: <$pagecount>", &ctx);
+        assert_eq!(result, "Words: 50000, Chars: 250000, Pages: 200");
+    }
+
+    #[test]
+    fn test_replace_name_parts() {
+        let ctx = make_context();
+        let result = replace_placeholders("<$surname>, <$forename>", &ctx);
+        assert_eq!(result, "Doe, John");
+    }
+
+    #[test]
+    fn test_auto_numbering() {
+        let ctx = make_context();
+        let text = "Chapter <$n>\nScene 1\nChapter <$n>\nScene 2";
+        let result = replace_placeholders(text, &ctx);
+        assert!(result.contains("Chapter 1"));
+        assert!(result.contains("Chapter 2"));
+    }
+
+    #[test]
+    fn test_roman_numeral_numbering() {
+        let ctx = make_context();
+        let text = "Part <$N>\nContent\nPart <$N>";
+        let result = replace_placeholders(text, &ctx);
+        assert!(result.contains("Part I"));
+        assert!(result.contains("Part II"));
+    }
+
+    #[test]
+    fn test_word_numbering() {
+        let ctx = make_context();
+        let text = "Chapter <$W>\nChapter <$W>";
+        let result = replace_placeholders(text, &ctx);
+        assert!(result.contains("Chapter One"));
+        assert!(result.contains("Chapter Two"));
+    }
+
+    #[test]
+    fn test_section_numbering() {
+        let ctx = make_context();
+        let text = "Chapter <$n>\nSection <$sn>\nSection <$sn>";
+        let result = replace_placeholders(text, &ctx);
+        assert!(result.contains("Chapter 1"));
+        assert!(result.contains("Section 1.1"));
+        assert!(result.contains("Section 1.2"));
+    }
+
+    #[test]
+    fn test_to_roman() {
+        assert_eq!(to_roman(1), "I");
+        assert_eq!(to_roman(4), "IV");
+        assert_eq!(to_roman(9), "IX");
+        assert_eq!(to_roman(14), "XIV");
+        assert_eq!(to_roman(42), "XLII");
+        assert_eq!(to_roman(1999), "MCMXCIX");
+    }
+
+    #[test]
+    fn test_to_word() {
+        assert_eq!(to_word(1), "One");
+        assert_eq!(to_word(10), "Ten");
+        assert_eq!(to_word(15), "Fifteen");
+        assert_eq!(to_word(21), "Twenty-one");
+        assert_eq!(to_word(42), "Forty-two");
+    }
+
+    #[test]
+    fn test_generate_toc() {
+        let sections = vec![
+            ("Chapter 1".to_string(), 0),
+            ("Scene 1".to_string(), 1),
+            ("Chapter 2".to_string(), 0),
+        ];
+        let toc = generate_toc(&sections);
+        assert!(toc.contains("Table of Contents"));
+        assert!(toc.contains("Chapter 1"));
+        assert!(toc.contains("Scene 1"));
+    }
+
+    #[test]
+    fn test_generate_toc_markdown() {
+        let sections = vec![
+            ("Chapter One".to_string(), 0),
+            ("Scene A".to_string(), 1),
+        ];
+        let toc = generate_toc_markdown(&sections);
+        assert!(toc.contains("# Table of Contents"));
+        assert!(toc.contains("[Chapter One]"));
+        assert!(toc.contains("#chapter-one"));
+    }
+
+    #[test]
+    fn test_generate_toc_html() {
+        let sections = vec![("Intro".to_string(), 0)];
+        let toc = generate_toc_html(&sections);
+        assert!(toc.contains("<nav"));
+        assert!(toc.contains("Intro"));
+        assert!(toc.contains("</ul>"));
+    }
+
+    #[test]
+    fn test_count_placeholders() {
+        assert_eq!(count_placeholders("Hello <$name> and <$date>"), 2);
+        assert_eq!(count_placeholders("No placeholders here"), 0);
+        assert_eq!(count_placeholders("<$n> <$N> <$W>"), 3);
+    }
+
+    #[test]
+    fn test_supported_placeholders() {
+        let ph = supported_placeholders();
+        assert!(ph.len() >= 20);
+        assert!(ph.iter().any(|(k, _)| *k == "<$date>"));
+        assert!(ph.iter().any(|(k, _)| *k == "<$author>"));
+    }
+
+    #[test]
+    fn test_placeholder_context() {
+        let ctx = make_context();
+        assert_eq!(ctx.surname(), "Doe");
+        assert_eq!(ctx.forename(), "John");
+        assert_eq!(ctx.author_initials(), "J.D.");
+    }
+
+    #[test]
+    fn test_default_context() {
+        let ctx = PlaceholderContext::default_with_title("Test");
+        assert_eq!(ctx.project_title, "Test");
+        assert_eq!(ctx.word_count, 0);
+    }
+
+    #[test]
+    fn test_pagebreak_placeholder() {
+        let ctx = make_context();
+        let result = replace_placeholders("Before<$pagebreak>After", &ctx);
+        assert!(result.contains("---"));
+    }
+}
