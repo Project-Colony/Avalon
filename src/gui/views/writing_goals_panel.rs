@@ -37,10 +37,16 @@ pub fn view(data: &WritingGoalsData) -> Element<'static, Message> {
         else if pct >= 50.0 { Theme::WARNING }
         else { Theme::TEXT_SECONDARY };
         let bar = progress_bar(pct);
+        let remaining = (data.daily_goal as i64 - data.words_today).max(0);
         column![
             text(format!("{}/{} words ({:.0}%)", data.words_today, data.daily_goal, pct))
                 .size(11).color(color),
             text(bar).size(10).color(color),
+            if pct >= 100.0 {
+                text("Goal reached!").size(9).color(Theme::SUCCESS)
+            } else {
+                text(format!("{} words remaining", remaining)).size(9).color(Theme::TEXT_MUTED)
+            },
         ].spacing(1)
     } else {
         column![
@@ -63,10 +69,19 @@ pub fn view(data: &WritingGoalsData) -> Element<'static, Message> {
         else if pct >= 50.0 { Theme::WARNING }
         else { Theme::TEXT_SECONDARY };
         let bar = progress_bar(pct);
+        let days_left = 7_usize.saturating_sub(data.days_this_week);
+        let remaining = (data.weekly_goal as i64 - data.words_this_week).max(0);
+        let daily_needed = if days_left > 0 { remaining / days_left as i64 } else { remaining };
         column![
             text(format!("{}/{} words ({:.0}%)", data.words_this_week, data.weekly_goal, pct))
                 .size(11).color(color),
             text(bar).size(10).color(color),
+            if pct >= 100.0 {
+                text("Weekly goal reached!").size(9).color(Theme::SUCCESS)
+            } else {
+                text(format!("{} needed | ~{}/day for {} days left", remaining, daily_needed, days_left))
+                    .size(9).color(Theme::TEXT_MUTED)
+            },
         ].spacing(1)
     } else {
         column![
@@ -75,13 +90,33 @@ pub fn view(data: &WritingGoalsData) -> Element<'static, Message> {
         ]
     };
 
+    // Streak visualization
+    let streak_vis = streak_display(data.streak);
+    let streak_color = if data.streak >= 7 { Theme::SUCCESS }
+        else if data.streak >= 3 { Theme::WARNING }
+        else { Theme::TEXT_SECONDARY };
+
     // Stats
     let stats = row![
         stat_item("Streak", &format!("{} days", data.streak)),
-        stat_item("Avg Daily", &format!("{:.0}", data.avg_daily)),
+        stat_item("Avg Daily", &format!("{:.0} words", data.avg_daily)),
         stat_item("Days/Wk", &format!("{}/7", data.days_this_week)),
     ]
     .spacing(16);
+
+    let streak_row = row![
+        text("Streak: ").size(10).color(Theme::TEXT_MUTED),
+        text(streak_vis).size(10).color(streak_color),
+        Space::with_width(8),
+        if data.streak >= 7 {
+            text("On fire!").size(10).color(Theme::SUCCESS)
+        } else if data.streak >= 3 {
+            text("Keep going!").size(10).color(Theme::WARNING)
+        } else {
+            text("Start writing!").size(10).color(Theme::TEXT_MUTED)
+        },
+    ]
+    .align_y(iced::Alignment::Center);
 
     let reset_btn = button(
         text("Reset Goals").size(10).color(Theme::TEXT_MUTED),
@@ -97,7 +132,9 @@ pub fn view(data: &WritingGoalsData) -> Element<'static, Message> {
         Space::with_height(6),
         row![weekly_label, Space::with_width(8), weekly_input].align_y(iced::Alignment::Center),
         weekly_progress,
-        Space::with_height(8),
+        Space::with_height(6),
+        streak_row,
+        Space::with_height(4),
         stats,
         Space::with_height(4),
         reset_btn,
@@ -122,5 +159,17 @@ fn progress_bar(pct: f64) -> String {
     let total: usize = 20;
     let filled = ((pct / 100.0) * total as f64).round() as usize;
     let empty = total.saturating_sub(filled);
-    format!("[{}{}]", "=".repeat(filled), " ".repeat(empty))
+    format!("[{}{}]", "\u{2588}".repeat(filled), "\u{2591}".repeat(empty))
+}
+
+fn streak_display(streak: usize) -> String {
+    let max_display = 14;
+    let show = streak.min(max_display);
+    let filled = "\u{25CF}".repeat(show); // filled circles
+    let empty = "\u{25CB}".repeat(max_display.saturating_sub(show)); // empty circles
+    if streak > max_display {
+        format!("{}{} +{}", filled, empty, streak - max_display)
+    } else {
+        format!("{}{}", filled, empty)
+    }
 }

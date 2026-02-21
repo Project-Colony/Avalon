@@ -152,6 +152,9 @@ fn render_item(
         BinderItemKind::WebPage => "W ",
     };
 
+    // Compile indicator
+    let compile_icon = if item.include_in_compile { "" } else { "\u{2298}" }; // circled minus for excluded
+
     // Show word count for documents
     let word_info = if item.kind == BinderItemKind::Text {
         item.document.as_ref()
@@ -194,11 +197,18 @@ fn render_item(
         Space::with_width(0).into()
     };
 
+    let compile_indicator: Element<'static, Message> = if !compile_icon.is_empty() {
+        text(compile_icon).size(10).color(Theme::TEXT_MUTED).into()
+    } else {
+        Space::with_width(0).into()
+    };
+
     let item_btn = button(
         row![
             Space::with_width(indent),
             item_text,
             Space::with_width(Length::Fill),
+            compile_indicator,
             status_indicator,
         ]
     )
