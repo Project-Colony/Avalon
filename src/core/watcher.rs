@@ -1,0 +1,257 @@
+use std::path::{Path, PathBuf};
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
+use notify::{self, Watcher, RecursiveMode, Event, EventKind};
+
+/// Events emitted by the file watcher
+#[derive(Debug, Clone)]
+pub enum WatchEvent {
+    /// A file inside the project was modified externally
+    FileModified(PathBuf),
+    /// A file was created inside the project directory
+    FileCreated(PathBuf),
+    /// A file was removed from the project directory
+    FileRemoved(PathBuf),
+    /// The project directory itself was removed
+    ProjectRemoved,
+}
+
+/// Watches a project directory for external file changes
+pub struct ProjectWatcher {
+    _watcher: notify::RecommendedWatcher,
+    receiver: mpsc::Receiver<WatchEvent>,
+    project_path: PathBuf,
+    last_event_time: Instant,
+    /// Debounce interval — ignore rapid consecutive events
+    debounce_ms: u64,
+}
+
+impl ProjectWatcher {
+    /// Start watching a project directory
+    pub fn new(project_path: &Path) -> Result<Self, notify::Error> {
+        let (tx, rx) = mpsc::channel();
+
+        let sender = tx.clone();
+        let project_dir = project_path.to_path_buf();
+
+        let mut watcher = notify::recommended_watcher(move |result: Result<Event, notify::Error>| {
+            if let Ok(event) = result {
+                let watch_events = Self::translate_event(&event, &project_dir);
+                for we in watch_events {
+                    let _ = sender.send(we);
+                }
+            }
+        })?;
+
+        watcher.watch(project_path, RecursiveMode::Recursive)?;
+
+        Ok(Self {
+            _watcher: watcher,
+            receiver: rx,
+            project_path: project_path.to_path_buf(),
+            last_event_time: Instant::now(),
+            debounce_ms: 500,
+        })
+    }
+
+    /// Translate a notify event into our WatchEvent type
+    fn translate_event(event: &Event, _project_dir: &Path) -> Vec<WatchEvent> {
+        let mut result = Vec::new();
+        match event.kind {
+            EventKind::Modify(_) => {
+                for path in &event.paths {
+                    result.push(WatchEvent::FileModified(path.clone()));
+                }
+            }
+            EventKind::Create(_) => {
+                for path in &event.paths {
+                    result.push(WatchEvent::FileCreated(path.clone()));
+                }
+            }
+            EventKind::Remove(_) => {
+                for path in &event.paths {
+                    result.push(WatchEvent::FileRemoved(path.clone()));
+                }
+            }
+            _ => {}
+        }
+        result
+    }
+
+    /// Drain all pending watch events (non-blocking)
+    pub fn poll_events(&mut self) -> Vec<WatchEvent> {
+        let now = Instant::now();
+        let debounce = Duration::from_millis(self.debounce_ms);
+
+        let mut events = Vec::new();
+        while let Ok(event) = self.receiver.try_recv() {
+            // Only emit events if debounce time has passed
+            if now.duration_since(self.last_event_time) >= debounce {
+                events.push(event);
+            }
+        }
+
+        if !events.is_empty() {
+            self.last_event_time = now;
+        }
+
+        // Deduplicate: only keep the last event per path
+        let mut seen = std::collections::HashSet::new();
+        events.retain(|e| {
+            let path = match e {
+                WatchEvent::FileModified(p)
+                | WatchEvent::FileCreated(p)
+                | WatchEvent::FileRemoved(p) => p.clone(),
+                WatchEvent::ProjectRemoved => self.project_path.clone(),
+            };
+            seen.insert(path)
+        });
+
+        events
+    }
+
+    /// Check if the watched project path still exists
+    pub fn is_project_alive(&self) -> bool {
+        self.project_path.exists()
+    }
+
+    /// Get the project path being watched
+    pub fn project_path(&self) -> &Path {
+        &self.project_path
+    }
+
+    /// Set the debounce interval in milliseconds
+    pub fn set_debounce_ms(&mut self, ms: u64) {
+        self.debounce_ms = ms;
+    }
+}
+
+/// Tracks which files have been modified externally and need reloading
+#[derive(Debug, Default)]
+pub struct ExternalChangeTracker {
+    /// Paths that changed since last check
+    pub modified_paths: Vec<PathBuf>,
+    /// Whether the project metadata file changed
+    pub project_metadata_changed: bool,
+    /// Whether any document files changed
+    pub documents_changed: Vec<PathBuf>,
+}
+
+impl ExternalChangeTracker {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Process watch events and categorize them
+    pub fn process_events(&mut self, events: &[WatchEvent]) {
+        self.modified_paths.clear();
+        self.project_metadata_changed = false;
+        self.documents_changed.clear();
+
+        for event in events {
+            match event {
+                WatchEvent::FileModified(path) | WatchEvent::FileCreated(path) => {
+                    self.modified_paths.push(path.clone());
+                    if path.file_name().map_or(false, |n| n == "project.json") {
+                        self.project_metadata_changed = true;
+                    }
+                    if path.extension().map_or(false, |e| e == "json") {
+                        if let Some(parent) = path.parent() {
+                            if parent.file_name().map_or(false, |n| n == "docs") {
+                                self.documents_changed.push(path.clone());
+                            }
+                        }
+                    }
+                }
+                WatchEvent::FileRemoved(path) => {
+                    self.modified_paths.push(path.clone());
+                }
+                WatchEvent::ProjectRemoved => {
+                    self.project_metadata_changed = true;
+                }
+            }
+        }
+    }
+
+    /// Check if any external changes need handling
+    pub fn has_changes(&self) -> bool {
+        !self.modified_paths.is_empty()
+    }
+
+    /// Clear all tracked changes
+    pub fn clear(&mut self) {
+        self.modified_paths.clear();
+        self.project_metadata_changed = false;
+        self.documents_changed.clear();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_external_change_tracker_new() {
+        let tracker = ExternalChangeTracker::new();
+        assert!(!tracker.has_changes());
+        assert!(!tracker.project_metadata_changed);
+        assert!(tracker.documents_changed.is_empty());
+    }
+
+    #[test]
+    fn test_external_change_tracker_process_events() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events = vec![
+            WatchEvent::FileModified(PathBuf::from("/project/project.json")),
+            WatchEvent::FileModified(PathBuf::from("/project/docs/abc.json")),
+        ];
+        tracker.process_events(&events);
+        assert!(tracker.has_changes());
+        assert!(tracker.project_metadata_changed);
+        assert_eq!(tracker.documents_changed.len(), 1);
+    }
+
+    #[test]
+    fn test_external_change_tracker_clear() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events = vec![
+            WatchEvent::FileModified(PathBuf::from("/project/project.json")),
+        ];
+        tracker.process_events(&events);
+        assert!(tracker.has_changes());
+        tracker.clear();
+        assert!(!tracker.has_changes());
+    }
+
+    #[test]
+    fn test_external_change_tracker_file_created() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events = vec![
+            WatchEvent::FileCreated(PathBuf::from("/project/docs/new-doc.json")),
+        ];
+        tracker.process_events(&events);
+        assert!(tracker.has_changes());
+        assert_eq!(tracker.documents_changed.len(), 1);
+        assert!(!tracker.project_metadata_changed);
+    }
+
+    #[test]
+    fn test_external_change_tracker_file_removed() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events = vec![
+            WatchEvent::FileRemoved(PathBuf::from("/project/docs/deleted.json")),
+        ];
+        tracker.process_events(&events);
+        assert!(tracker.has_changes());
+        assert_eq!(tracker.modified_paths.len(), 1);
+    }
+
+    #[test]
+    fn test_external_change_tracker_project_removed() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events = vec![WatchEvent::ProjectRemoved];
+        tracker.process_events(&events);
+        // ProjectRemoved sets metadata_changed flag
+        assert!(tracker.project_metadata_changed);
+    }
+}

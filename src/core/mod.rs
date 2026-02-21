@@ -13,4 +13,5 @@ pub mod bookmark;
 pub mod recent;
 pub mod script;
 pub mod backup;
+pub mod watcher;
 

@@ -324,6 +324,240 @@ impl TextAnalysis {
     }
 }
 
+/// Advanced readability metrics computed from text
+#[derive(Debug, Clone, Default)]
+pub struct ReadabilityMetrics {
+    /// Flesch Reading Ease score (0-100, higher = easier)
+    pub flesch_reading_ease: f64,
+    /// Flesch-Kincaid Grade Level (US grade levels)
+    pub flesch_kincaid_grade: f64,
+    /// Gunning Fog Index (estimated years of education needed)
+    pub gunning_fog: f64,
+    /// Coleman-Liau Index
+    pub coleman_liau: f64,
+    /// Automated Readability Index
+    pub automated_readability: f64,
+    /// SMOG grade (Simple Measure of Gobbledygook)
+    pub smog_grade: f64,
+    /// Average syllables per word
+    pub avg_syllables_per_word: f64,
+    /// Percentage of complex words (3+ syllables)
+    pub complex_word_percentage: f64,
+    /// Number of complex words
+    pub complex_word_count: usize,
+    /// Total syllable count
+    pub total_syllables: usize,
+}
+
+impl ReadabilityMetrics {
+    /// Compute all readability metrics from text
+    pub fn from_text(text: &str) -> Self {
+        if text.is_empty() {
+            return Self::default();
+        }
+
+        let words: Vec<&str> = text.split_whitespace().collect();
+        let word_count = words.len();
+        if word_count == 0 {
+            return Self::default();
+        }
+
+        let sentence_count = text.chars()
+            .filter(|c| *c == '.' || *c == '!' || *c == '?')
+            .count()
+            .max(1);
+
+        // Syllable analysis
+        let syllable_counts: Vec<usize> = words.iter().map(|w| count_syllables(w)).collect();
+        let total_syllables: usize = syllable_counts.iter().sum();
+        let complex_word_count = syllable_counts.iter().filter(|&&s| s >= 3).count();
+
+        let avg_syllables_per_word = total_syllables as f64 / word_count as f64;
+        let words_per_sentence = word_count as f64 / sentence_count as f64;
+
+        // Character counts for Coleman-Liau and ARI
+        let total_chars: usize = words.iter().map(|w| w.chars().filter(|c| c.is_alphanumeric()).count()).sum();
+
+        // Flesch Reading Ease
+        let flesch_reading_ease = 206.835
+            - 1.015 * words_per_sentence
+            - 84.6 * avg_syllables_per_word;
+
+        // Flesch-Kincaid Grade Level
+        let flesch_kincaid_grade = 0.39 * words_per_sentence
+            + 11.8 * avg_syllables_per_word
+            - 15.59;
+
+        // Gunning Fog Index
+        let complex_word_percentage = complex_word_count as f64 / word_count as f64 * 100.0;
+        let gunning_fog = 0.4 * (words_per_sentence + complex_word_percentage);
+
+        // Coleman-Liau Index
+        let l = total_chars as f64 / word_count as f64 * 100.0; // avg chars per 100 words
+        let s = sentence_count as f64 / word_count as f64 * 100.0; // avg sentences per 100 words
+        let coleman_liau = 0.0588 * l - 0.296 * s - 15.8;
+
+        // Automated Readability Index
+        let automated_readability = 4.71 * (total_chars as f64 / word_count as f64)
+            + 0.5 * words_per_sentence
+            - 21.43;
+
+        // SMOG Grade
+        let smog_grade = if sentence_count >= 3 {
+            1.0430 * (complex_word_count as f64 * 30.0 / sentence_count as f64).sqrt() + 3.1291
+        } else {
+            flesch_kincaid_grade // Fallback for short texts
+        };
+
+        Self {
+            flesch_reading_ease,
+            flesch_kincaid_grade: flesch_kincaid_grade.max(0.0),
+            gunning_fog: gunning_fog.max(0.0),
+            coleman_liau: coleman_liau.max(0.0),
+            automated_readability: automated_readability.max(0.0),
+            smog_grade: smog_grade.max(0.0),
+            avg_syllables_per_word,
+            complex_word_percentage,
+            complex_word_count,
+            total_syllables,
+        }
+    }
+
+    /// Get a consensus grade level (average of major indices)
+    pub fn consensus_grade(&self) -> f64 {
+        let grades = [
+            self.flesch_kincaid_grade,
+            self.gunning_fog,
+            self.coleman_liau,
+            self.automated_readability,
+        ];
+        let valid: Vec<f64> = grades.iter().copied().filter(|g| *g > 0.0).collect();
+        if valid.is_empty() {
+            return 0.0;
+        }
+        valid.iter().sum::<f64>() / valid.len() as f64
+    }
+
+    /// Human-readable label for the Flesch score
+    pub fn flesch_label(&self) -> &str {
+        if self.flesch_reading_ease >= 90.0 { "Very Easy (5th grade)" }
+        else if self.flesch_reading_ease >= 80.0 { "Easy (6th grade)" }
+        else if self.flesch_reading_ease >= 70.0 { "Fairly Easy (7th grade)" }
+        else if self.flesch_reading_ease >= 60.0 { "Standard (8th-9th grade)" }
+        else if self.flesch_reading_ease >= 50.0 { "Fairly Difficult (10th-12th grade)" }
+        else if self.flesch_reading_ease >= 30.0 { "Difficult (College)" }
+        else { "Very Difficult (Graduate)" }
+    }
+
+    /// Audience recommendation based on grade level
+    pub fn audience_label(&self) -> &str {
+        let grade = self.consensus_grade();
+        if grade <= 6.0 { "Children / General Public" }
+        else if grade <= 8.0 { "Young Adults" }
+        else if grade <= 12.0 { "General Adults" }
+        else if grade <= 16.0 { "College-educated" }
+        else { "Academic / Professional" }
+    }
+}
+
+/// Word frequency analysis for a text
+#[derive(Debug, Clone, Default)]
+pub struct WordFrequencyAnalysis {
+    /// Word frequencies sorted by count (descending)
+    pub frequencies: Vec<(String, usize)>,
+    /// Total unique words
+    pub unique_count: usize,
+    /// Total word count
+    pub total_count: usize,
+    /// Type-token ratio (vocabulary richness)
+    pub type_token_ratio: f64,
+    /// Hapax legomena (words appearing only once)
+    pub hapax_count: usize,
+    /// Top bigrams (two-word phrases)
+    pub top_bigrams: Vec<(String, usize)>,
+}
+
+impl WordFrequencyAnalysis {
+    /// Compute word frequency analysis from text
+    pub fn from_text(text: &str) -> Self {
+        if text.is_empty() {
+            return Self::default();
+        }
+
+        let words: Vec<String> = text
+            .split_whitespace()
+            .map(|w| w.to_lowercase().trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .filter(|w| !w.is_empty())
+            .collect();
+
+        let total_count = words.len();
+
+        // Word frequencies
+        let mut freq_map = std::collections::HashMap::new();
+        for word in &words {
+            *freq_map.entry(word.clone()).or_insert(0usize) += 1;
+        }
+
+        let unique_count = freq_map.len();
+        let hapax_count = freq_map.values().filter(|&&c| c == 1).count();
+
+        let mut frequencies: Vec<(String, usize)> = freq_map.into_iter().collect();
+        frequencies.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // Bigrams
+        let mut bigram_map = std::collections::HashMap::new();
+        for window in words.windows(2) {
+            let bigram = format!("{} {}", window[0], window[1]);
+            *bigram_map.entry(bigram).or_insert(0usize) += 1;
+        }
+        let mut top_bigrams: Vec<(String, usize)> = bigram_map
+            .into_iter()
+            .filter(|(_, count)| *count > 1)
+            .collect();
+        top_bigrams.sort_by(|a, b| b.1.cmp(&a.1));
+        top_bigrams.truncate(15);
+
+        let type_token_ratio = if total_count > 0 {
+            unique_count as f64 / total_count as f64 * 100.0
+        } else {
+            0.0
+        };
+
+        Self {
+            frequencies,
+            unique_count,
+            total_count,
+            type_token_ratio,
+            hapax_count,
+            top_bigrams,
+        }
+    }
+
+    /// Get the top N most frequent words
+    pub fn top_words(&self, n: usize) -> &[(String, usize)] {
+        let end = n.min(self.frequencies.len());
+        &self.frequencies[..end]
+    }
+
+    /// Get words appearing only once
+    pub fn hapax_words(&self) -> Vec<&str> {
+        self.frequencies
+            .iter()
+            .filter(|(_, c)| *c == 1)
+            .map(|(w, _)| w.as_str())
+            .collect()
+    }
+
+    /// Vocabulary richness label
+    pub fn richness_label(&self) -> &str {
+        if self.type_token_ratio >= 70.0 { "Very Rich" }
+        else if self.type_token_ratio >= 55.0 { "Rich" }
+        else if self.type_token_ratio >= 40.0 { "Moderate" }
+        else if self.type_token_ratio >= 25.0 { "Repetitive" }
+        else { "Very Repetitive" }
+    }
+}
+
 fn count_syllables(word: &str) -> usize {
     let word = word.to_lowercase();
     let vowels = "aeiouy";
@@ -480,5 +714,115 @@ mod tests {
         let stats = Statistics::from_text("Hello world.");
         let summary = stats.summary();
         assert!(summary.contains("2 words"));
+    }
+
+    #[test]
+    fn test_readability_metrics_basic() {
+        let text = "The cat sat on the mat. The dog ran in the yard. It was a nice day.";
+        let metrics = ReadabilityMetrics::from_text(text);
+        assert!(metrics.flesch_reading_ease > 50.0);
+        assert!(metrics.flesch_kincaid_grade >= 0.0);
+        assert!(metrics.gunning_fog >= 0.0);
+        assert!(metrics.total_syllables > 0);
+    }
+
+    #[test]
+    fn test_readability_metrics_empty() {
+        let metrics = ReadabilityMetrics::from_text("");
+        assert_eq!(metrics.flesch_reading_ease, 0.0);
+        assert_eq!(metrics.total_syllables, 0);
+    }
+
+    #[test]
+    fn test_readability_flesch_label() {
+        let text_easy = "The cat sat. The dog ran. I am here. We go now.";
+        let metrics_easy = ReadabilityMetrics::from_text(text_easy);
+        // Easy text should score high
+        assert!(metrics_easy.flesch_reading_ease > 60.0);
+
+        let mut metrics = ReadabilityMetrics::default();
+        metrics.flesch_reading_ease = 95.0;
+        assert!(metrics.flesch_label().contains("Very Easy"));
+        metrics.flesch_reading_ease = 45.0;
+        assert!(metrics.flesch_label().contains("Difficult"));
+        metrics.flesch_reading_ease = 10.0;
+        assert!(metrics.flesch_label().contains("Very Difficult"));
+    }
+
+    #[test]
+    fn test_readability_consensus_grade() {
+        let text = "The quick brown fox jumps over the lazy dog. Simple sentences are easy to read.";
+        let metrics = ReadabilityMetrics::from_text(text);
+        let grade = metrics.consensus_grade();
+        assert!(grade > 0.0);
+    }
+
+    #[test]
+    fn test_readability_audience_label() {
+        let mut metrics = ReadabilityMetrics::default();
+        metrics.flesch_kincaid_grade = 5.0;
+        metrics.gunning_fog = 5.0;
+        metrics.coleman_liau = 5.0;
+        metrics.automated_readability = 5.0;
+        assert_eq!(metrics.audience_label(), "Children / General Public");
+    }
+
+    #[test]
+    fn test_word_frequency_basic() {
+        let text = "the cat and the dog and the bird";
+        let analysis = WordFrequencyAnalysis::from_text(text);
+        assert_eq!(analysis.total_count, 8);
+        assert_eq!(analysis.unique_count, 5);
+        assert!(analysis.type_token_ratio > 0.0);
+        // "the" should be most frequent
+        assert_eq!(analysis.frequencies[0].0, "the");
+        assert_eq!(analysis.frequencies[0].1, 3);
+    }
+
+    #[test]
+    fn test_word_frequency_empty() {
+        let analysis = WordFrequencyAnalysis::from_text("");
+        assert_eq!(analysis.total_count, 0);
+        assert_eq!(analysis.unique_count, 0);
+    }
+
+    #[test]
+    fn test_word_frequency_hapax() {
+        let text = "one two two three three three";
+        let analysis = WordFrequencyAnalysis::from_text(text);
+        assert_eq!(analysis.hapax_count, 1); // "one" appears only once
+        let hapax = analysis.hapax_words();
+        assert!(hapax.contains(&"one"));
+    }
+
+    #[test]
+    fn test_word_frequency_bigrams() {
+        let text = "the cat the cat the cat the dog the dog";
+        let analysis = WordFrequencyAnalysis::from_text(text);
+        // Should have bigrams with count > 1
+        // "the cat" x3, "cat the" x2, "the dog" x2
+        assert!(analysis.top_bigrams.len() >= 2);
+        // Most frequent bigram should be "the cat" (3x)
+        let top = &analysis.top_bigrams[0];
+        assert_eq!(top.0, "the cat");
+        assert_eq!(top.1, 3);
+    }
+
+    #[test]
+    fn test_word_frequency_richness_label() {
+        let mut analysis = WordFrequencyAnalysis::default();
+        analysis.type_token_ratio = 75.0;
+        assert_eq!(analysis.richness_label(), "Very Rich");
+        analysis.type_token_ratio = 20.0;
+        assert_eq!(analysis.richness_label(), "Very Repetitive");
+    }
+
+    #[test]
+    fn test_word_frequency_top_words() {
+        let text = "alpha beta gamma alpha beta alpha";
+        let analysis = WordFrequencyAnalysis::from_text(text);
+        let top2 = analysis.top_words(2);
+        assert_eq!(top2.len(), 2);
+        assert_eq!(top2[0].0, "alpha");
     }
 }
