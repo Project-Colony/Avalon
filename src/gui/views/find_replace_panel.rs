@@ -14,9 +14,15 @@ pub struct FindReplaceData {
 
 /// Render the find/replace panel within current document
 pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
-    let header = text("FIND & REPLACE IN DOCUMENT")
-        .size(11)
-        .color(Theme::TEXT_SECONDARY);
+    let header = row![
+        text("FIND & REPLACE").size(11).color(Theme::TEXT_SECONDARY),
+        Space::with_width(4),
+        text("\u{1F50D}").size(10),
+        Space::with_width(Length::Fill),
+        text("Ctrl+F: find | Ctrl+H: replace | Esc: close")
+            .size(9)
+            .color(Theme::TEXT_MUTED),
+    ];
 
     let find_input = text_input("Find in document...", &data.find_text)
         .on_input(|val| Message::DocFindChanged(val))
@@ -31,30 +37,25 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
         .padding(4)
         .width(Length::FillPortion(3));
 
-    let match_info = if data.match_count > 0 {
-        format!("{} match(es) found", data.match_count)
+    // Match status with color-coded feedback
+    let (match_icon, match_info, match_color) = if data.match_count > 0 {
+        ("\u{2713}", format!("{} match{}", data.match_count, if data.match_count == 1 { "" } else { "es" }), Theme::SUCCESS)
     } else if !data.find_text.is_empty() {
-        "No matches".to_string()
+        ("\u{2717}", "No matches found".to_string(), Theme::WARNING)
     } else {
-        "Type to search...".to_string()
-    };
-
-    let match_color = if data.match_count > 0 {
-        Theme::SUCCESS
-    } else if !data.find_text.is_empty() {
-        Theme::WARNING
-    } else {
-        Theme::TEXT_MUTED
+        ("\u{2026}", "Type to search...".to_string(), Theme::TEXT_MUTED)
     };
 
     let find_row = row![
         find_input,
         Space::with_width(4),
-        button(text("Prev").size(11).color(Theme::TEXT_ACCENT))
+        text(match_icon).size(12).color(match_color),
+        Space::with_width(4),
+        button(text("\u{2191} Prev").size(10).color(Theme::TEXT_ACCENT))
             .on_press(Message::DocFindPrev)
             .padding(Padding::from([4, 8])),
         Space::with_width(2),
-        button(text("Next").size(11).color(Theme::TEXT_ACCENT))
+        button(text("Next \u{2193}").size(10).color(Theme::TEXT_ACCENT))
             .on_press(Message::DocFindNext)
             .padding(Padding::from([4, 8])),
     ]
@@ -63,11 +64,13 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
     let replace_row = row![
         replace_input,
         Space::with_width(4),
-        button(text("Replace").size(11).color(Theme::TEXT_ACCENT))
+        Space::with_width(14),
+        Space::with_width(4),
+        button(text("Replace").size(10).color(Theme::TEXT_ACCENT))
             .on_press(Message::DocReplaceCurrent)
             .padding(Padding::from([4, 8])),
         Space::with_width(2),
-        button(text("Replace All").size(11).color(Theme::WARNING))
+        button(text("Replace All").size(10).color(Theme::WARNING))
             .on_press(Message::DocReplaceAll)
             .padding(Padding::from([4, 8])),
     ]
@@ -77,10 +80,14 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
         text(match_info)
             .size(10)
             .color(match_color),
-        Space::with_width(Length::Fill),
+        Space::with_width(12),
         toggler(data.case_sensitive)
             .label("Aa")
             .on_toggle(|_| Message::DocFindToggleCase),
+        Space::with_width(Length::Fill),
+        text("Enter: next | Shift+Enter: prev")
+            .size(9)
+            .color(Theme::TEXT_MUTED),
     ];
 
     let content = column![
