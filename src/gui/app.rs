@@ -1407,19 +1407,7 @@ impl ScrineverApp {
             Message::GenerateName(kind) => {
                 use crate::core::namegen::NameGenerator;
                 self.name_gen_type = kind.clone();
-                let name = match kind.as_str() {
-                    "male" => NameGenerator::male_name(),
-                    "female" => NameGenerator::female_name(),
-                    "fantasy" => NameGenerator::fantasy_name(),
-                    "place" => NameGenerator::place_name(),
-                    "scifi" => NameGenerator::scifi_name(),
-                    k if k.contains('_') => {
-                        let parts: Vec<&str> = k.splitn(2, '_').collect();
-                        let gender = if parts.get(1) == Some(&"f") { "female" } else { "male" };
-                        NameGenerator::culture_name(parts[0], gender)
-                    }
-                    _ => NameGenerator::male_name(),
-                };
+                let name = NameGenerator::generate_one(&kind);
                 self.generated_names.push(name);
             }
 
