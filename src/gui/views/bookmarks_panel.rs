@@ -78,9 +78,23 @@ pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
         list = list.push(bm_row);
     }
 
-    let hint = text("Ctrl+D: bookmark selected item")
-        .size(9)
-        .color(Theme::TEXT_MUTED);
+    // Bookmarks with notes count
+    let with_notes = bookmarks.bookmarks.iter().filter(|b| b.note.is_some()).count();
+    let note_info = if with_notes > 0 {
+        format!(" | {} with notes", with_notes)
+    } else {
+        String::new()
+    };
+
+    let hint = row![
+        text("Ctrl+D: bookmark selected item")
+            .size(9)
+            .color(Theme::TEXT_MUTED),
+        Space::with_width(Length::Fill),
+        text(format!("Drag to reorder{}", note_info))
+            .size(9)
+            .color(Theme::TEXT_MUTED),
+    ];
 
     let content = column![
         header,

@@ -133,3 +133,51 @@ fn strip_markdown(text: &str) -> String {
 
     result
 }
+
+/// Word wrap text to a maximum line width
+pub fn word_wrap(text: &str, max_width: usize) -> String {
+    let mut result = String::new();
+    for line in text.lines() {
+        if line.len() <= max_width {
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+        let mut current_len = 0;
+        for word in line.split_whitespace() {
+            if current_len + word.len() + 1 > max_width && current_len > 0 {
+                result.push('\n');
+                current_len = 0;
+            }
+            if current_len > 0 {
+                result.push(' ');
+                current_len += 1;
+            }
+            result.push_str(word);
+            current_len += word.len();
+        }
+        result.push('\n');
+    }
+    if result.ends_with('\n') {
+        result.pop();
+    }
+    result
+}
+
+/// Estimate page count from content
+pub fn estimate_pages(contents: &[CompileContent]) -> usize {
+    let total_words: usize = contents.iter()
+        .map(|c| c.text.split_whitespace().count())
+        .sum();
+    (total_words / 250).max(1)
+}
+
+/// Count total words across all content sections
+pub fn word_count(contents: &[CompileContent]) -> usize {
+    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+}
+
+/// Count total characters across all content sections
+pub fn char_count(contents: &[CompileContent]) -> usize {
+    contents.iter().map(|c| c.text.len()).sum()
+}

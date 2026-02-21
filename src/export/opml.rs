@@ -168,3 +168,40 @@ fn unescape_xml(s: &str) -> String {
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
 }
+
+/// Count the total number of outline items in a binder tree
+pub fn count_items(item: &BinderItem) -> usize {
+    1 + item.children.iter().map(|c| count_items(c)).sum::<usize>()
+}
+
+/// Count the depth of the deepest item in the tree
+pub fn max_depth(item: &BinderItem) -> usize {
+    if item.children.is_empty() {
+        0
+    } else {
+        1 + item.children.iter().map(|c| max_depth(c)).max().unwrap_or(0)
+    }
+}
+
+/// Extract all titles from a binder tree into a flat list
+pub fn flat_titles(item: &BinderItem, depth: usize) -> Vec<(usize, String)> {
+    let mut titles = vec![(depth, item.title.clone())];
+    for child in &item.children {
+        titles.extend(flat_titles(child, depth + 1));
+    }
+    titles
+}
+
+/// Validate OPML content by checking for required elements
+pub fn validate_opml(content: &str) -> Result<()> {
+    if !content.contains("<opml") {
+        anyhow::bail!("Missing <opml> root element");
+    }
+    if !content.contains("<head>") || !content.contains("</head>") {
+        anyhow::bail!("Missing <head> element");
+    }
+    if !content.contains("<body>") || !content.contains("</body>") {
+        anyhow::bail!("Missing <body> element");
+    }
+    Ok(())
+}

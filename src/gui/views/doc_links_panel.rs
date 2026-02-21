@@ -123,9 +123,33 @@ pub fn view(
         );
     }
 
-    let hint = text("Syntax: [[Document Title]] or [[Title|display text]]")
-        .size(9)
-        .color(Theme::TEXT_MUTED);
+    // Link health summary
+    let orphan_indicator = if incoming_links.is_empty() && !outgoing_links.is_empty() {
+        "Orphan: no backlinks to this doc"
+    } else if incoming_links.is_empty() && outgoing_links.is_empty() {
+        "Isolated: no links at all"
+    } else {
+        ""
+    };
+
+    let health_row: Element<'static, Message> = if !orphan_indicator.is_empty() {
+        text(orphan_indicator)
+            .size(9)
+            .color(Theme::WARNING)
+            .into()
+    } else {
+        Space::with_height(0).into()
+    };
+
+    let hint = row![
+        text("Syntax: [[Document Title]] or [[Title|display text]]")
+            .size(9)
+            .color(Theme::TEXT_MUTED),
+        Space::with_width(Length::Fill),
+        text(format!("{}\u{2192} {}\u{2190}", outgoing_links.len(), incoming_links.len()))
+            .size(9)
+            .color(Theme::TEXT_MUTED),
+    ];
 
     let content = column![
         header,
@@ -136,6 +160,7 @@ pub fn view(
         Space::with_height(6),
         scrollable(insert_col).height(Length::Fixed(60.0)),
         Space::with_height(2),
+        health_row,
         hint,
     ]
     .padding(Padding::from([8, 12]));

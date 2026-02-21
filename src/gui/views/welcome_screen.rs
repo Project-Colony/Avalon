@@ -116,8 +116,36 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
         text("Ctrl+1-4 Switch View | F11 Focus Mode | F5 Composition Mode").size(11).color(Theme::TEXT_MUTED),
         text("Ctrl+B Bold | Ctrl+U Underline | Ctrl+H Find/Replace | Esc Close Panel").size(11).color(Theme::TEXT_MUTED),
         text("Ctrl+Shift+F Composition | Ctrl+Shift+T Script Mode | Ctrl+Shift+G Goals").size(11).color(Theme::TEXT_MUTED),
+        text("Ctrl+5 Snapshots | Ctrl+D Bookmark | Ctrl+G Go to Line | Tab Next Panel").size(11).color(Theme::TEXT_MUTED),
     ]
     .spacing(2);
+
+    // Tip of the day
+    let tips = [
+        "Use Collections to organize documents into custom groups outside the binder hierarchy.",
+        "Snapshots let you save and compare versions of your document at any point.",
+        "The Corkboard view shows index cards for each document in a folder.",
+        "Use [[Title]] syntax to create links between your documents.",
+        "Set word targets per document or per session in the Targets panel.",
+        "Use labels and statuses to track progress on individual documents.",
+        "The Scrivenings view stitches multiple documents together for seamless reading.",
+        "Project Notes are a quick scratchpad saved with your project.",
+    ];
+    let tip_index = {
+        use chrono::Datelike;
+        chrono::Local::now().ordinal0() as usize % tips.len()
+    };
+
+    let tip_section = column![
+        Space::with_height(12),
+        row![
+            text("\u{1F4A1}").size(12),
+            Space::with_width(4),
+            text("Tip:").size(11).color(Theme::TEXT_ACCENT),
+            Space::with_width(4),
+            text(tips[tip_index]).size(11).color(Theme::TEXT_SECONDARY),
+        ],
+    ];
 
     let version_info = text("Avalon v0.1.0 — Open source writing studio")
         .size(10)
@@ -132,6 +160,7 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
         recent_section,
         template_section,
         shortcuts,
+        tip_section,
         Space::with_height(16),
         version_info,
     ]

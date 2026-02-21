@@ -97,12 +97,24 @@ pub fn view<'a>(
     .width(Length::Fill)
     .height(Length::Fill);
 
+    let secondary_pages = secondary_words as f64 / 250.0;
+    let reading_min = secondary_words as f64 / 250.0;
+    let reading_display = if reading_min < 1.0 {
+        "<1m".to_string()
+    } else {
+        format!("{:.0}m", reading_min)
+    };
+
     let secondary_footer = container(
         row![
-            text(format!("{} words | {} chars | {} para", secondary_words, secondary_chars, secondary_paragraphs))
+            text(format!("{} words | {} chars | {} para | {:.1} pg | {} read",
+                secondary_words, secondary_chars, secondary_paragraphs,
+                secondary_pages, reading_display
+            ))
                 .size(10)
                 .color(Theme::TEXT_MUTED),
             Space::with_width(Length::Fill),
+            text("Ctrl+Shift+E: toggle split").size(9).color(Theme::TEXT_MUTED),
         ]
     )
     .padding(Padding::from([4, 12]));

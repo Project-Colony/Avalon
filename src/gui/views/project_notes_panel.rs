@@ -36,11 +36,21 @@ pub fn view(notes: &str) -> Element<'static, Message> {
         .padding(8)
         .width(Length::Fill);
 
+    // Reading time
+    let reading_min = word_count as f64 / 250.0;
+    let reading_display = if reading_min < 1.0 {
+        "<1m read".to_string()
+    } else {
+        format!("~{:.0}m read", reading_min)
+    };
+
     // Contextual hints based on content
     let hint_text = if notes.is_empty() {
         "Ideas: character bios, world-building notes, research links, plot outlines, revision notes"
     } else if word_count < 10 {
         "Keep adding notes — they're saved with the project automatically"
+    } else if word_count > 500 {
+        "These notes are getting long — consider moving sections to Research folder"
     } else {
         "Tip: Use this pad for quick notes. For longer notes, use Research folder in the binder."
     };
@@ -50,6 +60,8 @@ pub fn view(notes: &str) -> Element<'static, Message> {
             .size(9)
             .color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
+        text(reading_display).size(9).color(Theme::TEXT_MUTED),
+        Space::with_width(8),
         text("\u{1F4BE} Auto-saved with project")
             .size(9)
             .color(Theme::TEXT_MUTED),

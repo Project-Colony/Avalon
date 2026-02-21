@@ -131,4 +131,92 @@ impl WritingHistory {
     pub fn active_days(&self) -> usize {
         self.entries.iter().filter(|e| e.words_written > 0).count()
     }
+
+    /// Total number of days tracked
+    pub fn total_days(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Activity ratio (fraction of tracked days with positive words)
+    pub fn activity_ratio(&self) -> f64 {
+        if self.entries.is_empty() {
+            return 0.0;
+        }
+        self.active_days() as f64 / self.entries.len() as f64
+    }
+
+    /// Words written in the last 30 days
+    pub fn words_this_month(&self) -> i64 {
+        let month = self.recent(30);
+        month.iter().map(|e| e.words_written).sum()
+    }
+
+    /// Most productive day of the week (0=Mon, 6=Sun)
+    pub fn most_productive_weekday(&self) -> Option<chrono::Weekday> {
+        use chrono::Datelike;
+        use std::collections::HashMap;
+        let mut totals: HashMap<chrono::Weekday, i64> = HashMap::new();
+        for entry in &self.entries {
+            *totals.entry(entry.date.weekday()).or_insert(0) += entry.words_written.max(0);
+        }
+        totals.into_iter().max_by_key(|(_, v)| *v).map(|(k, _)| k)
+    }
+
+    /// Check if user has written today
+    pub fn wrote_today(&self) -> bool {
+        self.today().map_or(false, |e| e.words_written > 0)
+    }
+
+    /// Average writing time per session in minutes
+    pub fn average_session_minutes(&self) -> f64 {
+        let active: Vec<_> = self.entries.iter().filter(|e| e.time_spent_seconds > 0).collect();
+        if active.is_empty() {
+            return 0.0;
+        }
+        let total: u64 = active.iter().map(|e| e.time_spent_seconds).sum();
+        (total as f64 / 60.0) / active.len() as f64
+    }
+
+    /// Format total time as a human-readable string
+    pub fn total_time_display(&self) -> String {
+        let secs = self.total_time_seconds();
+        let hours = secs / 3600;
+        let mins = (secs % 3600) / 60;
+        if hours > 0 {
+            format!("{}h {}m", hours, mins)
+        } else {
+            format!("{}m", mins)
+        }
+    }
+
+    /// Get a summary string for display
+    pub fn summary(&self) -> String {
+        format!(
+            "{} words over {} days ({} active), streak: {}",
+            self.total_words_written(),
+            self.total_days(),
+            self.active_days(),
+            self.current_streak()
+        )
+    }
+}
+
+impl DailyEntry {
+    /// Time spent as a human-readable string
+    pub fn time_display(&self) -> String {
+        let mins = self.time_spent_seconds / 60;
+        if mins >= 60 {
+            format!("{}h {}m", mins / 60, mins % 60)
+        } else {
+            format!("{}m", mins)
+        }
+    }
+
+    /// Words per minute for this session
+    pub fn wpm(&self) -> f64 {
+        if self.time_spent_seconds < 60 {
+            return 0.0;
+        }
+        self.words_written.max(0) as f64 / (self.time_spent_seconds as f64 / 60.0)
+    }
 }

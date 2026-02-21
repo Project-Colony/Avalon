@@ -116,4 +116,66 @@ impl BookmarkList {
     pub fn count(&self) -> usize {
         self.bookmarks.len()
     }
+
+    /// Check if the bookmark list is empty
+    pub fn is_empty(&self) -> bool {
+        self.bookmarks.is_empty()
+    }
+
+    /// Clear all bookmarks
+    pub fn clear(&mut self) {
+        self.bookmarks.clear();
+    }
+
+    /// Search bookmarks by name (case-insensitive)
+    pub fn search(&self, query: &str) -> Vec<&Bookmark> {
+        let q = query.to_lowercase();
+        self.bookmarks.iter().filter(|b| b.name.to_lowercase().contains(&q)).collect()
+    }
+
+    /// Set a note on a bookmark
+    pub fn set_note(&mut self, item_id: &Uuid, note: &str) {
+        if let Some(bm) = self.bookmarks.iter_mut().find(|b| &b.item_id == item_id) {
+            bm.note = if note.is_empty() { None } else { Some(note.to_string()) };
+        }
+    }
+
+    /// Set a color on a bookmark
+    pub fn set_color(&mut self, item_id: &Uuid, color: &str) {
+        if let Some(bm) = self.bookmarks.iter_mut().find(|b| &b.item_id == item_id) {
+            bm.color = if color.is_empty() { None } else { Some(color.to_string()) };
+        }
+    }
+
+    /// Get all unique colors used by bookmarks
+    pub fn used_colors(&self) -> Vec<String> {
+        let mut colors: Vec<String> = self.bookmarks.iter()
+            .filter_map(|b| b.color.clone())
+            .collect();
+        colors.sort();
+        colors.dedup();
+        colors
+    }
+
+    /// Get bookmarks filtered by color
+    pub fn by_color(&self, color: &str) -> Vec<&Bookmark> {
+        self.bookmarks.iter()
+            .filter(|b| b.color.as_deref() == Some(color))
+            .collect()
+    }
+
+    /// Get bookmarks that have notes
+    pub fn with_notes(&self) -> Vec<&Bookmark> {
+        self.bookmarks.iter()
+            .filter(|b| b.note.is_some())
+            .collect()
+    }
+
+    /// Move a bookmark to a new position in the list
+    pub fn reorder(&mut self, from: usize, to: usize) {
+        if from < self.bookmarks.len() && to < self.bookmarks.len() {
+            let item = self.bookmarks.remove(from);
+            self.bookmarks.insert(to, item);
+        }
+    }
 }

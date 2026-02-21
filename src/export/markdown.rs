@@ -110,3 +110,38 @@ pub fn word_count(contents: &[CompileContent]) -> usize {
         .map(|c| c.text.split_whitespace().count())
         .sum()
 }
+
+/// Count total characters across all content sections
+pub fn char_count(contents: &[CompileContent]) -> usize {
+    contents.iter().map(|c| c.text.len()).sum()
+}
+
+/// Estimate page count from content
+pub fn estimate_pages(contents: &[CompileContent]) -> usize {
+    let total_words: usize = contents.iter()
+        .map(|c| c.text.split_whitespace().count())
+        .sum();
+    (total_words / 250).max(1)
+}
+
+/// Extract all headings from markdown content for analysis
+pub fn extract_headings(contents: &[CompileContent]) -> Vec<(usize, String)> {
+    let mut headings = Vec::new();
+    for content in contents {
+        if content.is_folder {
+            let level = (content.depth + 2).min(6);
+            headings.push((level, content.title.clone()));
+        }
+        for line in content.text.lines() {
+            let trimmed = line.trim();
+            if trimmed.starts_with('#') {
+                let level = trimmed.chars().take_while(|c| *c == '#').count();
+                let text = trimmed[level..].trim().to_string();
+                if !text.is_empty() && level <= 6 {
+                    headings.push((level, text));
+                }
+            }
+        }
+    }
+    headings
+}

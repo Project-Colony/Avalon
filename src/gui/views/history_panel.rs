@@ -101,10 +101,31 @@ pub fn view(history: &WritingHistory) -> Element<'static, Message> {
         entries_col = entries_col.push(entry_row);
     }
 
+    // Activity ratio indicator
+    let activity = history.activity_ratio();
+    let activity_color = if activity >= 0.8 { Theme::SUCCESS }
+    else if activity >= 0.5 { Theme::WARNING }
+    else { Theme::TEXT_MUTED };
+    let activity_pct = format!("{:.0}% active", activity * 100.0);
+
+    let longest = history.longest_streak();
+    let week_words = history.words_this_week();
+
+    let extra_stats = row![
+        text(format!("Longest streak: {}d", longest)).size(10).color(Theme::TEXT_MUTED),
+        Space::with_width(12),
+        text(format!("This week: {}", format_number(week_words.max(0) as u64)))
+            .size(10).color(Theme::TEXT_ACCENT),
+        Space::with_width(12),
+        text(activity_pct).size(10).color(activity_color),
+    ];
+
     let content = column![
         header,
         Space::with_height(4),
         summary,
+        Space::with_height(4),
+        extra_stats,
         Space::with_height(6),
         scrollable(entries_col).height(Length::Fixed(120.0)),
     ]

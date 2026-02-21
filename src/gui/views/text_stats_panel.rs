@@ -114,6 +114,27 @@ pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
     ]
     .align_y(iced::Alignment::Center);
 
+    // Syllable and word length distribution estimate
+    let long_words: usize = analysis.most_common_words.iter()
+        .filter(|(w, _)| w.len() > 8)
+        .count();
+    let short_words: usize = analysis.most_common_words.iter()
+        .filter(|(w, _)| w.len() <= 4)
+        .count();
+    let total_common = analysis.most_common_words.len().max(1);
+
+    let complexity_row = row![
+        text("Complexity:").size(11).color(Theme::TEXT_MUTED),
+        Space::with_width(4),
+        text(format!("{}% short", short_words * 100 / total_common)).size(10).color(Theme::SUCCESS),
+        Space::with_width(8),
+        text(format!("{}% long", long_words * 100 / total_common)).size(10).color(Theme::WARNING),
+        Space::with_width(16),
+        text(format!("Syllables/word: ~{:.1}", analysis.avg_word_length * 0.6))
+            .size(10).color(Theme::TEXT_MUTED),
+    ]
+    .align_y(iced::Alignment::Center);
+
     let content = column![
         header,
         Space::with_height(4),
@@ -124,6 +145,8 @@ pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
         readability,
         Space::with_height(4),
         vocab_row,
+        Space::with_height(4),
+        complexity_row,
         Space::with_height(4),
         scrollable(common_words),
         overused_row,
