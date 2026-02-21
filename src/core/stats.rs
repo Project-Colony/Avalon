@@ -345,3 +345,140 @@ fn count_syllables(word: &str) -> usize {
     }
     count.max(1)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_statistics_from_text() {
+        let stats = Statistics::from_text("Hello world. This is a test.");
+        assert_eq!(stats.word_count, 6);
+        assert_eq!(stats.sentence_count, 2);
+        assert_eq!(stats.document_count, 1);
+    }
+
+    #[test]
+    fn test_statistics_empty_text() {
+        let stats = Statistics::from_text("");
+        assert_eq!(stats.word_count, 0);
+        assert_eq!(stats.char_count, 0);
+    }
+
+    #[test]
+    fn test_progress_string() {
+        let stats = Statistics::from_text("one two three four five");
+        let progress = stats.progress_string(Some(10));
+        assert!(progress.contains("5 / 10"));
+        assert!(progress.contains("50.0%"));
+
+        let no_target = stats.progress_string(None);
+        assert!(no_target.contains("5 words"));
+    }
+
+    #[test]
+    fn test_reading_speaking_time() {
+        let stats = Statistics::from_text(&"word ".repeat(250));
+        assert!((stats.reading_time_minutes() - 1.0).abs() < 0.1);
+        assert!((stats.speaking_time_minutes() - 250.0 / 150.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_session_stats() {
+        let mut session = SessionStats::new();
+        assert!(!session.is_active());
+
+        session.update(500, 600);
+        assert!(session.is_active());
+        assert_eq!(session.words_written, 500);
+        assert!((session.words_per_minute - 50.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_session_elapsed_display() {
+        let mut session = SessionStats::new();
+        session.update(100, 3661);
+        assert_eq!(session.elapsed_display(), "1h 1m 1s");
+
+        session.update(100, 125);
+        assert_eq!(session.elapsed_display(), "2m 5s");
+
+        session.update(100, 30);
+        assert_eq!(session.elapsed_display(), "30s");
+    }
+
+    #[test]
+    fn test_session_words_display() {
+        let mut session = SessionStats::new();
+        session.update(100, 60);
+        assert_eq!(session.words_display(), "+100");
+
+        session.update(-50, 60);
+        assert_eq!(session.words_display(), "-50");
+    }
+
+    #[test]
+    fn test_session_pages_written() {
+        let mut session = SessionStats::new();
+        session.update(500, 600);
+        assert!((session.pages_written() - 2.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_text_analysis_basic() {
+        let analysis = TextAnalysis::from_text("The quick brown fox jumps over the lazy dog. The dog barked loudly.");
+        assert_eq!(analysis.word_count, 13);
+        assert!(analysis.unique_words > 0);
+        assert_eq!(analysis.sentence_count, 2);
+        assert!(analysis.readability_score > 0.0);
+    }
+
+    #[test]
+    fn test_text_analysis_empty() {
+        let analysis = TextAnalysis::from_text("");
+        assert!(analysis.is_empty());
+        assert_eq!(analysis.word_count, 0);
+    }
+
+    #[test]
+    fn test_readability_labels() {
+        let mut analysis = TextAnalysis::default();
+        analysis.readability_score = 95.0;
+        assert_eq!(analysis.readability_label(), "Very Easy");
+        analysis.readability_score = 85.0;
+        assert_eq!(analysis.readability_label(), "Easy");
+        analysis.readability_score = 55.0;
+        assert_eq!(analysis.readability_label(), "Fairly Difficult");
+        analysis.readability_score = 20.0;
+        assert_eq!(analysis.readability_label(), "Very Difficult");
+    }
+
+    #[test]
+    fn test_vocabulary_richness() {
+        let analysis = TextAnalysis::from_text("the the the the the");
+        assert!(analysis.vocabulary_richness() < 50.0);
+        assert_eq!(analysis.vocabulary_label(), "Repetitive");
+    }
+
+    #[test]
+    fn test_text_analysis_summary() {
+        let analysis = TextAnalysis::from_text("Hello world. Testing.");
+        let summary = analysis.summary();
+        assert!(summary.contains("3 words"));
+    }
+
+    #[test]
+    fn test_count_syllables() {
+        assert_eq!(count_syllables("cat"), 1);
+        assert_eq!(count_syllables("hello"), 2);
+        assert_eq!(count_syllables("beautiful"), 3);
+        assert_eq!(count_syllables("a"), 1);
+    }
+
+    #[test]
+    fn test_statistics_summary() {
+        let stats = Statistics::from_text("Hello world.");
+        let summary = stats.summary();
+        assert!(summary.contains("2 words"));
+    }
+}

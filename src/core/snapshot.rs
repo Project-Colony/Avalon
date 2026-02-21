@@ -188,3 +188,82 @@ impl Snapshot {
         DiffStats::from_chunks(&diff)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::document::Document;
+
+    #[test]
+    fn test_snapshot_from_document() {
+        let doc = Document::with_content("Hello world");
+        let snap = Snapshot::from_document(&doc, "Test snapshot");
+        assert_eq!(snap.title, "Test snapshot");
+        assert_eq!(snap.content, "Hello world");
+        assert_eq!(snap.word_count, 2);
+    }
+
+    #[test]
+    fn test_snapshot_char_line_count() {
+        let doc = Document::with_content("Line one\nLine two\nLine three");
+        let snap = Snapshot::from_document(&doc, "Test");
+        assert_eq!(snap.char_count(), 28);
+        assert_eq!(snap.line_count(), 3);
+    }
+
+    #[test]
+    fn test_diff_equal() {
+        let doc = Document::with_content("Hello world");
+        let snap = Snapshot::from_document(&doc, "Test");
+        let chunks = snap.diff_with("Hello world");
+        assert_eq!(chunks.len(), 1);
+        assert!(matches!(chunks[0], DiffChunk::Equal(_)));
+    }
+
+    #[test]
+    fn test_diff_added_lines() {
+        let doc = Document::with_content("Line one");
+        let snap = Snapshot::from_document(&doc, "Test");
+        let chunks = snap.diff_with("Line one\nLine two");
+        assert!(chunks.len() >= 2);
+    }
+
+    #[test]
+    fn test_diff_stats() {
+        let doc = Document::with_content("Line one\nLine two");
+        let snap = Snapshot::from_document(&doc, "Test");
+        let stats = snap.diff_stats_with("Line one\nLine three\nLine four");
+        assert!(stats.has_changes());
+        assert!(stats.lines_added > 0 || stats.lines_removed > 0);
+    }
+
+    #[test]
+    fn test_diff_stats_summary() {
+        let chunks = vec![
+            DiffChunk::Equal("same".to_string()),
+            DiffChunk::Removed("old line".to_string()),
+            DiffChunk::Added("new line".to_string()),
+        ];
+        let stats = DiffStats::from_chunks(&chunks);
+        assert_eq!(stats.lines_added, 1);
+        assert_eq!(stats.lines_removed, 1);
+        assert_eq!(stats.lines_unchanged, 1);
+        assert!(stats.has_changes());
+
+        let summary = stats.summary();
+        assert!(summary.contains("+1"));
+        assert!(summary.contains("-1"));
+    }
+
+    #[test]
+    fn test_diff_stats_no_changes() {
+        let chunks = vec![
+            DiffChunk::Equal("line1".to_string()),
+            DiffChunk::Equal("line2".to_string()),
+        ];
+        let stats = DiffStats::from_chunks(&chunks);
+        assert!(!stats.has_changes());
+        assert_eq!(stats.total_changes(), 0);
+        assert!((stats.change_percentage() - 0.0).abs() < 0.01);
+    }
+}

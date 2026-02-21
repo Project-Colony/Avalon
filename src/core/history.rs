@@ -220,3 +220,170 @@ impl DailyEntry {
         self.words_written.max(0) as f64 / (self.time_spent_seconds as f64 / 60.0)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_entry(date: NaiveDate, words: i64, time: u64) -> DailyEntry {
+        DailyEntry {
+            date,
+            word_count_start: 1000,
+            word_count_end: (1000 + words.max(0)) as usize,
+            words_written: words,
+            time_spent_seconds: time,
+        }
+    }
+
+    #[test]
+    fn test_writing_history_new() {
+        let history = WritingHistory::new();
+        assert!(history.entries.is_empty());
+        assert_eq!(history.total_words_written(), 0);
+        assert_eq!(history.total_days(), 0);
+        assert_eq!(history.current_streak(), 0);
+    }
+
+    #[test]
+    fn test_record_words() {
+        let mut history = WritingHistory::new();
+        history.record(100, 60);
+        assert_eq!(history.total_days(), 1);
+        // Record again for the same day
+        history.record(200, 60);
+        assert_eq!(history.total_days(), 1);
+    }
+
+    #[test]
+    fn test_total_words_written() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 500, 3600));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 300, 1800));
+        assert_eq!(history.total_words_written(), 800);
+    }
+
+    #[test]
+    fn test_average_words_per_day() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 400, 3600));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 1800));
+        assert!((history.average_words_per_day() - 300.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_current_streak() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 0, 0));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 200, 120));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 4).unwrap(), 150, 90));
+        assert_eq!(history.current_streak(), 2);
+    }
+
+    #[test]
+    fn test_longest_streak() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 60));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 300, 60));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 4).unwrap(), 0, 0));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 5).unwrap(), 100, 60));
+        assert_eq!(history.longest_streak(), 3);
+    }
+
+    #[test]
+    fn test_best_day() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 500, 120));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 200, 90));
+        let best = history.best_day().unwrap();
+        assert_eq!(best.words_written, 500);
+    }
+
+    #[test]
+    fn test_recent() {
+        let mut history = WritingHistory::new();
+        for i in 1..=10 {
+            history.entries.push(make_entry(
+                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), i as i64 * 100, 60));
+        }
+        let recent = history.recent(3);
+        assert_eq!(recent.len(), 3);
+        assert_eq!(recent[0].words_written, 800);
+    }
+
+    #[test]
+    fn test_active_days() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 0, 0));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 200, 60));
+        assert_eq!(history.active_days(), 2);
+        assert_eq!(history.total_days(), 3);
+    }
+
+    #[test]
+    fn test_activity_ratio() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 0, 0));
+        assert!((history.activity_ratio() - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_total_time_display() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 7200));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 1800));
+        let display = history.total_time_display();
+        assert_eq!(display, "2h 30m");
+    }
+
+    #[test]
+    fn test_daily_entry_wpm() {
+        let entry = make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 300, 600);
+        assert!((entry.wpm() - 30.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_daily_entry_time_display() {
+        let entry = make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 5400);
+        assert_eq!(entry.time_display(), "1h 30m");
+    }
+
+    #[test]
+    fn test_summary() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 500, 3600));
+        let summary = history.summary();
+        assert!(summary.contains("500 words"));
+        assert!(summary.contains("1 days"));
+    }
+}

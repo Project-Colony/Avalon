@@ -195,3 +195,134 @@ impl CollectionKind {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_collection_new() {
+        let coll = Collection::new_manual("Test Collection");
+        assert_eq!(coll.name, "Test Collection");
+        assert!(coll.item_ids.is_empty());
+        assert!(coll.is_empty());
+        assert!(matches!(coll.kind, CollectionKind::Manual));
+    }
+
+    #[test]
+    fn test_collection_new_search() {
+        let coll = Collection::new_search("Search Results", "query");
+        assert!(matches!(coll.kind, CollectionKind::Search { .. }));
+        assert_eq!(coll.kind.label(), "Smart");
+    }
+
+    #[test]
+    fn test_add_remove_items() {
+        let mut coll = Collection::new_manual("Test");
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+
+        coll.add_item(id1);
+        coll.add_item(id2);
+        assert_eq!(coll.item_ids.len(), 2);
+        assert!(coll.contains(&id1));
+
+        coll.remove_item(&id1);
+        assert_eq!(coll.item_ids.len(), 1);
+        assert!(!coll.contains(&id1));
+    }
+
+    #[test]
+    fn test_no_duplicate_items() {
+        let mut coll = Collection::new_manual("Test");
+        let id = Uuid::new_v4();
+        coll.add_item(id);
+        coll.add_item(id);
+        assert_eq!(coll.item_ids.len(), 1);
+    }
+
+    #[test]
+    fn test_item_at_position() {
+        let mut coll = Collection::new_manual("Test");
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        coll.add_item(id1);
+        coll.add_item(id2);
+
+        assert_eq!(coll.item_at_position(0), Some(&id1));
+        assert_eq!(coll.item_at_position(1), Some(&id2));
+        assert_eq!(coll.item_at_position(2), None);
+    }
+
+    #[test]
+    fn test_position_of() {
+        let mut coll = Collection::new_manual("Test");
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        coll.add_item(id1);
+        coll.add_item(id2);
+
+        assert_eq!(coll.position_of(&id1), Some(0));
+        assert_eq!(coll.position_of(&id2), Some(1));
+    }
+
+    #[test]
+    fn test_swap() {
+        let mut coll = Collection::new_manual("Test");
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        coll.add_item(id1);
+        coll.add_item(id2);
+        coll.swap(0, 1);
+        assert_eq!(coll.item_at_position(0), Some(&id2));
+        assert_eq!(coll.item_at_position(1), Some(&id1));
+    }
+
+    #[test]
+    fn test_dedup() {
+        let mut coll = Collection::new_manual("Test");
+        let id = Uuid::new_v4();
+        coll.item_ids.push(id);
+        coll.item_ids.push(id);
+        coll.item_ids.push(id);
+        coll.dedup();
+        assert_eq!(coll.item_ids.len(), 1);
+    }
+
+    #[test]
+    fn test_retain() {
+        let mut coll = Collection::new_manual("Test");
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        let id3 = Uuid::new_v4();
+        coll.add_item(id1);
+        coll.add_item(id2);
+        coll.add_item(id3);
+        coll.retain(|id| *id != id2);
+        assert_eq!(coll.item_ids.len(), 2);
+        assert!(!coll.contains(&id2));
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut coll = Collection::new_manual("Test");
+        coll.add_item(Uuid::new_v4());
+        coll.add_item(Uuid::new_v4());
+        coll.clear();
+        assert!(coll.is_empty());
+    }
+
+    #[test]
+    fn test_collection_kind_labels() {
+        let manual = CollectionKind::Manual;
+        assert_eq!(manual.label(), "Manual");
+        assert_eq!(manual.icon(), "\u{2630}");
+
+        let search = CollectionKind::Search {
+            query: "test".to_string(),
+            case_sensitive: false,
+            whole_word: false,
+        };
+        assert_eq!(search.label(), "Smart");
+    }
+}

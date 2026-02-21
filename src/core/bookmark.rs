@@ -179,3 +179,151 @@ impl BookmarkList {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_id() -> Uuid {
+        Uuid::new_v4()
+    }
+
+    #[test]
+    fn test_bookmark_new() {
+        let id = make_id();
+        let bm = Bookmark::new(id, "Test");
+        assert_eq!(bm.item_id, id);
+        assert_eq!(bm.name, "Test");
+        assert!(bm.color.is_none());
+        assert!(bm.note.is_none());
+    }
+
+    #[test]
+    fn test_bookmark_with_note() {
+        let id = make_id();
+        let bm = Bookmark::with_note(id, "Test", "Important chapter");
+        assert_eq!(bm.note, Some("Important chapter".to_string()));
+    }
+
+    #[test]
+    fn test_bookmark_list_add_remove() {
+        let mut list = BookmarkList::new();
+        assert!(list.is_empty());
+        assert_eq!(list.count(), 0);
+
+        let id1 = make_id();
+        let id2 = make_id();
+        list.add(id1, "First");
+        list.add(id2, "Second");
+        assert_eq!(list.count(), 2);
+        assert!(list.is_bookmarked(&id1));
+
+        list.remove(&id1);
+        assert_eq!(list.count(), 1);
+        assert!(!list.is_bookmarked(&id1));
+    }
+
+    #[test]
+    fn test_no_duplicates() {
+        let mut list = BookmarkList::new();
+        let id = make_id();
+        list.add(id, "Test");
+        list.add(id, "Test Again");
+        assert_eq!(list.count(), 1);
+    }
+
+    #[test]
+    fn test_toggle() {
+        let mut list = BookmarkList::new();
+        let id = make_id();
+        list.toggle(id, "Test");
+        assert!(list.is_bookmarked(&id));
+        list.toggle(id, "Test");
+        assert!(!list.is_bookmarked(&id));
+    }
+
+    #[test]
+    fn test_rename() {
+        let mut list = BookmarkList::new();
+        let id = make_id();
+        list.add(id, "Original");
+        list.rename(&id, "Renamed");
+        assert_eq!(list.get(&id).unwrap().name, "Renamed");
+    }
+
+    #[test]
+    fn test_search() {
+        let mut list = BookmarkList::new();
+        list.add(make_id(), "Chapter One");
+        list.add(make_id(), "Chapter Two");
+        list.add(make_id(), "Epilogue");
+
+        let results = list.search("chapter");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_set_note_and_color() {
+        let mut list = BookmarkList::new();
+        let id = make_id();
+        list.add(id, "Test");
+        list.set_note(&id, "A note");
+        list.set_color(&id, "red");
+        assert_eq!(list.get(&id).unwrap().note, Some("A note".to_string()));
+        assert_eq!(list.get(&id).unwrap().color, Some("red".to_string()));
+    }
+
+    #[test]
+    fn test_clear() {
+        let mut list = BookmarkList::new();
+        list.add(make_id(), "A");
+        list.add(make_id(), "B");
+        list.clear();
+        assert!(list.is_empty());
+    }
+
+    #[test]
+    fn test_sorted_by_name() {
+        let mut list = BookmarkList::new();
+        list.add(make_id(), "Zebra");
+        list.add(make_id(), "Alpha");
+        list.add(make_id(), "Middle");
+        let sorted = list.sorted_by_name();
+        assert_eq!(sorted[0].name, "Alpha");
+        assert_eq!(sorted[1].name, "Middle");
+        assert_eq!(sorted[2].name, "Zebra");
+    }
+
+    #[test]
+    fn test_reorder() {
+        let mut list = BookmarkList::new();
+        let id1 = make_id();
+        let id2 = make_id();
+        let id3 = make_id();
+        list.add(id1, "A");
+        list.add(id2, "B");
+        list.add(id3, "C");
+        list.reorder(0, 2);
+        assert_eq!(list.bookmarks[0].name, "B");
+        assert_eq!(list.bookmarks[2].name, "A");
+    }
+
+    #[test]
+    fn test_by_color() {
+        let mut list = BookmarkList::new();
+        let id1 = make_id();
+        let id2 = make_id();
+        let id3 = make_id();
+        list.add(id1, "A");
+        list.add(id2, "B");
+        list.add(id3, "C");
+        list.set_color(&id1, "red");
+        list.set_color(&id2, "red");
+
+        let reds = list.by_color("red");
+        assert_eq!(reds.len(), 2);
+        let colors = list.used_colors();
+        assert_eq!(colors.len(), 1);
+        assert_eq!(colors[0], "red");
+    }
+}

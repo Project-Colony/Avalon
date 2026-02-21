@@ -309,3 +309,173 @@ impl SearchOptions {
             if flags.is_empty() { String::new() } else { format!("({})", flags.join(", ")) })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::binder::{Binder, BinderItem};
+
+    fn make_binder_with_content(items: Vec<(&str, &str)>) -> Binder {
+        let mut binder = Binder::default_structure();
+        for (title, content) in items {
+            let mut item = BinderItem::new_text(title);
+            if let Some(ref mut doc) = item.document {
+                doc.content = content.to_string();
+            }
+            binder.draft.add_child(item);
+        }
+        binder
+    }
+
+    #[test]
+    fn test_search_empty_query() {
+        let binder = make_binder_with_content(vec![("Doc1", "Hello world")]);
+        let options = SearchOptions { query: String::new(), ..Default::default() };
+        let results = search_binder(&binder, &options);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_search_basic() {
+        let binder = make_binder_with_content(vec![
+            ("Chapter 1", "The cat sat on the mat."),
+            ("Chapter 2", "The dog ran in the park."),
+        ]);
+        let options = SearchOptions {
+            query: "the".to_string(),
+            case_sensitive: false,
+            ..Default::default()
+        };
+        let results = search_binder(&binder, &options);
+        assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn test_search_case_sensitive() {
+        let binder = make_binder_with_content(vec![
+            ("Doc", "Hello hello HELLO"),
+        ]);
+        let options = SearchOptions {
+            query: "Hello".to_string(),
+            case_sensitive: true,
+            search_content: true,
+            search_titles: false,
+            ..Default::default()
+        };
+        let results = search_binder(&binder, &options);
+        assert!(!results.is_empty());
+        // Should find exactly 1 match for case-sensitive "Hello"
+        let content_matches: Vec<_> = results[0].matches.iter()
+            .filter(|m| !m.context.starts_with("[Title]"))
+            .collect();
+        assert_eq!(content_matches.len(), 1);
+    }
+
+    #[test]
+    fn test_search_in_title() {
+        let binder = make_binder_with_content(vec![
+            ("Important Chapter", "Some content here"),
+        ]);
+        let options = SearchOptions {
+            query: "important".to_string(),
+            search_titles: true,
+            search_content: false,
+            ..Default::default()
+        };
+        let results = search_binder(&binder, &options);
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_search_no_results() {
+        let binder = make_binder_with_content(vec![
+            ("Doc", "Hello world"),
+        ]);
+        let options = SearchOptions {
+            query: "zzzzz".to_string(),
+            ..Default::default()
+        };
+        let results = search_binder(&binder, &options);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_search_result_context() {
+        let binder = make_binder_with_content(vec![
+            ("Doc", "The quick brown fox jumps over the lazy dog"),
+        ]);
+        let options = SearchOptions {
+            query: "fox".to_string(),
+            search_content: true,
+            search_titles: false,
+            ..Default::default()
+        };
+        let results = search_binder(&binder, &options);
+        assert_eq!(results.len(), 1);
+        assert!(results[0].matches[0].context.contains("fox"));
+    }
+
+    #[test]
+    fn test_replace_in_document() {
+        let options = SearchOptions {
+            query: "cat".to_string(),
+            case_sensitive: false,
+            ..Default::default()
+        };
+        let result = replace_in_document("The cat sat. The cat ran.", &options, "dog");
+        assert_eq!(result, "The dog sat. The dog ran.");
+    }
+
+    #[test]
+    fn test_replace_case_sensitive() {
+        let options = SearchOptions {
+            query: "Cat".to_string(),
+            case_sensitive: true,
+            ..Default::default()
+        };
+        let result = replace_in_document("Cat cat CAT", &options, "Dog");
+        assert_eq!(result, "Dog cat CAT");
+    }
+
+    #[test]
+    fn test_search_options_defaults() {
+        let opts = SearchOptions::default();
+        assert!(opts.query.is_empty());
+        assert!(!opts.case_sensitive);
+        assert!(!opts.whole_word);
+        assert!(opts.search_titles);
+        assert!(opts.search_content);
+        assert!(opts.has_scope());
+    }
+
+    #[test]
+    fn test_content_only_options() {
+        let opts = SearchOptions::content_only("test");
+        assert_eq!(opts.query, "test");
+        assert!(!opts.search_titles);
+        assert!(opts.search_content);
+    }
+
+    #[test]
+    fn test_search_match_length() {
+        let m = SearchMatch {
+            line_number: 1,
+            start: 10,
+            end: 15,
+            context: "Some context".to_string(),
+        };
+        assert_eq!(m.match_length(), 5);
+    }
+
+    #[test]
+    fn test_search_options_summary() {
+        let opts = SearchOptions {
+            query: "hello".to_string(),
+            case_sensitive: true,
+            ..Default::default()
+        };
+        let summary = opts.summary();
+        assert!(summary.contains("hello"));
+        assert!(summary.contains("case-sensitive"));
+    }
+}

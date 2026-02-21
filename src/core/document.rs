@@ -518,3 +518,176 @@ impl SpanStyle {
             || self.color.is_some() || self.highlight.is_some()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_document_new() {
+        let doc = Document::new();
+        assert!(doc.content.is_empty());
+        assert_eq!(doc.word_count(), 0);
+        assert_eq!(doc.char_count(), 0);
+        assert!(doc.is_empty());
+    }
+
+    #[test]
+    fn test_document_with_content() {
+        let doc = Document::with_content("Hello world. This is a test.");
+        assert_eq!(doc.word_count(), 6);
+        assert_eq!(doc.sentence_count(), 2);
+        assert!(!doc.is_empty());
+    }
+
+    #[test]
+    fn test_word_count() {
+        let doc = Document::with_content("one two three four five");
+        assert_eq!(doc.word_count(), 5);
+    }
+
+    #[test]
+    fn test_paragraph_count() {
+        let doc = Document::with_content("First paragraph.\n\nSecond paragraph.\n\nThird paragraph.");
+        assert_eq!(doc.paragraph_count(), 3);
+    }
+
+    #[test]
+    fn test_sentence_count() {
+        let doc = Document::with_content("Hello! How are you? I am fine.");
+        assert_eq!(doc.sentence_count(), 3);
+    }
+
+    #[test]
+    fn test_char_counts() {
+        let doc = Document::with_content("a b c");
+        assert_eq!(doc.char_count(), 5);
+        assert_eq!(doc.char_count_no_spaces(), 3);
+    }
+
+    #[test]
+    fn test_unique_word_count() {
+        let doc = Document::with_content("the cat sat on the mat the cat");
+        assert_eq!(doc.unique_word_count(), 5); // the, cat, sat, on, mat
+    }
+
+    #[test]
+    fn test_word_frequency() {
+        let doc = Document::with_content("the cat the dog the cat");
+        let freq = doc.word_frequency();
+        assert_eq!(freq.get("the"), Some(&3));
+        assert_eq!(freq.get("cat"), Some(&2));
+        assert_eq!(freq.get("dog"), Some(&1));
+    }
+
+    #[test]
+    fn test_most_frequent_words() {
+        let doc = Document::with_content("a a a b b c");
+        let top = doc.most_frequent_words(2);
+        assert_eq!(top.len(), 2);
+        assert_eq!(top[0].0, "a");
+        assert_eq!(top[0].1, 3);
+    }
+
+    #[test]
+    fn test_vocabulary_richness() {
+        let doc = Document::with_content("the the the");
+        assert!((doc.vocabulary_richness() - 1.0 / 3.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_readability() {
+        let doc = Document::with_content("The cat sat on the mat. The dog ran away.");
+        let grade = doc.readability_grade();
+        // Simple text should be low grade level
+        assert!(grade < 10.0);
+        let ease = doc.reading_ease();
+        assert!(ease > 0.0);
+    }
+
+    #[test]
+    fn test_insert_text() {
+        let mut doc = Document::with_content("Hello world");
+        doc.insert_text(5, " beautiful");
+        assert_eq!(doc.content, "Hello beautiful world");
+    }
+
+    #[test]
+    fn test_delete_range() {
+        let mut doc = Document::with_content("Hello beautiful world");
+        doc.delete_range(5, 15);
+        assert_eq!(doc.content, "Hello world");
+    }
+
+    #[test]
+    fn test_set_content() {
+        let mut doc = Document::new();
+        doc.set_content("New content".to_string());
+        assert_eq!(doc.content, "New content");
+    }
+
+    #[test]
+    fn test_find_positions() {
+        let doc = Document::with_content("the cat and the dog and the mouse");
+        let positions = doc.find_positions("the");
+        assert_eq!(positions.len(), 3);
+        assert_eq!(positions[0], 0);
+    }
+
+    #[test]
+    fn test_preview() {
+        let doc = Document::with_content("This is a very long text that should be truncated");
+        let preview = doc.preview(10);
+        assert!(preview.ends_with("..."));
+        assert!(preview.len() <= 15);
+    }
+
+    #[test]
+    fn test_contains_text() {
+        let doc = Document::with_content("Hello World");
+        assert!(doc.contains_text("hello"));
+        assert!(doc.contains_text("WORLD"));
+        assert!(!doc.contains_text("foo"));
+    }
+
+    #[test]
+    fn test_summary() {
+        let doc = Document::with_content("Hello world.\n\nAnother paragraph.");
+        let summary = doc.summary();
+        assert!(summary.contains("4 words"));
+        assert!(summary.contains("2 paragraphs"));
+    }
+
+    #[test]
+    fn test_footnote_creation() {
+        let fn1 = Footnote::new(1, "A footnote");
+        assert_eq!(fn1.marker, 1);
+        assert!(!fn1.is_endnote);
+
+        let en1 = Footnote::endnote(2, "An endnote");
+        assert!(en1.is_endnote);
+    }
+
+    #[test]
+    fn test_text_span() {
+        let span = TextSpan::new(5, 10, SpanStyle::bold());
+        assert_eq!(span.len(), 5);
+        assert!(!span.is_empty());
+        assert!(span.contains(7));
+        assert!(!span.contains(11));
+
+        let other = TextSpan::new(8, 15, SpanStyle::italic());
+        assert!(span.overlaps(&other));
+    }
+
+    #[test]
+    fn test_reference_types() {
+        let web = Reference::from_url("Google", "https://google.com");
+        assert!(web.is_web());
+        assert!(!web.is_file());
+
+        let file = Reference::from_path("Notes", "/path/to/notes.txt");
+        assert!(file.is_file());
+        assert!(!file.is_web());
+    }
+}
