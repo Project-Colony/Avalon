@@ -133,6 +133,10 @@ pub struct ScrineverApp {
 
     // === Revision tracking ===
     pub current_revision: Option<crate::core::script::RevisionLevel>,
+
+    // === Compile presets ===
+    pub compile_presets: Vec<(String, CompileOptions)>,
+    pub footnote_counter: usize,
 }
 
 /// Messages for the application
@@ -308,6 +312,20 @@ pub enum Message {
     // Document links
     InsertDocLink(Uuid),
 
+    // Formatting toolbar
+    InsertBold,
+    InsertItalic,
+    InsertUnderline,
+    InsertStrikethrough,
+    InsertHeading(u8),
+    InsertBlockQuote,
+    InsertFootnote,
+    InsertHRule,
+
+    // Compile presets
+    SaveCompilePreset(String),
+    LoadCompilePreset(String),
+
     // Misc
     Tick,
     DismissNotification,
@@ -366,6 +384,8 @@ impl ScrineverApp {
             current_script_element: None,
             auto_correction: crate::core::script::AutoCorrection::default(),
             current_revision: None,
+            compile_presets: Vec::new(),
+            footnote_counter: 0,
         };
 
         (app, IcedTask::none())
@@ -395,6 +415,19 @@ impl ScrineverApp {
         self.project.as_ref()
             .map(|p| p.binder.total_word_count())
             .unwrap_or(0)
+    }
+
+    /// Insert markdown-style wrapping markup (e.g., ** for bold)
+    fn insert_markdown_wrap(&mut self, marker: &str) {
+        let wrap = format!("{}text{}", marker, marker);
+        self.editor.content.perform(
+            iced::widget::text_editor::Action::Edit(
+                iced::widget::text_editor::Edit::Paste(
+                    std::sync::Arc::new(wrap)
+                )
+            )
+        );
+        self.editor.mark_dirty();
     }
 
     pub fn update(&mut self, message: Message) -> IcedTask<Message> {
@@ -1572,6 +1605,97 @@ impl ScrineverApp {
                 }
             }
 
+            // ========== Formatting toolbar ==========
+            Message::InsertBold => {
+                self.insert_markdown_wrap("**");
+            }
+
+            Message::InsertItalic => {
+                self.insert_markdown_wrap("*");
+            }
+
+            Message::InsertUnderline => {
+                self.insert_markdown_wrap("__");
+            }
+
+            Message::InsertStrikethrough => {
+                self.insert_markdown_wrap("~~");
+            }
+
+            Message::InsertHeading(level) => {
+                let prefix = "#".repeat(level as usize);
+                let markup = format!("{} ", prefix);
+                self.editor.content.perform(
+                    iced::widget::text_editor::Action::Edit(
+                        iced::widget::text_editor::Edit::Paste(
+                            std::sync::Arc::new(markup)
+                        )
+                    )
+                );
+                self.editor.mark_dirty();
+            }
+
+            Message::InsertBlockQuote => {
+                self.editor.content.perform(
+                    iced::widget::text_editor::Action::Edit(
+                        iced::widget::text_editor::Edit::Paste(
+                            std::sync::Arc::new("> ".to_string())
+                        )
+                    )
+                );
+                self.editor.mark_dirty();
+            }
+
+            Message::InsertFootnote => {
+                self.footnote_counter += 1;
+                let marker = format!("[^{}]", self.footnote_counter);
+                self.editor.content.perform(
+                    iced::widget::text_editor::Action::Edit(
+                        iced::widget::text_editor::Edit::Paste(
+                            std::sync::Arc::new(marker.clone())
+                        )
+                    )
+                );
+                self.editor.mark_dirty();
+                // Add footnote to document
+                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item_mut(&item_id) {
+                        if let Some(ref mut doc) = item.document {
+                            doc.footnotes.push(crate::core::document::Footnote {
+                                marker: self.footnote_counter,
+                                text: String::new(),
+                                is_endnote: false,
+                            });
+                        }
+                    }
+                }
+                self.notification = Some(format!("Footnote {} inserted", self.footnote_counter));
+            }
+
+            Message::InsertHRule => {
+                self.editor.content.perform(
+                    iced::widget::text_editor::Action::Edit(
+                        iced::widget::text_editor::Edit::Paste(
+                            std::sync::Arc::new("\n---\n".to_string())
+                        )
+                    )
+                );
+                self.editor.mark_dirty();
+            }
+
+            // ========== Compile presets ==========
+            Message::SaveCompilePreset(name) => {
+                self.compile_presets.push((name.clone(), self.compile_options.clone()));
+                self.notification = Some(format!("Compile preset '{}' saved", name));
+            }
+
+            Message::LoadCompilePreset(name) => {
+                if let Some((_, preset)) = self.compile_presets.iter().find(|(n, _)| n == &name) {
+                    self.compile_options = preset.clone();
+                    self.notification = Some(format!("Loaded preset '{}'", name));
+                }
+            }
+
             // ========== Misc ==========
             Message::Tick => {
                 // Auto-save
@@ -1645,7 +1769,12 @@ impl ScrineverApp {
 
         // Settings dialog (overlay)
         if self.show_settings_dialog {
-            return views::settings_dialog::view(&project.settings, &project.title);
+            return views::settings_dialog::view(
+                &project.settings,
+                &project.title,
+                self.script_mode,
+                &self.auto_correction,
+            );
         }
 
         // Fullscreen editor mode
@@ -1692,7 +1821,8 @@ impl ScrineverApp {
                         .unwrap_or("Reference");
                     views::split_editor_view::view(&self.editor, title, secondary_content, secondary_title)
                 } else {
-                    views::editor_view::view(&self.editor, title)
+                    let script_el = self.current_script_element.as_ref().map(|e| e.label());
+                    views::editor_view::view(&self.editor, title, self.script_mode, script_el)
                 }
             }
             ViewMode::Corkboard => {

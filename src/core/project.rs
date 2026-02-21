@@ -429,6 +429,75 @@ impl Project {
 
                 self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
             }
+            "radio_drama" => {
+                let mut draft = BinderItem::new_folder("Radio Drama");
+                draft.children.push(BinderItem::new_text("Title Page"));
+                draft.children.push(BinderItem::new_text("Cast List"));
+                let mut ep1 = BinderItem::new_folder("Episode 1");
+                ep1.children.push(BinderItem::new_text("Scene 1"));
+                ep1.children.push(BinderItem::new_text("Scene 2"));
+                draft.children.push(ep1);
+
+                let mut research = BinderItem::new_folder("Research");
+                research.children.push(BinderItem::new_folder("Characters"));
+                research.children.push(BinderItem::new_text("Sound Effects Notes"));
+                research.children.push(BinderItem::new_text("Music Cues"));
+
+                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+            }
+            "documentary" => {
+                let mut draft = BinderItem::new_folder("Documentary");
+                draft.children.push(BinderItem::new_text("Synopsis / Treatment"));
+                draft.children.push(BinderItem::new_text("Opening"));
+                let mut seg1 = BinderItem::new_folder("Segment 1");
+                seg1.children.push(BinderItem::new_text("Narration"));
+                seg1.children.push(BinderItem::new_text("Interview Notes"));
+                seg1.children.push(BinderItem::new_text("B-Roll List"));
+                draft.children.push(seg1);
+                let mut seg2 = BinderItem::new_folder("Segment 2");
+                seg2.children.push(BinderItem::new_text("Narration"));
+                seg2.children.push(BinderItem::new_text("Interview Notes"));
+                draft.children.push(seg2);
+                draft.children.push(BinderItem::new_text("Closing"));
+
+                let mut research = BinderItem::new_folder("Research");
+                research.children.push(BinderItem::new_folder("Interviews"));
+                research.children.push(BinderItem::new_folder("Sources"));
+                research.children.push(BinderItem::new_text("Shot List"));
+
+                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+            }
+            "mla_paper" => {
+                let mut draft = BinderItem::new_folder("Paper");
+                draft.children.push(BinderItem::new_text("Title Page"));
+                draft.children.push(BinderItem::new_text("Introduction"));
+                draft.children.push(BinderItem::new_text("Body"));
+                draft.children.push(BinderItem::new_text("Conclusion"));
+                draft.children.push(BinderItem::new_text("Works Cited"));
+
+                let mut research = BinderItem::new_folder("Research");
+                research.children.push(BinderItem::new_folder("Sources"));
+                research.children.push(BinderItem::new_text("Notes"));
+                research.children.push(BinderItem::new_text("Outline"));
+
+                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+            }
+            "chicago_essay" => {
+                let mut draft = BinderItem::new_folder("Essay");
+                draft.children.push(BinderItem::new_text("Title Page"));
+                draft.children.push(BinderItem::new_text("Introduction"));
+                draft.children.push(BinderItem::new_text("Argument"));
+                draft.children.push(BinderItem::new_text("Analysis"));
+                draft.children.push(BinderItem::new_text("Conclusion"));
+                draft.children.push(BinderItem::new_text("Bibliography"));
+
+                let mut research = BinderItem::new_folder("Research");
+                research.children.push(BinderItem::new_folder("Primary Sources"));
+                research.children.push(BinderItem::new_folder("Secondary Sources"));
+                research.children.push(BinderItem::new_text("Notes"));
+
+                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+            }
             _ => {} // Keep default structure
         }
     }

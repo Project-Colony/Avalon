@@ -6,7 +6,12 @@ use crate::gui::app::Message;
 use crate::gui::theme::Theme;
 
 /// Render the project settings dialog
-pub fn view(settings: &ProjectSettings, project_title: &str) -> Element<'static, Message> {
+pub fn view(
+    settings: &ProjectSettings,
+    project_title: &str,
+    script_mode: bool,
+    auto_correction: &crate::core::script::AutoCorrection,
+) -> Element<'static, Message> {
     let header = text("Project Settings")
         .size(20)
         .color(Theme::TEXT_PRIMARY);
@@ -130,6 +135,24 @@ pub fn view(settings: &ProjectSettings, project_title: &str) -> Element<'static,
         .padding(4)
         .width(Length::Fixed(60.0));
 
+    // Script mode
+    let script_header = text("Script Mode").size(14).color(Theme::TEXT_SECONDARY);
+    let script_toggle = toggler(script_mode)
+        .label("Enable script/screenplay mode")
+        .on_toggle(|_| Message::ToggleScriptMode);
+
+    // Auto-correction
+    let autocorrect_header = text("Auto-Correction").size(14).color(Theme::TEXT_SECONDARY);
+    let smart_quotes_toggle = toggler(auto_correction.smart_quotes)
+        .label("Smart quotes (\u{201C}...\u{201D})")
+        .on_toggle(|_| Message::ToggleAutoCorrectSmartQuotes);
+    let em_dash_toggle = toggler(auto_correction.em_dashes)
+        .label("Em dashes (-- \u{2192} \u{2014})")
+        .on_toggle(|_| Message::ToggleAutoCorrectEmDashes);
+    let ellipsis_toggle = toggler(auto_correction.ellipsis)
+        .label("Ellipsis (... \u{2192} \u{2026})")
+        .on_toggle(|_| Message::ToggleAutoCorrectEllipsis);
+
     // Buttons
     let done_btn = button(
         text("  Done  ").size(14).color(Theme::TEXT_PRIMARY),
@@ -172,6 +195,16 @@ pub fn view(settings: &ProjectSettings, project_title: &str) -> Element<'static,
         comp_header,
         comp_width_label,
         comp_width_input,
+        Space::with_height(16),
+        script_header,
+        script_toggle,
+        Space::with_height(16),
+        autocorrect_header,
+        smart_quotes_toggle,
+        Space::with_height(4),
+        em_dash_toggle,
+        Space::with_height(4),
+        ellipsis_toggle,
         Space::with_height(24),
         done_btn,
     ]

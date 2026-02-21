@@ -6,13 +6,52 @@ use crate::gui::app::Message;
 use crate::gui::theme::Theme;
 
 /// Render the main text editor view
-pub fn view<'a>(editor_state: &'a EditorState, title: &str) -> Element<'a, Message> {
+pub fn view<'a>(
+    editor_state: &'a EditorState,
+    title: &str,
+    script_mode: bool,
+    script_element: Option<&str>,
+) -> Element<'a, Message> {
     let header = container(
-        text(title.to_string())
-            .size(14)
-            .color(Theme::TEXT_SECONDARY),
+        row![
+            text(title.to_string())
+                .size(14)
+                .color(Theme::TEXT_SECONDARY),
+            Space::with_width(Length::Fill),
+            if script_mode {
+                text(format!("[Script: {}]", script_element.unwrap_or("Action")))
+                    .size(11)
+                    .color(Theme::TEXT_ACCENT)
+            } else {
+                text("".to_string()).size(11)
+            },
+        ]
     )
     .padding(Padding::from([8, 16]));
+
+    // Formatting toolbar
+    let format_bar = container(
+        row![
+            fmt_btn("B", Message::InsertBold),
+            fmt_btn("I", Message::InsertItalic),
+            fmt_btn("U", Message::InsertUnderline),
+            fmt_btn("S", Message::InsertStrikethrough),
+            Space::with_width(8),
+            fmt_btn("H1", Message::InsertHeading(1)),
+            fmt_btn("H2", Message::InsertHeading(2)),
+            fmt_btn("H3", Message::InsertHeading(3)),
+            Space::with_width(8),
+            fmt_btn(">", Message::InsertBlockQuote),
+            fmt_btn("Fn", Message::InsertFootnote),
+            fmt_btn("--", Message::InsertHRule),
+            Space::with_width(Length::Fill),
+            fmt_btn("UPPER", Message::TextToUppercase),
+            fmt_btn("lower", Message::TextToLowercase),
+            fmt_btn("Title", Message::TextToTitleCase),
+        ]
+        .spacing(2)
+    )
+    .padding(Padding::from([2, 16]));
 
     let editor = text_editor(&editor_state.content)
         .on_action(|action| Message::EditorAction(action))
@@ -36,6 +75,7 @@ pub fn view<'a>(editor_state: &'a EditorState, title: &str) -> Element<'a, Messa
 
     let content = column![
         header,
+        format_bar,
         editor,
         stats_bar,
     ];
@@ -44,6 +84,15 @@ pub fn view<'a>(editor_state: &'a EditorState, title: &str) -> Element<'a, Messa
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
+}
+
+fn fmt_btn(label: &str, message: Message) -> Element<'static, Message> {
+    button(
+        text(label.to_string()).size(11).color(Theme::TEXT_SECONDARY),
+    )
+    .on_press(message)
+    .padding(Padding::from([2, 6]))
+    .into()
 }
 
 /// Render fullscreen (distraction-free) editor mode

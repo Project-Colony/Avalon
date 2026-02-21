@@ -137,5 +137,29 @@ pub fn built_in_templates() -> Vec<Template> {
             category: TemplateCategory::Scriptwriting,
             template_id: "comic_script".into(),
         },
+        Template {
+            name: "Radio Drama".into(),
+            description: "A radio drama script template with scenes and SFX cues.".into(),
+            category: TemplateCategory::Scriptwriting,
+            template_id: "radio_drama".into(),
+        },
+        Template {
+            name: "Documentary Script".into(),
+            description: "A documentary script with narration, interviews, and B-roll notes.".into(),
+            category: TemplateCategory::Scriptwriting,
+            template_id: "documentary".into(),
+        },
+        Template {
+            name: "MLA Paper".into(),
+            description: "Academic paper following MLA format guidelines.".into(),
+            category: TemplateCategory::Academic,
+            template_id: "mla_paper".into(),
+        },
+        Template {
+            name: "Chicago Essay".into(),
+            description: "Essay following Chicago Manual of Style guidelines.".into(),
+            category: TemplateCategory::Academic,
+            template_id: "chicago_essay".into(),
+        },
     ]
 }

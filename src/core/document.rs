@@ -13,6 +13,9 @@ pub struct Document {
     pub notes: String,
     /// Document-level references/links
     pub references: Vec<Reference>,
+    /// Footnotes / endnotes
+    #[serde(default)]
+    pub footnotes: Vec<Footnote>,
     /// Last modification time
     pub modified_at: DateTime<Utc>,
     /// Cursor position (for restoring editing state)
@@ -26,6 +29,7 @@ impl Document {
             spans: Vec::new(),
             notes: String::new(),
             references: Vec::new(),
+            footnotes: Vec::new(),
             modified_at: Utc::now(),
             cursor_position: 0,
         }
@@ -154,4 +158,12 @@ pub struct Reference {
     pub url: Option<String>,
     pub path: Option<String>,
     pub notes: String,
+}
+
+/// A footnote or endnote
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Footnote {
+    pub marker: usize,
+    pub text: String,
+    pub is_endnote: bool,
 }
