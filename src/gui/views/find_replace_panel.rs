@@ -11,6 +11,40 @@ pub struct FindReplaceData {
     pub match_count: usize,
     pub case_sensitive: bool,
     pub current_match: usize,
+    pub whole_word: bool,
+    pub use_regex: bool,
+}
+
+impl FindReplaceData {
+    pub fn new() -> Self {
+        Self {
+            find_text: String::new(),
+            replace_text: String::new(),
+            match_count: 0,
+            case_sensitive: false,
+            current_match: 0,
+            whole_word: false,
+            use_regex: false,
+        }
+    }
+
+    /// Check if we have an active search
+    pub fn has_query(&self) -> bool {
+        !self.find_text.is_empty()
+    }
+
+    /// Check if there are matches to navigate
+    pub fn has_matches(&self) -> bool {
+        self.match_count > 0
+    }
+
+    /// Reset search state
+    pub fn clear(&mut self) {
+        self.find_text.clear();
+        self.replace_text.clear();
+        self.match_count = 0;
+        self.current_match = 0;
+    }
 }
 
 /// Render the find/replace panel within current document

@@ -2787,6 +2787,8 @@ impl ScrineverApp {
                     match_count: self.doc_find_match_count,
                     case_sensitive: self.doc_find_case_sensitive,
                     current_match: self.doc_find_current_match,
+                    whole_word: false,
+                    use_regex: false,
                 };
                 Some(views::find_replace_panel::view(&data))
             }

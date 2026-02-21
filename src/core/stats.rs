@@ -105,6 +105,73 @@ impl SessionStats {
             self.words_per_minute = self.words_written as f64 / (elapsed_seconds as f64 / 60.0);
         }
     }
+
+    /// Format elapsed time as human-readable string
+    pub fn elapsed_display(&self) -> String {
+        let hours = self.time_elapsed_seconds / 3600;
+        let mins = (self.time_elapsed_seconds % 3600) / 60;
+        let secs = self.time_elapsed_seconds % 60;
+        if hours > 0 {
+            format!("{}h {}m {}s", hours, mins, secs)
+        } else if mins > 0 {
+            format!("{}m {}s", mins, secs)
+        } else {
+            format!("{}s", secs)
+        }
+    }
+
+    /// Get net word change as a formatted string with sign
+    pub fn words_display(&self) -> String {
+        if self.words_written > 0 {
+            format!("+{}", self.words_written)
+        } else {
+            format!("{}", self.words_written)
+        }
+    }
+
+    /// Estimated pages written this session
+    pub fn pages_written(&self) -> f64 {
+        self.words_written.max(0) as f64 / 250.0
+    }
+
+    /// Check if the session is active (has time recorded)
+    pub fn is_active(&self) -> bool {
+        self.time_elapsed_seconds > 0
+    }
+}
+
+impl Statistics {
+    /// Get a summary string
+    pub fn summary(&self) -> String {
+        format!(
+            "{} words, {:.1} pages, {} docs in {} folders",
+            self.word_count, self.page_count, self.document_count, self.folder_count
+        )
+    }
+
+    /// Average words per page (should be ~250)
+    pub fn avg_words_per_page(&self) -> f64 {
+        if self.page_count > 0.0 {
+            self.word_count as f64 / self.page_count
+        } else {
+            0.0
+        }
+    }
+
+    /// Reading time estimate in minutes (250 WPM)
+    pub fn reading_time_minutes(&self) -> f64 {
+        self.word_count as f64 / 250.0
+    }
+
+    /// Speaking time estimate in minutes (150 WPM)
+    pub fn speaking_time_minutes(&self) -> f64 {
+        self.word_count as f64 / 150.0
+    }
+
+    /// Check if the project is empty
+    pub fn is_empty(&self) -> bool {
+        self.word_count == 0 && self.document_count == 0
+    }
 }
 
 /// Detailed text analysis for the text statistics panel
@@ -212,6 +279,48 @@ impl TextAnalysis {
         else if self.readability_score >= 50.0 { "Fairly Difficult" }
         else if self.readability_score >= 30.0 { "Difficult" }
         else { "Very Difficult" }
+    }
+
+    /// Vocabulary richness (type-token ratio)
+    pub fn vocabulary_richness(&self) -> f64 {
+        if self.word_count == 0 {
+            return 0.0;
+        }
+        self.unique_words as f64 / self.word_count as f64 * 100.0
+    }
+
+    /// Vocabulary richness label
+    pub fn vocabulary_label(&self) -> &str {
+        let ttr = self.vocabulary_richness();
+        if ttr >= 70.0 { "Rich" }
+        else if ttr >= 50.0 { "Moderate" }
+        else { "Repetitive" }
+    }
+
+    /// Get a one-line summary
+    pub fn summary(&self) -> String {
+        format!(
+            "{} words, {} unique, readability: {:.0} ({})",
+            self.word_count, self.unique_words,
+            self.readability_score, self.readability_label()
+        )
+    }
+
+    /// Estimated grade level for reading
+    pub fn grade_level(&self) -> f64 {
+        if self.word_count == 0 || self.sentence_count == 0 {
+            return 0.0;
+        }
+        // Flesch-Kincaid Grade Level
+        let syllables: f64 = self.avg_word_length * 0.6 * self.word_count as f64;
+        0.39 * (self.word_count as f64 / self.sentence_count as f64)
+            + 11.8 * (syllables / self.word_count as f64)
+            - 15.59
+    }
+
+    /// Is the text empty?
+    pub fn is_empty(&self) -> bool {
+        self.word_count == 0
     }
 }
 

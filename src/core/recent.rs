@@ -151,4 +151,26 @@ impl RecentProjects {
         let home = dirs::home_dir().unwrap_or_default();
         home.join(".config").join("scrinever").join("recent.json")
     }
+
+    /// Get projects opened within the last N days
+    pub fn recently_active(&self, days: i64) -> Vec<&RecentProject> {
+        let cutoff = Utc::now() - chrono::Duration::days(days);
+        self.projects.iter().filter(|p| p.last_opened > cutoff).collect()
+    }
+
+    /// Get the total number of unique project paths
+    pub fn unique_paths(&self) -> usize {
+        let mut seen = std::collections::HashSet::new();
+        for p in &self.projects {
+            seen.insert(p.path.clone());
+        }
+        seen.len()
+    }
+
+    /// Sort projects by title alphabetically
+    pub fn sorted_by_title(&self) -> Vec<&RecentProject> {
+        let mut sorted: Vec<&RecentProject> = self.projects.iter().collect();
+        sorted.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()));
+        sorted
+    }
 }
