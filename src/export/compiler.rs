@@ -1,10 +1,11 @@
 use std::path::Path;
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
 use crate::core::binder::{Binder, BinderItem, BinderItemKind};
 
 /// Output format for compilation
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OutputFormat {
     PlainText,
     Markdown,
@@ -66,7 +67,7 @@ impl OutputFormat {
 }
 
 /// Options for compiling/exporting
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompileOptions {
     pub format: OutputFormat,
     pub title: String,
@@ -107,7 +108,7 @@ impl Default for CompileOptions {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SeparatorType {
     EmptyLine,
     PageBreak,

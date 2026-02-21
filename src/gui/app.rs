@@ -611,6 +611,7 @@ impl ScrineverApp {
                 if let Some(p) = project {
                     self.compile_options.title = p.title.clone();
                     self.project_notes_text = p.project_notes.clone();
+                    self.compile_presets = p.compile_presets.clone();
                     self.generated_names.clear();
                     self.project = Some(p);
                     self.selected_item = None;
@@ -1951,7 +1952,13 @@ impl ScrineverApp {
 
             // ========== Compile presets ==========
             Message::SaveCompilePreset(name) => {
+                // Remove existing preset with same name
+                self.compile_presets.retain(|(n, _)| n != &name);
                 self.compile_presets.push((name.clone(), self.compile_options.clone()));
+                // Persist to project
+                if let Some(ref mut project) = self.project {
+                    project.compile_presets = self.compile_presets.clone();
+                }
                 self.notification = Some(format!("Compile preset '{}' saved", name));
             }
 

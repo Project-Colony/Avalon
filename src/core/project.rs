@@ -12,6 +12,7 @@ use super::document::Document;
 use super::history::WritingHistory;
 use super::snapshot::Snapshot;
 use super::metadata::ProjectSettings;
+use crate::export::compiler::CompileOptions;
 
 /// A Scrinever project — the top-level container for all writing data.
 /// Stored as a directory with structured JSON files inside.
@@ -35,6 +36,9 @@ pub struct Project {
     /// Bookmarks / favorites
     #[serde(default)]
     pub bookmarks: BookmarkList,
+    /// Compile presets (name -> options)
+    #[serde(default)]
+    pub compile_presets: Vec<(String, CompileOptions)>,
     #[serde(skip)]
     pub path: Option<PathBuf>,
 }
@@ -54,6 +58,7 @@ impl Project {
             collections: Vec::new(),
             writing_history: WritingHistory::new(),
             bookmarks: BookmarkList::new(),
+            compile_presets: Vec::new(),
             path: None,
         }
     }
@@ -87,6 +92,13 @@ impl Project {
         // Save snapshots
         let snaps_dir = project_dir.join("snapshots");
         fs::create_dir_all(&snaps_dir)?;
+        self.save_snapshots(&snaps_dir)?;
+
+        // Save compile presets (if any)
+        let presets_path = project_dir.join("compile_presets.json");
+        if let Ok(json) = serde_json::to_string_pretty(&self.compile_presets) {
+            let _ = fs::write(&presets_path, json);
+        }
 
         self.path = Some(project_dir);
         Ok(())
@@ -104,6 +116,22 @@ impl Project {
         let docs_dir = project_dir.join("docs");
         if docs_dir.exists() {
             project.load_documents(&docs_dir)?;
+        }
+
+        // Load snapshots
+        let snaps_dir = project_dir.join("snapshots");
+        if snaps_dir.exists() {
+            project.load_snapshots(&snaps_dir)?;
+        }
+
+        // Load compile presets
+        let presets_path = project_dir.join("compile_presets.json");
+        if presets_path.exists() {
+            if let Ok(json) = fs::read_to_string(&presets_path) {
+                if let Ok(presets) = serde_json::from_str(&json) {
+                    project.compile_presets = presets;
+                }
+            }
         }
 
         project.path = Some(project_dir.to_path_buf());
@@ -130,6 +158,31 @@ impl Project {
                 let json = fs::read_to_string(&doc_path)?;
                 let doc: Document = serde_json::from_str(&json)?;
                 item.document = Some(doc);
+            }
+        }
+        Ok(())
+    }
+
+    /// Save all snapshots to disk (one file per binder item that has snapshots)
+    fn save_snapshots(&self, snaps_dir: &Path) -> Result<()> {
+        for item in self.binder.all_items() {
+            if !item.snapshots.is_empty() {
+                let snap_path = snaps_dir.join(format!("{}.json", item.id));
+                let json = serde_json::to_string_pretty(&item.snapshots)?;
+                fs::write(snap_path, json)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Load all snapshots from disk
+    fn load_snapshots(&mut self, snaps_dir: &Path) -> Result<()> {
+        for item in self.binder.all_items_mut() {
+            let snap_path = snaps_dir.join(format!("{}.json", item.id));
+            if snap_path.exists() {
+                let json = fs::read_to_string(&snap_path)?;
+                let snapshots: Vec<Snapshot> = serde_json::from_str(&json)?;
+                item.snapshots = snapshots;
             }
         }
         Ok(())
@@ -799,5 +852,150 @@ mod tests {
         let parsed = parsed.unwrap();
         assert_eq!(parsed.title, "Serialization Test");
         assert_eq!(parsed.id, project.id);
+    }
+
+    #[test]
+    fn test_save_and_load_snapshots() {
+        use tempfile::tempdir;
+        use crate::core::binder::BinderItem;
+
+        let dir = tempdir().unwrap();
+        let mut project = Project::new("SnapshotTest");
+
+        // Add a document with content
+        let mut item = BinderItem::new_text("Chapter 1");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Hello world".to_string();
+        }
+        project.binder.draft.children.push(item);
+
+        // Create a snapshot
+        let item_id = project.binder.draft.children.last().unwrap().id;
+        let _ = project.create_snapshot(&item_id, "First Draft");
+
+        // Verify snapshot exists in memory
+        let item = project.binder.find_item(&item_id).unwrap();
+        assert_eq!(item.snapshots.len(), 1);
+        assert_eq!(item.snapshots[0].title, "First Draft");
+        assert_eq!(item.snapshots[0].content, "Hello world");
+
+        // Save project
+        project.save(dir.path()).unwrap();
+
+        // Load project
+        let project_dir = dir.path().join("SnapshotTest.scriv");
+        let loaded = Project::load(&project_dir).unwrap();
+
+        // Verify snapshot was persisted
+        let loaded_item = loaded.binder.find_item(&item_id).unwrap();
+        assert_eq!(loaded_item.snapshots.len(), 1);
+        assert_eq!(loaded_item.snapshots[0].title, "First Draft");
+        assert_eq!(loaded_item.snapshots[0].content, "Hello world");
+    }
+
+    #[test]
+    fn test_save_and_load_compile_presets() {
+        use tempfile::tempdir;
+        use crate::export::compiler::{CompileOptions, OutputFormat};
+
+        let dir = tempdir().unwrap();
+        let mut project = Project::new("PresetTest");
+
+        // Add compile presets
+        let mut opts = CompileOptions::default();
+        opts.title = "My Book".to_string();
+        opts.format = OutputFormat::Html;
+        project.compile_presets.push(("HTML Export".to_string(), opts));
+
+        let mut opts2 = CompileOptions::default();
+        opts2.format = OutputFormat::Latex;
+        opts2.font_size = 14.0;
+        project.compile_presets.push(("LaTeX Export".to_string(), opts2));
+
+        // Save project
+        project.save(dir.path()).unwrap();
+
+        // Load project
+        let project_dir = dir.path().join("PresetTest.scriv");
+        let loaded = Project::load(&project_dir).unwrap();
+
+        assert_eq!(loaded.compile_presets.len(), 2);
+        assert_eq!(loaded.compile_presets[0].0, "HTML Export");
+        assert_eq!(loaded.compile_presets[0].1.title, "My Book");
+        assert!(matches!(loaded.compile_presets[0].1.format, OutputFormat::Html));
+        assert_eq!(loaded.compile_presets[1].0, "LaTeX Export");
+        assert!((loaded.compile_presets[1].1.font_size - 14.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_save_and_load_annotations() {
+        use tempfile::tempdir;
+        use crate::core::binder::BinderItem;
+        use crate::core::annotation::Annotation;
+
+        let dir = tempdir().unwrap();
+        let mut project = Project::new("AnnotationTest");
+
+        // Add a document with annotations
+        let mut item = BinderItem::new_text("Chapter 1");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "The quick brown fox jumps over the lazy dog.".to_string();
+            doc.annotations.push(Annotation::new(4, 19, "Check this phrasing"));
+            doc.annotations.push(Annotation::new(35, 43, "Consider stronger word"));
+        }
+        project.binder.draft.children.push(item);
+        let item_id = project.binder.draft.children.last().unwrap().id;
+
+        // Save project
+        project.save(dir.path()).unwrap();
+
+        // Load project
+        let project_dir = dir.path().join("AnnotationTest.scriv");
+        let loaded = Project::load(&project_dir).unwrap();
+
+        let loaded_item = loaded.binder.find_item(&item_id).unwrap();
+        let doc = loaded_item.document.as_ref().unwrap();
+        assert_eq!(doc.annotations.len(), 2);
+        assert_eq!(doc.annotations[0].text, "Check this phrasing");
+        assert_eq!(doc.annotations[0].start, 4);
+        assert_eq!(doc.annotations[0].end, 19);
+        assert_eq!(doc.annotations[1].text, "Consider stronger word");
+    }
+
+    #[test]
+    fn test_save_and_load_multiple_snapshots() {
+        use tempfile::tempdir;
+        use crate::core::binder::BinderItem;
+
+        let dir = tempdir().unwrap();
+        let mut project = Project::new("MultiSnapTest");
+
+        let mut item = BinderItem::new_text("Scene 1");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Version 1".to_string();
+        }
+        project.binder.draft.children.push(item);
+        let item_id = project.binder.draft.children.last().unwrap().id;
+
+        // Create first snapshot
+        let _ = project.create_snapshot(&item_id, "Draft 1");
+
+        // Modify and create second snapshot
+        if let Some(doc) = project.get_document_mut(&item_id) {
+            doc.content = "Version 2 - improved".to_string();
+        }
+        let _ = project.create_snapshot(&item_id, "Draft 2");
+
+        // Save and reload
+        project.save(dir.path()).unwrap();
+        let project_dir = dir.path().join("MultiSnapTest.scriv");
+        let loaded = Project::load(&project_dir).unwrap();
+
+        let loaded_item = loaded.binder.find_item(&item_id).unwrap();
+        assert_eq!(loaded_item.snapshots.len(), 2);
+        assert_eq!(loaded_item.snapshots[0].title, "Draft 1");
+        assert_eq!(loaded_item.snapshots[0].content, "Version 1");
+        assert_eq!(loaded_item.snapshots[1].title, "Draft 2");
+        assert_eq!(loaded_item.snapshots[1].content, "Version 2 - improved");
     }
 }
