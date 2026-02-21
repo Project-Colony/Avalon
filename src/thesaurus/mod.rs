@@ -227,4 +227,88 @@ impl Thesaurus {
     pub fn word_count(&self) -> usize {
         self.entries.len()
     }
+
+    /// Total number of synonym entries across all words
+    pub fn total_entries(&self) -> usize {
+        self.entries.values().map(|v| v.len()).sum()
+    }
+
+    /// Check if a specific word exists in the thesaurus
+    pub fn contains(&self, word: &str) -> bool {
+        self.entries.contains_key(&word.to_lowercase())
+    }
+
+    /// Get all words in the thesaurus
+    pub fn all_words(&self) -> Vec<&String> {
+        self.entries.keys().collect()
+    }
+
+    /// Get random synonyms for a word (for variety in writing)
+    pub fn random_synonym(&self, word: &str) -> Option<String> {
+        let entries = self.lookup(word);
+        if entries.is_empty() {
+            return None;
+        }
+        // Pick from the first entry's synonyms
+        let synonyms = &entries[0].synonyms;
+        if synonyms.is_empty() {
+            return None;
+        }
+        // Simple deterministic "random" based on word length and first char
+        let idx = (word.len() + word.chars().next().unwrap_or('a') as usize) % synonyms.len();
+        Some(synonyms[idx].clone())
+    }
+
+    /// Get all antonyms for a word across all entries
+    pub fn antonyms(&self, word: &str) -> Vec<String> {
+        let entries = self.lookup(word);
+        let mut antonyms = Vec::new();
+        for entry in entries {
+            for ant in &entry.antonyms {
+                if !antonyms.contains(ant) {
+                    antonyms.push(ant.clone());
+                }
+            }
+        }
+        antonyms
+    }
+
+    /// Search for words matching a prefix
+    pub fn words_with_prefix(&self, prefix: &str) -> Vec<&String> {
+        let p = prefix.to_lowercase();
+        self.entries.keys().filter(|k| k.starts_with(&p)).collect()
+    }
+}
+
+impl ThesaurusEntry {
+    /// Total number of related words (synonyms + antonyms)
+    pub fn total_related(&self) -> usize {
+        self.synonyms.len() + self.antonyms.len()
+    }
+
+    /// Check if this entry has any antonyms
+    pub fn has_antonyms(&self) -> bool {
+        !self.antonyms.is_empty()
+    }
+
+    /// Summary string
+    pub fn summary(&self) -> String {
+        format!(
+            "({}) {} synonym(s), {} antonym(s)",
+            self.part_of_speech, self.synonyms.len(), self.antonyms.len()
+        )
+    }
+}
+
+impl PartOfSpeech {
+    /// All parts of speech
+    pub fn all() -> Vec<Self> {
+        vec![
+            PartOfSpeech::Noun,
+            PartOfSpeech::Verb,
+            PartOfSpeech::Adjective,
+            PartOfSpeech::Adverb,
+            PartOfSpeech::Unknown,
+        ]
+    }
 }

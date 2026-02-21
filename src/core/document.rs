@@ -256,10 +256,113 @@ pub struct Reference {
     pub notes: String,
 }
 
+impl Reference {
+    /// Create a URL reference
+    pub fn from_url(title: &str, url: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            url: Some(url.to_string()),
+            path: None,
+            notes: String::new(),
+        }
+    }
+
+    /// Create a file path reference
+    pub fn from_path(title: &str, path: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            url: None,
+            path: Some(path.to_string()),
+            notes: String::new(),
+        }
+    }
+
+    /// Check if this is a web reference
+    pub fn is_web(&self) -> bool {
+        self.url.is_some()
+    }
+
+    /// Check if this is a file reference
+    pub fn is_file(&self) -> bool {
+        self.path.is_some()
+    }
+}
+
 /// A footnote or endnote
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Footnote {
     pub marker: usize,
     pub text: String,
     pub is_endnote: bool,
+}
+
+impl Footnote {
+    /// Create a new footnote
+    pub fn new(marker: usize, text: &str) -> Self {
+        Self {
+            marker,
+            text: text.to_string(),
+            is_endnote: false,
+        }
+    }
+
+    /// Create a new endnote
+    pub fn endnote(marker: usize, text: &str) -> Self {
+        Self {
+            marker,
+            text: text.to_string(),
+            is_endnote: true,
+        }
+    }
+}
+
+impl TextSpan {
+    /// Create a new span with a given style
+    pub fn new(start: usize, end: usize, style: SpanStyle) -> Self {
+        Self { start, end, style }
+    }
+
+    /// Length of the span in characters
+    pub fn len(&self) -> usize {
+        self.end.saturating_sub(self.start)
+    }
+
+    /// Check if span is empty
+    pub fn is_empty(&self) -> bool {
+        self.start >= self.end
+    }
+
+    /// Check if a position is within this span
+    pub fn contains(&self, pos: usize) -> bool {
+        pos >= self.start && pos < self.end
+    }
+
+    /// Check if two spans overlap
+    pub fn overlaps(&self, other: &TextSpan) -> bool {
+        self.start < other.end && other.start < self.end
+    }
+}
+
+impl SpanStyle {
+    /// Create a bold style
+    pub fn bold() -> Self {
+        Self { bold: true, ..Default::default() }
+    }
+
+    /// Create an italic style
+    pub fn italic() -> Self {
+        Self { italic: true, ..Default::default() }
+    }
+
+    /// Create a bold + italic style
+    pub fn bold_italic() -> Self {
+        Self { bold: true, italic: true, ..Default::default() }
+    }
+
+    /// Check if this span has any styling applied
+    pub fn has_formatting(&self) -> bool {
+        self.bold || self.italic || self.underline || self.strikethrough
+            || self.font_size.is_some() || self.font_family.is_some()
+            || self.color.is_some() || self.highlight.is_some()
+    }
 }
