@@ -133,7 +133,6 @@ pub fn link_health_summary(binder: &Binder) -> LinkHealthSummary {
 
     let total = validations.len();
     let valid = validations.iter().filter(|v| matches!(v.status, LinkStatus::Valid(_))).count();
-    let broken = validations.iter().filter(|v| v.status == LinkStatus::Broken).count();
     let ambiguous = validations.iter().filter(|v| matches!(v.status, LinkStatus::Ambiguous(_))).count();
 
     // Collect broken links for reporting

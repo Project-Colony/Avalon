@@ -1210,6 +1210,14 @@ impl ScrineverApp {
 
             Message::HideSettings => {
                 self.show_settings_dialog = false;
+                // Persist settings by saving the project
+                if let Some(ref mut project) = self.project {
+                    if let Some(path) = project.path.clone() {
+                        if let Some(parent) = path.parent() {
+                            let _ = project.save(parent);
+                        }
+                    }
+                }
             }
 
             Message::SettingsSetProjectTitle(title) => {
