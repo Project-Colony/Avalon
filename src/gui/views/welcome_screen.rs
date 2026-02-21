@@ -113,9 +113,15 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
         Space::with_height(4),
         text("Ctrl+S Save | Ctrl+N New Doc | Ctrl+F Search | Ctrl+E Compile").size(11).color(Theme::TEXT_MUTED),
         text("Ctrl+I Inspector | Ctrl+Z Undo | Ctrl+Y Redo | Ctrl+, Settings").size(11).color(Theme::TEXT_MUTED),
-        text("Ctrl+1-4 Switch View | F11 Focus Mode | Esc Close Panel").size(11).color(Theme::TEXT_MUTED),
+        text("Ctrl+1-4 Switch View | F11 Focus Mode | F5 Composition Mode").size(11).color(Theme::TEXT_MUTED),
+        text("Ctrl+B Bold | Ctrl+U Underline | Ctrl+H Find/Replace | Esc Close Panel").size(11).color(Theme::TEXT_MUTED),
+        text("Ctrl+Shift+F Composition | Ctrl+Shift+T Script Mode | Ctrl+Shift+G Goals").size(11).color(Theme::TEXT_MUTED),
     ]
     .spacing(2);
+
+    let version_info = text("Avalon v0.1.0 — Open source writing studio")
+        .size(10)
+        .color(Theme::TEXT_MUTED);
 
     let content = column![
         Space::with_height(40),
@@ -126,6 +132,8 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
         recent_section,
         template_section,
         shortcuts,
+        Space::with_height(16),
+        version_info,
     ]
     .align_x(iced::Alignment::Center)
     .padding(40);

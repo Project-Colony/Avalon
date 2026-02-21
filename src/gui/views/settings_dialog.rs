@@ -96,25 +96,50 @@ pub fn view(
         .on_toggle(|val| Message::SettingsToggleWordCount(val));
 
     // Labels section
-    let labels_header = text("Labels").size(14).color(Theme::TEXT_SECONDARY);
+    let labels_header = row![
+        text("Labels").size(14).color(Theme::TEXT_SECONDARY),
+        Space::with_width(Length::Fill),
+        text(format!("{} defined", settings.labels.len()))
+            .size(10).color(Theme::TEXT_MUTED),
+    ];
     let mut labels_col = column![].spacing(2);
     for lbl in &settings.labels {
         let color = lbl.color.to_iced_color();
         labels_col = labels_col.push(
             row![
-                text("*").size(14).color(color),
+                text("\u{25CF}").size(12).color(color),
                 Space::with_width(4),
                 text(lbl.name.clone()).size(12).color(Theme::TEXT_PRIMARY),
+                Space::with_width(Length::Fill),
+                text(format!("{:?}", lbl.color)).size(9).color(Theme::TEXT_MUTED),
             ]
+            .align_y(iced::Alignment::Center)
         );
     }
 
     // Statuses section
-    let statuses_header = text("Statuses").size(14).color(Theme::TEXT_SECONDARY);
+    let statuses_header = row![
+        text("Statuses").size(14).color(Theme::TEXT_SECONDARY),
+        Space::with_width(Length::Fill),
+        text(format!("{} defined", settings.statuses.len()))
+            .size(10).color(Theme::TEXT_MUTED),
+    ];
     let mut statuses_col = column![].spacing(2);
-    for st in &settings.statuses {
+    for (idx, st) in settings.statuses.iter().enumerate() {
+        let status_color = match st.name.as_str() {
+            "To Do" => Theme::ERROR,
+            "First Draft" => Theme::WARNING,
+            "Revised Draft" => Theme::TEXT_ACCENT,
+            "Final Draft" => Theme::SUCCESS,
+            "Done" => Theme::SUCCESS,
+            _ => Theme::TEXT_SECONDARY,
+        };
         statuses_col = statuses_col.push(
-            text(format!("  {}", st.name)).size(12).color(Theme::TEXT_PRIMARY),
+            row![
+                text(format!("{}.", idx + 1)).size(10).color(Theme::TEXT_MUTED),
+                Space::with_width(4),
+                text(st.name.clone()).size(12).color(status_color),
+            ]
         );
     }
 
