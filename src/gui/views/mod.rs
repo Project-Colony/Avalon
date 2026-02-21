@@ -21,3 +21,6 @@ pub mod collections_panel;
 pub mod bookmarks_panel;
 pub mod annotations_panel;
 pub mod targets_panel;
+pub mod split_editor_view;
+pub mod quick_reference_panel;
+pub mod find_replace_panel;

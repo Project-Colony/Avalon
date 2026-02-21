@@ -379,6 +379,56 @@ impl Project {
 
                 self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
             }
+            "journal" => {
+                let mut draft = BinderItem::new_folder("Journal");
+                let mut jan = BinderItem::new_folder("January");
+                jan.children.push(BinderItem::new_text("Entry 1"));
+                draft.children.push(jan);
+                let mut feb = BinderItem::new_folder("February");
+                feb.children.push(BinderItem::new_text("Entry 1"));
+                draft.children.push(feb);
+
+                let mut research = BinderItem::new_folder("Research");
+                research.children.push(BinderItem::new_text("Reflections"));
+                research.children.push(BinderItem::new_text("Goals"));
+
+                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+            }
+            "blog" => {
+                let mut draft = BinderItem::new_folder("Blog");
+                let mut drafts = BinderItem::new_folder("Drafts");
+                drafts.children.push(BinderItem::new_text("Post Idea 1"));
+                drafts.children.push(BinderItem::new_text("Post Idea 2"));
+                draft.children.push(drafts);
+                let mut published = BinderItem::new_folder("Published");
+                published.children.push(BinderItem::new_text("First Post"));
+                draft.children.push(published);
+
+                let mut research = BinderItem::new_folder("Research");
+                research.children.push(BinderItem::new_text("Topic Ideas"));
+                research.children.push(BinderItem::new_text("Style Guide"));
+
+                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+            }
+            "comic_script" => {
+                let mut draft = BinderItem::new_folder("Comic");
+                draft.children.push(BinderItem::new_text("Cover"));
+                let mut issue1 = BinderItem::new_folder("Issue #1");
+                issue1.children.push(BinderItem::new_text("Page 1"));
+                issue1.children.push(BinderItem::new_text("Page 2"));
+                issue1.children.push(BinderItem::new_text("Page 3"));
+                draft.children.push(issue1);
+                let mut issue2 = BinderItem::new_folder("Issue #2");
+                issue2.children.push(BinderItem::new_text("Page 1"));
+                draft.children.push(issue2);
+
+                let mut research = BinderItem::new_folder("Research");
+                research.children.push(BinderItem::new_folder("Characters"));
+                research.children.push(BinderItem::new_folder("World"));
+                research.children.push(BinderItem::new_text("Art References"));
+
+                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+            }
             _ => {} // Keep default structure
         }
     }

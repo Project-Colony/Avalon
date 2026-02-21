@@ -45,6 +45,8 @@ pub fn view(
     let colls_btn = panel_button("Coll", BottomPanel::Collections, bottom_panel);
     let bookmarks_btn = panel_button("Bkmk", BottomPanel::Bookmarks, bottom_panel);
     let targets_btn = panel_button("Targets", BottomPanel::Targets, bottom_panel);
+    let annot_btn = panel_button("Annot", BottomPanel::Annotations, bottom_panel);
+    let find_btn = panel_button("Find", BottomPanel::FindReplace, bottom_panel);
 
     let sep4 = text(" | ").size(14).color(Theme::TEXT_MUTED);
 
@@ -76,6 +78,8 @@ pub fn view(
         colls_btn,
         bookmarks_btn,
         targets_btn,
+        annot_btn,
+        find_btn,
         sep4,
         Space::with_width(Length::Fill),
         settings_btn,

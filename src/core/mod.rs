@@ -11,4 +11,5 @@ pub mod namegen;
 pub mod annotation;
 pub mod bookmark;
 pub mod recent;
+pub mod script;
 

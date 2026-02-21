@@ -42,6 +42,8 @@ pub enum BottomPanel {
     Bookmarks,
     Annotations,
     Targets,
+    QuickRef,
+    FindReplace,
 }
 
 /// Application state
@@ -111,6 +113,26 @@ pub struct ScrineverApp {
 
     // === Recent projects ===
     pub recent_projects: crate::core::recent::RecentProjects,
+
+    // === Split editor ===
+    pub split_editor_item: Option<Uuid>,
+
+    // === Document find/replace ===
+    pub doc_find_text: String,
+    pub doc_replace_text: String,
+    pub doc_find_case_sensitive: bool,
+    pub doc_find_match_count: usize,
+
+    // === Quick reference ===
+    pub quick_ref_item: Option<Uuid>,
+
+    // === Script mode ===
+    pub script_mode: bool,
+    pub current_script_element: Option<crate::core::script::ScriptElement>,
+    pub auto_correction: crate::core::script::AutoCorrection,
+
+    // === Revision tracking ===
+    pub current_revision: Option<crate::core::script::RevisionLevel>,
 }
 
 /// Messages for the application
@@ -255,6 +277,37 @@ pub enum Message {
     // Recent projects
     OpenRecentProject(std::path::PathBuf),
 
+    // Split editor
+    OpenInSplitEditor(Uuid),
+    CloseSplitEditor,
+
+    // Document find/replace
+    DocFindChanged(String),
+    DocFindNext,
+    DocFindPrev,
+    DocReplaceCurrent,
+    DocReplaceAll,
+    DocReplaceChanged(String),
+    DocFindToggleCase,
+
+    // Quick reference
+    ShowQuickRef(Uuid),
+
+    // Script mode
+    ToggleScriptMode,
+    SetScriptElement(String),
+
+    // Auto-correction
+    ToggleAutoCorrectSmartQuotes,
+    ToggleAutoCorrectEmDashes,
+    ToggleAutoCorrectEllipsis,
+
+    // Revision level
+    SetRevisionLevel(String),
+
+    // Document links
+    InsertDocLink(Uuid),
+
     // Misc
     Tick,
     DismissNotification,
@@ -303,6 +356,16 @@ impl ScrineverApp {
             new_collection_name: String::new(),
             annotation_text: String::new(),
             recent_projects: crate::core::recent::RecentProjects::load(),
+            split_editor_item: None,
+            doc_find_text: String::new(),
+            doc_replace_text: String::new(),
+            doc_find_case_sensitive: false,
+            doc_find_match_count: 0,
+            quick_ref_item: None,
+            script_mode: false,
+            current_script_element: None,
+            auto_correction: crate::core::script::AutoCorrection::default(),
+            current_revision: None,
         };
 
         (app, IcedTask::none())
@@ -1324,6 +1387,191 @@ impl ScrineverApp {
                 }
             }
 
+            // ========== Split editor ==========
+            Message::OpenInSplitEditor(item_id) => {
+                self.split_editor_item = Some(item_id);
+            }
+
+            Message::CloseSplitEditor => {
+                self.split_editor_item = None;
+            }
+
+            // ========== Document find/replace ==========
+            Message::DocFindChanged(query) => {
+                self.doc_find_text = query;
+                // Count matches in current document
+                if let (Some(ref project), Some(item_id)) = (&self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item(&item_id) {
+                        if let Some(ref doc) = item.document {
+                            if !self.doc_find_text.is_empty() {
+                                let content = if self.doc_find_case_sensitive {
+                                    doc.content.clone()
+                                } else {
+                                    doc.content.to_lowercase()
+                                };
+                                let query = if self.doc_find_case_sensitive {
+                                    self.doc_find_text.clone()
+                                } else {
+                                    self.doc_find_text.to_lowercase()
+                                };
+                                self.doc_find_match_count = content.matches(&query).count();
+                            } else {
+                                self.doc_find_match_count = 0;
+                            }
+                        }
+                    }
+                }
+            }
+
+            Message::DocFindNext => {
+                self.notification = Some("Find next: navigate in editor".to_string());
+            }
+
+            Message::DocFindPrev => {
+                self.notification = Some("Find previous: navigate in editor".to_string());
+            }
+
+            Message::DocReplaceCurrent => {
+                self.notification = Some("Replace current match".to_string());
+            }
+
+            Message::DocReplaceAll => {
+                self.sync_editor_to_project();
+                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item_mut(&item_id) {
+                        if let Some(ref mut doc) = item.document {
+                            if !self.doc_find_text.is_empty() {
+                                if self.doc_find_case_sensitive {
+                                    doc.content = doc.content.replace(&self.doc_find_text, &self.doc_replace_text);
+                                } else {
+                                    // Case-insensitive replace
+                                    let lower_content = doc.content.to_lowercase();
+                                    let lower_find = self.doc_find_text.to_lowercase();
+                                    let mut result = String::new();
+                                    let mut last_end = 0;
+                                    for (start, _) in lower_content.match_indices(&lower_find) {
+                                        result.push_str(&doc.content[last_end..start]);
+                                        result.push_str(&self.doc_replace_text);
+                                        last_end = start + self.doc_find_text.len();
+                                    }
+                                    result.push_str(&doc.content[last_end..]);
+                                    doc.content = result;
+                                }
+                                self.editor.load_document(doc);
+                                self.editor.mark_dirty();
+                                self.doc_find_match_count = 0;
+                                self.notification = Some("All occurrences replaced".to_string());
+                            }
+                        }
+                    }
+                }
+            }
+
+            Message::DocReplaceChanged(text) => {
+                self.doc_replace_text = text;
+            }
+
+            Message::DocFindToggleCase => {
+                self.doc_find_case_sensitive = !self.doc_find_case_sensitive;
+                // Recount matches
+                if !self.doc_find_text.is_empty() {
+                    if let (Some(ref project), Some(item_id)) = (&self.project, self.selected_item) {
+                        if let Some(item) = project.binder.find_item(&item_id) {
+                            if let Some(ref doc) = item.document {
+                                let content = if self.doc_find_case_sensitive {
+                                    doc.content.clone()
+                                } else {
+                                    doc.content.to_lowercase()
+                                };
+                                let query = if self.doc_find_case_sensitive {
+                                    self.doc_find_text.clone()
+                                } else {
+                                    self.doc_find_text.to_lowercase()
+                                };
+                                self.doc_find_match_count = content.matches(&query).count();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ========== Quick reference ==========
+            Message::ShowQuickRef(item_id) => {
+                self.quick_ref_item = Some(item_id);
+                self.bottom_panel = BottomPanel::QuickRef;
+            }
+
+            // ========== Script mode ==========
+            Message::ToggleScriptMode => {
+                self.script_mode = !self.script_mode;
+                if self.script_mode {
+                    self.current_script_element = Some(crate::core::script::ScriptElement::Action);
+                } else {
+                    self.current_script_element = None;
+                }
+                self.notification = Some(
+                    if self.script_mode { "Script mode enabled".to_string() }
+                    else { "Script mode disabled".to_string() }
+                );
+            }
+
+            Message::SetScriptElement(element_name) => {
+                self.current_script_element = match element_name.as_str() {
+                    "Scene Heading" => Some(crate::core::script::ScriptElement::SceneHeading),
+                    "Action" => Some(crate::core::script::ScriptElement::Action),
+                    "Character" => Some(crate::core::script::ScriptElement::Character),
+                    "Dialogue" => Some(crate::core::script::ScriptElement::Dialogue),
+                    "Parenthetical" => Some(crate::core::script::ScriptElement::Parenthetical),
+                    "Transition" => Some(crate::core::script::ScriptElement::Transition),
+                    "Shot" => Some(crate::core::script::ScriptElement::Shot),
+                    "Note" => Some(crate::core::script::ScriptElement::Note),
+                    _ => None,
+                };
+            }
+
+            // ========== Auto-correction ==========
+            Message::ToggleAutoCorrectSmartQuotes => {
+                self.auto_correction.smart_quotes = !self.auto_correction.smart_quotes;
+            }
+
+            Message::ToggleAutoCorrectEmDashes => {
+                self.auto_correction.em_dashes = !self.auto_correction.em_dashes;
+            }
+
+            Message::ToggleAutoCorrectEllipsis => {
+                self.auto_correction.ellipsis = !self.auto_correction.ellipsis;
+            }
+
+            // ========== Revision tracking ==========
+            Message::SetRevisionLevel(level_name) => {
+                self.current_revision = match level_name.as_str() {
+                    "Revision 1" => Some(crate::core::script::RevisionLevel::First),
+                    "Revision 2" => Some(crate::core::script::RevisionLevel::Second),
+                    "Revision 3" => Some(crate::core::script::RevisionLevel::Third),
+                    "Revision 4" => Some(crate::core::script::RevisionLevel::Fourth),
+                    "Revision 5" => Some(crate::core::script::RevisionLevel::Fifth),
+                    "None" | _ => None,
+                };
+            }
+
+            // ========== Document links ==========
+            Message::InsertDocLink(target_id) => {
+                if let Some(ref project) = self.project {
+                    if let Some(target_item) = project.binder.find_item(&target_id) {
+                        let link_text = format!("[[{}]]", target_item.title);
+                        self.editor.content.perform(
+                            iced::widget::text_editor::Action::Edit(
+                                iced::widget::text_editor::Edit::Paste(
+                                    std::sync::Arc::new(link_text)
+                                )
+                            )
+                        );
+                        self.editor.mark_dirty();
+                        self.notification = Some(format!("Linked to '{}'", target_item.title));
+                    }
+                }
+            }
+
             // ========== Misc ==========
             Message::Tick => {
                 // Auto-save
@@ -1432,7 +1680,20 @@ impl ScrineverApp {
                     .and_then(|id| project.binder.find_item(&id))
                     .map(|item| item.title.as_str())
                     .unwrap_or("No document selected");
-                views::editor_view::view(&self.editor, title)
+
+                // Check for split editor mode
+                if let Some(split_id) = self.split_editor_item {
+                    let secondary_content = project.binder.find_item(&split_id)
+                        .and_then(|item| item.document.as_ref())
+                        .map(|doc| doc.content.as_str())
+                        .unwrap_or("");
+                    let secondary_title = project.binder.find_item(&split_id)
+                        .map(|item| item.title.as_str())
+                        .unwrap_or("Reference");
+                    views::split_editor_view::view(&self.editor, title, secondary_content, secondary_title)
+                } else {
+                    views::editor_view::view(&self.editor, title)
+                }
             }
             ViewMode::Corkboard => {
                 let (items, parent_title) = if let Some(id) = self.selected_item {
@@ -1596,6 +1857,27 @@ impl ScrineverApp {
                     words_per_day_needed,
                 };
                 Some(views::targets_panel::view(&data))
+            }
+            BottomPanel::QuickRef => {
+                if let Some(ref_id) = self.quick_ref_item {
+                    self.project.as_ref()
+                        .and_then(|p| p.binder.find_item(&ref_id))
+                        .map(|item| {
+                            let data = views::quick_reference_panel::QuickRefData::from_item(item);
+                            views::quick_reference_panel::view(&data)
+                        })
+                } else {
+                    None
+                }
+            }
+            BottomPanel::FindReplace => {
+                let data = views::find_replace_panel::FindReplaceData {
+                    find_text: self.doc_find_text.clone(),
+                    replace_text: self.doc_replace_text.clone(),
+                    match_count: self.doc_find_match_count,
+                    case_sensitive: self.doc_find_case_sensitive,
+                };
+                Some(views::find_replace_panel::view(&data))
             }
             BottomPanel::None => None,
         };

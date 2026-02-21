@@ -119,5 +119,23 @@ pub fn built_in_templates() -> Vec<Template> {
             category: TemplateCategory::Miscellaneous,
             template_id: "recipes".into(),
         },
+        Template {
+            name: "Journal / Diary".into(),
+            description: "A personal journal with monthly sections.".into(),
+            category: TemplateCategory::Miscellaneous,
+            template_id: "journal".into(),
+        },
+        Template {
+            name: "Blog".into(),
+            description: "Blog post collection with drafts and published sections.".into(),
+            category: TemplateCategory::Miscellaneous,
+            template_id: "blog".into(),
+        },
+        Template {
+            name: "Comic Script".into(),
+            description: "A comic book script template with issues and pages.".into(),
+            category: TemplateCategory::Scriptwriting,
+            template_id: "comic_script".into(),
+        },
     ]
 }
