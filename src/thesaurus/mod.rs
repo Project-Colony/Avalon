@@ -157,3 +157,74 @@ impl Default for Thesaurus {
         Self::new()
     }
 }
+
+impl Thesaurus {
+    /// Load a built-in thesaurus with common synonyms as a fallback
+    /// when WordNet data files are not available
+    pub fn load_builtin(&mut self) {
+        let common_synonyms: &[(&str, PartOfSpeech, &[&str])] = &[
+            ("good", PartOfSpeech::Adjective, &["great", "fine", "excellent", "wonderful", "positive", "satisfactory", "decent"]),
+            ("bad", PartOfSpeech::Adjective, &["poor", "terrible", "awful", "dreadful", "unpleasant", "inferior"]),
+            ("big", PartOfSpeech::Adjective, &["large", "huge", "enormous", "vast", "immense", "substantial"]),
+            ("small", PartOfSpeech::Adjective, &["little", "tiny", "minute", "compact", "diminutive", "modest"]),
+            ("happy", PartOfSpeech::Adjective, &["joyful", "cheerful", "delighted", "pleased", "content", "glad"]),
+            ("sad", PartOfSpeech::Adjective, &["unhappy", "sorrowful", "melancholy", "gloomy", "dejected", "mournful"]),
+            ("fast", PartOfSpeech::Adjective, &["quick", "rapid", "swift", "speedy", "brisk", "hasty"]),
+            ("slow", PartOfSpeech::Adjective, &["sluggish", "gradual", "leisurely", "unhurried", "deliberate"]),
+            ("beautiful", PartOfSpeech::Adjective, &["gorgeous", "stunning", "lovely", "attractive", "elegant"]),
+            ("old", PartOfSpeech::Adjective, &["ancient", "elderly", "aged", "antique", "vintage", "mature"]),
+            ("new", PartOfSpeech::Adjective, &["fresh", "novel", "recent", "modern", "contemporary", "original"]),
+            ("important", PartOfSpeech::Adjective, &["significant", "crucial", "vital", "essential", "critical"]),
+            ("interesting", PartOfSpeech::Adjective, &["fascinating", "engaging", "compelling", "intriguing"]),
+            ("difficult", PartOfSpeech::Adjective, &["hard", "challenging", "arduous", "demanding", "tough"]),
+            ("easy", PartOfSpeech::Adjective, &["simple", "straightforward", "effortless", "uncomplicated"]),
+            ("strong", PartOfSpeech::Adjective, &["powerful", "mighty", "robust", "sturdy", "forceful"]),
+            ("dark", PartOfSpeech::Adjective, &["dim", "shadowy", "gloomy", "murky", "somber", "dusky"]),
+            ("bright", PartOfSpeech::Adjective, &["brilliant", "radiant", "luminous", "vivid", "shining"]),
+            ("quiet", PartOfSpeech::Adjective, &["silent", "hushed", "still", "peaceful", "calm", "muted"]),
+            ("loud", PartOfSpeech::Adjective, &["noisy", "boisterous", "thunderous", "deafening", "blaring"]),
+            ("walk", PartOfSpeech::Verb, &["stroll", "stride", "amble", "saunter", "trek", "march", "wander"]),
+            ("run", PartOfSpeech::Verb, &["sprint", "dash", "race", "jog", "gallop", "rush", "hurry"]),
+            ("say", PartOfSpeech::Verb, &["speak", "state", "declare", "announce", "remark", "mention"]),
+            ("think", PartOfSpeech::Verb, &["believe", "consider", "ponder", "reflect", "contemplate"]),
+            ("look", PartOfSpeech::Verb, &["gaze", "stare", "glance", "peer", "observe", "watch"]),
+            ("make", PartOfSpeech::Verb, &["create", "produce", "build", "construct", "craft", "form"]),
+            ("give", PartOfSpeech::Verb, &["provide", "offer", "grant", "present", "bestow", "deliver"]),
+            ("get", PartOfSpeech::Verb, &["obtain", "acquire", "receive", "gain", "achieve", "attain"]),
+            ("come", PartOfSpeech::Verb, &["arrive", "approach", "reach", "appear", "emerge", "enter"]),
+            ("go", PartOfSpeech::Verb, &["leave", "depart", "proceed", "travel", "move", "advance"]),
+            ("house", PartOfSpeech::Noun, &["home", "dwelling", "residence", "abode", "domicile"]),
+            ("world", PartOfSpeech::Noun, &["earth", "globe", "realm", "domain", "sphere", "universe"]),
+            ("story", PartOfSpeech::Noun, &["tale", "narrative", "account", "chronicle", "saga"]),
+            ("place", PartOfSpeech::Noun, &["location", "site", "spot", "area", "region", "locale"]),
+            ("man", PartOfSpeech::Noun, &["person", "individual", "fellow", "gentleman", "male"]),
+            ("woman", PartOfSpeech::Noun, &["lady", "female", "person", "individual"]),
+            ("child", PartOfSpeech::Noun, &["kid", "youngster", "youth", "minor", "juvenile"]),
+            ("friend", PartOfSpeech::Noun, &["companion", "ally", "comrade", "associate", "confidant"]),
+            ("enemy", PartOfSpeech::Noun, &["foe", "adversary", "opponent", "rival", "antagonist"]),
+        ];
+
+        for (word, pos, syns) in common_synonyms {
+            let entry = ThesaurusEntry {
+                part_of_speech: pos.clone(),
+                definition: String::new(),
+                synonyms: syns.iter().map(|s| s.to_string()).collect(),
+                antonyms: Vec::new(),
+            };
+
+            self.entries
+                .entry(word.to_string())
+                .or_insert_with(Vec::new)
+                .push(entry);
+        }
+
+        if !self.entries.is_empty() {
+            self.loaded = true;
+        }
+    }
+
+    /// Get the number of words in the thesaurus
+    pub fn word_count(&self) -> usize {
+        self.entries.len()
+    }
+}

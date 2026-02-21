@@ -87,4 +87,48 @@ impl WritingHistory {
         }
         streak
     }
+
+    /// Longest streak ever achieved
+    pub fn longest_streak(&self) -> usize {
+        let mut best = 0;
+        let mut current = 0;
+        for entry in &self.entries {
+            if entry.words_written > 0 {
+                current += 1;
+                best = best.max(current);
+            } else {
+                current = 0;
+            }
+        }
+        best
+    }
+
+    /// Average words per minute across all sessions
+    pub fn average_wpm(&self) -> f64 {
+        let total_time = self.total_time_seconds();
+        if total_time < 60 {
+            return 0.0;
+        }
+        let total_positive: i64 = self.entries.iter()
+            .map(|e| e.words_written.max(0))
+            .sum();
+        total_positive as f64 / (total_time as f64 / 60.0)
+    }
+
+    /// Words written in the last 7 days
+    pub fn words_this_week(&self) -> i64 {
+        let week = self.recent(7);
+        week.iter().map(|e| e.words_written).sum()
+    }
+
+    /// Get today's entry, if any
+    pub fn today(&self) -> Option<&DailyEntry> {
+        let today = Utc::now().date_naive();
+        self.entries.iter().rev().find(|e| e.date == today)
+    }
+
+    /// Number of days with writing activity
+    pub fn active_days(&self) -> usize {
+        self.entries.iter().filter(|e| e.words_written > 0).count()
+    }
 }
