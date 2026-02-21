@@ -32,6 +32,74 @@ impl std::fmt::Display for TemplateCategory {
     }
 }
 
+impl TemplateCategory {
+    /// All categories in display order
+    pub fn all() -> Vec<Self> {
+        vec![
+            TemplateCategory::Blank,
+            TemplateCategory::Fiction,
+            TemplateCategory::NonFiction,
+            TemplateCategory::Scriptwriting,
+            TemplateCategory::Academic,
+            TemplateCategory::Miscellaneous,
+        ]
+    }
+
+    /// Get description of the category
+    pub fn description(&self) -> &str {
+        match self {
+            TemplateCategory::Fiction => "Templates for novels, stories, and creative writing",
+            TemplateCategory::NonFiction => "Templates for books, essays, and articles",
+            TemplateCategory::Scriptwriting => "Templates for screenplays, plays, and scripts",
+            TemplateCategory::Academic => "Templates for papers, theses, and research",
+            TemplateCategory::Miscellaneous => "Other templates for various purposes",
+            TemplateCategory::Blank => "Start with an empty project",
+        }
+    }
+
+    /// Get an icon for the category
+    pub fn icon(&self) -> &str {
+        match self {
+            TemplateCategory::Fiction => "\u{1F4D6}",
+            TemplateCategory::NonFiction => "\u{1F4DA}",
+            TemplateCategory::Scriptwriting => "\u{1F3AC}",
+            TemplateCategory::Academic => "\u{1F393}",
+            TemplateCategory::Miscellaneous => "\u{1F4CB}",
+            TemplateCategory::Blank => "\u{1F4C4}",
+        }
+    }
+}
+
+impl Template {
+    /// Get a one-line summary
+    pub fn summary(&self) -> String {
+        format!("{} — {} ({})", self.name, self.description, self.category)
+    }
+
+    /// Check if the template matches a search query
+    pub fn matches_query(&self, query: &str) -> bool {
+        let q = query.to_lowercase();
+        self.name.to_lowercase().contains(&q)
+            || self.description.to_lowercase().contains(&q)
+            || self.template_id.to_lowercase().contains(&q)
+    }
+}
+
+/// Find a template by its ID
+pub fn find_template(id: &str) -> Option<Template> {
+    built_in_templates().into_iter().find(|t| t.template_id == id)
+}
+
+/// Get templates filtered by category
+pub fn templates_by_category(category: &TemplateCategory) -> Vec<Template> {
+    built_in_templates().into_iter().filter(|t| &t.category == category).collect()
+}
+
+/// Get the total number of built-in templates
+pub fn template_count() -> usize {
+    built_in_templates().len()
+}
+
 /// Get all built-in templates
 pub fn built_in_templates() -> Vec<Template> {
     vec![

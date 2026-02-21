@@ -268,6 +268,69 @@ pub struct CompileContent {
     pub is_folder: bool,
 }
 
+impl CompileContent {
+    /// Word count for this content item
+    pub fn word_count(&self) -> usize {
+        self.text.split_whitespace().count()
+    }
+
+    /// Character count for this content item
+    pub fn char_count(&self) -> usize {
+        self.text.len()
+    }
+
+    /// Check if this content item is empty
+    pub fn is_empty(&self) -> bool {
+        self.text.trim().is_empty() && !self.is_folder
+    }
+}
+
+impl SeparatorType {
+    /// Human-readable label
+    pub fn label(&self) -> &str {
+        match self {
+            SeparatorType::EmptyLine => "Empty Line",
+            SeparatorType::PageBreak => "Page Break",
+            SeparatorType::SectionBreak => "Section Break (***)",
+            SeparatorType::Custom(_) => "Custom",
+            SeparatorType::None => "None",
+        }
+    }
+
+    /// All standard separator types
+    pub fn all_standard() -> Vec<Self> {
+        vec![
+            SeparatorType::EmptyLine,
+            SeparatorType::PageBreak,
+            SeparatorType::SectionBreak,
+            SeparatorType::None,
+        ]
+    }
+}
+
+impl OutputFormat {
+    /// Check if this format requires save_to_file (binary formats)
+    pub fn is_binary(&self) -> bool {
+        matches!(self, OutputFormat::Pdf | OutputFormat::Docx | OutputFormat::Epub)
+    }
+
+    /// MIME type for this format
+    pub fn mime_type(&self) -> &str {
+        match self {
+            OutputFormat::PlainText => "text/plain",
+            OutputFormat::Markdown => "text/markdown",
+            OutputFormat::Html => "text/html",
+            OutputFormat::Pdf => "application/pdf",
+            OutputFormat::Latex => "application/x-latex",
+            OutputFormat::Docx => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            OutputFormat::Epub => "application/epub+zip",
+            OutputFormat::Rtf => "application/rtf",
+            OutputFormat::Opml => "text/x-opml",
+            OutputFormat::Fountain => "text/plain",
+        }
+    }
+}
+
 fn plain_text_compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
     super::plain_text::compile(contents, options)
 }
