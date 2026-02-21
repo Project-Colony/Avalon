@@ -30,6 +30,9 @@ pub struct InspectorData {
     pub available_labels: Vec<String>,
     pub keywords: Vec<String>,
     pub is_bookmarked: bool,
+    pub footnote_count: usize,
+    pub reference_count: usize,
+    pub custom_fields: Vec<(String, String)>,
 }
 
 impl InspectorData {
@@ -85,6 +88,24 @@ impl InspectorData {
             },
             keywords: item.metadata.keywords.clone(),
             is_bookmarked,
+            footnote_count: item.document.as_ref()
+                .map(|d| d.footnotes.len())
+                .unwrap_or(0),
+            reference_count: item.document.as_ref()
+                .map(|d| d.references.len())
+                .unwrap_or(0),
+            custom_fields: item.metadata.custom_metadata.iter()
+                .map(|f| {
+                    let val = match &f.value {
+                        crate::core::metadata::CustomFieldValue::Text(t) => t.clone(),
+                        crate::core::metadata::CustomFieldValue::Number(n) => format!("{}", n),
+                        crate::core::metadata::CustomFieldValue::Checkbox(b) => if *b { "Yes".to_string() } else { "No".to_string() },
+                        crate::core::metadata::CustomFieldValue::Date(d) => d.clone(),
+                        crate::core::metadata::CustomFieldValue::List(l) => l.join(", "),
+                    };
+                    (f.name.clone(), val)
+                })
+                .collect(),
         }
     }
 }
@@ -244,6 +265,43 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
         .padding(Padding::from([2, 8])),
     ];
 
+    // Additional info (footnotes, refs)
+    let extra_info: Element<'static, Message> = if data.footnote_count > 0 || data.reference_count > 0 {
+        column![
+            stat_row("Footnotes", format!("{}", data.footnote_count)),
+            stat_row("References", format!("{}", data.reference_count)),
+        ]
+        .spacing(2)
+        .into()
+    } else {
+        Space::with_height(0).into()
+    };
+
+    // Custom metadata
+    let mut custom_col = column![].spacing(2);
+    if !data.custom_fields.is_empty() {
+        custom_col = custom_col.push(
+            text("Custom Metadata").size(11).color(Theme::TEXT_MUTED)
+        );
+        for (name, value) in &data.custom_fields {
+            custom_col = custom_col.push(stat_row(name, value.clone()));
+        }
+    }
+
+    // Quick ref button
+    let quick_ref_btn = button(
+        text("Quick Reference").size(10).color(Theme::TEXT_ACCENT),
+    )
+    .on_press(Message::ShowQuickRef(id))
+    .padding(Padding::from([2, 6]));
+
+    // Split editor button
+    let split_editor_btn = button(
+        text("Open in Split").size(10).color(Theme::TEXT_SECONDARY),
+    )
+    .on_press(Message::OpenInSplitEditor(id))
+    .padding(Padding::from([2, 6]));
+
     let content = column![
         header,
         Space::with_height(4),
@@ -270,13 +328,18 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
         Space::with_height(12),
         stats_header,
         stats_content,
+        extra_info,
         Space::with_height(8),
         keywords_label,
         keywords_input,
+        Space::with_height(8),
+        custom_col,
         Space::with_height(12),
         snapshots_header,
         snapshots_row,
         Space::with_height(8),
+        row![quick_ref_btn, Space::with_width(4), split_editor_btn].spacing(2),
+        Space::with_height(4),
         convert_row,
         split_btn,
     ]

@@ -146,11 +146,28 @@ fn render_item(
         BinderItemKind::Folder => {
             if item.expanded { "v " } else { "> " }
         }
-        BinderItemKind::Text => "  ",
-        _ => "  ",
+        BinderItemKind::Text => "# ",
+        BinderItemKind::Image => "@ ",
+        BinderItemKind::Pdf => "P ",
+        BinderItemKind::WebPage => "W ",
     };
 
-    let label = format!("{}{}", icon, item.title);
+    // Show word count for documents
+    let word_info = if item.kind == BinderItemKind::Text {
+        item.document.as_ref()
+            .map(|d| {
+                let wc = d.word_count();
+                if wc > 0 { format!(" ({})", wc) } else { String::new() }
+            })
+            .unwrap_or_default()
+    } else if item.kind == BinderItemKind::Folder && !item.children.is_empty() {
+        let total = item.total_word_count();
+        if total > 0 { format!(" [{}]", total) } else { String::new() }
+    } else {
+        String::new()
+    };
+
+    let label = format!("{}{}{}", icon, item.title, word_info);
 
     // Apply label color if present
     let label_color = if is_selected {

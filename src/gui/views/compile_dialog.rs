@@ -1,4 +1,4 @@
-use iced::widget::{button, column, container, pick_list, row, text, text_input, toggler, Space};
+use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_input, toggler, Space};
 use iced::{Element, Length, Padding};
 
 use crate::export::compiler::{CompileOptions, OutputFormat, SeparatorType};
@@ -6,7 +6,7 @@ use crate::gui::app::Message;
 use crate::gui::theme::Theme;
 
 /// Render the compile/export dialog
-pub fn view(options: &CompileOptions) -> Element<'static, Message> {
+pub fn view(options: &CompileOptions, presets: &[(String, CompileOptions)]) -> Element<'static, Message> {
     let header = text("Compile Project")
         .size(20)
         .color(Theme::TEXT_PRIMARY);
@@ -112,9 +112,48 @@ pub fn view(options: &CompileOptions) -> Element<'static, Message> {
     .on_press(Message::HideCompileDialog)
     .padding(Padding::from([8, 20]));
 
+    // Presets section
+    let presets_label = text("Compile Presets").size(12).color(Theme::TEXT_MUTED);
+    let mut presets_row = row![].spacing(4);
+    let built_in_presets = vec![
+        ("Novel".to_string(), "novel"),
+        ("Manuscript".to_string(), "manuscript"),
+        ("Screenplay".to_string(), "screenplay"),
+    ];
+    for (name, _) in &built_in_presets {
+        let n = name.clone();
+        presets_row = presets_row.push(
+            button(
+                text(name.clone()).size(10).color(Theme::TEXT_SECONDARY),
+            )
+            .on_press(Message::LoadCompilePreset(n))
+            .padding(Padding::from([2, 6]))
+        );
+    }
+    for (name, _) in presets {
+        let n = name.clone();
+        presets_row = presets_row.push(
+            button(
+                text(name.clone()).size(10).color(Theme::TEXT_ACCENT),
+            )
+            .on_press(Message::LoadCompilePreset(n))
+            .padding(Padding::from([2, 6]))
+        );
+    }
+
+    let save_preset_btn = button(
+        text("Save Current as Preset").size(10).color(Theme::TEXT_ACCENT),
+    )
+    .on_press(Message::SaveCompilePreset("Custom".to_string()))
+    .padding(Padding::from([2, 8]));
+
     let content = column![
         header,
-        Space::with_height(16),
+        Space::with_height(8),
+        presets_label,
+        scrollable(presets_row).direction(scrollable::Direction::Horizontal(scrollable::Scrollbar::new())),
+        save_preset_btn,
+        Space::with_height(12),
         format_label,
         format_picker,
         Space::with_height(12),

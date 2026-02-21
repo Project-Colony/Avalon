@@ -1764,7 +1764,7 @@ impl ScrineverApp {
 
         // Compile dialog (overlay)
         if self.show_compile_dialog {
-            return views::compile_dialog::view(&self.compile_options);
+            return views::compile_dialog::view(&self.compile_options, &self.compile_presets);
         }
 
         // Settings dialog (overlay)
@@ -2076,6 +2076,10 @@ impl ScrineverApp {
                             "z" => Some(Message::Undo),
                             "y" => Some(Message::Redo),
                             "," => Some(Message::ShowSettings),
+                            "b" => Some(Message::InsertBold),
+                            "u" => Some(Message::InsertUnderline),
+                            "h" => Some(Message::ShowBottomPanel(BottomPanel::FindReplace)),
+                            "d" => Some(Message::ShowBottomPanel(BottomPanel::Annotations)),
                             "1" => Some(Message::SwitchView(ViewMode::Editor)),
                             "2" => Some(Message::SwitchView(ViewMode::Corkboard)),
                             "3" => Some(Message::SwitchView(ViewMode::Outliner)),
