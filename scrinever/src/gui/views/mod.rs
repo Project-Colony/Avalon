@@ -1,0 +1,9 @@
+pub mod binder_view;
+pub mod editor_view;
+pub mod corkboard_view;
+pub mod outliner_view;
+pub mod inspector_view;
+pub mod toolbar;
+pub mod status_bar;
+pub mod welcome_screen;
+pub mod compile_dialog;
