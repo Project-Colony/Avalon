@@ -461,8 +461,441 @@ impl EditorState {
     }
 }
 
+impl EditorState {
+    /// Transpose the two characters around the cursor
+    pub fn transpose_chars(&mut self) {
+        let text = self.document.content.clone();
+        let pos = self.cursor;
+        if pos == 0 || pos >= text.len() {
+            if pos < 2 || text.len() < 2 {
+                return;
+            }
+        }
+
+        let swap_pos = if pos >= text.len() { pos - 2 } else { pos.saturating_sub(1) };
+        let bytes = text.as_bytes();
+        if swap_pos + 1 >= text.len() {
+            return;
+        }
+
+        if !bytes[swap_pos].is_ascii() || !bytes[swap_pos + 1].is_ascii() {
+            return;
+        }
+
+        self.push_undo();
+        let mut chars: Vec<u8> = text.bytes().collect();
+        chars.swap(swap_pos, swap_pos + 1);
+        let new_content = String::from_utf8(chars).unwrap_or(text);
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.cursor = swap_pos + 2;
+        self.dirty = true;
+    }
+
+    /// Sort selected lines alphabetically, or all lines if no selection
+    pub fn sort_lines(&mut self) {
+        let text = self.document.content.clone();
+        let mut lines: Vec<&str> = text.lines().collect();
+        if lines.len() < 2 {
+            return;
+        }
+        self.push_undo();
+        lines.sort();
+        let new_content = lines.join("\n");
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.dirty = true;
+    }
+
+    /// Remove duplicate lines (keeping first occurrence)
+    pub fn remove_duplicate_lines(&mut self) {
+        let text = self.document.content.clone();
+        let lines: Vec<&str> = text.lines().collect();
+        if lines.len() < 2 {
+            return;
+        }
+        self.push_undo();
+        let mut seen = std::collections::HashSet::new();
+        let unique: Vec<&str> = lines.into_iter()
+            .filter(|line| seen.insert(*line))
+            .collect();
+        let new_content = unique.join("\n");
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.dirty = true;
+    }
+
+    /// Join the current line with the next line
+    pub fn join_lines(&mut self) {
+        let text = self.document.content.clone();
+        let pos = self.cursor.min(text.len());
+
+        let line_end = text[pos..].find('\n').map(|p| pos + p);
+        if let Some(nl_pos) = line_end {
+            self.push_undo();
+            let mut new_content = text;
+            new_content.replace_range(nl_pos..nl_pos + 1, " ");
+            self.document.content = new_content.clone();
+            self.content = iced::widget::text_editor::Content::with_text(&new_content);
+            self.dirty = true;
+        }
+    }
+
+    /// Move the current line up (swap with previous line)
+    pub fn move_line_up(&mut self) {
+        let text = self.document.content.clone();
+        let pos = self.cursor.min(text.len());
+        let lines: Vec<&str> = text.lines().collect();
+        if lines.len() < 2 {
+            return;
+        }
+
+        let current_line = text[..pos].matches('\n').count();
+        if current_line == 0 {
+            return;
+        }
+
+        self.push_undo();
+        let mut new_lines = lines;
+        new_lines.swap(current_line, current_line - 1);
+        let new_content = new_lines.join("\n");
+
+        let new_cursor = new_lines[..current_line - 1].iter()
+            .map(|l| l.len() + 1)
+            .sum::<usize>();
+
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.cursor = new_cursor;
+        self.dirty = true;
+    }
+
+    /// Move the current line down (swap with next line)
+    pub fn move_line_down(&mut self) {
+        let text = self.document.content.clone();
+        let pos = self.cursor.min(text.len());
+        let lines: Vec<&str> = text.lines().collect();
+        if lines.len() < 2 {
+            return;
+        }
+
+        let current_line = text[..pos].matches('\n').count();
+        if current_line >= lines.len() - 1 {
+            return;
+        }
+
+        self.push_undo();
+        let mut new_lines = lines;
+        new_lines.swap(current_line, current_line + 1);
+        let new_content = new_lines.join("\n");
+
+        let new_cursor = new_lines[..current_line + 1].iter()
+            .map(|l| l.len() + 1)
+            .sum::<usize>();
+
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.cursor = new_cursor;
+        self.dirty = true;
+    }
+
+    /// Delete the current line
+    pub fn delete_line(&mut self) {
+        let text = self.document.content.clone();
+        let pos = self.cursor.min(text.len());
+        let lines: Vec<&str> = text.lines().collect();
+        if lines.is_empty() {
+            return;
+        }
+
+        let current_line = text[..pos].matches('\n').count();
+        self.push_undo();
+
+        let mut new_lines: Vec<&str> = lines;
+        new_lines.remove(current_line.min(new_lines.len() - 1));
+        let new_content = new_lines.join("\n");
+
+        let new_cursor = if new_lines.is_empty() {
+            0
+        } else {
+            let target_line = current_line.min(new_lines.len() - 1);
+            new_lines[..target_line].iter()
+                .map(|l| l.len() + 1)
+                .sum::<usize>()
+        };
+
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.cursor = new_cursor;
+        self.dirty = true;
+    }
+
+    /// Duplicate the current line
+    pub fn duplicate_line(&mut self) {
+        let text = self.document.content.clone();
+        let pos = self.cursor.min(text.len());
+        let lines: Vec<&str> = text.lines().collect();
+        if lines.is_empty() {
+            return;
+        }
+
+        let current_line = text[..pos].matches('\n').count();
+        let line_idx = current_line.min(lines.len() - 1);
+
+        self.push_undo();
+        let mut new_lines = lines;
+        let dup = new_lines[line_idx];
+        new_lines.insert(line_idx + 1, dup);
+        let new_content = new_lines.join("\n");
+
+        let new_cursor = new_lines[..line_idx + 1].iter()
+            .map(|l| l.len() + 1)
+            .sum::<usize>();
+
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.cursor = new_cursor;
+        self.dirty = true;
+    }
+
+    /// Indent the current line (add 4 spaces at start)
+    pub fn indent_line(&mut self) {
+        let text = self.document.content.clone();
+        let pos = self.cursor.min(text.len());
+
+        let line_start = text[..pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
+
+        self.push_undo();
+        let new_content = format!("{}    {}", &text[..line_start], &text[line_start..]);
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.cursor = pos + 4;
+        self.dirty = true;
+    }
+
+    /// Unindent the current line (remove up to 4 spaces from start)
+    pub fn unindent_line(&mut self) {
+        let text = self.document.content.clone();
+        let pos = self.cursor.min(text.len());
+
+        let line_start = text[..pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
+
+        let spaces = text[line_start..].chars().take(4).take_while(|c| *c == ' ').count();
+        if spaces == 0 {
+            return;
+        }
+
+        self.push_undo();
+        let new_content = format!("{}{}", &text[..line_start], &text[line_start + spaces..]);
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.cursor = pos.saturating_sub(spaces);
+        self.dirty = true;
+    }
+
+    /// Toggle a markdown comment around the current line
+    pub fn toggle_comment(&mut self) {
+        let text = self.document.content.clone();
+        let pos = self.cursor.min(text.len());
+
+        let line_start = text[..pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let line_end = text[pos..].find('\n').map(|p| pos + p).unwrap_or(text.len());
+        let line = &text[line_start..line_end];
+
+        self.push_undo();
+        let new_content = if line.starts_with("<!-- ") && line.ends_with(" -->") {
+            let uncommented = &line[5..line.len() - 4];
+            format!("{}{}{}", &text[..line_start], uncommented, &text[line_end..])
+        } else {
+            format!("{}<!-- {} -->{}", &text[..line_start], line, &text[line_end..])
+        };
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.dirty = true;
+    }
+}
+
 impl Default for EditorState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::document::Document;
+
+    fn editor_with(content: &str) -> EditorState {
+        let doc = Document::with_content(content);
+        EditorState::from_document(&doc)
+    }
+
+    // Note: tests use document.content directly because iced Content::with_text()
+    // may add a trailing newline in the widget representation.
+
+    #[test]
+    fn test_transpose_chars() {
+        let mut editor = editor_with("abcdef");
+        editor.cursor = 2;
+        editor.transpose_chars();
+        assert_eq!(editor.document.content, "acbdef");
+    }
+
+    #[test]
+    fn test_transpose_chars_at_start() {
+        let mut editor = editor_with("abc");
+        editor.cursor = 0;
+        editor.transpose_chars();
+        assert_eq!(editor.document.content, "abc");
+    }
+
+    #[test]
+    fn test_sort_lines() {
+        let mut editor = editor_with("cherry\napple\nbanana");
+        editor.sort_lines();
+        assert_eq!(editor.document.content, "apple\nbanana\ncherry");
+    }
+
+    #[test]
+    fn test_sort_lines_single() {
+        let mut editor = editor_with("only one line");
+        editor.sort_lines();
+        assert_eq!(editor.document.content, "only one line");
+    }
+
+    #[test]
+    fn test_remove_duplicate_lines() {
+        let mut editor = editor_with("apple\nbanana\napple\ncherry\nbanana");
+        editor.remove_duplicate_lines();
+        assert_eq!(editor.document.content, "apple\nbanana\ncherry");
+    }
+
+    #[test]
+    fn test_remove_duplicate_lines_no_dups() {
+        let mut editor = editor_with("a\nb\nc");
+        editor.remove_duplicate_lines();
+        assert_eq!(editor.document.content, "a\nb\nc");
+    }
+
+    #[test]
+    fn test_join_lines() {
+        let mut editor = editor_with("line one\nline two\nline three");
+        editor.cursor = 3;
+        editor.join_lines();
+        assert_eq!(editor.document.content, "line one line two\nline three");
+    }
+
+    #[test]
+    fn test_move_line_up() {
+        let mut editor = editor_with("first\nsecond\nthird");
+        editor.cursor = 7;
+        editor.move_line_up();
+        assert_eq!(editor.document.content, "second\nfirst\nthird");
+    }
+
+    #[test]
+    fn test_move_line_up_first_line() {
+        let mut editor = editor_with("first\nsecond");
+        editor.cursor = 2;
+        editor.move_line_up();
+        assert_eq!(editor.document.content, "first\nsecond");
+    }
+
+    #[test]
+    fn test_move_line_down() {
+        let mut editor = editor_with("first\nsecond\nthird");
+        editor.cursor = 2;
+        editor.move_line_down();
+        assert_eq!(editor.document.content, "second\nfirst\nthird");
+    }
+
+    #[test]
+    fn test_move_line_down_last_line() {
+        let mut editor = editor_with("first\nsecond");
+        editor.cursor = 8;
+        editor.move_line_down();
+        assert_eq!(editor.document.content, "first\nsecond");
+    }
+
+    #[test]
+    fn test_delete_line() {
+        let mut editor = editor_with("first\nsecond\nthird");
+        editor.cursor = 7;
+        editor.delete_line();
+        assert_eq!(editor.document.content, "first\nthird");
+    }
+
+    #[test]
+    fn test_delete_line_first() {
+        let mut editor = editor_with("first\nsecond\nthird");
+        editor.cursor = 2;
+        editor.delete_line();
+        assert_eq!(editor.document.content, "second\nthird");
+    }
+
+    #[test]
+    fn test_duplicate_line() {
+        let mut editor = editor_with("first\nsecond\nthird");
+        editor.cursor = 2;
+        editor.duplicate_line();
+        assert_eq!(editor.document.content, "first\nfirst\nsecond\nthird");
+    }
+
+    #[test]
+    fn test_indent_line() {
+        let mut editor = editor_with("hello\nworld");
+        editor.cursor = 0;
+        editor.indent_line();
+        assert_eq!(editor.document.content, "    hello\nworld");
+        assert_eq!(editor.cursor, 4);
+    }
+
+    #[test]
+    fn test_unindent_line() {
+        let mut editor = editor_with("    hello\nworld");
+        editor.cursor = 6;
+        editor.unindent_line();
+        assert_eq!(editor.document.content, "hello\nworld");
+    }
+
+    #[test]
+    fn test_unindent_partial() {
+        let mut editor = editor_with("  hello\nworld");
+        editor.cursor = 4;
+        editor.unindent_line();
+        assert_eq!(editor.document.content, "hello\nworld");
+    }
+
+    #[test]
+    fn test_toggle_comment() {
+        let mut editor = editor_with("hello world");
+        editor.cursor = 3;
+        editor.toggle_comment();
+        assert_eq!(editor.document.content, "<!-- hello world -->");
+
+        // Toggle again to uncomment
+        editor.cursor = 5;
+        editor.toggle_comment();
+        assert_eq!(editor.document.content, "hello world");
+    }
+
+    #[test]
+    fn test_sort_lines_preserves_order() {
+        let mut editor = editor_with("z line\na line\nm line");
+        editor.sort_lines();
+        let lines: Vec<&str> = editor.document.content.lines().collect();
+        assert_eq!(lines, vec!["a line", "m line", "z line"]);
+    }
+
+    #[test]
+    fn test_editor_undo_after_operation() {
+        let mut editor = editor_with("first\nsecond");
+        editor.cursor = 7;
+        editor.delete_line();
+        assert_eq!(editor.document.content, "first");
+        assert!(editor.can_undo());
+        editor.undo();
+        assert_eq!(editor.document.content, "first\nsecond");
     }
 }
