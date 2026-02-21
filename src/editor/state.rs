@@ -117,6 +117,21 @@ impl EditorState {
         })
     }
 
+    /// Get the line number (0-based) at the cursor position
+    pub fn cursor_line(&self) -> usize {
+        let text = &self.document.content;
+        let pos = self.cursor.min(text.len());
+        text[..pos].matches('\n').count()
+    }
+
+    /// Get the column number (0-based) at the cursor position
+    pub fn cursor_column(&self) -> usize {
+        let text = &self.document.content;
+        let pos = self.cursor.min(text.len());
+        let last_newline = text[..pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        pos - last_newline
+    }
+
     /// Get the word at the current cursor position
     pub fn word_at_cursor(&self) -> Option<String> {
         let text = self.text();

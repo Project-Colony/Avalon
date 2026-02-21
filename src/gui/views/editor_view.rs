@@ -231,10 +231,21 @@ pub fn view_fullscreen<'a>(editor_state: &'a EditorState, title: &str) -> Elemen
         .height(Length::Fill);
 
     let word_count = editor_state.document.word_count();
+    let char_count = editor_state.document.char_count();
+    let para_count = editor_state.document.paragraph_count();
+    let pages = editor_state.document.page_count();
+
     let footer = container(
-        text(format!("{} words", word_count))
-            .size(12)
-            .color(Theme::TEXT_MUTED),
+        row![
+            text(format!("{} words | {} chars | {} para | {:.1} pg",
+                word_count, char_count, para_count, pages))
+                .size(11)
+                .color(Theme::TEXT_MUTED),
+            Space::with_width(Length::Fill),
+            text(format!("Ln {}", editor_state.cursor_line() + 1))
+                .size(10)
+                .color(Theme::TEXT_MUTED),
+        ]
     )
     .padding(Padding::from([4, 80]))
     .width(Length::Fill);
