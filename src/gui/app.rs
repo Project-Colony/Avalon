@@ -127,6 +127,7 @@ pub struct ScrineverApp {
     pub doc_find_case_sensitive: bool,
     pub doc_find_match_count: usize,
     pub doc_find_current_match: usize,
+    pub doc_find_positions: Vec<usize>,
 
     // === Quick reference ===
     pub quick_ref_item: Option<Uuid>,
@@ -468,6 +469,7 @@ impl ScrineverApp {
             doc_find_case_sensitive: false,
             doc_find_match_count: 0,
             doc_find_current_match: 0,
+            doc_find_positions: Vec::new(),
             quick_ref_item: None,
             script_mode: false,
             current_script_element: None,
@@ -1493,12 +1495,13 @@ impl ScrineverApp {
                     if !self.annotation_text.is_empty() {
                         if let Some(item) = project.binder.find_item_mut(&item_id) {
                             if let Some(ref mut doc) = item.document {
-                                doc.references.push(crate::core::document::Reference {
-                                    title: format!("Comment: {}", &self.annotation_text),
-                                    url: None,
-                                    path: None,
-                                    notes: self.annotation_text.clone(),
-                                });
+                                let cursor_pos = self.editor.cursor;
+                                let ann = crate::core::annotation::Annotation::new(
+                                    cursor_pos,
+                                    cursor_pos,
+                                    &self.annotation_text,
+                                );
+                                doc.annotations.push(ann);
                             }
                         }
                         self.annotation_text.clear();
@@ -1507,11 +1510,27 @@ impl ScrineverApp {
                 }
             }
 
-            Message::DeleteAnnotation(_ann_id) => {
+            Message::DeleteAnnotation(ann_id) => {
+                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item_mut(&item_id) {
+                        if let Some(ref mut doc) = item.document {
+                            doc.annotations.retain(|a| a.id != ann_id);
+                        }
+                    }
+                }
                 self.notification = Some("Annotation deleted".to_string());
             }
 
-            Message::ToggleAnnotationResolved(_ann_id) => {
+            Message::ToggleAnnotationResolved(ann_id) => {
+                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item_mut(&item_id) {
+                        if let Some(ref mut doc) = item.document {
+                            if let Some(ann) = doc.annotations.iter_mut().find(|a| a.id == ann_id) {
+                                ann.toggle_resolved();
+                            }
+                        }
+                    }
+                }
                 self.notification = Some("Annotation toggled".to_string());
             }
 
@@ -1623,7 +1642,9 @@ impl ScrineverApp {
             // ========== Document find/replace ==========
             Message::DocFindChanged(query) => {
                 self.doc_find_text = query;
-                // Count matches in current document
+                self.doc_find_positions.clear();
+                self.doc_find_current_match = 0;
+                // Find all match positions in current document
                 if let (Some(ref project), Some(item_id)) = (&self.project, self.selected_item) {
                     if let Some(item) = project.binder.find_item(&item_id) {
                         if let Some(ref doc) = item.document {
@@ -1638,7 +1659,10 @@ impl ScrineverApp {
                                 } else {
                                     self.doc_find_text.to_lowercase()
                                 };
-                                self.doc_find_match_count = content.matches(&query).count();
+                                for (pos, _) in content.match_indices(&query) {
+                                    self.doc_find_positions.push(pos);
+                                }
+                                self.doc_find_match_count = self.doc_find_positions.len();
                             } else {
                                 self.doc_find_match_count = 0;
                             }
@@ -1648,15 +1672,78 @@ impl ScrineverApp {
             }
 
             Message::DocFindNext => {
-                self.notification = Some("Find next: navigate in editor".to_string());
+                if !self.doc_find_positions.is_empty() {
+                    self.doc_find_current_match = (self.doc_find_current_match + 1) % self.doc_find_positions.len();
+                    let pos = self.doc_find_positions[self.doc_find_current_match];
+                    self.notification = Some(format!(
+                        "Match {}/{} at position {}",
+                        self.doc_find_current_match + 1,
+                        self.doc_find_positions.len(),
+                        pos
+                    ));
+                } else {
+                    self.notification = Some("No matches found".to_string());
+                }
             }
 
             Message::DocFindPrev => {
-                self.notification = Some("Find previous: navigate in editor".to_string());
+                if !self.doc_find_positions.is_empty() {
+                    if self.doc_find_current_match == 0 {
+                        self.doc_find_current_match = self.doc_find_positions.len() - 1;
+                    } else {
+                        self.doc_find_current_match -= 1;
+                    }
+                    let pos = self.doc_find_positions[self.doc_find_current_match];
+                    self.notification = Some(format!(
+                        "Match {}/{} at position {}",
+                        self.doc_find_current_match + 1,
+                        self.doc_find_positions.len(),
+                        pos
+                    ));
+                } else {
+                    self.notification = Some("No matches found".to_string());
+                }
             }
 
             Message::DocReplaceCurrent => {
-                self.notification = Some("Replace current match".to_string());
+                if !self.doc_find_positions.is_empty() && self.doc_find_current_match < self.doc_find_positions.len() {
+                    self.sync_editor_to_project();
+                    if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                        if let Some(item) = project.binder.find_item_mut(&item_id) {
+                            if let Some(ref mut doc) = item.document {
+                                let pos = self.doc_find_positions[self.doc_find_current_match];
+                                let find_len = self.doc_find_text.len();
+                                if pos + find_len <= doc.content.len() {
+                                    doc.content = format!(
+                                        "{}{}{}",
+                                        &doc.content[..pos],
+                                        self.doc_replace_text,
+                                        &doc.content[pos + find_len..]
+                                    );
+                                    self.editor.load_document(doc);
+                                    self.editor.mark_dirty();
+                                    // Recalculate positions
+                                    let len_diff = self.doc_replace_text.len() as i64 - find_len as i64;
+                                    self.doc_find_positions.remove(self.doc_find_current_match);
+                                    // Adjust subsequent positions
+                                    for p in self.doc_find_positions.iter_mut() {
+                                        if *p > pos {
+                                            *p = (*p as i64 + len_diff).max(0) as usize;
+                                        }
+                                    }
+                                    self.doc_find_match_count = self.doc_find_positions.len();
+                                    if self.doc_find_current_match >= self.doc_find_positions.len() && !self.doc_find_positions.is_empty() {
+                                        self.doc_find_current_match = 0;
+                                    }
+                                    self.notification = Some(format!(
+                                        "Replaced match. {} remaining",
+                                        self.doc_find_positions.len()
+                                    ));
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             Message::DocReplaceAll => {
@@ -2738,9 +2825,12 @@ impl ScrineverApp {
                 Some(views::bookmarks_panel::view(&project.bookmarks))
             }
             BottomPanel::Annotations => {
-                // Show references from the current document as annotations
-                let annotations = Vec::new();
-                Some(views::annotations_panel::view(&annotations, &self.annotation_text))
+                let annotations = self.selected_item
+                    .and_then(|id| project.binder.find_item(&id))
+                    .and_then(|item| item.document.as_ref())
+                    .map(|doc| doc.annotations.as_slice())
+                    .unwrap_or(&[]);
+                Some(views::annotations_panel::view(annotations, &self.annotation_text))
             }
             BottomPanel::Targets => {
                 let current_words = project.binder.total_word_count();

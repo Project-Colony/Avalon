@@ -16,6 +16,9 @@ pub struct Document {
     /// Footnotes / endnotes
     #[serde(default)]
     pub footnotes: Vec<Footnote>,
+    /// Inline annotations / comments
+    #[serde(default)]
+    pub annotations: Vec<crate::core::annotation::Annotation>,
     /// Last modification time
     pub modified_at: DateTime<Utc>,
     /// Cursor position (for restoring editing state)
@@ -30,6 +33,7 @@ impl Document {
             notes: String::new(),
             references: Vec::new(),
             footnotes: Vec::new(),
+            annotations: Vec::new(),
             modified_at: Utc::now(),
             cursor_position: 0,
         }
