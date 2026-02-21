@@ -131,6 +131,70 @@ impl PlaceholderContext {
     pub fn forename(&self) -> String {
         self.author.split_whitespace().next().unwrap_or("").to_string()
     }
+
+    /// Create a context with default values
+    pub fn default_with_title(title: &str) -> Self {
+        Self {
+            project_title: title.to_string(),
+            author: String::new(),
+            word_count: 0,
+            char_count: 0,
+            page_count: 0,
+        }
+    }
+
+    /// Author initials (e.g., "J.R.R." from "John Ronald Reuel")
+    pub fn author_initials(&self) -> String {
+        self.author.split_whitespace()
+            .filter_map(|w| w.chars().next())
+            .map(|c| format!("{}.", c.to_uppercase()))
+            .collect::<Vec<_>>()
+            .join("")
+    }
+}
+
+/// List all supported placeholders for documentation
+pub fn supported_placeholders() -> Vec<(&'static str, &'static str)> {
+    vec![
+        ("<$date>", "Current date (YYYY-MM-DD)"),
+        ("<$longdate>", "Current date (Month Day, Year)"),
+        ("<$shortdate>", "Current date (MM/DD/YY)"),
+        ("<$time>", "Current time (HH:MM)"),
+        ("<$year>", "Current year"),
+        ("<$month>", "Current month name"),
+        ("<$day>", "Current day of month"),
+        ("<$projecttitle>", "Project title"),
+        ("<$author>", "Author full name"),
+        ("<$surname>", "Author surname"),
+        ("<$forename>", "Author forename"),
+        ("<$wc>", "Word count"),
+        ("<$wordcount>", "Word count (alias)"),
+        ("<$cc>", "Character count"),
+        ("<$charcount>", "Character count (alias)"),
+        ("<$pagecount>", "Estimated page count"),
+        ("<$n>", "Auto-number (chapter)"),
+        ("<$N>", "Auto-number (Roman numeral)"),
+        ("<$W>", "Auto-number (English word)"),
+        ("<$sn>", "Section number (chapter.section)"),
+        ("<$fn>", "Figure number"),
+        ("<$pagebreak>", "Page break marker"),
+    ]
+}
+
+/// Count how many placeholders appear in a text
+pub fn count_placeholders(text: &str) -> usize {
+    let mut count = 0;
+    let mut chars = text.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '<' && chars.peek() == Some(&'$') {
+            // Found a potential placeholder start
+            let rest: String = chars.clone().take_while(|&ch| ch != '>').collect();
+            if !rest.is_empty() {
+                count += 1;
+            }
+        }
+    }
+    count
 }
 
 /// Convert a number to Roman numerals
