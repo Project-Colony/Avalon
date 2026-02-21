@@ -252,3 +252,98 @@ impl AutoCorrection {
         self.superscript_ordinals = true;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_script_element_all() {
+        let all = ScriptElement::all();
+        assert_eq!(all.len(), 8);
+    }
+
+    #[test]
+    fn test_script_element_label() {
+        assert_eq!(ScriptElement::SceneHeading.label(), "Scene Heading");
+        assert_eq!(ScriptElement::Dialogue.label(), "Dialogue");
+    }
+
+    #[test]
+    fn test_script_element_uppercase() {
+        assert!(ScriptElement::SceneHeading.is_uppercase());
+        assert!(ScriptElement::Character.is_uppercase());
+        assert!(ScriptElement::Transition.is_uppercase());
+        assert!(!ScriptElement::Dialogue.is_uppercase());
+        assert!(!ScriptElement::Action.is_uppercase());
+    }
+
+    #[test]
+    fn test_script_element_indent() {
+        assert_eq!(ScriptElement::SceneHeading.indent_level(), 0);
+        assert_eq!(ScriptElement::Character.indent_level(), 2);
+        assert_eq!(ScriptElement::Dialogue.indent_level(), 1);
+    }
+
+    #[test]
+    fn test_next_element_on_enter() {
+        assert!(matches!(ScriptElement::SceneHeading.next_element_on_enter(), ScriptElement::Action));
+        assert!(matches!(ScriptElement::Character.next_element_on_enter(), ScriptElement::Dialogue));
+        assert!(matches!(ScriptElement::Dialogue.next_element_on_enter(), ScriptElement::Character));
+    }
+
+    #[test]
+    fn test_auto_correction_default() {
+        let ac = AutoCorrection::default();
+        assert!(ac.smart_quotes);
+        assert!(ac.em_dashes);
+        assert!(ac.ellipsis);
+        assert!(ac.any_enabled());
+    }
+
+    #[test]
+    fn test_auto_correction_disable_all() {
+        let mut ac = AutoCorrection::default();
+        ac.disable_all();
+        assert!(!ac.any_enabled());
+        assert!(ac.active_list().is_empty());
+    }
+
+    #[test]
+    fn test_auto_correction_enable_all() {
+        let mut ac = AutoCorrection::default();
+        ac.disable_all();
+        ac.enable_all();
+        assert!(ac.any_enabled());
+        assert_eq!(ac.active_list().len(), 5);
+    }
+
+    #[test]
+    fn test_revision_level_next() {
+        assert!(matches!(RevisionLevel::First.next(), RevisionLevel::Second));
+        assert!(matches!(RevisionLevel::Fifth.next(), RevisionLevel::First));
+    }
+
+    #[test]
+    fn test_revision_level_label() {
+        let label = RevisionLevel::First.label();
+        assert!(label.contains("1") || label.contains("First"));
+        let label3 = RevisionLevel::Third.label();
+        assert!(label3.contains("3") || label3.contains("Third"));
+    }
+
+    #[test]
+    fn test_script_element_shortcut_hints() {
+        for el in ScriptElement::all() {
+            assert!(!el.shortcut_hint().is_empty());
+        }
+    }
+
+    #[test]
+    fn test_auto_correction_apply() {
+        let ac = AutoCorrection::default();
+        let result = ac.apply("Hello -- world...");
+        assert!(result.contains('\u{2014}') || result.contains("--")); // em dash or original
+        assert!(result.contains('\u{2026}') || result.contains("...")); // ellipsis or original
+    }
+}

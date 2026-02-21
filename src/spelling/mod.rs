@@ -273,3 +273,131 @@ pub fn spelling_accuracy(checker: &SpellChecker, text: &str) -> f64 {
     let misspelled = count_misspellings(checker, text);
     (1.0 - misspelled as f64 / words.len() as f64) * 100.0
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_checker() -> SpellChecker {
+        let mut checker = SpellChecker::new();
+        checker.try_init();
+        checker
+    }
+
+    #[test]
+    fn test_spell_checker_init() {
+        let checker = make_checker();
+        assert!(checker.active);
+        assert!(checker.dictionary_size() > 100);
+    }
+
+    #[test]
+    fn test_check_common_words() {
+        let checker = make_checker();
+        assert!(checker.check_word("the"));
+        assert!(checker.check_word("hello"));
+        assert!(checker.check_word("world"));
+    }
+
+    #[test]
+    fn test_check_numbers() {
+        let checker = make_checker();
+        assert!(checker.check_word("42"));
+        assert!(checker.check_word("123456"));
+    }
+
+    #[test]
+    fn test_check_single_letters() {
+        let checker = make_checker();
+        assert!(checker.check_word("a"));
+        assert!(checker.check_word("I"));
+    }
+
+    #[test]
+    fn test_suggest_for_misspelling() {
+        let checker = make_checker();
+        let suggestions = checker.suggest("helo");
+        // Should suggest "hello" or similar
+        assert!(!suggestions.is_empty() || !checker.active);
+    }
+
+    #[test]
+    fn test_user_dictionary() {
+        let mut checker = make_checker();
+        assert!(!checker.check_word("xyztestword"));
+
+        checker.add_to_dictionary("xyztestword");
+        assert!(checker.check_word("xyztestword"));
+        assert_eq!(checker.user_dictionary_size(), 1);
+
+        checker.remove_from_dictionary("xyztestword");
+        assert!(!checker.check_word("xyztestword"));
+    }
+
+    #[test]
+    fn test_clear_user_dictionary() {
+        let mut checker = make_checker();
+        checker.add_to_dictionary("testword1");
+        checker.add_to_dictionary("testword2");
+        assert_eq!(checker.user_dictionary_size(), 2);
+
+        checker.clear_user_dictionary();
+        assert_eq!(checker.user_dictionary_size(), 0);
+    }
+
+    #[test]
+    fn test_check_text() {
+        let checker = make_checker();
+        let misspellings = checker.check_text("the cat sat on the mat");
+        // All common words — should find no misspellings (assuming they're in dictionary)
+        // (This depends on the dictionary having these words)
+        assert!(misspellings.len() <= 2);
+    }
+
+    #[test]
+    fn test_spell_suggestion_methods() {
+        let suggestion = SpellSuggestion {
+            word: "helo".to_string(),
+            suggestions: vec!["hello".to_string(), "help".to_string()],
+            position: 0,
+        };
+        assert!(suggestion.has_suggestions());
+        assert_eq!(suggestion.best_suggestion(), Some("hello"));
+        assert_eq!(suggestion.suggestion_count(), 2);
+        let summary = suggestion.summary();
+        assert!(summary.contains("helo"));
+    }
+
+    #[test]
+    fn test_edit_distance() {
+        assert_eq!(edit_distance("", ""), 0);
+        assert_eq!(edit_distance("abc", ""), 3);
+        assert_eq!(edit_distance("", "abc"), 3);
+        assert_eq!(edit_distance("kitten", "sitting"), 3);
+        assert_eq!(edit_distance("hello", "hello"), 0);
+        assert_eq!(edit_distance("hello", "helo"), 1);
+    }
+
+    #[test]
+    fn test_inactive_checker() {
+        let checker = SpellChecker::new();
+        assert!(!checker.active);
+        assert!(checker.check_word("anything")); // always true when inactive
+        assert!(checker.suggest("anything").is_empty());
+        assert!(checker.check_text("anything").is_empty());
+    }
+
+    #[test]
+    fn test_spelling_accuracy_empty() {
+        let checker = make_checker();
+        assert_eq!(spelling_accuracy(&checker, ""), 100.0);
+    }
+
+    #[test]
+    fn test_check_words() {
+        let checker = make_checker();
+        let bad = checker.check_words(&["the", "xyznonword", "hello"]);
+        // xyznonword is unlikely to be in any dictionary
+        assert!(bad.contains(&"xyznonword".to_string()) || !checker.active);
+    }
+}

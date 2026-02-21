@@ -312,3 +312,131 @@ impl PartOfSpeech {
         ]
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_thesaurus() -> Thesaurus {
+        let mut t = Thesaurus::new();
+        t.load_builtin();
+        t
+    }
+
+    #[test]
+    fn test_thesaurus_new() {
+        let t = Thesaurus::new();
+        assert!(!t.loaded);
+        assert_eq!(t.word_count(), 0);
+    }
+
+    #[test]
+    fn test_load_builtin() {
+        let t = make_thesaurus();
+        assert!(t.loaded);
+        assert!(t.word_count() >= 20);
+    }
+
+    #[test]
+    fn test_lookup() {
+        let t = make_thesaurus();
+        let entries = t.lookup("happy");
+        assert!(!entries.is_empty());
+        assert!(entries[0].synonyms.contains(&"joyful".to_string()));
+    }
+
+    #[test]
+    fn test_has_word() {
+        let t = make_thesaurus();
+        assert!(t.has_word("happy"));
+        assert!(t.has_word("HAPPY")); // case-insensitive
+        assert!(!t.has_word("xyznonword"));
+    }
+
+    #[test]
+    fn test_synonyms() {
+        let t = make_thesaurus();
+        let syns = t.synonyms("big");
+        assert!(syns.contains(&"large".to_string()));
+        assert!(syns.contains(&"huge".to_string()));
+    }
+
+    #[test]
+    fn test_synonyms_missing_word() {
+        let t = make_thesaurus();
+        let syns = t.synonyms("xyznonword");
+        assert!(syns.is_empty());
+    }
+
+    #[test]
+    fn test_contains() {
+        let t = make_thesaurus();
+        assert!(t.contains("walk"));
+        assert!(!t.contains("zzzzz"));
+    }
+
+    #[test]
+    fn test_all_words() {
+        let t = make_thesaurus();
+        let words = t.all_words();
+        assert!(words.len() >= 20);
+    }
+
+    #[test]
+    fn test_words_with_prefix() {
+        let t = make_thesaurus();
+        let words = t.words_with_prefix("ha");
+        assert!(words.iter().any(|w| w.as_str() == "happy"));
+    }
+
+    #[test]
+    fn test_random_synonym() {
+        let t = make_thesaurus();
+        let syn = t.random_synonym("good");
+        assert!(syn.is_some());
+    }
+
+    #[test]
+    fn test_random_synonym_missing() {
+        let t = make_thesaurus();
+        let syn = t.random_synonym("xyznonword");
+        assert!(syn.is_none());
+    }
+
+    #[test]
+    fn test_total_entries() {
+        let t = make_thesaurus();
+        assert!(t.total_entries() >= 20);
+    }
+
+    #[test]
+    fn test_thesaurus_entry_summary() {
+        let t = make_thesaurus();
+        let entries = t.lookup("walk");
+        assert!(!entries.is_empty());
+        let summary = entries[0].summary();
+        assert!(summary.contains("synonym"));
+    }
+
+    #[test]
+    fn test_thesaurus_entry_total_related() {
+        let t = make_thesaurus();
+        let entries = t.lookup("run");
+        assert!(!entries.is_empty());
+        assert!(entries[0].total_related() > 0);
+    }
+
+    #[test]
+    fn test_part_of_speech_display() {
+        assert_eq!(format!("{}", PartOfSpeech::Noun), "noun");
+        assert_eq!(format!("{}", PartOfSpeech::Verb), "verb");
+        assert_eq!(format!("{}", PartOfSpeech::Adjective), "adj.");
+        assert_eq!(format!("{}", PartOfSpeech::Adverb), "adv.");
+    }
+
+    #[test]
+    fn test_part_of_speech_all() {
+        let all = PartOfSpeech::all();
+        assert_eq!(all.len(), 5);
+    }
+}
