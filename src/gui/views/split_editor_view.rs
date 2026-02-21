@@ -12,14 +12,20 @@ pub fn view<'a>(
     secondary_content: &str,
     secondary_title: &str,
 ) -> Element<'a, Message> {
-    // Primary editor (left)
+    // Primary editor (left) - editable
+    let primary_words = primary_editor.document.word_count();
+    let primary_chars = primary_editor.document.char_count();
+    let primary_pages = primary_words as f64 / 250.0;
+
     let primary_header = container(
         row![
+            text("\u{270E}").size(12).color(Theme::TEXT_ACCENT),
+            Space::with_width(4),
             text(primary_title.to_string())
                 .size(13)
                 .color(Theme::TEXT_ACCENT),
             Space::with_width(Length::Fill),
-            text("Primary").size(10).color(Theme::TEXT_MUTED),
+            text("Editing").size(10).color(Theme::SUCCESS),
         ]
         .padding(Padding::from([4, 12]))
     )
@@ -30,11 +36,15 @@ pub fn view<'a>(
         .padding(Padding::from([12, 16]))
         .height(Length::Fill);
 
-    let primary_words = primary_editor.document.word_count();
+    let dirty_marker = if primary_editor.dirty { " \u{2022}" } else { "" };
     let primary_footer = container(
-        text(format!("{} words", primary_words))
-            .size(11)
-            .color(Theme::TEXT_MUTED),
+        row![
+            text(format!("{} words | {} chars | {:.1} pg{}", primary_words, primary_chars, primary_pages, dirty_marker))
+                .size(10)
+                .color(Theme::TEXT_MUTED),
+            Space::with_width(Length::Fill),
+            text("Ctrl+S: save").size(9).color(Theme::TEXT_MUTED),
+        ]
     )
     .padding(Padding::from([4, 12]));
 
@@ -44,17 +54,27 @@ pub fn view<'a>(
     .width(Length::FillPortion(1))
     .height(Length::Fill);
 
-    // Secondary (right) - read-only text display
+    // Secondary (right) - read-only reference
+    let secondary_words = secondary_content.split_whitespace().count();
+    let secondary_chars = secondary_content.len();
+    let secondary_paragraphs = if secondary_content.is_empty() {
+        0
+    } else {
+        secondary_content.split("\n\n").filter(|p| !p.trim().is_empty()).count()
+    };
+
     let secondary_header = container(
         row![
+            text("\u{1F4D6}").size(12),
+            Space::with_width(4),
             text(secondary_title.to_string())
                 .size(13)
                 .color(Theme::TEXT_SECONDARY),
             Space::with_width(Length::Fill),
-            text("Reference").size(10).color(Theme::TEXT_MUTED),
+            text("Read-only").size(10).color(Theme::TEXT_MUTED),
             Space::with_width(8),
             button(
-                text("Close").size(10).color(Theme::TEXT_MUTED),
+                text("\u{2715} Close").size(10).color(Theme::TEXT_MUTED),
             )
             .on_press(Message::CloseSplitEditor)
             .padding(Padding::from([2, 6])),
@@ -77,11 +97,13 @@ pub fn view<'a>(
     .width(Length::Fill)
     .height(Length::Fill);
 
-    let secondary_words = secondary_content.split_whitespace().count();
     let secondary_footer = container(
-        text(format!("{} words", secondary_words))
-            .size(11)
-            .color(Theme::TEXT_MUTED),
+        row![
+            text(format!("{} words | {} chars | {} para", secondary_words, secondary_chars, secondary_paragraphs))
+                .size(10)
+                .color(Theme::TEXT_MUTED),
+            Space::with_width(Length::Fill),
+        ]
     )
     .padding(Padding::from([4, 12]));
 
@@ -91,10 +113,12 @@ pub fn view<'a>(
     .width(Length::FillPortion(1))
     .height(Length::Fill);
 
-    // Divider
-    let divider = container(Space::with_width(2))
-        .width(Length::Fixed(2.0))
-        .height(Length::Fill);
+    // Visual divider between panels
+    let divider = container(
+        text("\u{2502}").size(14).color(Theme::BORDER)
+    )
+    .width(Length::Fixed(4.0))
+    .height(Length::Fill);
 
     container(
         row![primary_panel, divider, secondary_panel]

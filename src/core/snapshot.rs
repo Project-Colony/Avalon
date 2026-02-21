@@ -70,3 +70,57 @@ pub enum DiffChunk {
     Added(String),
     Removed(String),
 }
+
+/// Summary statistics for a diff
+pub struct DiffStats {
+    pub lines_added: usize,
+    pub lines_removed: usize,
+    pub lines_unchanged: usize,
+    pub words_added: i64,
+}
+
+impl DiffStats {
+    /// Compute stats from a list of diff chunks
+    pub fn from_chunks(chunks: &[DiffChunk]) -> Self {
+        let mut added = 0;
+        let mut removed = 0;
+        let mut unchanged = 0;
+        let mut words_added: i64 = 0;
+
+        for chunk in chunks {
+            match chunk {
+                DiffChunk::Equal(_) => unchanged += 1,
+                DiffChunk::Added(line) => {
+                    added += 1;
+                    words_added += line.split_whitespace().count() as i64;
+                }
+                DiffChunk::Removed(line) => {
+                    removed += 1;
+                    words_added -= line.split_whitespace().count() as i64;
+                }
+            }
+        }
+
+        Self {
+            lines_added: added,
+            lines_removed: removed,
+            lines_unchanged: unchanged,
+            words_added,
+        }
+    }
+
+    /// Get a short summary string
+    pub fn summary(&self) -> String {
+        let word_change = if self.words_added > 0 {
+            format!("+{} words", self.words_added)
+        } else if self.words_added < 0 {
+            format!("{} words", self.words_added)
+        } else {
+            "no word change".to_string()
+        };
+        format!(
+            "+{} / -{} lines ({}), {} unchanged",
+            self.lines_added, self.lines_removed, word_change, self.lines_unchanged
+        )
+    }
+}

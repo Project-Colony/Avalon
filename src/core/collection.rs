@@ -51,4 +51,48 @@ impl Collection {
     pub fn remove_item(&mut self, id: &Uuid) {
         self.item_ids.retain(|i| i != id);
     }
+
+    /// Check if this collection contains a specific item
+    pub fn contains(&self, id: &Uuid) -> bool {
+        self.item_ids.contains(id)
+    }
+
+    /// Get the item count
+    pub fn count(&self) -> usize {
+        self.item_ids.len()
+    }
+
+    /// Check if this is a search (smart) collection
+    pub fn is_smart(&self) -> bool {
+        matches!(self.kind, CollectionKind::Search { .. })
+    }
+
+    /// Get the search query if this is a smart collection
+    pub fn search_query(&self) -> Option<&str> {
+        match &self.kind {
+            CollectionKind::Search { query, .. } => Some(query.as_str()),
+            CollectionKind::Manual => None,
+        }
+    }
+
+    /// Clear all items from the collection
+    pub fn clear(&mut self) {
+        self.item_ids.clear();
+    }
+
+    /// Reorder: move an item to a new position
+    pub fn move_item(&mut self, from: usize, to: usize) {
+        if from < self.item_ids.len() && to < self.item_ids.len() {
+            let item = self.item_ids.remove(from);
+            self.item_ids.insert(to, item);
+        }
+    }
+
+    /// Get display info about collection kind
+    pub fn kind_label(&self) -> &str {
+        match &self.kind {
+            CollectionKind::Manual => "Manual",
+            CollectionKind::Search { .. } => "Smart",
+        }
+    }
 }

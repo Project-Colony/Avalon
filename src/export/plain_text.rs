@@ -1,11 +1,13 @@
 use anyhow::Result;
-use super::compiler::{CompileContent, CompileOptions};
+use super::compiler::{CompileContent, CompileOptions, SeparatorType};
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
     let mut output = String::new();
 
+    // Front matter / title page
     if options.include_front_matter && !options.title.is_empty() {
         let title = options.title.to_uppercase();
+        output.push('\n');
         output.push_str(&title);
         output.push('\n');
         output.push_str(&"=".repeat(title.len()));
@@ -17,22 +19,117 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
         }
 
         output.push('\n');
-        output.push_str(&"-".repeat(40));
+        output.push_str(&"\u{2500}".repeat(40));
         output.push_str("\n\n");
     }
 
-    for content in contents {
+    let mut prev_was_folder = false;
+
+    for (i, content) in contents.iter().enumerate() {
         if content.is_folder {
+            // Page break between top-level folders
+            if options.page_break_between_folders && content.depth == 1 && i > 0 {
+                output.push_str("\n\n");
+                output.push_str(&"\u{2500}".repeat(40));
+                output.push_str("\n\n");
+            }
+
+            // Folder headings with depth-based decoration
             output.push('\n');
-            output.push_str(&content.title.to_uppercase());
-            output.push('\n');
-            output.push_str(&"-".repeat(content.title.len()));
+            match content.depth {
+                0 | 1 => {
+                    let heading = content.title.to_uppercase();
+                    output.push_str(&heading);
+                    output.push('\n');
+                    output.push_str(&"=".repeat(heading.len()));
+                }
+                2 => {
+                    output.push_str(&content.title);
+                    output.push('\n');
+                    output.push_str(&"-".repeat(content.title.len()));
+                }
+                _ => {
+                    let indent = "  ".repeat(content.depth.saturating_sub(2));
+                    output.push_str(&format!("{}* {}", indent, content.title));
+                }
+            }
             output.push_str("\n\n");
+            prev_was_folder = true;
         } else if !content.text.is_empty() {
-            output.push_str(&content.text);
+            // Document separator between non-folder items
+            if i > 0 && !prev_was_folder {
+                match &options.separator {
+                    SeparatorType::EmptyLine => output.push('\n'),
+                    SeparatorType::SectionBreak => {
+                        output.push_str("\n        * * *\n\n");
+                    }
+                    SeparatorType::Custom(s) => {
+                        output.push_str(&format!("\n{}\n\n", s));
+                    }
+                    SeparatorType::PageBreak => {
+                        output.push_str("\n\n");
+                        output.push_str(&"\u{2500}".repeat(40));
+                        output.push_str("\n\n");
+                    }
+                    SeparatorType::None => {}
+                }
+            }
+
+            // Strip markdown formatting for clean plain text
+            let clean = strip_markdown(&content.text);
+            output.push_str(&clean);
             output.push_str("\n\n");
+            prev_was_folder = false;
         }
     }
 
     Ok(output.trim_end().to_string())
+}
+
+/// Strip basic markdown formatting to produce clean plain text
+fn strip_markdown(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+
+    for line in text.lines() {
+        let trimmed = line.trim();
+
+        // Convert headings to plain text
+        if trimmed.starts_with('#') {
+            let content = trimmed.trim_start_matches('#').trim();
+            result.push_str(content);
+            result.push('\n');
+            continue;
+        }
+
+        // Strip bold/italic/strikethrough markers
+        let mut cleaned = line.to_string();
+        cleaned = cleaned.replace("***", "");
+        cleaned = cleaned.replace("**", "");
+        cleaned = cleaned.replace("~~", "");
+
+        // Remove remaining single emphasis markers
+        let chars: Vec<char> = cleaned.chars().collect();
+        let mut out = String::with_capacity(cleaned.len());
+        for &ch in &chars {
+            if ch != '*' && ch != '_' {
+                out.push(ch);
+            }
+        }
+
+        // Convert blockquotes to indented quotes
+        let out = if out.trim_start().starts_with("> ") {
+            out.replacen("> ", "  ", 1)
+        } else {
+            out
+        };
+
+        result.push_str(&out);
+        result.push('\n');
+    }
+
+    if result.ends_with('\n') {
+        result.pop();
+    }
+
+    result
 }

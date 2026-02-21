@@ -76,6 +76,85 @@ impl EditorState {
         self.dirty = false;
     }
 
+    /// Get the current line number (1-indexed)
+    pub fn current_line(&self) -> usize {
+        let text = self.text();
+        let pos = self.cursor.min(text.len());
+        text[..pos].matches('\n').count() + 1
+    }
+
+    /// Get the current column number (1-indexed)
+    pub fn current_column(&self) -> usize {
+        let text = self.text();
+        let pos = self.cursor.min(text.len());
+        let last_newline = text[..pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        pos - last_newline + 1
+    }
+
+    /// Get the total number of lines in the document
+    pub fn line_count(&self) -> usize {
+        self.text().matches('\n').count() + 1
+    }
+
+    /// Check whether text is currently selected
+    pub fn has_selection(&self) -> bool {
+        self.selection_start.is_some()
+    }
+
+    /// Get the selected text range, if any
+    pub fn selection_range(&self) -> Option<(usize, usize)> {
+        self.selection_start.map(|start| {
+            let end = self.cursor;
+            if start <= end { (start, end) } else { (end, start) }
+        })
+    }
+
+    /// Get the currently selected text, if any
+    pub fn selected_text(&self) -> Option<String> {
+        self.selection_range().map(|(start, end)| {
+            let text = self.text();
+            text.get(start..end).unwrap_or("").to_string()
+        })
+    }
+
+    /// Get the word at the current cursor position
+    pub fn word_at_cursor(&self) -> Option<String> {
+        let text = self.text();
+        let pos = self.cursor.min(text.len());
+        if text.is_empty() || pos == 0 {
+            return None;
+        }
+        let bytes = text.as_bytes();
+        let mut start = pos;
+        while start > 0 && bytes.get(start - 1).map_or(false, |b| b.is_ascii_alphanumeric() || *b == b'_') {
+            start -= 1;
+        }
+        let mut end = pos;
+        while end < text.len() && bytes.get(end).map_or(false, |b| b.is_ascii_alphanumeric() || *b == b'_') {
+            end += 1;
+        }
+        if start < end {
+            Some(text[start..end].to_string())
+        } else {
+            None
+        }
+    }
+
+    /// Check if the undo stack has entries
+    pub fn can_undo(&self) -> bool {
+        !self.undo_stack.is_empty()
+    }
+
+    /// Check if the redo stack has entries
+    pub fn can_redo(&self) -> bool {
+        !self.redo_stack.is_empty()
+    }
+
+    /// Get the undo stack depth
+    pub fn undo_depth(&self) -> usize {
+        self.undo_stack.len()
+    }
+
     /// Push current state onto undo stack
     pub fn push_undo(&mut self) {
         self.undo_stack.push(UndoEntry {

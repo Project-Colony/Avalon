@@ -8,10 +8,13 @@ use crate::gui::theme::Theme;
 
 /// Render the bookmarks panel (bottom panel)
 pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
+    let count = bookmarks.bookmarks.len();
     let header = row![
         text("BOOKMARKS").size(11).color(Theme::TEXT_SECONDARY),
+        Space::with_width(8),
+        text("\u{2605}").size(12).color(Theme::WARNING),
         Space::with_width(Length::Fill),
-        text(format!("{} bookmark(s)", bookmarks.bookmarks.len()))
+        text(format!("{} bookmark{}", count, if count == 1 { "" } else { "s" }))
             .size(10)
             .color(Theme::TEXT_MUTED),
     ];
@@ -20,27 +23,52 @@ pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
 
     if bookmarks.bookmarks.is_empty() {
         list = list.push(
-            text("No bookmarks. Use the star icon in the inspector to bookmark items.")
-                .size(11)
-                .color(Theme::TEXT_MUTED),
+            container(
+                column![
+                    text("No bookmarks yet.").size(12).color(Theme::TEXT_MUTED),
+                    Space::with_height(4),
+                    text("Use the \u{2605} star icon in the inspector to bookmark documents for quick access.")
+                        .size(10)
+                        .color(Theme::TEXT_MUTED),
+                ]
+            ).padding(Padding::from([8, 0]))
         );
     }
 
-    for bm in &bookmarks.bookmarks {
+    for (i, bm) in bookmarks.bookmarks.iter().enumerate() {
         let item_id = bm.item_id;
+
+        // Alternate row numbering for visual clarity
+        let index_str = format!("{}.", i + 1);
+        let age = chrono::Utc::now().signed_duration_since(bm.created_at);
+        let age_str = if age.num_days() > 0 {
+            format!("{}d ago", age.num_days())
+        } else if age.num_hours() > 0 {
+            format!("{}h ago", age.num_hours())
+        } else {
+            "just now".to_string()
+        };
+
         let bm_row = row![
+            text(index_str).size(10).color(Theme::TEXT_MUTED).width(Length::Fixed(20.0)),
+            text("\u{2605}").size(10).color(Theme::WARNING),
+            Space::with_width(4),
             button(
                 text(bm.name.clone()).size(12).color(Theme::TEXT_PRIMARY),
             )
             .on_press(Message::SelectBinderItem(item_id))
             .padding(Padding::from([2, 6])),
             Space::with_width(Length::Fill),
-            text(bm.created_at.format("%Y-%m-%d").to_string())
-                .size(10)
+            text(age_str)
+                .size(9)
+                .color(Theme::TEXT_MUTED),
+            Space::with_width(4),
+            text(bm.created_at.format("%m-%d").to_string())
+                .size(9)
                 .color(Theme::TEXT_MUTED),
             Space::with_width(4),
             button(
-                text("x").size(10).color(Theme::ERROR),
+                text("\u{2715}").size(10).color(Theme::ERROR),
             )
             .on_press(Message::ToggleBookmark(item_id))
             .padding(Padding::from([1, 4])),
@@ -50,10 +78,16 @@ pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
         list = list.push(bm_row);
     }
 
+    let hint = text("Ctrl+D: bookmark selected item")
+        .size(9)
+        .color(Theme::TEXT_MUTED);
+
     let content = column![
         header,
         Space::with_height(4),
         scrollable(list).height(Length::Fixed(120.0)),
+        Space::with_height(2),
+        hint,
     ]
     .padding(Padding::from([8, 12]));
 
