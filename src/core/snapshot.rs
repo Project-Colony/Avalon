@@ -123,4 +123,68 @@ impl DiffStats {
             self.lines_added, self.lines_removed, word_change, self.lines_unchanged
         )
     }
+
+    /// Total lines changed (added + removed)
+    pub fn total_changes(&self) -> usize {
+        self.lines_added + self.lines_removed
+    }
+
+    /// Total lines in diff
+    pub fn total_lines(&self) -> usize {
+        self.lines_added + self.lines_removed + self.lines_unchanged
+    }
+
+    /// Percentage of lines changed
+    pub fn change_percentage(&self) -> f64 {
+        let total = self.total_lines();
+        if total == 0 {
+            return 0.0;
+        }
+        self.total_changes() as f64 / total as f64 * 100.0
+    }
+
+    /// Check if there are any changes
+    pub fn has_changes(&self) -> bool {
+        self.lines_added > 0 || self.lines_removed > 0
+    }
+}
+
+impl Snapshot {
+    /// Age as human-readable string
+    pub fn age_string(&self) -> String {
+        let duration = Utc::now().signed_duration_since(self.created_at);
+        let hours = duration.num_hours();
+        if hours < 1 {
+            format!("{}m ago", duration.num_minutes().max(1))
+        } else if hours < 24 {
+            format!("{}h ago", hours)
+        } else {
+            let days = duration.num_days();
+            if days < 7 {
+                format!("{}d ago", days)
+            } else {
+                format!("{}w ago", days / 7)
+            }
+        }
+    }
+
+    /// Character count at snapshot time
+    pub fn char_count(&self) -> usize {
+        self.content.len()
+    }
+
+    /// Line count at snapshot time
+    pub fn line_count(&self) -> usize {
+        if self.content.is_empty() {
+            0
+        } else {
+            self.content.lines().count()
+        }
+    }
+
+    /// Compute diff stats with current content
+    pub fn diff_stats_with(&self, current: &str) -> DiffStats {
+        let diff = self.diff_with(current);
+        DiffStats::from_chunks(&diff)
+    }
 }

@@ -95,4 +95,57 @@ impl Collection {
             CollectionKind::Search { .. } => "Smart",
         }
     }
+
+    /// Rename the collection
+    pub fn rename(&mut self, new_name: &str) {
+        self.name = new_name.to_string();
+    }
+
+    /// Check if the collection is empty
+    pub fn is_empty(&self) -> bool {
+        self.item_ids.is_empty()
+    }
+
+    /// Get item IDs as a slice
+    pub fn items(&self) -> &[Uuid] {
+        &self.item_ids
+    }
+
+    /// Add multiple items at once
+    pub fn add_items(&mut self, ids: &[Uuid]) {
+        for id in ids {
+            self.add_item(*id);
+        }
+    }
+
+    /// Get the search options if this is a smart collection
+    pub fn search_options(&self) -> Option<(&str, bool, bool)> {
+        match &self.kind {
+            CollectionKind::Search {
+                query,
+                case_sensitive,
+                whole_word,
+            } => Some((query.as_str(), *case_sensitive, *whole_word)),
+            CollectionKind::Manual => None,
+        }
+    }
+
+    /// Sort items by a custom comparator
+    pub fn sort_by<F>(&mut self, compare: F)
+    where
+        F: FnMut(&Uuid, &Uuid) -> std::cmp::Ordering,
+    {
+        self.item_ids.sort_by(compare);
+    }
+
+    /// Get item at a specific index
+    pub fn get(&self, index: usize) -> Option<&Uuid> {
+        self.item_ids.get(index)
+    }
+
+    /// Summary string for display
+    pub fn summary(&self) -> String {
+        let kind = self.kind_label();
+        format!("{} ({}, {} items)", self.name, kind, self.count())
+    }
 }
