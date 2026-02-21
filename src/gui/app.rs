@@ -126,6 +126,7 @@ pub struct ScrineverApp {
     pub doc_replace_text: String,
     pub doc_find_case_sensitive: bool,
     pub doc_find_match_count: usize,
+    pub doc_find_current_match: usize,
 
     // === Quick reference ===
     pub quick_ref_item: Option<Uuid>,
@@ -466,6 +467,7 @@ impl ScrineverApp {
             doc_replace_text: String::new(),
             doc_find_case_sensitive: false,
             doc_find_match_count: 0,
+            doc_find_current_match: 0,
             quick_ref_item: None,
             script_mode: false,
             current_script_element: None,
@@ -2784,6 +2786,7 @@ impl ScrineverApp {
                     replace_text: self.doc_replace_text.clone(),
                     match_count: self.doc_find_match_count,
                     case_sensitive: self.doc_find_case_sensitive,
+                    current_match: self.doc_find_current_match,
                 };
                 Some(views::find_replace_panel::view(&data))
             }

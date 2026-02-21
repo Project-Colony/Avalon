@@ -10,6 +10,7 @@ pub struct FindReplaceData {
     pub replace_text: String,
     pub match_count: usize,
     pub case_sensitive: bool,
+    pub current_match: usize,
 }
 
 /// Render the find/replace panel within current document
@@ -37,9 +38,18 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
         .padding(4)
         .width(Length::FillPortion(3));
 
-    // Match status with color-coded feedback
+    // Match status with color-coded feedback and position indicator
     let (match_icon, match_info, match_color) = if data.match_count > 0 {
-        ("\u{2713}", format!("{} match{}", data.match_count, if data.match_count == 1 { "" } else { "es" }), Theme::SUCCESS)
+        let position_text = if data.match_count == 1 {
+            "1 match".to_string()
+        } else {
+            format!(
+                "{} of {} matches",
+                (data.current_match + 1).min(data.match_count),
+                data.match_count
+            )
+        };
+        ("\u{2713}", position_text, Theme::SUCCESS)
     } else if !data.find_text.is_empty() {
         ("\u{2717}", "No matches found".to_string(), Theme::WARNING)
     } else {
@@ -76,16 +86,22 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
     ]
     .align_y(iced::Alignment::Center);
 
+    let case_label = if data.case_sensitive {
+        "Case: ON"
+    } else {
+        "Case: off"
+    };
+
     let info = row![
         text(match_info)
             .size(10)
             .color(match_color),
         Space::with_width(12),
         toggler(data.case_sensitive)
-            .label("Aa")
+            .label(case_label)
             .on_toggle(|_| Message::DocFindToggleCase),
         Space::with_width(Length::Fill),
-        text("Enter: next | Shift+Enter: prev")
+        text("Enter: next | Shift+Enter: prev | Ctrl+G: go to line")
             .size(9)
             .color(Theme::TEXT_MUTED),
     ];

@@ -2,7 +2,7 @@ use std::path::Path;
 use anyhow::Result;
 use printpdf::*;
 
-use super::compiler::{CompileContent, CompileOptions};
+use super::compiler::{CompileContent, CompileOptions, SeparatorType};
 
 pub fn save_pdf(contents: &[CompileContent], options: &CompileOptions, path: &Path) -> Result<()> {
     let (doc, page1, layer1) = PdfDocument::new(
@@ -133,4 +133,59 @@ pub fn save_pdf(contents: &[CompileContent], options: &CompileOptions, path: &Pa
 
     doc.save(&mut std::io::BufWriter::new(std::fs::File::create(path)?))?;
     Ok(())
+}
+
+/// Add a page number footer to the current layer
+fn add_page_number(layer: &PdfLayerReference, page_num: usize, font: &IndirectFontRef) {
+    layer.use_text(
+        &format!("- {} -", page_num),
+        10.0,
+        Mm(100.0),
+        Mm(15.0),
+        font,
+    );
+}
+
+/// Strip basic markdown formatting from text for PDF rendering
+fn strip_markdown(text: &str) -> String {
+    let mut result = text.to_string();
+    // Remove bold markers
+    result = result.replace("**", "");
+    // Remove italic markers (single *)
+    result = result.replace('*', "");
+    // Remove strikethrough
+    result = result.replace("~~", "");
+    // Remove heading markers
+    while result.starts_with('#') {
+        result = result.trim_start_matches('#').trim_start().to_string();
+    }
+    // Remove blockquote markers
+    if result.starts_with("> ") {
+        result = result[2..].to_string();
+    }
+    result
+}
+
+/// Estimate the number of pages for a given set of content
+pub fn estimate_pages(contents: &[CompileContent], options: &CompileOptions) -> usize {
+    let chars_per_line = (160.0 / (options.font_size * 0.2)) as usize;
+    let lines_per_page = (240.0 / (options.font_size * 0.5)) as usize;
+    let mut total_lines = 0usize;
+
+    for content in contents {
+        if content.is_folder {
+            total_lines += 3; // heading + spacing
+        } else {
+            for line in content.text.lines() {
+                if line.is_empty() {
+                    total_lines += 1;
+                } else {
+                    total_lines += (line.len() / chars_per_line).max(1);
+                }
+            }
+            total_lines += 1; // spacing between docs
+        }
+    }
+
+    (total_lines / lines_per_page).max(1)
 }

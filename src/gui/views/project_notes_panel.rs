@@ -9,13 +9,25 @@ pub fn view(notes: &str) -> Element<'static, Message> {
     let word_count = notes.split_whitespace().count();
     let char_count = notes.len();
     let line_count = if notes.is_empty() { 0 } else { notes.lines().count() };
+    let sentence_count = notes
+        .chars()
+        .filter(|c| *c == '.' || *c == '!' || *c == '?')
+        .count();
+    let paragraph_count = if notes.is_empty() {
+        0
+    } else {
+        notes.split("\n\n").filter(|p| !p.trim().is_empty()).count()
+    };
 
     let header = row![
         text("PROJECT NOTES").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(Length::Fill),
-        text(format!("{} words | {} chars | {} lines", word_count, char_count, line_count))
-            .size(10)
-            .color(Theme::TEXT_MUTED),
+        text(format!(
+            "{} words | {} chars | {} lines | {} sentences | {} para",
+            word_count, char_count, line_count, sentence_count, paragraph_count
+        ))
+        .size(10)
+        .color(Theme::TEXT_MUTED),
     ];
 
     let notes_input = text_input("Write project-level notes, ideas, reminders...", notes)
@@ -24,12 +36,21 @@ pub fn view(notes: &str) -> Element<'static, Message> {
         .padding(8)
         .width(Length::Fill);
 
+    // Contextual hints based on content
+    let hint_text = if notes.is_empty() {
+        "Ideas: character bios, world-building notes, research links, plot outlines, revision notes"
+    } else if word_count < 10 {
+        "Keep adding notes — they're saved with the project automatically"
+    } else {
+        "Tip: Use this pad for quick notes. For longer notes, use Research folder in the binder."
+    };
+
     let hint = row![
-        text("Tip: Use this scratch pad for project-wide notes, character ideas, research links, and reminders.")
+        text(hint_text)
             .size(9)
             .color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
-        text("Saved with project")
+        text("\u{1F4BE} Auto-saved with project")
             .size(9)
             .color(Theme::TEXT_MUTED),
     ];

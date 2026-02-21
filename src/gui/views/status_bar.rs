@@ -5,6 +5,17 @@ use crate::core::stats::Statistics;
 use crate::gui::app::Message;
 use crate::gui::theme::Theme;
 
+/// View mode label for the status bar
+pub fn view_mode_label(mode: &str) -> &str {
+    match mode {
+        "editor" => "Editor",
+        "corkboard" => "Corkboard",
+        "outliner" => "Outliner",
+        "scrivenings" => "Scrivenings",
+        _ => mode,
+    }
+}
+
 /// Render the status bar at the bottom of the application
 pub fn view(
     stats: &Statistics,
@@ -19,14 +30,25 @@ pub fn view(
 
     let progress = stats.progress_string(target_words);
 
-    // Reading time estimate
+    // Reading time estimate (250 wpm average)
     let reading_min = stats.word_count as f64 / 250.0;
+    let reading_display = if reading_min < 1.0 {
+        "<1m read".to_string()
+    } else if reading_min < 60.0 {
+        format!("~{:.0}m read", reading_min)
+    } else {
+        format!("~{:.1}h read", reading_min / 60.0)
+    };
 
-    // Compact stats
+    // Compact stats with formatting
     let stats_text = format!(
-        "W:{} | Ch:{} | S:{} | P:{} | Pg:{:.1} | ~{:.0}m",
-        stats.word_count, stats.char_count, stats.sentence_count,
-        stats.paragraph_count, stats.page_count, reading_min
+        "W:{} | Ch:{} | S:{} | P:{} | Pg:{:.1} | {}",
+        format_stat(stats.word_count),
+        format_stat(stats.char_count),
+        format_stat(stats.sentence_count),
+        stats.paragraph_count,
+        stats.page_count,
+        reading_display
     );
 
     // Session indicator
@@ -46,16 +68,37 @@ pub fn view(
         if target > 0 {
             let pct = (stats.word_count as f64 / target as f64 * 100.0).min(999.9);
             let remaining = target.saturating_sub(stats.word_count);
-            let color = if pct >= 100.0 { Theme::SUCCESS }
-                else if pct >= 75.0 { Theme::TEXT_ACCENT }
-                else if pct >= 50.0 { Theme::WARNING }
-                else { Theme::TEXT_SECONDARY };
+            let color = if pct >= 100.0 {
+                Theme::SUCCESS
+            } else if pct >= 75.0 {
+                Theme::TEXT_ACCENT
+            } else if pct >= 50.0 {
+                Theme::WARNING
+            } else {
+                Theme::TEXT_SECONDARY
+            };
+
+            // Mini progress bar
+            let bar_width: usize = 10;
+            let filled = ((pct / 100.0) * bar_width as f64) as usize;
+            let empty = bar_width.saturating_sub(filled);
+            let bar = format!(
+                "{}{}",
+                "\u{2588}".repeat(filled),
+                "\u{2591}".repeat(empty)
+            );
+
             row![
                 Space::with_width(8),
+                text(bar).size(8).color(color),
+                Space::with_width(4),
                 text(format!("{:.0}%", pct)).size(10).color(color),
                 Space::with_width(4),
-                text(format!("({} left)", remaining)).size(9).color(Theme::TEXT_MUTED),
-            ].into()
+                text(format!("({} left)", format_stat(remaining)))
+                    .size(9)
+                    .color(Theme::TEXT_MUTED),
+            ]
+            .into()
         } else {
             Space::with_width(0).into()
         }
@@ -64,7 +107,11 @@ pub fn view(
     };
 
     // Documents count
-    let docs_text = format!("{}doc{}", stats.document_count, if stats.document_count == 1 { "" } else { "s" });
+    let docs_text = format!(
+        "{}doc{}",
+        stats.document_count,
+        if stats.document_count == 1 { "" } else { "s" }
+    );
 
     let content = row![
         text(project_info).size(11).color(dirty_color),
@@ -84,4 +131,15 @@ pub fn view(
     container(content)
         .width(Length::Fill)
         .into()
+}
+
+/// Format a number with comma separators for large values
+fn format_stat(n: usize) -> String {
+    if n < 1000 {
+        n.to_string()
+    } else if n < 1_000_000 {
+        format!("{:.1}k", n as f64 / 1000.0)
+    } else {
+        format!("{:.1}M", n as f64 / 1_000_000.0)
+    }
 }

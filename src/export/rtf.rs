@@ -1,5 +1,5 @@
 use anyhow::Result;
-use super::compiler::{CompileContent, CompileOptions};
+use super::compiler::{CompileContent, CompileOptions, SeparatorType};
 
 /// Compile to RTF (Rich Text Format)
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
@@ -15,8 +15,8 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
     rtf.push_str("{\\f2\\fmodern\\fcharset0 Courier New;}\n");
     rtf.push_str("}\n");
 
-    // Color table
-    rtf.push_str("{\\colortbl;\\red0\\green0\\blue0;\\red128\\green128\\blue128;}\n");
+    // Color table (black, gray, red for annotations, blue for links)
+    rtf.push_str("{\\colortbl;\\red0\\green0\\blue0;\\red128\\green128\\blue128;\\red200\\green50\\blue50;\\red50\\green50\\blue200;}\n");
 
     // Default font size (in half-points)
     let fs = (options.font_size * 2.0) as u32;
@@ -40,20 +40,34 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
         rtf.push_str("\\page\n");
     }
 
+    let mut prev_was_text = false;
+
     for content in contents {
         if content.is_folder {
+            // Page break before top-level folders
+            if content.depth == 0 && prev_was_text && options.page_break_between_folders {
+                rtf.push_str("\\page\n");
+            }
+
             // Heading
             let heading_fs = match content.depth {
                 0 => (fs as f32 * 1.5) as u32,
                 1 => (fs as f32 * 1.3) as u32,
-                _ => (fs as f32 * 1.1) as u32,
+                2 => (fs as f32 * 1.1) as u32,
+                _ => fs,
             };
             rtf.push_str(&format!(
                 "\\pard\\sb240\\sa120\\fs{} \\b {}\\b0\\par\n",
                 heading_fs,
                 rtf_escape(&content.title)
             ));
+            prev_was_text = false;
         } else {
+            // Separator between consecutive text docs
+            if prev_was_text {
+                rtf.push_str(&separator_rtf(&options.separator));
+            }
+
             // Body text — split into paragraphs
             for paragraph in content.text.split("\n\n") {
                 let trimmed = paragraph.trim();
@@ -62,15 +76,57 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                     continue;
                 }
 
+                // Handle blockquotes
+                if trimmed.starts_with("> ") {
+                    let quote_text = convert_basic_markdown(&trimmed[2..]);
+                    rtf.push_str(&format!(
+                        "\\pard\\li720\\ri720\\sa60\\fs{} \\i {}\\i0\\par\n",
+                        fs, quote_text
+                    ));
+                    continue;
+                }
+
+                // Handle heading lines within markdown
+                if trimmed.starts_with('#') {
+                    let level = trimmed.chars().take_while(|c| *c == '#').count();
+                    let heading_text = trimmed[level..].trim();
+                    let h_fs = match level {
+                        1 => (fs as f32 * 1.5) as u32,
+                        2 => (fs as f32 * 1.3) as u32,
+                        _ => (fs as f32 * 1.1) as u32,
+                    };
+                    rtf.push_str(&format!(
+                        "\\pard\\sb120\\sa60\\fs{} \\b {}\\b0\\par\n",
+                        h_fs,
+                        rtf_escape(heading_text)
+                    ));
+                    continue;
+                }
+
                 // Handle basic markdown inline formatting
                 let text = convert_basic_markdown(trimmed);
                 rtf.push_str(&format!("\\pard\\fi360\\sa60\\fs{} {}\\par\n", fs, text));
             }
+            prev_was_text = true;
         }
     }
 
     rtf.push_str("}\n");
     Ok(rtf)
+}
+
+fn separator_rtf(sep: &SeparatorType) -> String {
+    match sep {
+        SeparatorType::EmptyLine => "\\par\\par\n".to_string(),
+        SeparatorType::PageBreak => "\\page\n".to_string(),
+        SeparatorType::SectionBreak => {
+            "\\pard\\qc\\sa120\\sb120 * * *\\par\n".to_string()
+        }
+        SeparatorType::Custom(s) => {
+            format!("\\pard\\qc\\sa120\\sb120 {}\\par\n", rtf_escape(s))
+        }
+        SeparatorType::None => String::new(),
+    }
 }
 
 /// Escape special RTF characters

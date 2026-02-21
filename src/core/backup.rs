@@ -123,8 +123,10 @@ impl BackupEntry {
             format!("{} B", self.size_bytes)
         } else if self.size_bytes < 1024 * 1024 {
             format!("{:.1} KB", self.size_bytes as f64 / 1024.0)
-        } else {
+        } else if self.size_bytes < 1024 * 1024 * 1024 {
             format!("{:.1} MB", self.size_bytes as f64 / (1024.0 * 1024.0))
+        } else {
+            format!("{:.2} GB", self.size_bytes as f64 / (1024.0 * 1024.0 * 1024.0))
         }
     }
 
@@ -143,5 +145,73 @@ impl BackupEntry {
         } else {
             self.timestamp.clone()
         }
+    }
+
+    /// Parse the timestamp into a chrono NaiveDateTime
+    pub fn parsed_timestamp(&self) -> Option<chrono::NaiveDateTime> {
+        if self.timestamp.len() >= 15 {
+            let date = chrono::NaiveDate::from_ymd_opt(
+                self.timestamp[0..4].parse().ok()?,
+                self.timestamp[4..6].parse().ok()?,
+                self.timestamp[6..8].parse().ok()?,
+            )?;
+            let time = chrono::NaiveTime::from_hms_opt(
+                self.timestamp[9..11].parse().ok()?,
+                self.timestamp[11..13].parse().ok()?,
+                self.timestamp[13..15].parse().ok()?,
+            )?;
+            Some(chrono::NaiveDateTime::new(date, time))
+        } else {
+            None
+        }
+    }
+
+    /// Age as human-readable string
+    pub fn age_string(&self) -> String {
+        if let Some(ts) = self.parsed_timestamp() {
+            let now = chrono::Utc::now().naive_utc();
+            let duration = now.signed_duration_since(ts);
+            let hours = duration.num_hours();
+            if hours < 1 {
+                format!("{}m ago", duration.num_minutes().max(1))
+            } else if hours < 24 {
+                format!("{}h ago", hours)
+            } else {
+                let days = duration.num_days();
+                if days < 7 {
+                    format!("{}d ago", days)
+                } else {
+                    format!("{}w ago", days / 7)
+                }
+            }
+        } else {
+            String::new()
+        }
+    }
+
+    /// Check if the backup file exists on disk
+    pub fn exists(&self) -> bool {
+        self.path.exists()
+    }
+}
+
+impl BackupManager {
+    /// Delete a specific backup
+    pub fn delete_backup(backup_path: &Path) -> Result<()> {
+        fs::remove_file(backup_path)
+            .context("Failed to delete backup")?;
+        Ok(())
+    }
+
+    /// Get total size of all backups for a project
+    pub fn total_backup_size(project_name: &str) -> Result<u64> {
+        let backups = Self::list_backups(project_name)?;
+        Ok(backups.iter().map(|b| b.size_bytes).sum())
+    }
+
+    /// Get the number of backups for a project
+    pub fn backup_count(project_name: &str) -> Result<usize> {
+        let backups = Self::list_backups(project_name)?;
+        Ok(backups.len())
     }
 }
