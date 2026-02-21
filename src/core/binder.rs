@@ -528,6 +528,316 @@ impl BinderItemKind {
     }
 }
 
+impl Binder {
+    /// Move an item from one location to a different parent (reparenting).
+    /// Returns true if the move was successful.
+    pub fn reparent_item(&mut self, item_id: &Uuid, new_parent_id: &Uuid, position: usize) -> bool {
+        // Don't reparent to self
+        if item_id == new_parent_id {
+            return false;
+        }
+        // Don't reparent a folder into one of its own descendants
+        if let Some(item) = self.find_item(item_id) {
+            if item.find(new_parent_id).is_some() {
+                return false; // Would create cycle
+            }
+        }
+
+        // Remove the item from its current location
+        let removed = self.draft.remove_child(item_id)
+            .or_else(|| self.research.remove_child(item_id));
+
+        if let Some(item) = removed {
+            // Insert into new parent
+            if let Some(parent) = self.find_item_mut(new_parent_id) {
+                let pos = position.min(parent.children.len());
+                parent.children.insert(pos, item);
+                parent.modified_at = Utc::now();
+                return true;
+            }
+            // If we couldn't find the new parent, put it back in draft
+            self.draft.children.push(item);
+        }
+
+        false
+    }
+
+    /// Move an item to a specific position within its current parent.
+    /// position is the index within the parent's children list.
+    pub fn move_item_to_position(&mut self, item_id: &Uuid, position: usize) -> bool {
+        if self.draft.move_child_to_position(item_id, position) { return true; }
+        if self.research.move_child_to_position(item_id, position) { return true; }
+        self.trash.move_child_to_position(item_id, position)
+    }
+
+    /// Merge multiple items into a single document.
+    /// Items are merged in order, separated by the given separator.
+    pub fn merge_items(&mut self, item_ids: &[Uuid], separator: &str) -> Option<Uuid> {
+        if item_ids.len() < 2 {
+            return None;
+        }
+
+        // Collect content from items
+        let mut merged_title = String::new();
+        let mut merged_content = String::new();
+
+        for (i, id) in item_ids.iter().enumerate() {
+            if let Some(item) = self.find_item(id) {
+                if i == 0 {
+                    merged_title = format!("{} (Merged)", item.title);
+                }
+                if let Some(ref doc) = item.document {
+                    if !merged_content.is_empty() {
+                        merged_content.push_str(separator);
+                    }
+                    merged_content.push_str(&doc.content);
+                }
+            }
+        }
+
+        if merged_content.is_empty() {
+            return None;
+        }
+
+        // Create the merged item
+        let mut merged = BinderItem::new_text(&merged_title);
+        if let Some(ref mut doc) = merged.document {
+            doc.content = merged_content;
+        }
+        let merged_id = merged.id;
+
+        // Add the merged item at the first item's location
+        self.draft.add_child(merged);
+
+        // Remove the original items
+        for id in item_ids {
+            self.draft.remove_child(id);
+        }
+
+        Some(merged_id)
+    }
+
+    /// Split a document into multiple documents at separator points.
+    /// Returns the IDs of the new documents.
+    pub fn split_item(&mut self, item_id: &Uuid, separator: &str) -> Vec<Uuid> {
+        let mut new_ids = Vec::new();
+        let (title, sections) = {
+            if let Some(item) = self.find_item(item_id) {
+                if let Some(ref doc) = item.document {
+                    let sections: Vec<String> = doc.content
+                        .split(separator)
+                        .filter(|s| !s.trim().is_empty())
+                        .map(|s| s.trim().to_string())
+                        .collect();
+                    (item.title.clone(), sections)
+                } else {
+                    return new_ids;
+                }
+            } else {
+                return new_ids;
+            }
+        };
+
+        if sections.len() < 2 {
+            return new_ids;
+        }
+
+        for (i, section) in sections.iter().enumerate() {
+            let mut new_item = BinderItem::new_text(&format!("{} - Part {}", title, i + 1));
+            if let Some(ref mut doc) = new_item.document {
+                doc.content = section.clone();
+            }
+            new_ids.push(new_item.id);
+            self.draft.add_child(new_item);
+        }
+
+        // Remove original
+        self.draft.remove_child(item_id);
+
+        new_ids
+    }
+
+    /// Flatten a folder: move all its children up to the parent level and remove the folder.
+    pub fn flatten_folder(&mut self, folder_id: &Uuid) -> bool {
+        // Extract children from the folder
+        let children = {
+            if let Some(item) = self.find_item(folder_id) {
+                if item.kind != BinderItemKind::Folder || item.children.is_empty() {
+                    return false;
+                }
+                item.children.clone()
+            } else {
+                return false;
+            }
+        };
+
+        // Find where this folder is and insert children there
+        if self.draft.flatten_child(folder_id, &children) { return true; }
+        if self.research.flatten_child(folder_id, &children) { return true; }
+        false
+    }
+
+    /// Group consecutive items into a new folder.
+    /// The items must be siblings (direct children of the same parent).
+    pub fn group_items_into_folder(&mut self, item_ids: &[Uuid], folder_title: &str) -> Option<Uuid> {
+        if item_ids.is_empty() {
+            return None;
+        }
+
+        // Try in draft first
+        if let Some(id) = self.draft.group_children(item_ids, folder_title) {
+            return Some(id);
+        }
+        // Try in research
+        if let Some(id) = self.research.group_children(item_ids, folder_title) {
+            return Some(id);
+        }
+        None
+    }
+}
+
+impl BinderItem {
+    /// Move a child to a specific position within this item's children
+    pub fn move_child_to_position(&mut self, id: &Uuid, position: usize) -> bool {
+        if let Some(pos) = self.children.iter().position(|c| &c.id == id) {
+            let target = position.min(self.children.len() - 1);
+            if pos != target {
+                let item = self.children.remove(pos);
+                self.children.insert(target, item);
+                return true;
+            }
+            return false;
+        }
+        for child in &mut self.children {
+            if child.move_child_to_position(id, position) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Flatten a child folder: replace it with its children
+    fn flatten_child(&mut self, folder_id: &Uuid, children: &[BinderItem]) -> bool {
+        if let Some(pos) = self.children.iter().position(|c| &c.id == folder_id) {
+            self.children.remove(pos);
+            for (i, child) in children.iter().enumerate() {
+                self.children.insert(pos + i, child.clone());
+            }
+            return true;
+        }
+        for child in &mut self.children {
+            if child.flatten_child(folder_id, children) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Group a set of direct children into a new folder
+    fn group_children(&mut self, item_ids: &[Uuid], folder_title: &str) -> Option<Uuid> {
+        // Check if all items are direct children
+        let positions: Vec<usize> = item_ids.iter()
+            .filter_map(|id| self.children.iter().position(|c| &c.id == id))
+            .collect();
+
+        if positions.len() != item_ids.len() {
+            // Not all items are direct children; try nested
+            for child in &mut self.children {
+                if let Some(id) = child.group_children(item_ids, folder_title) {
+                    return Some(id);
+                }
+            }
+            return None;
+        }
+
+        // Remove items (in reverse order to preserve indices)
+        let mut sorted_positions = positions.clone();
+        sorted_positions.sort();
+        sorted_positions.reverse();
+
+        let mut items_to_group = Vec::new();
+        for &pos in &sorted_positions {
+            items_to_group.push(self.children.remove(pos));
+        }
+        items_to_group.reverse(); // Restore original order
+
+        // Create the folder and add children
+        let mut folder = BinderItem::new_folder(folder_title);
+        let folder_id = folder.id;
+        for item in items_to_group {
+            folder.children.push(item);
+        }
+
+        // Insert the folder at the first item's original position
+        let insert_pos = *sorted_positions.last().unwrap_or(&0);
+        let insert_pos = insert_pos.min(self.children.len());
+        self.children.insert(insert_pos, folder);
+
+        Some(folder_id)
+    }
+
+    /// Get the path from root to this item (as titles)
+    pub fn path_to_item(&self, target_id: &Uuid) -> Option<Vec<String>> {
+        if &self.id == target_id {
+            return Some(vec![self.title.clone()]);
+        }
+        for child in &self.children {
+            if let Some(mut path) = child.path_to_item(target_id) {
+                path.insert(0, self.title.clone());
+                return Some(path);
+            }
+        }
+        None
+    }
+
+    /// Get the sibling items (other children of the same parent)
+    pub fn sibling_ids(&self, item_id: &Uuid) -> Vec<Uuid> {
+        if self.children.iter().any(|c| &c.id == item_id) {
+            return self.children.iter()
+                .filter(|c| &c.id != item_id)
+                .map(|c| c.id)
+                .collect();
+        }
+        for child in &self.children {
+            let result = child.sibling_ids(item_id);
+            if !result.is_empty() {
+                return result;
+            }
+        }
+        Vec::new()
+    }
+
+    /// Get the next sibling item
+    pub fn next_sibling(&self, item_id: &Uuid) -> Option<Uuid> {
+        if let Some(pos) = self.children.iter().position(|c| &c.id == item_id) {
+            if pos + 1 < self.children.len() {
+                return Some(self.children[pos + 1].id);
+            }
+        }
+        for child in &self.children {
+            if let Some(id) = child.next_sibling(item_id) {
+                return Some(id);
+            }
+        }
+        None
+    }
+
+    /// Get the previous sibling item
+    pub fn prev_sibling(&self, item_id: &Uuid) -> Option<Uuid> {
+        if let Some(pos) = self.children.iter().position(|c| &c.id == item_id) {
+            if pos > 0 {
+                return Some(self.children[pos - 1].id);
+            }
+        }
+        for child in &self.children {
+            if let Some(id) = child.prev_sibling(item_id) {
+                return Some(id);
+            }
+        }
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -703,5 +1013,180 @@ mod tests {
     fn test_include_in_compile_default() {
         let item = BinderItem::new_text("Test");
         assert!(item.include_in_compile);
+    }
+
+    #[test]
+    fn test_reparent_item() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("Scene");
+        let item_id = item.id;
+        let folder = BinderItem::new_folder("Chapter");
+        let folder_id = folder.id;
+        binder.draft.add_child(item);
+        binder.draft.add_child(folder);
+
+        assert!(binder.reparent_item(&item_id, &folder_id, 0));
+        // Item should now be inside the folder
+        let folder = binder.find_item(&folder_id).unwrap();
+        assert_eq!(folder.child_count(), 1);
+        assert_eq!(folder.children[0].id, item_id);
+    }
+
+    #[test]
+    fn test_reparent_item_no_cycle() {
+        let mut binder = Binder::default_structure();
+        let mut parent = BinderItem::new_folder("Parent");
+        let child = BinderItem::new_folder("Child");
+        let parent_id = parent.id;
+        let child_id = child.id;
+        parent.add_child(child);
+        binder.draft.add_child(parent);
+
+        // Should fail: can't reparent parent into its own child
+        assert!(!binder.reparent_item(&parent_id, &child_id, 0));
+    }
+
+    #[test]
+    fn test_move_item_to_position() {
+        let mut binder = Binder::default_structure();
+        let a = BinderItem::new_text("A");
+        let b = BinderItem::new_text("B");
+        let c = BinderItem::new_text("C");
+        let a_id = a.id;
+        binder.draft.add_child(a);
+        binder.draft.add_child(b);
+        binder.draft.add_child(c);
+
+        // Move A to last position
+        assert!(binder.move_item_to_position(&a_id, 2));
+        assert_eq!(binder.draft.children.last().unwrap().id, a_id);
+    }
+
+    #[test]
+    fn test_group_items_into_folder() {
+        let mut binder = Binder::default_structure();
+        let a = BinderItem::new_text("A");
+        let b = BinderItem::new_text("B");
+        let c = BinderItem::new_text("C");
+        let a_id = a.id;
+        let b_id = b.id;
+        binder.draft.add_child(a);
+        binder.draft.add_child(b);
+        binder.draft.add_child(c);
+
+        let folder_id = binder.group_items_into_folder(&[a_id, b_id], "New Chapter").unwrap();
+        let folder = binder.find_item(&folder_id).unwrap();
+        assert_eq!(folder.title, "New Chapter");
+        assert_eq!(folder.child_count(), 2);
+    }
+
+    #[test]
+    fn test_flatten_folder() {
+        let mut binder = Binder::default_structure();
+        let mut folder = BinderItem::new_folder("Chapter");
+        let folder_id = folder.id;
+        folder.add_child(BinderItem::new_text("Scene 1"));
+        folder.add_child(BinderItem::new_text("Scene 2"));
+        binder.draft.add_child(folder);
+
+        let initial_children = binder.draft.children.len();
+        assert!(binder.flatten_folder(&folder_id));
+        // Folder should be gone, its children should be at the same level
+        assert!(binder.find_item(&folder_id).is_none());
+        // Draft should have 2 more children (scenes) but one fewer (the folder)
+        assert_eq!(binder.draft.children.len(), initial_children + 1); // -1 folder + 2 scenes
+    }
+
+    #[test]
+    fn test_split_item() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Full Document");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Part one content\n\n---\n\nPart two content\n\n---\n\nPart three".to_string();
+        }
+        let item_id = item.id;
+        binder.draft.add_child(item);
+
+        let new_ids = binder.split_item(&item_id, "\n\n---\n\n");
+        assert_eq!(new_ids.len(), 3);
+        // Original should be gone
+        assert!(binder.find_item(&item_id).is_none());
+    }
+
+    #[test]
+    fn test_merge_items() {
+        let mut binder = Binder::default_structure();
+        let mut a = BinderItem::new_text("Part A");
+        if let Some(ref mut doc) = a.document {
+            doc.content = "Content A".to_string();
+        }
+        let mut b = BinderItem::new_text("Part B");
+        if let Some(ref mut doc) = b.document {
+            doc.content = "Content B".to_string();
+        }
+        let a_id = a.id;
+        let b_id = b.id;
+        binder.draft.add_child(a);
+        binder.draft.add_child(b);
+
+        let merged_id = binder.merge_items(&[a_id, b_id], "\n\n").unwrap();
+        let merged = binder.find_item(&merged_id).unwrap();
+        let content = merged.document.as_ref().unwrap().content.clone();
+        assert!(content.contains("Content A"));
+        assert!(content.contains("Content B"));
+    }
+
+    #[test]
+    fn test_path_to_item() {
+        let mut folder = BinderItem::new_folder("Draft");
+        let mut chapter = BinderItem::new_folder("Chapter 1");
+        let scene = BinderItem::new_text("Scene 1");
+        let scene_id = scene.id;
+        chapter.add_child(scene);
+        folder.add_child(chapter);
+
+        let path = folder.path_to_item(&scene_id).unwrap();
+        assert_eq!(path, vec!["Draft", "Chapter 1", "Scene 1"]);
+    }
+
+    #[test]
+    fn test_sibling_ids() {
+        let mut folder = BinderItem::new_folder("Parent");
+        let a = BinderItem::new_text("A");
+        let b = BinderItem::new_text("B");
+        let c = BinderItem::new_text("C");
+        let b_id = b.id;
+        let a_id = a.id;
+        let c_id = c.id;
+        folder.add_child(a);
+        folder.add_child(b);
+        folder.add_child(c);
+
+        let siblings = folder.sibling_ids(&b_id);
+        assert_eq!(siblings.len(), 2);
+        assert!(siblings.contains(&a_id));
+        assert!(siblings.contains(&c_id));
+    }
+
+    #[test]
+    fn test_next_prev_sibling() {
+        let mut folder = BinderItem::new_folder("Parent");
+        let a = BinderItem::new_text("A");
+        let b = BinderItem::new_text("B");
+        let c = BinderItem::new_text("C");
+        let a_id = a.id;
+        let b_id = b.id;
+        let c_id = c.id;
+        folder.add_child(a);
+        folder.add_child(b);
+        folder.add_child(c);
+
+        assert_eq!(folder.next_sibling(&a_id), Some(b_id));
+        assert_eq!(folder.next_sibling(&b_id), Some(c_id));
+        assert_eq!(folder.next_sibling(&c_id), None);
+
+        assert_eq!(folder.prev_sibling(&c_id), Some(b_id));
+        assert_eq!(folder.prev_sibling(&b_id), Some(a_id));
+        assert_eq!(folder.prev_sibling(&a_id), None);
     }
 }
