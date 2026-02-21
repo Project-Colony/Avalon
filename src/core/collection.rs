@@ -148,4 +148,50 @@ impl Collection {
         let kind = self.kind_label();
         format!("{} ({}, {} items)", self.name, kind, self.count())
     }
+
+    /// Check if an item is at a specific position
+    pub fn item_at_position(&self, pos: usize) -> Option<&Uuid> {
+        self.item_ids.get(pos)
+    }
+
+    /// Find the position of an item in the collection
+    pub fn position_of(&self, id: &Uuid) -> Option<usize> {
+        self.item_ids.iter().position(|i| i == id)
+    }
+
+    /// Swap two items by their positions
+    pub fn swap(&mut self, a: usize, b: usize) {
+        if a < self.item_ids.len() && b < self.item_ids.len() {
+            self.item_ids.swap(a, b);
+        }
+    }
+
+    /// Remove duplicate item IDs (preserving first occurrence)
+    pub fn dedup(&mut self) {
+        let mut seen = std::collections::HashSet::new();
+        self.item_ids.retain(|id| seen.insert(*id));
+    }
+
+    /// Keep only items that pass the predicate
+    pub fn retain<F>(&mut self, f: F) where F: FnMut(&Uuid) -> bool {
+        self.item_ids.retain(f);
+    }
+}
+
+impl CollectionKind {
+    /// Human-readable label
+    pub fn label(&self) -> &str {
+        match self {
+            CollectionKind::Manual => "Manual",
+            CollectionKind::Search { .. } => "Smart",
+        }
+    }
+
+    /// Icon character for UI display
+    pub fn icon(&self) -> &str {
+        match self {
+            CollectionKind::Manual => "\u{2630}",
+            CollectionKind::Search { .. } => "\u{2605}",
+        }
+    }
 }

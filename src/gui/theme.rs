@@ -160,4 +160,56 @@ impl Theme {
             color.b * (1.0 - a) + gray * a,
         )
     }
+
+    /// Invert a color
+    pub fn invert(color: Color) -> Color {
+        Color::from_rgb(1.0 - color.r, 1.0 - color.g, 1.0 - color.b)
+    }
+
+    /// Calculate perceived brightness (0.0 = black, 1.0 = white)
+    pub fn brightness(color: Color) -> f32 {
+        color.r * 0.299 + color.g * 0.587 + color.b * 0.114
+    }
+
+    /// Get a contrasting text color (white or black) for a given background
+    pub fn contrast_text(bg: Color) -> Color {
+        if Self::brightness(bg) > 0.5 {
+            Color::from_rgb(0.1, 0.1, 0.1)
+        } else {
+            Color::from_rgb(0.95, 0.95, 0.95)
+        }
+    }
+
+    /// Get a status color for writing status labels
+    pub fn status_color(status: &str) -> Color {
+        match status {
+            "To Do" => Self::ERROR,
+            "In Progress" | "First Draft" => Self::WARNING,
+            "Revised Draft" => Self::TEXT_ACCENT,
+            "Final Draft" | "Done" => Self::SUCCESS,
+            _ => Self::TEXT_SECONDARY,
+        }
+    }
+
+    /// Get all highlight colors as a list
+    pub fn highlight_colors() -> Vec<(&'static str, Color)> {
+        vec![
+            ("Yellow", Self::HIGHLIGHT_YELLOW),
+            ("Blue", Self::HIGHLIGHT_BLUE),
+            ("Green", Self::HIGHLIGHT_GREEN),
+            ("Red", Self::HIGHLIGHT_RED),
+            ("Purple", Self::HIGHLIGHT_PURPLE),
+        ]
+    }
+
+    /// Get all script element colors as a list
+    pub fn script_colors() -> Vec<(&'static str, Color)> {
+        vec![
+            ("Scene Heading", Self::SCRIPT_SCENE),
+            ("Action", Self::SCRIPT_ACTION),
+            ("Character", Self::SCRIPT_CHARACTER),
+            ("Dialogue", Self::SCRIPT_DIALOGUE),
+            ("Transition", Self::SCRIPT_TRANSITION),
+        ]
+    }
 }
