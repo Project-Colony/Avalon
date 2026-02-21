@@ -7,4 +7,6 @@ pub mod plain_text;
 pub mod docx;
 pub mod epub;
 pub mod rtf;
+pub mod opml;
+pub mod fountain;
 

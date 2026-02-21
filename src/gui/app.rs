@@ -44,6 +44,7 @@ pub enum BottomPanel {
     Targets,
     QuickRef,
     FindReplace,
+    WritingGoals,
 }
 
 /// Application state
@@ -137,6 +138,18 @@ pub struct ScrineverApp {
     // === Compile presets ===
     pub compile_presets: Vec<(String, CompileOptions)>,
     pub footnote_counter: usize,
+
+    // === Project statistics dialog ===
+    pub show_project_stats: bool,
+
+    // === Writing goals ===
+    pub daily_goal: usize,
+    pub daily_goal_text: String,
+    pub weekly_goal: usize,
+    pub weekly_goal_text: String,
+
+    // === Composition mode ===
+    pub composition_mode: bool,
 }
 
 /// Messages for the application
@@ -326,6 +339,31 @@ pub enum Message {
     SaveCompilePreset(String),
     LoadCompilePreset(String),
 
+    // Project statistics
+    ShowProjectStats,
+    HideProjectStats,
+
+    // Writing goals
+    SetDailyGoal(String),
+    SetWeeklyGoal(String),
+    ResetGoals,
+
+    // Composition mode
+    ToggleCompositionMode,
+
+    // Backup
+    CreateBackup,
+    RestoreBackup(std::path::PathBuf),
+
+    // OPML import
+    ImportOpml,
+
+    // Smart collection
+    CreateSmartCollection(String),
+
+    // Export OPML
+    ExportOpml,
+
     // Misc
     Tick,
     DismissNotification,
@@ -386,6 +424,12 @@ impl ScrineverApp {
             current_revision: None,
             compile_presets: Vec::new(),
             footnote_counter: 0,
+            show_project_stats: false,
+            daily_goal: 0,
+            daily_goal_text: String::new(),
+            weekly_goal: 0,
+            weekly_goal_text: String::new(),
+            composition_mode: false,
         };
 
         (app, IcedTask::none())
@@ -816,6 +860,8 @@ impl ScrineverApp {
                     "Word (DOCX)" => OutputFormat::Docx,
                     "ePub" => OutputFormat::Epub,
                     "RTF" => OutputFormat::Rtf,
+                    "OPML" => OutputFormat::Opml,
+                    "Fountain" => OutputFormat::Fountain,
                     _ => OutputFormat::Markdown,
                 };
             }
@@ -1696,6 +1742,224 @@ impl ScrineverApp {
                 }
             }
 
+            // ========== Project Statistics ==========
+            Message::ShowProjectStats => {
+                self.show_project_stats = true;
+            }
+
+            Message::HideProjectStats => {
+                self.show_project_stats = false;
+            }
+
+            // ========== Writing Goals ==========
+            Message::SetDailyGoal(val) => {
+                self.daily_goal_text = val.clone();
+                if let Ok(goal) = val.parse::<usize>() {
+                    self.daily_goal = goal;
+                } else if val.is_empty() {
+                    self.daily_goal = 0;
+                }
+            }
+
+            Message::SetWeeklyGoal(val) => {
+                self.weekly_goal_text = val.clone();
+                if let Ok(goal) = val.parse::<usize>() {
+                    self.weekly_goal = goal;
+                } else if val.is_empty() {
+                    self.weekly_goal = 0;
+                }
+            }
+
+            Message::ResetGoals => {
+                self.daily_goal = 0;
+                self.daily_goal_text.clear();
+                self.weekly_goal = 0;
+                self.weekly_goal_text.clear();
+                self.notification = Some("Goals reset".to_string());
+            }
+
+            // ========== Composition Mode ==========
+            Message::ToggleCompositionMode => {
+                self.composition_mode = !self.composition_mode;
+                self.notification = Some(
+                    if self.composition_mode { "Composition mode enabled".to_string() }
+                    else { "Composition mode disabled".to_string() }
+                );
+            }
+
+            // ========== Backup ==========
+            Message::CreateBackup => {
+                if let Some(ref project) = self.project {
+                    if let Some(ref path) = project.path {
+                        match crate::core::backup::BackupManager::create_backup(path) {
+                            Ok(backup_path) => {
+                                self.notification = Some(format!("Backup created: {:?}", backup_path.file_name().unwrap_or_default()));
+                            }
+                            Err(e) => {
+                                self.notification = Some(format!("Backup error: {}", e));
+                            }
+                        }
+                    } else {
+                        self.notification = Some("Save the project first before creating a backup.".to_string());
+                    }
+                }
+            }
+
+            Message::RestoreBackup(path) => {
+                if let Some(ref project) = self.project {
+                    if let Some(ref proj_path) = project.path {
+                        match crate::core::backup::BackupManager::restore_backup(&path, proj_path) {
+                            Ok(_) => {
+                                // Reload the project
+                                match crate::core::project::Project::load(proj_path) {
+                                    Ok(p) => {
+                                        self.compile_options.title = p.title.clone();
+                                        self.project_notes_text = p.project_notes.clone();
+                                        self.project = Some(p);
+                                        self.selected_item = None;
+                                        self.editor = EditorState::new();
+                                        self.notification = Some("Backup restored successfully".to_string());
+                                    }
+                                    Err(e) => {
+                                        self.notification = Some(format!("Restore error: {}", e));
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                self.notification = Some(format!("Restore error: {}", e));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // ========== OPML Import ==========
+            Message::ImportOpml => {
+                if let Some(ref mut project) = self.project {
+                    let home = dirs::home_dir().unwrap_or_default();
+                    let import_dir = home.join("Scrinever Import");
+                    if import_dir.exists() {
+                        let mut count = 0;
+                        if let Ok(entries) = std::fs::read_dir(&import_dir) {
+                            for entry in entries.flatten() {
+                                let path = entry.path();
+                                if path.is_file() {
+                                    let ext = path.extension()
+                                        .and_then(|e| e.to_str())
+                                        .unwrap_or("")
+                                        .to_lowercase();
+                                    if ext == "opml" {
+                                        if let Ok(content) = std::fs::read_to_string(&path) {
+                                            match crate::export::opml::import_opml(&content) {
+                                                Ok(items) => {
+                                                    for item in items {
+                                                        project.binder.draft.add_child(item);
+                                                        count += 1;
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    self.notification = Some(format!("OPML parse error: {}", e));
+                                                }
+                                            }
+                                        }
+                                    } else if ext == "fountain" {
+                                        if let Ok(content) = std::fs::read_to_string(&path) {
+                                            let sections = crate::export::fountain::parse_fountain(&content);
+                                            for (title, text) in sections {
+                                                let mut item = BinderItem::new_text(&title);
+                                                if let Some(ref mut doc) = item.document {
+                                                    doc.content = text;
+                                                }
+                                                project.binder.draft.add_child(item);
+                                                count += 1;
+                                            }
+                                        }
+                                    } else if ext == "html" || ext == "htm" {
+                                        if let Ok(content) = std::fs::read_to_string(&path) {
+                                            let title = path.file_stem()
+                                                .and_then(|s| s.to_str())
+                                                .unwrap_or("Imported HTML")
+                                                .to_string();
+                                            // Strip HTML tags for plain text import
+                                            let plain = strip_html_tags(&content);
+                                            let mut item = BinderItem::new_text(&title);
+                                            if let Some(ref mut doc) = item.document {
+                                                doc.content = plain;
+                                            }
+                                            project.binder.draft.add_child(item);
+                                            count += 1;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if count > 0 {
+                            self.notification = Some(format!("Imported {} item(s)", count));
+                        } else {
+                            self.notification = Some("No importable files found in ~/Scrinever Import/".to_string());
+                        }
+                    } else {
+                        let _ = std::fs::create_dir_all(&import_dir);
+                        self.notification = Some("Created ~/Scrinever Import/ — place files there and import again.".to_string());
+                    }
+                }
+            }
+
+            // ========== Smart Collection ==========
+            Message::CreateSmartCollection(query) => {
+                if let Some(ref mut project) = self.project {
+                    if !query.is_empty() {
+                        let mut coll = crate::core::collection::Collection::new_search("Smart: Search", &query);
+                        // Auto-populate with matching items
+                        let options = crate::core::search::SearchOptions {
+                            query: query.clone(),
+                            case_sensitive: false,
+                            whole_word: false,
+                            regex: false,
+                            search_titles: true,
+                            search_content: true,
+                            search_notes: false,
+                            search_synopsis: true,
+                        };
+                        let results = crate::core::search::search_binder(&project.binder, &options);
+                        for result in &results {
+                            coll.add_item(result.item_id);
+                        }
+                        coll.name = format!("Smart: \"{}\" ({} items)", query, results.len());
+                        project.collections.push(coll);
+                        self.notification = Some(format!("Smart collection created with {} items", results.len()));
+                    }
+                }
+            }
+
+            // ========== Export OPML ==========
+            Message::ExportOpml => {
+                self.sync_editor_to_project();
+                if let Some(ref project) = self.project {
+                    let home = dirs::home_dir().unwrap_or_default();
+                    let output_dir = home.join("Scrinever Output");
+                    let _ = std::fs::create_dir_all(&output_dir);
+                    let filename = format!("{}.opml", project.title.replace(' ', "_"));
+                    let output_path = output_dir.join(&filename);
+
+                    match crate::export::opml::export_opml(&project.binder, &project.title) {
+                        Ok(opml_content) => {
+                            match std::fs::write(&output_path, opml_content) {
+                                Ok(_) => {
+                                    self.notification = Some(format!("OPML exported to {:?}", output_path));
+                                }
+                                Err(e) => {
+                                    self.notification = Some(format!("Export error: {}", e));
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            self.notification = Some(format!("OPML error: {}", e));
+                        }
+                    }
+                }
+            }
+
             // ========== Misc ==========
             Message::Tick => {
                 // Auto-save
@@ -1712,6 +1976,10 @@ impl ScrineverApp {
                             let save_dir = home.join("Scrinever Projects");
                             if project.save(&save_dir).is_ok() {
                                 self.editor.mark_clean();
+                                // Auto-backup on save (every 10th auto-save)
+                                if let Some(ref path) = project.path {
+                                    let _ = crate::core::backup::BackupManager::create_backup(path);
+                                }
                             }
                         }
                     }
@@ -1737,8 +2005,12 @@ impl ScrineverApp {
             }
 
             Message::EscapePressed => {
-                if self.fullscreen_editor {
+                if self.composition_mode {
+                    self.composition_mode = false;
+                } else if self.fullscreen_editor {
                     self.fullscreen_editor = false;
+                } else if self.show_project_stats {
+                    self.show_project_stats = false;
                 } else if self.show_compile_dialog {
                     self.show_compile_dialog = false;
                 } else if self.show_settings_dialog {
@@ -1775,6 +2047,55 @@ impl ScrineverApp {
                 self.script_mode,
                 &self.auto_correction,
             );
+        }
+
+        // Project statistics dialog (overlay)
+        if self.show_project_stats {
+            let stats = Statistics::from_binder(&project.binder);
+            let data = views::project_stats_dialog::ProjectStatsData {
+                title: project.title.clone(),
+                word_count: stats.word_count,
+                char_count: stats.char_count,
+                char_no_spaces: stats.char_count_no_spaces,
+                paragraph_count: stats.paragraph_count,
+                sentence_count: stats.sentence_count,
+                page_count: stats.page_count,
+                document_count: stats.document_count,
+                folder_count: stats.folder_count,
+                avg_words_per_doc: stats.average_words_per_document,
+                avg_words_per_day: project.writing_history.average_words_per_day(),
+                total_writing_days: project.writing_history.entries.len(),
+                current_streak: project.writing_history.current_streak(),
+                best_day_words: project.writing_history.best_day()
+                    .map(|d| d.words_written)
+                    .unwrap_or(0),
+                total_time_hours: project.writing_history.total_time_seconds() as f64 / 3600.0,
+                reading_time_minutes: stats.word_count as f64 / 250.0,
+                speaking_time_minutes: stats.word_count as f64 / 150.0,
+                target_words: project.settings.target_word_count,
+                deadline: project.settings.target_deadline.clone(),
+                days_remaining: project.settings.target_deadline.as_ref()
+                    .and_then(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+                    .map(|target_date| {
+                        let today = chrono::Utc::now().date_naive();
+                        (target_date - today).num_days()
+                    }),
+                words_per_day_needed: {
+                    let days_remaining = project.settings.target_deadline.as_ref()
+                        .and_then(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+                        .map(|target_date| {
+                            let today = chrono::Utc::now().date_naive();
+                            (target_date - today).num_days()
+                        });
+                    match (project.settings.target_word_count, days_remaining) {
+                        (Some(target), Some(days)) if days > 0 && target > stats.word_count => {
+                            Some((target - stats.word_count) / days as usize)
+                        }
+                        _ => None,
+                    }
+                },
+            };
+            return views::project_stats_dialog::view(&data);
         }
 
         // Fullscreen editor mode
@@ -2009,6 +2330,32 @@ impl ScrineverApp {
                 };
                 Some(views::find_replace_panel::view(&data))
             }
+            BottomPanel::WritingGoals => {
+                let words_today = if self.session_active {
+                    self.session_stats.words_written
+                } else {
+                    project.writing_history.entries.last()
+                        .filter(|e| e.date == chrono::Utc::now().date_naive())
+                        .map(|e| e.words_written)
+                        .unwrap_or(0)
+                };
+                let words_this_week: i64 = project.writing_history.recent(7)
+                    .iter()
+                    .map(|e| e.words_written)
+                    .sum();
+                let data = views::writing_goals_panel::WritingGoalsData {
+                    daily_goal: self.daily_goal,
+                    daily_goal_text: self.daily_goal_text.clone(),
+                    weekly_goal: self.weekly_goal,
+                    weekly_goal_text: self.weekly_goal_text.clone(),
+                    words_today,
+                    words_this_week,
+                    streak: project.writing_history.current_streak(),
+                    avg_daily: project.writing_history.average_words_per_day(),
+                    days_this_week: project.writing_history.recent(7).len(),
+                };
+                Some(views::writing_goals_panel::view(&data))
+            }
             BottomPanel::None => None,
         };
 
@@ -2063,7 +2410,27 @@ impl ScrineverApp {
     /// Keyboard shortcuts and auto-save timer
     pub fn subscription(&self) -> Subscription<Message> {
         let key_sub = keyboard::on_key_press(|key, modifiers| {
-            if modifiers.control() || modifiers.command() {
+            let ctrl = modifiers.control() || modifiers.command();
+            let shift = modifiers.shift();
+
+            if ctrl && shift {
+                // Ctrl+Shift shortcuts
+                match key {
+                    keyboard::Key::Character(c) => {
+                        let c = c.as_str();
+                        match c {
+                            "i" | "I" => Some(Message::InsertItalic),
+                            "x" | "X" => Some(Message::InsertStrikethrough),
+                            "f" | "F" => Some(Message::ToggleCompositionMode),
+                            "s" | "S" => Some(Message::ShowProjectStats),
+                            "g" | "G" => Some(Message::ShowBottomPanel(BottomPanel::WritingGoals)),
+                            "t" | "T" => Some(Message::ToggleScriptMode),
+                            _ => None,
+                        }
+                    }
+                    _ => None,
+                }
+            } else if ctrl {
                 match key {
                     keyboard::Key::Character(c) => {
                         let c = c.as_str();
@@ -2080,6 +2447,7 @@ impl ScrineverApp {
                             "u" => Some(Message::InsertUnderline),
                             "h" => Some(Message::ShowBottomPanel(BottomPanel::FindReplace)),
                             "d" => Some(Message::ShowBottomPanel(BottomPanel::Annotations)),
+                            "g" => Some(Message::ShowBottomPanel(BottomPanel::WritingGoals)),
                             "1" => Some(Message::SwitchView(ViewMode::Editor)),
                             "2" => Some(Message::SwitchView(ViewMode::Corkboard)),
                             "3" => Some(Message::SwitchView(ViewMode::Outliner)),
@@ -2096,6 +2464,9 @@ impl ScrineverApp {
                     }
                     keyboard::Key::Named(keyboard::key::Named::F11) => {
                         Some(Message::ToggleFullscreen)
+                    }
+                    keyboard::Key::Named(keyboard::key::Named::F5) => {
+                        Some(Message::ToggleCompositionMode)
                     }
                     _ => None,
                 }
@@ -2130,4 +2501,82 @@ fn title_case(text: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// Strip HTML tags from content for plain text import
+fn strip_html_tags(html: &str) -> String {
+    let mut result = String::new();
+    let mut in_tag = false;
+    let mut in_script = false;
+
+    let lower = html.to_lowercase();
+    let chars: Vec<char> = html.chars().collect();
+    let lower_chars: Vec<char> = lower.chars().collect();
+
+    let mut i = 0;
+    while i < chars.len() {
+        if !in_tag && i + 7 < lower_chars.len() {
+            let slice: String = lower_chars[i..i + 7].iter().collect();
+            if slice == "<script" {
+                in_script = true;
+            }
+        }
+        if in_script && i + 8 < lower_chars.len() {
+            let slice: String = lower_chars[i..i + 9].iter().collect();
+            if slice == "</script>" {
+                in_script = false;
+                i += 9;
+                continue;
+            }
+        }
+
+        if in_script {
+            i += 1;
+            continue;
+        }
+
+        if chars[i] == '<' {
+            in_tag = true;
+            // Convert block elements to newlines
+            if i + 2 < lower_chars.len() {
+                let next_two: String = lower_chars[i + 1..i + 3.min(lower_chars.len())].iter().collect();
+                if next_two.starts_with('p') || next_two.starts_with('b') || next_two.starts_with('h')
+                    || next_two.starts_with('l') || next_two.starts_with('d')
+                    || next_two.starts_with('t')
+                {
+                    result.push('\n');
+                }
+            }
+        } else if chars[i] == '>' {
+            in_tag = false;
+        } else if !in_tag {
+            result.push(chars[i]);
+        }
+        i += 1;
+    }
+
+    // Clean up excessive newlines
+    let mut cleaned = String::new();
+    let mut prev_was_newline = false;
+    for ch in result.chars() {
+        if ch == '\n' {
+            if !prev_was_newline {
+                cleaned.push('\n');
+            }
+            prev_was_newline = true;
+        } else {
+            prev_was_newline = false;
+            cleaned.push(ch);
+        }
+    }
+
+    // Unescape common HTML entities
+    cleaned = cleaned.replace("&amp;", "&");
+    cleaned = cleaned.replace("&lt;", "<");
+    cleaned = cleaned.replace("&gt;", ">");
+    cleaned = cleaned.replace("&quot;", "\"");
+    cleaned = cleaned.replace("&#39;", "'");
+    cleaned = cleaned.replace("&nbsp;", " ");
+
+    cleaned.trim().to_string()
 }

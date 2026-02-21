@@ -14,6 +14,8 @@ pub enum OutputFormat {
     Docx,
     Epub,
     Rtf,
+    Opml,
+    Fountain,
 }
 
 impl OutputFormat {
@@ -27,6 +29,8 @@ impl OutputFormat {
             OutputFormat::Docx => "docx",
             OutputFormat::Epub => "epub",
             OutputFormat::Rtf => "rtf",
+            OutputFormat::Opml => "opml",
+            OutputFormat::Fountain => "fountain",
         }
     }
 
@@ -40,6 +44,8 @@ impl OutputFormat {
             OutputFormat::Docx => "Word (DOCX)",
             OutputFormat::Epub => "ePub",
             OutputFormat::Rtf => "RTF",
+            OutputFormat::Opml => "OPML",
+            OutputFormat::Fountain => "Fountain",
         }
     }
 
@@ -53,6 +59,8 @@ impl OutputFormat {
             OutputFormat::Docx,
             OutputFormat::Epub,
             OutputFormat::Rtf,
+            OutputFormat::Opml,
+            OutputFormat::Fountain,
         ]
     }
 }
@@ -116,6 +124,8 @@ impl Compiler {
             OutputFormat::Html => super::html::compile(&contents, options),
             OutputFormat::Latex => super::latex::compile(&contents, options),
             OutputFormat::Rtf => super::rtf::compile(&contents, options),
+            OutputFormat::Fountain => super::fountain::compile(&contents, options),
+            OutputFormat::Opml => super::opml::export_opml(binder, &options.title),
             OutputFormat::Pdf => {
                 Ok("PDF compilation requires save_to_file()".to_string())
             }

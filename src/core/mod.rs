@@ -12,4 +12,5 @@ pub mod annotation;
 pub mod bookmark;
 pub mod recent;
 pub mod script;
+pub mod backup;
 
