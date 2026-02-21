@@ -4,4 +4,7 @@ pub mod html;
 pub mod pdf;
 pub mod latex;
 pub mod plain_text;
+pub mod docx;
+pub mod epub;
+pub mod rtf;
 

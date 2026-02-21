@@ -7,3 +7,6 @@ pub mod toolbar;
 pub mod status_bar;
 pub mod welcome_screen;
 pub mod compile_dialog;
+pub mod search_panel;
+pub mod thesaurus_panel;
+pub mod snapshot_panel;

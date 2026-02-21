@@ -13,6 +13,7 @@ pub enum OutputFormat {
     Latex,
     Docx,
     Epub,
+    Rtf,
 }
 
 impl OutputFormat {
@@ -25,6 +26,7 @@ impl OutputFormat {
             OutputFormat::Latex => "tex",
             OutputFormat::Docx => "docx",
             OutputFormat::Epub => "epub",
+            OutputFormat::Rtf => "rtf",
         }
     }
 
@@ -37,6 +39,7 @@ impl OutputFormat {
             OutputFormat::Latex => "LaTeX",
             OutputFormat::Docx => "Word (DOCX)",
             OutputFormat::Epub => "ePub",
+            OutputFormat::Rtf => "RTF",
         }
     }
 
@@ -49,6 +52,7 @@ impl OutputFormat {
             OutputFormat::Latex,
             OutputFormat::Docx,
             OutputFormat::Epub,
+            OutputFormat::Rtf,
         ]
     }
 }
@@ -102,9 +106,8 @@ pub enum SeparatorType {
 pub struct Compiler;
 
 impl Compiler {
-    /// Compile the draft into a single output
+    /// Compile the draft into a single output string
     pub fn compile(binder: &Binder, options: &CompileOptions) -> Result<String> {
-        // Collect all text content from the draft in order
         let contents = Self::collect_contents(&binder.draft, options);
 
         match options.format {
@@ -112,20 +115,32 @@ impl Compiler {
             OutputFormat::Markdown => super::markdown::compile(&contents, options),
             OutputFormat::Html => super::html::compile(&contents, options),
             OutputFormat::Latex => super::latex::compile(&contents, options),
+            OutputFormat::Rtf => super::rtf::compile(&contents, options),
             OutputFormat::Pdf => {
-                // PDF compilation returns a path, not text content
-                Ok("PDF compilation requires save_pdf()".to_string())
+                Ok("PDF compilation requires save_to_file()".to_string())
             }
-            _ => Ok(contents.iter().map(|c| c.text.clone()).collect::<Vec<_>>().join("\n\n")),
+            OutputFormat::Docx => {
+                Ok("DOCX compilation requires save_to_file()".to_string())
+            }
+            OutputFormat::Epub => {
+                Ok("ePub compilation requires save_to_file()".to_string())
+            }
         }
     }
 
     /// Save compiled output to a file
     pub fn save_to_file(binder: &Binder, options: &CompileOptions, path: &Path) -> Result<()> {
+        let contents = Self::collect_contents(&binder.draft, options);
+
         match options.format {
             OutputFormat::Pdf => {
-                let contents = Self::collect_contents(&binder.draft, options);
                 super::pdf::save_pdf(&contents, options, path)
+            }
+            OutputFormat::Docx => {
+                super::docx::save_docx(&contents, options, path)
+            }
+            OutputFormat::Epub => {
+                super::epub::save_epub(&contents, options, path)
             }
             _ => {
                 let output = Self::compile(binder, options)?;

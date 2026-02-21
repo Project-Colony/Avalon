@@ -1,8 +1,9 @@
-use iced::widget::{column, container, row, text, text_input, Space};
+use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_input, toggler, Space};
 use iced::{Element, Length, Padding};
 use uuid::Uuid;
 
 use crate::core::binder::BinderItem;
+use crate::core::metadata::ProjectSettings;
 use crate::gui::app::Message;
 use crate::gui::theme::Theme;
 
@@ -11,25 +12,38 @@ pub struct InspectorData {
     pub id: Uuid,
     pub title: String,
     pub synopsis: String,
+    pub notes: String,
     pub status: String,
     pub label: String,
     pub word_count: String,
     pub char_count: String,
     pub paragraph_count: String,
+    pub sentence_count: String,
     pub page_count: String,
     pub children_count: String,
     pub total_word_count: String,
     pub snapshot_count: String,
     pub is_document: bool,
+    pub include_in_compile: bool,
+    pub target_word_count: Option<usize>,
+    pub available_statuses: Vec<String>,
+    pub available_labels: Vec<String>,
+    pub keywords: Vec<String>,
 }
 
 impl InspectorData {
-    pub fn from_item(item: &BinderItem) -> Self {
+    pub fn from_item(
+        item: &BinderItem,
+        notes: &str,
+        target: Option<usize>,
+        settings: &ProjectSettings,
+    ) -> Self {
         let is_document = item.document.is_some();
         Self {
             id: item.id,
             title: item.title.clone(),
             synopsis: item.synopsis.clone(),
+            notes: notes.to_string(),
             status: item.metadata.status.as_ref()
                 .map(|s| s.name.clone())
                 .unwrap_or_else(|| "None".to_string()),
@@ -45,6 +59,9 @@ impl InspectorData {
             paragraph_count: item.document.as_ref()
                 .map(|d| format!("{}", d.paragraph_count()))
                 .unwrap_or_default(),
+            sentence_count: item.document.as_ref()
+                .map(|d| format!("{}", d.sentence_count()))
+                .unwrap_or_default(),
             page_count: item.document.as_ref()
                 .map(|d| format!("{:.1}", d.page_count()))
                 .unwrap_or_default(),
@@ -52,6 +69,19 @@ impl InspectorData {
             total_word_count: format!("{}", item.total_word_count()),
             snapshot_count: format!("{} snapshot(s)", item.snapshots.len()),
             is_document,
+            include_in_compile: item.include_in_compile,
+            target_word_count: target,
+            available_statuses: {
+                let mut s: Vec<String> = vec!["None".to_string()];
+                s.extend(settings.statuses.iter().map(|st| st.name.clone()));
+                s
+            },
+            available_labels: {
+                let mut l: Vec<String> = vec!["None".to_string()];
+                l.extend(settings.labels.iter().map(|lb| lb.name.clone()));
+                l
+            },
+            keywords: item.metadata.keywords.clone(),
         }
     }
 }
@@ -67,24 +97,71 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
 
     let id = data.id;
 
+    // Title
     let title_label = text("Title").size(11).color(Theme::TEXT_MUTED);
     let title_input = text_input("Title...", &data.title)
         .on_input(move |val| Message::RenameItem(id, val))
         .size(14)
         .padding(6);
 
+    // Synopsis
     let synopsis_label = text("Synopsis").size(11).color(Theme::TEXT_MUTED);
     let synopsis_input = text_input("Synopsis...", &data.synopsis)
         .on_input(move |val| Message::UpdateSynopsis(id, val))
         .size(13)
         .padding(6);
 
+    // Status picker
     let status_label = text("Status").size(11).color(Theme::TEXT_MUTED);
-    let status_display = text(data.status).size(13).color(Theme::TEXT_PRIMARY);
+    let status_picker = pick_list(
+        data.available_statuses,
+        Some(data.status),
+        move |val| Message::SetItemStatus(id, val),
+    )
+    .width(Length::Fill);
 
+    // Label picker
     let label_label = text("Label").size(11).color(Theme::TEXT_MUTED);
-    let label_display = text(data.label).size(13).color(Theme::TEXT_PRIMARY);
+    let label_picker = pick_list(
+        data.available_labels,
+        Some(data.label),
+        move |val| Message::SetItemLabel(id, val),
+    )
+    .width(Length::Fill);
 
+    // Include in compile toggle
+    let compile_toggle = toggler(data.include_in_compile)
+        .label("Include in Compile")
+        .on_toggle(move |_| Message::ToggleIncludeInCompile(id));
+
+    // Notes
+    let notes_label = text("Notes").size(11).color(Theme::TEXT_MUTED);
+    let notes_input = text_input("Document notes...", &data.notes)
+        .on_input(|val| Message::NotesChanged(val))
+        .size(12)
+        .padding(6);
+
+    // Target word count
+    let target_label = text("Target Words").size(11).color(Theme::TEXT_MUTED);
+    let target_value = data.target_word_count
+        .map(|t| t.to_string())
+        .unwrap_or_default();
+    let target_input = text_input("e.g. 50000", &target_value)
+        .on_input(move |val| Message::SetItemTarget(id, val))
+        .size(12)
+        .padding(6);
+
+    // Progress bar (if target set)
+    let progress_row: Element<'static, Message> = if let (Some(target), true) = (data.target_word_count, data.is_document) {
+        let words: usize = data.word_count.parse().unwrap_or(0);
+        let pct = (words as f64 / target as f64 * 100.0).min(100.0);
+        let bar = format!("{:.1}% ({}/{})", pct, words, target);
+        text(bar).size(11).color(Theme::SUCCESS).into()
+    } else {
+        Space::with_height(0).into()
+    };
+
+    // Statistics
     let stats_header = text("Statistics").size(11).color(Theme::TEXT_MUTED);
 
     let stats_content = if data.is_document {
@@ -92,53 +169,82 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
             stat_row("Words", data.word_count),
             stat_row("Characters", data.char_count),
             stat_row("Paragraphs", data.paragraph_count),
+            stat_row("Sentences", data.sentence_count),
             stat_row("Pages (est.)", data.page_count),
         ]
         .spacing(2)
     } else {
         column![
             stat_row("Total Words", data.total_word_count),
-            stat_row("Documents", data.children_count),
+            stat_row("Children", data.children_count),
         ]
         .spacing(2)
     };
 
+    // Keywords
+    let keywords_text = if data.keywords.is_empty() {
+        "None".to_string()
+    } else {
+        data.keywords.join(", ")
+    };
+
+    // Snapshots
     let snapshots_header = text("Snapshots").size(11).color(Theme::TEXT_MUTED);
-    let snapshots_info = text(data.snapshot_count).size(12).color(Theme::TEXT_SECONDARY);
+    let snapshots_row = row![
+        text(data.snapshot_count).size(12).color(Theme::TEXT_SECONDARY),
+        Space::with_width(Length::Fill),
+        button(
+            text("Take").size(11).color(Theme::TEXT_ACCENT),
+        )
+        .on_press(Message::CreateSnapshot)
+        .padding(Padding::from([2, 8])),
+    ];
 
     let content = column![
         header,
         Space::with_height(4),
         title_label,
         title_input,
-        Space::with_height(8),
+        Space::with_height(6),
         synopsis_label,
         synopsis_input,
-        Space::with_height(12),
-        status_label,
-        status_display,
         Space::with_height(8),
+        status_label,
+        status_picker,
+        Space::with_height(6),
         label_label,
-        label_display,
-        Space::with_height(16),
+        label_picker,
+        Space::with_height(8),
+        compile_toggle,
+        Space::with_height(8),
+        notes_label,
+        notes_input,
+        Space::with_height(8),
+        target_label,
+        target_input,
+        progress_row,
+        Space::with_height(12),
         stats_header,
         stats_content,
-        Space::with_height(16),
+        Space::with_height(4),
+        text("Keywords").size(11).color(Theme::TEXT_MUTED),
+        text(keywords_text).size(11).color(Theme::TEXT_SECONDARY),
+        Space::with_height(12),
         snapshots_header,
-        snapshots_info,
+        snapshots_row,
     ]
     .padding(12)
-    .width(Length::Fixed(220.0));
+    .width(Length::Fixed(240.0));
 
-    container(content)
+    container(scrollable(content))
         .height(Length::Fill)
         .into()
 }
 
 fn stat_row(label: &str, value: String) -> Element<'static, Message> {
     row![
-        text(label.to_string()).size(12).color(Theme::TEXT_MUTED).width(Length::FillPortion(1)),
-        text(value).size(12).color(Theme::TEXT_PRIMARY).width(Length::FillPortion(1)),
+        text(label.to_string()).size(11).color(Theme::TEXT_MUTED).width(Length::FillPortion(1)),
+        text(value).size(11).color(Theme::TEXT_PRIMARY).width(Length::FillPortion(1)),
     ]
     .into()
 }

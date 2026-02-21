@@ -15,5 +15,7 @@ fn main() -> iced::Result {
 
     iced::application(ScrineverApp::title, ScrineverApp::update, ScrineverApp::view)
         .window_size((1280.0, 800.0))
+        .subscription(ScrineverApp::subscription)
+        .theme(ScrineverApp::theme)
         .run_with(ScrineverApp::new)
 }
