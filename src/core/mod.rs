@@ -18,4 +18,5 @@ pub mod indexer;
 pub mod targets;
 pub mod autosave;
 pub mod links;
+pub mod validation;
 

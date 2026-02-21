@@ -1322,7 +1322,29 @@ impl ScrineverApp {
                                         .unwrap_or("Imported")
                                         .to_string();
                                     match ext.as_str() {
-                                        "txt" | "md" | "markdown" | "rtf" => {
+                                        "md" | "markdown" => {
+                                            if let Ok(content) = std::fs::read_to_string(&path) {
+                                                // Use structured Markdown import (headings -> folders/docs)
+                                                match crate::export::markdown_import::import_markdown(&content, &title) {
+                                                    Ok(items) => {
+                                                        for item in items {
+                                                            project.binder.draft.add_child(item);
+                                                            count += 1;
+                                                        }
+                                                    }
+                                                    Err(_) => {
+                                                        // Fallback to plain import
+                                                        let mut item = BinderItem::new_text(&title);
+                                                        if let Some(ref mut doc) = item.document {
+                                                            doc.content = content;
+                                                        }
+                                                        project.binder.draft.add_child(item);
+                                                        count += 1;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        "txt" | "rtf" => {
                                             if let Ok(content) = std::fs::read_to_string(&path) {
                                                 let mut item = BinderItem::new_text(&title);
                                                 if let Some(ref mut doc) = item.document {
