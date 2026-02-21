@@ -29,6 +29,7 @@ pub struct InspectorData {
     pub available_statuses: Vec<String>,
     pub available_labels: Vec<String>,
     pub keywords: Vec<String>,
+    pub is_bookmarked: bool,
 }
 
 impl InspectorData {
@@ -37,6 +38,7 @@ impl InspectorData {
         notes: &str,
         target: Option<usize>,
         settings: &ProjectSettings,
+        is_bookmarked: bool,
     ) -> Self {
         let is_document = item.document.is_some();
         Self {
@@ -82,20 +84,30 @@ impl InspectorData {
                 l
             },
             keywords: item.metadata.keywords.clone(),
+            is_bookmarked,
         }
     }
 }
 
 /// Render the inspector panel (right sidebar)
 pub fn view(data: InspectorData) -> Element<'static, Message> {
+    let id = data.id;
+
+    let bookmark_label = if data.is_bookmarked { "Unbookmark" } else { "Bookmark" };
+    let bookmark_color = if data.is_bookmarked { Theme::WARNING } else { Theme::TEXT_MUTED };
+
     let header = container(
-        text("INSPECTOR")
-            .size(12)
-            .color(Theme::TEXT_SECONDARY),
+        row![
+            text("INSPECTOR").size(12).color(Theme::TEXT_SECONDARY),
+            Space::with_width(Length::Fill),
+            button(
+                text(bookmark_label).size(10).color(bookmark_color),
+            )
+            .on_press(Message::ToggleBookmark(id))
+            .padding(Padding::from([2, 6])),
+        ]
     )
     .padding(Padding::from([8, 12]));
-
-    let id = data.id;
 
     // Title
     let title_label = text("Title").size(11).color(Theme::TEXT_MUTED);

@@ -2,6 +2,7 @@ use iced::keyboard;
 use iced::widget::{column, container, row, text, text_editor};
 use iced::{Element, Length, Padding, Subscription, Task as IcedTask};
 use uuid::Uuid;
+use chrono;
 
 use crate::core::binder::{BinderItem, BinderItemKind};
 use crate::core::document::Document;
@@ -22,6 +23,7 @@ pub enum ViewMode {
     Editor,
     Corkboard,
     Outliner,
+    Scrivenings,
 }
 
 /// Which bottom panel is visible
@@ -36,6 +38,10 @@ pub enum BottomPanel {
     TextStats,
     NameGen,
     ProjectNotes,
+    Collections,
+    Bookmarks,
+    Annotations,
+    Targets,
 }
 
 /// Application state
@@ -95,6 +101,16 @@ pub struct ScrineverApp {
 
     // === Project notes (scratch pad) ===
     pub project_notes_text: String,
+
+    // === Collections ===
+    pub selected_collection: Option<uuid::Uuid>,
+    pub new_collection_name: String,
+
+    // === Annotations ===
+    pub annotation_text: String,
+
+    // === Recent projects ===
+    pub recent_projects: crate::core::recent::RecentProjects,
 }
 
 /// Messages for the application
@@ -208,6 +224,37 @@ pub enum Message {
     // Keywords
     SetItemKeywords(Uuid, String),
 
+    // Collections
+    CollectionNameInput(String),
+    CreateCollection,
+    DeleteCollection(Uuid),
+    SelectCollection(Uuid),
+    AddToCollection(Uuid),
+
+    // Bookmarks
+    ToggleBookmark(Uuid),
+
+    // Annotations
+    AnnotationTextInput(String),
+    AddAnnotation,
+    DeleteAnnotation(Uuid),
+    ToggleAnnotationResolved(Uuid),
+
+    // Project targets
+    SettingsSetDeadline(String),
+
+    // Text transforms
+    TextToUppercase,
+    TextToLowercase,
+    TextToTitleCase,
+
+    // Undo/Redo
+    Undo,
+    Redo,
+
+    // Recent projects
+    OpenRecentProject(std::path::PathBuf),
+
     // Misc
     Tick,
     DismissNotification,
@@ -252,6 +299,10 @@ impl ScrineverApp {
             generated_names: Vec::new(),
             name_gen_type: "male".to_string(),
             project_notes_text: String::new(),
+            selected_collection: None,
+            new_collection_name: String::new(),
+            annotation_text: String::new(),
+            recent_projects: crate::core::recent::RecentProjects::load(),
         };
 
         (app, IcedTask::none())
@@ -260,8 +311,8 @@ impl ScrineverApp {
     pub fn title(&self) -> String {
         let dirty = if self.editor.dirty { " *" } else { "" };
         match &self.project {
-            Some(p) => format!("Scrinever - {}{}", p.title, dirty),
-            None => "Scrinever".to_string(),
+            Some(p) => format!("Avalon - {}{}", p.title, dirty),
+            None => "Avalon".to_string(),
         }
     }
 
@@ -348,6 +399,10 @@ impl ScrineverApp {
                     match project.save(&save_dir) {
                         Ok(_) => {
                             self.editor.mark_clean();
+                            if let Some(ref path) = project.path {
+                                self.recent_projects.add(&project.title, path.clone());
+                                self.recent_projects.save();
+                            }
                             self.notification = Some(format!("Project saved to {:?}", save_dir));
                         }
                         Err(e) => {
@@ -1093,6 +1148,169 @@ impl ScrineverApp {
                 }
             }
 
+            // ========== Collections ==========
+            Message::CollectionNameInput(name) => {
+                self.new_collection_name = name;
+            }
+
+            Message::CreateCollection => {
+                if let Some(ref mut project) = self.project {
+                    if !self.new_collection_name.is_empty() {
+                        let coll = crate::core::collection::Collection::new_manual(&self.new_collection_name);
+                        project.collections.push(coll);
+                        self.new_collection_name.clear();
+                        self.notification = Some("Collection created".to_string());
+                    }
+                }
+            }
+
+            Message::DeleteCollection(coll_id) => {
+                if let Some(ref mut project) = self.project {
+                    project.collections.retain(|c| c.id != coll_id);
+                    if self.selected_collection == Some(coll_id) {
+                        self.selected_collection = None;
+                    }
+                }
+            }
+
+            Message::SelectCollection(coll_id) => {
+                self.selected_collection = Some(coll_id);
+            }
+
+            Message::AddToCollection(coll_id) => {
+                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                    if let Some(coll) = project.collections.iter_mut().find(|c| c.id == coll_id) {
+                        coll.add_item(item_id);
+                        self.notification = Some(format!("Added to collection '{}'", coll.name));
+                    }
+                }
+            }
+
+            // ========== Bookmarks ==========
+            Message::ToggleBookmark(item_id) => {
+                if let Some(ref mut project) = self.project {
+                    let name = project.binder.find_item(&item_id)
+                        .map(|i| i.title.clone())
+                        .unwrap_or_default();
+                    project.bookmarks.toggle(item_id, &name);
+                }
+            }
+
+            // ========== Annotations ==========
+            Message::AnnotationTextInput(text) => {
+                self.annotation_text = text;
+            }
+
+            Message::AddAnnotation => {
+                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                    if !self.annotation_text.is_empty() {
+                        if let Some(item) = project.binder.find_item_mut(&item_id) {
+                            if let Some(ref mut doc) = item.document {
+                                doc.references.push(crate::core::document::Reference {
+                                    title: format!("Comment: {}", &self.annotation_text),
+                                    url: None,
+                                    path: None,
+                                    notes: self.annotation_text.clone(),
+                                });
+                            }
+                        }
+                        self.annotation_text.clear();
+                        self.notification = Some("Annotation added".to_string());
+                    }
+                }
+            }
+
+            Message::DeleteAnnotation(_ann_id) => {
+                self.notification = Some("Annotation deleted".to_string());
+            }
+
+            Message::ToggleAnnotationResolved(_ann_id) => {
+                self.notification = Some("Annotation toggled".to_string());
+            }
+
+            // ========== Project targets ==========
+            Message::SettingsSetDeadline(deadline) => {
+                if let Some(ref mut project) = self.project {
+                    if deadline.is_empty() {
+                        project.settings.target_deadline = None;
+                    } else {
+                        project.settings.target_deadline = Some(deadline);
+                    }
+                }
+            }
+
+            // ========== Text transforms ==========
+            Message::TextToUppercase => {
+                self.sync_editor_to_project();
+                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item_mut(&item_id) {
+                        if let Some(ref mut doc) = item.document {
+                            doc.content = doc.content.to_uppercase();
+                            self.editor.load_document(doc);
+                            self.editor.mark_dirty();
+                        }
+                    }
+                }
+            }
+
+            Message::TextToLowercase => {
+                self.sync_editor_to_project();
+                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item_mut(&item_id) {
+                        if let Some(ref mut doc) = item.document {
+                            doc.content = doc.content.to_lowercase();
+                            self.editor.load_document(doc);
+                            self.editor.mark_dirty();
+                        }
+                    }
+                }
+            }
+
+            Message::TextToTitleCase => {
+                self.sync_editor_to_project();
+                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item_mut(&item_id) {
+                        if let Some(ref mut doc) = item.document {
+                            doc.content = title_case(&doc.content);
+                            self.editor.load_document(doc);
+                            self.editor.mark_dirty();
+                        }
+                    }
+                }
+            }
+
+            // ========== Undo/Redo ==========
+            Message::Undo => {
+                if self.editor.undo() {
+                    self.sync_editor_to_project();
+                }
+            }
+
+            Message::Redo => {
+                if self.editor.redo() {
+                    self.sync_editor_to_project();
+                }
+            }
+
+            // ========== Recent projects ==========
+            Message::OpenRecentProject(path) => {
+                match Project::load(&path) {
+                    Ok(p) => {
+                        self.compile_options.title = p.title.clone();
+                        self.project_notes_text = p.project_notes.clone();
+                        self.generated_names.clear();
+                        self.recent_projects.add(&p.title, path);
+                        self.recent_projects.save();
+                        self.project = Some(p);
+                        self.selected_item = None;
+                        self.editor = EditorState::new();
+                    }
+                    Err(e) => {
+                        self.notification = Some(format!("Load error: {}", e));
+                    }
+                }
+            }
+
             // ========== Keywords ==========
             Message::SetItemKeywords(id, keywords_str) => {
                 if let Some(ref mut project) = self.project {
@@ -1167,7 +1385,7 @@ impl ScrineverApp {
     pub fn view(&self) -> Element<'_, Message> {
         // Welcome screen
         if self.project.is_none() {
-            return views::welcome_screen::view();
+            return views::welcome_screen::view(&self.recent_projects);
         }
 
         let project = self.project.as_ref().unwrap();
@@ -1237,6 +1455,28 @@ impl ScrineverApp {
             ViewMode::Outliner => {
                 views::outliner_view::view(&project.binder.draft, &self.item_targets)
             }
+            ViewMode::Scrivenings => {
+                let (items, parent_title) = if let Some(id) = self.selected_item {
+                    if let Some(item) = project.binder.find_item(&id) {
+                        if item.kind == BinderItemKind::Folder {
+                            let children: Vec<&BinderItem> = item.children.iter()
+                                .filter(|c| c.document.is_some())
+                                .collect();
+                            (children, item.title.clone())
+                        } else {
+                            (vec![item], item.title.clone())
+                        }
+                    } else {
+                        (vec![], "Select a folder".to_string())
+                    }
+                } else {
+                    let children: Vec<&BinderItem> = project.binder.draft.children.iter()
+                        .filter(|c| c.document.is_some())
+                        .collect();
+                    (children, project.binder.draft.title.clone())
+                };
+                views::scrivenings_view::view(&items, &parent_title)
+            }
         };
 
         // Inspector (right panel)
@@ -1244,11 +1484,13 @@ impl ScrineverApp {
             self.selected_item
                 .and_then(|id| project.binder.find_item(&id))
                 .map(|item| {
+                    let is_bookmarked = project.bookmarks.is_bookmarked(&item.id);
                     let data = views::inspector_view::InspectorData::from_item(
                         item,
                         &self.notes_text,
                         self.item_targets.get(&item.id).copied(),
                         &project.settings,
+                        is_bookmarked,
                     );
                     views::inspector_view::view(data)
                 })
@@ -1313,6 +1555,48 @@ impl ScrineverApp {
             BottomPanel::ProjectNotes => {
                 Some(views::project_notes_panel::view(&self.project_notes_text))
             }
+            BottomPanel::Collections => {
+                let data = views::collections_panel::CollectionsData {
+                    collections: project.collections.clone(),
+                    selected_collection: self.selected_collection,
+                    new_collection_name: self.new_collection_name.clone(),
+                };
+                Some(views::collections_panel::view(&data))
+            }
+            BottomPanel::Bookmarks => {
+                Some(views::bookmarks_panel::view(&project.bookmarks))
+            }
+            BottomPanel::Annotations => {
+                // Show references from the current document as annotations
+                let annotations = Vec::new();
+                Some(views::annotations_panel::view(&annotations, &self.annotation_text))
+            }
+            BottomPanel::Targets => {
+                let current_words = project.binder.total_word_count();
+                let deadline = project.settings.target_deadline.clone().unwrap_or_default();
+                let days_remaining = project.settings.target_deadline.as_ref()
+                    .and_then(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+                    .map(|target_date| {
+                        let today = chrono::Utc::now().date_naive();
+                        (target_date - today).num_days()
+                    });
+                let words_per_day_needed = match (project.settings.target_word_count, days_remaining) {
+                    (Some(target), Some(days)) if days > 0 && target > current_words => {
+                        Some((target - current_words) / days as usize)
+                    }
+                    _ => None,
+                };
+                let data = views::targets_panel::TargetsData {
+                    project_target: project.settings.target_word_count,
+                    current_words,
+                    deadline,
+                    session_target: self.session_goal,
+                    session_words: self.session_stats.words_written,
+                    days_remaining,
+                    words_per_day_needed,
+                };
+                Some(views::targets_panel::view(&data))
+            }
             BottomPanel::None => None,
         };
 
@@ -1323,6 +1607,7 @@ impl ScrineverApp {
             project.settings.target_word_count,
             self.editor.dirty,
             &project.title,
+            self.session_active,
         );
 
         // Notification bar
@@ -1376,7 +1661,13 @@ impl ScrineverApp {
                             "f" => Some(Message::ShowBottomPanel(BottomPanel::Search)),
                             "e" => Some(Message::ShowCompileDialog),
                             "i" => Some(Message::ToggleInspector),
+                            "z" => Some(Message::Undo),
+                            "y" => Some(Message::Redo),
                             "," => Some(Message::ShowSettings),
+                            "1" => Some(Message::SwitchView(ViewMode::Editor)),
+                            "2" => Some(Message::SwitchView(ViewMode::Corkboard)),
+                            "3" => Some(Message::SwitchView(ViewMode::Outliner)),
+                            "4" => Some(Message::SwitchView(ViewMode::Scrivenings)),
                             _ => None,
                         }
                     }
@@ -1405,4 +1696,22 @@ impl ScrineverApp {
     pub fn theme(&self) -> iced::Theme {
         iced::Theme::Dark
     }
+}
+
+/// Convert text to Title Case
+fn title_case(text: &str) -> String {
+    text.split_whitespace()
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                None => String::new(),
+                Some(first) => {
+                    let upper: String = first.to_uppercase().collect();
+                    let rest: String = chars.collect();
+                    format!("{}{}", upper, rest.to_lowercase())
+                }
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }

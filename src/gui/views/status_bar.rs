@@ -11,6 +11,7 @@ pub fn view(
     target_words: Option<usize>,
     is_dirty: bool,
     project_title: &str,
+    session_active: bool,
 ) -> Element<'static, Message> {
     let dirty_indicator = if is_dirty { " [modified]" } else { "" };
     let project_info = format!("{}{}", project_title, dirty_indicator);
@@ -21,12 +22,18 @@ pub fn view(
         stats.char_count, stats.page_count, stats.document_count
     );
 
+    let session_indicator = if session_active {
+        " | Session active"
+    } else {
+        ""
+    };
+
     let content = row![
         text(project_info).size(12).color(Theme::TEXT_SECONDARY),
         Space::with_width(Length::Fill),
         text(progress).size(12).color(Theme::TEXT_PRIMARY),
         Space::with_width(20),
-        text(extra).size(12).color(Theme::TEXT_MUTED),
+        text(format!("{}{}", extra, session_indicator)).size(12).color(Theme::TEXT_MUTED),
     ]
     .padding(Padding::from([4, 12]));
 

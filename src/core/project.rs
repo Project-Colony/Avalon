@@ -6,6 +6,7 @@ use uuid::Uuid;
 use anyhow::{Context, Result};
 
 use super::binder::Binder;
+use super::bookmark::BookmarkList;
 use super::collection::Collection;
 use super::document::Document;
 use super::history::WritingHistory;
@@ -31,6 +32,9 @@ pub struct Project {
     /// Writing history (daily word counts)
     #[serde(default)]
     pub writing_history: WritingHistory,
+    /// Bookmarks / favorites
+    #[serde(default)]
+    pub bookmarks: BookmarkList,
     #[serde(skip)]
     pub path: Option<PathBuf>,
 }
@@ -49,6 +53,7 @@ impl Project {
             project_notes: String::new(),
             collections: Vec::new(),
             writing_history: WritingHistory::new(),
+            bookmarks: BookmarkList::new(),
             path: None,
         }
     }

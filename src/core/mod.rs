@@ -8,4 +8,7 @@ pub mod stats;
 pub mod collection;
 pub mod history;
 pub mod namegen;
+pub mod annotation;
+pub mod bookmark;
+pub mod recent;
 

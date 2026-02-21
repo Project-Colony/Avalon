@@ -16,3 +16,8 @@ pub mod name_generator_panel;
 pub mod text_stats_panel;
 pub mod history_panel;
 pub mod project_notes_panel;
+pub mod scrivenings_view;
+pub mod collections_panel;
+pub mod bookmarks_panel;
+pub mod annotations_panel;
+pub mod targets_panel;

@@ -1,13 +1,14 @@
-use iced::widget::{button, column, container, row, text, Space};
+use iced::widget::{button, column, container, row, scrollable, text, Space};
 use iced::{Element, Length, Padding};
 
+use crate::core::recent::RecentProjects;
 use crate::gui::app::Message;
 use crate::gui::theme::Theme;
 use crate::templates::{built_in_templates, TemplateCategory};
 
 /// Render the welcome/start screen
-pub fn view() -> Element<'static, Message> {
-    let title = text("Scrinever")
+pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
+    let title = text("Avalon")
         .size(42)
         .color(Theme::TEXT_PRIMARY);
 
@@ -33,6 +34,38 @@ pub fn view() -> Element<'static, Message> {
         open_project_btn,
     ];
 
+    // Recent projects
+    let mut recent_section = column![
+        Space::with_height(20),
+        text("Recent Projects").size(16).color(Theme::TEXT_SECONDARY),
+        Space::with_height(8),
+    ]
+    .spacing(4);
+
+    if recent_projects.projects.is_empty() {
+        recent_section = recent_section.push(
+            text("No recent projects.")
+                .size(13)
+                .color(Theme::TEXT_MUTED),
+        );
+    } else {
+        for rp in recent_projects.projects.iter().take(10) {
+            let path = rp.path.clone();
+            let recent_btn = button(
+                row![
+                    text(rp.title.clone()).size(14).color(Theme::TEXT_PRIMARY),
+                    Space::with_width(12),
+                    text(rp.last_opened.format("%Y-%m-%d %H:%M").to_string())
+                        .size(11)
+                        .color(Theme::TEXT_MUTED),
+                ]
+            )
+            .on_press(Message::OpenRecentProject(path))
+            .padding(Padding::from([6, 12]));
+            recent_section = recent_section.push(recent_btn);
+        }
+    }
+
     // Template categories
     let templates = built_in_templates();
     let categories = [
@@ -43,7 +76,7 @@ pub fn view() -> Element<'static, Message> {
     ];
 
     let mut template_section = column![
-        Space::with_height(24),
+        Space::with_height(20),
         text("Quick Start Templates").size(16).color(Theme::TEXT_SECONDARY),
         Space::with_height(8),
     ]
@@ -73,18 +106,31 @@ pub fn view() -> Element<'static, Message> {
         }
     }
 
+    // Keyboard shortcuts help
+    let shortcuts = column![
+        Space::with_height(20),
+        text("Keyboard Shortcuts").size(14).color(Theme::TEXT_SECONDARY),
+        Space::with_height(4),
+        text("Ctrl+S Save | Ctrl+N New Doc | Ctrl+F Search | Ctrl+E Compile").size(11).color(Theme::TEXT_MUTED),
+        text("Ctrl+I Inspector | Ctrl+Z Undo | Ctrl+Y Redo | Ctrl+, Settings").size(11).color(Theme::TEXT_MUTED),
+        text("Ctrl+1-4 Switch View | F11 Focus Mode | Esc Close Panel").size(11).color(Theme::TEXT_MUTED),
+    ]
+    .spacing(2);
+
     let content = column![
-        Space::with_height(60),
+        Space::with_height(40),
         title,
         subtitle,
-        Space::with_height(32),
+        Space::with_height(24),
         buttons,
+        recent_section,
         template_section,
+        shortcuts,
     ]
     .align_x(iced::Alignment::Center)
     .padding(40);
 
-    container(content)
+    container(scrollable(content))
         .width(Length::Fill)
         .height(Length::Fill)
         .center_x(Length::Fill)

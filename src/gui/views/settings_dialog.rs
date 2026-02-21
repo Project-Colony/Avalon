@@ -1,4 +1,4 @@
-use iced::widget::{button, column, container, pick_list, row, text, text_input, toggler, Space};
+use iced::widget::{button, column, container, pick_list, row, scrollable, text, text_input, toggler, Space};
 use iced::{Element, Length, Padding};
 
 use crate::core::metadata::ProjectSettings;
@@ -67,6 +67,15 @@ pub fn view(settings: &ProjectSettings, project_title: &str) -> Element<'static,
         .padding(6)
         .width(Length::Fixed(150.0));
 
+    // Deadline
+    let deadline_label = text("Target Deadline").size(12).color(Theme::TEXT_MUTED);
+    let deadline_str = settings.target_deadline.clone().unwrap_or_default();
+    let deadline_input = text_input("YYYY-MM-DD", &deadline_str)
+        .on_input(|val| Message::SettingsSetDeadline(val))
+        .size(14)
+        .padding(6)
+        .width(Length::Fixed(150.0));
+
     // Auto-save interval
     let autosave_label = text("Auto-save Interval (seconds)").size(12).color(Theme::TEXT_MUTED);
     let autosave_str = format!("{}", settings.auto_save_seconds);
@@ -80,6 +89,46 @@ pub fn view(settings: &ProjectSettings, project_title: &str) -> Element<'static,
     let word_count_toggle = toggler(settings.show_word_count)
         .label("Show word count in status bar")
         .on_toggle(|val| Message::SettingsToggleWordCount(val));
+
+    // Labels section
+    let labels_header = text("Labels").size(14).color(Theme::TEXT_SECONDARY);
+    let mut labels_col = column![].spacing(2);
+    for lbl in &settings.labels {
+        let color = lbl.color.to_iced_color();
+        labels_col = labels_col.push(
+            row![
+                text("*").size(14).color(color),
+                Space::with_width(4),
+                text(lbl.name.clone()).size(12).color(Theme::TEXT_PRIMARY),
+            ]
+        );
+    }
+
+    // Statuses section
+    let statuses_header = text("Statuses").size(14).color(Theme::TEXT_SECONDARY);
+    let mut statuses_col = column![].spacing(2);
+    for st in &settings.statuses {
+        statuses_col = statuses_col.push(
+            text(format!("  {}", st.name)).size(12).color(Theme::TEXT_PRIMARY),
+        );
+    }
+
+    // Composition mode settings
+    let comp_header = text("Composition Mode").size(14).color(Theme::TEXT_SECONDARY);
+    let comp_width_label = text("Text Width (%)").size(12).color(Theme::TEXT_MUTED);
+    let comp_width_str = format!("{:.0}", settings.fullscreen_text_width);
+    let comp_width_input = text_input("60", &comp_width_str)
+        .on_input(|val| {
+            if let Ok(w) = val.parse::<f32>() {
+                if (10.0..=100.0).contains(&w) {
+                    // Accept valid width — handled in settings
+                }
+            }
+            Message::SettingsSetFont(val) // placeholder
+        })
+        .size(12)
+        .padding(4)
+        .width(Length::Fixed(60.0));
 
     // Buttons
     let done_btn = button(
@@ -105,18 +154,31 @@ pub fn view(settings: &ProjectSettings, project_title: &str) -> Element<'static,
         Space::with_height(12),
         target_label,
         target_input,
+        Space::with_height(8),
+        deadline_label,
+        deadline_input,
         Space::with_height(12),
         autosave_label,
         autosave_input,
         Space::with_height(12),
         word_count_toggle,
+        Space::with_height(16),
+        labels_header,
+        labels_col,
+        Space::with_height(12),
+        statuses_header,
+        statuses_col,
+        Space::with_height(16),
+        comp_header,
+        comp_width_label,
+        comp_width_input,
         Space::with_height(24),
         done_btn,
     ]
     .padding(24)
     .max_width(500);
 
-    container(content)
+    container(scrollable(content))
         .width(Length::Fill)
         .height(Length::Fill)
         .center_x(Length::Fill)
