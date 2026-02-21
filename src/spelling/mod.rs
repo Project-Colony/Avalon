@@ -236,4 +236,40 @@ impl SpellSuggestion {
     pub fn best_suggestion(&self) -> Option<&str> {
         self.suggestions.first().map(|s| s.as_str())
     }
+
+    /// Number of suggestions available
+    pub fn suggestion_count(&self) -> usize {
+        self.suggestions.len()
+    }
+
+    /// Summary string for display
+    pub fn summary(&self) -> String {
+        if self.suggestions.is_empty() {
+            format!("\"{}\" — no suggestions", self.word)
+        } else {
+            format!("\"{}\" — {} suggestions: {}", self.word,
+                self.suggestions.len(),
+                self.suggestions.iter().take(3).cloned().collect::<Vec<_>>().join(", "))
+        }
+    }
+}
+
+/// Count misspelled words in a text
+pub fn count_misspellings(checker: &SpellChecker, text: &str) -> usize {
+    text.split_whitespace()
+        .filter(|w| {
+            let clean: String = w.chars().filter(|c| c.is_alphanumeric() || *c == '\'').collect();
+            !clean.is_empty() && clean.len() > 1 && !checker.check_text(&clean).is_empty()
+        })
+        .count()
+}
+
+/// Get spelling accuracy as a percentage
+pub fn spelling_accuracy(checker: &SpellChecker, text: &str) -> f64 {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    if words.is_empty() {
+        return 100.0;
+    }
+    let misspelled = count_misspellings(checker, text);
+    (1.0 - misspelled as f64 / words.len() as f64) * 100.0
 }
