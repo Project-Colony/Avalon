@@ -2607,6 +2607,12 @@ impl ScrineverApp {
         // Project statistics dialog (overlay)
         if self.show_project_stats {
             let stats = Statistics::from_binder(&project.binder);
+            let all_text = project.binder.all_text();
+            let readability = if all_text.split_whitespace().count() >= 50 {
+                Some(crate::core::stats::ReadabilityMetrics::from_text(&all_text))
+            } else {
+                None
+            };
             let data = views::project_stats_dialog::ProjectStatsData {
                 title: project.title.clone(),
                 word_count: stats.word_count,
@@ -2649,6 +2655,11 @@ impl ScrineverApp {
                         _ => None,
                     }
                 },
+                // Readability metrics (from all draft content)
+                flesch_score: readability.as_ref().map(|r| r.flesch_reading_ease),
+                flesch_label: readability.as_ref().map(|r| r.flesch_label().to_string()),
+                grade_level: readability.as_ref().map(|r| r.consensus_grade()),
+                audience: readability.as_ref().map(|r| r.audience_label().to_string()),
             };
             return views::project_stats_dialog::view(&data);
         }

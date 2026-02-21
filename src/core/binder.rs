@@ -100,6 +100,16 @@ impl Binder {
             .sum()
     }
 
+    /// Get all text content concatenated (for readability analysis)
+    pub fn all_text(&self) -> String {
+        self.all_items().iter()
+            .filter_map(|i| i.document.as_ref())
+            .filter(|d| !d.content.trim().is_empty())
+            .map(|d| d.content.as_str())
+            .collect::<Vec<_>>()
+            .join("\n\n")
+    }
+
     /// Move an item up in its parent's children list
     pub fn move_item_up(&mut self, id: &Uuid) -> bool {
         if self.draft.move_child_up(id) { return true; }

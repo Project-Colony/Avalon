@@ -27,6 +27,11 @@ pub struct ProjectStatsData {
     pub deadline: Option<String>,
     pub days_remaining: Option<i64>,
     pub words_per_day_needed: Option<usize>,
+    // Readability metrics
+    pub flesch_score: Option<f64>,
+    pub flesch_label: Option<String>,
+    pub grade_level: Option<f64>,
+    pub audience: Option<String>,
 }
 
 /// Render the project statistics dialog
@@ -66,6 +71,25 @@ pub fn view(data: &ProjectStatsData) -> Element<'static, Message> {
         stat("Best Day", &format!("{} words", data.best_day_words)),
         stat("Total Time", &format!("{:.1} hours", data.total_time_hours)),
     ]);
+
+    // Readability
+    let readability_section: Element<'static, Message> = if let Some(score) = data.flesch_score {
+        let mut items = vec![
+            stat("Flesch Reading Ease", &format!("{:.1}", score)),
+        ];
+        if let Some(ref label) = data.flesch_label {
+            items.push(stat("Reading Level", label));
+        }
+        if let Some(grade) = data.grade_level {
+            items.push(stat("Grade Level", &format!("{:.1}", grade)));
+        }
+        if let Some(ref audience) = data.audience {
+            items.push(stat("Target Audience", audience));
+        }
+        section("Readability", items)
+    } else {
+        Space::with_height(0).into()
+    };
 
     // Target progress (if target set)
     let target_section: Element<'static, Message> = if let Some(target) = data.target_words {
@@ -123,6 +147,8 @@ pub fn view(data: &ProjectStatsData) -> Element<'static, Message> {
         time_section,
         Space::with_height(8),
         habits_section,
+        Space::with_height(8),
+        readability_section,
         Space::with_height(8),
         target_section,
         Space::with_height(16),
