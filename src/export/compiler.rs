@@ -1,0 +1,515 @@
+use std::path::Path;
+use anyhow::Result;
+
+use crate::core::binder::{Binder, BinderItem, BinderItemKind};
+
+/// Output format for compilation
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OutputFormat {
+    PlainText,
+    Markdown,
+    Html,
+    Pdf,
+    Latex,
+    Docx,
+    Epub,
+    Rtf,
+    Opml,
+    Fountain,
+}
+
+impl OutputFormat {
+    pub fn extension(&self) -> &str {
+        match self {
+            OutputFormat::PlainText => "txt",
+            OutputFormat::Markdown => "md",
+            OutputFormat::Html => "html",
+            OutputFormat::Pdf => "pdf",
+            OutputFormat::Latex => "tex",
+            OutputFormat::Docx => "docx",
+            OutputFormat::Epub => "epub",
+            OutputFormat::Rtf => "rtf",
+            OutputFormat::Opml => "opml",
+            OutputFormat::Fountain => "fountain",
+        }
+    }
+
+    pub fn display_name(&self) -> &str {
+        match self {
+            OutputFormat::PlainText => "Plain Text",
+            OutputFormat::Markdown => "Markdown",
+            OutputFormat::Html => "HTML",
+            OutputFormat::Pdf => "PDF",
+            OutputFormat::Latex => "LaTeX",
+            OutputFormat::Docx => "Word (DOCX)",
+            OutputFormat::Epub => "ePub",
+            OutputFormat::Rtf => "RTF",
+            OutputFormat::Opml => "OPML",
+            OutputFormat::Fountain => "Fountain",
+        }
+    }
+
+    pub fn all() -> Vec<Self> {
+        vec![
+            OutputFormat::PlainText,
+            OutputFormat::Markdown,
+            OutputFormat::Html,
+            OutputFormat::Pdf,
+            OutputFormat::Latex,
+            OutputFormat::Docx,
+            OutputFormat::Epub,
+            OutputFormat::Rtf,
+            OutputFormat::Opml,
+            OutputFormat::Fountain,
+        ]
+    }
+}
+
+/// Options for compiling/exporting
+#[derive(Debug, Clone)]
+pub struct CompileOptions {
+    pub format: OutputFormat,
+    pub title: String,
+    pub author: String,
+    /// Include front matter (title page)
+    pub include_front_matter: bool,
+    /// Separator between documents
+    pub separator: SeparatorType,
+    /// Whether to add page breaks between top-level folders
+    pub page_break_between_folders: bool,
+    /// Include only items marked for compile
+    pub compile_marked_only: bool,
+    /// Font size for output
+    pub font_size: f32,
+    /// Font family for output
+    pub font_family: String,
+    /// Include table of contents
+    pub include_toc: bool,
+    /// Replace Scrivener-style placeholders (<$n>, <$date>, etc.)
+    pub replace_placeholders: bool,
+}
+
+impl Default for CompileOptions {
+    fn default() -> Self {
+        Self {
+            format: OutputFormat::Markdown,
+            title: String::new(),
+            author: String::new(),
+            include_front_matter: true,
+            separator: SeparatorType::EmptyLine,
+            page_break_between_folders: true,
+            compile_marked_only: true,
+            font_size: 12.0,
+            font_family: "Times New Roman".to_string(),
+            include_toc: false,
+            replace_placeholders: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum SeparatorType {
+    EmptyLine,
+    PageBreak,
+    SectionBreak,
+    Custom(String),
+    None,
+}
+
+/// The compiler that assembles documents for export
+pub struct Compiler;
+
+impl Compiler {
+    /// Compile the draft into a single output string
+    pub fn compile(binder: &Binder, options: &CompileOptions) -> Result<String> {
+        let contents = Self::collect_contents(&binder.draft, options);
+
+        let mut output = match options.format {
+            OutputFormat::PlainText => plain_text_compile(&contents, options),
+            OutputFormat::Markdown => super::markdown::compile(&contents, options),
+            OutputFormat::Html => super::html::compile(&contents, options),
+            OutputFormat::Latex => super::latex::compile(&contents, options),
+            OutputFormat::Rtf => super::rtf::compile(&contents, options),
+            OutputFormat::Fountain => super::fountain::compile(&contents, options),
+            OutputFormat::Opml => super::opml::export_opml(binder, &options.title),
+            OutputFormat::Pdf => {
+                Ok("PDF compilation requires save_to_file()".to_string())
+            }
+            OutputFormat::Docx => {
+                Ok("DOCX compilation requires save_to_file()".to_string())
+            }
+            OutputFormat::Epub => {
+                Ok("ePub compilation requires save_to_file()".to_string())
+            }
+        }?;
+
+        // Insert table of contents if enabled
+        if options.include_toc {
+            let sections: Vec<(String, usize)> = contents.iter()
+                .filter(|c| c.is_folder || !c.text.is_empty())
+                .map(|c| (c.title.clone(), c.depth))
+                .collect();
+
+            let toc = match options.format {
+                OutputFormat::Html => super::placeholders::generate_toc_html(&sections),
+                OutputFormat::Markdown => super::placeholders::generate_toc_markdown(&sections),
+                _ => super::placeholders::generate_toc(&sections),
+            };
+
+            // Insert TOC after front matter (or at start)
+            if options.include_front_matter {
+                // Find end of front matter (first double newline)
+                if let Some(pos) = output.find("\n\n") {
+                    output.insert_str(pos + 2, &toc);
+                } else {
+                    output = format!("{}\n{}", toc, output);
+                }
+            } else {
+                output = format!("{}{}", toc, output);
+            }
+        }
+
+        // Replace placeholders if enabled
+        if options.replace_placeholders {
+            let total_words = contents.iter()
+                .map(|c| c.text.split_whitespace().count())
+                .sum::<usize>();
+            let total_chars = contents.iter()
+                .map(|c| c.text.len())
+                .sum::<usize>();
+
+            let context = super::placeholders::PlaceholderContext {
+                project_title: options.title.clone(),
+                author: options.author.clone(),
+                word_count: total_words,
+                char_count: total_chars,
+                page_count: (total_words / 250).max(1),
+            };
+            output = super::placeholders::replace_placeholders(&output, &context);
+        }
+
+        Ok(output)
+    }
+
+    /// Save compiled output to a file
+    pub fn save_to_file(binder: &Binder, options: &CompileOptions, path: &Path) -> Result<()> {
+        let contents = Self::collect_contents(&binder.draft, options);
+
+        match options.format {
+            OutputFormat::Pdf => {
+                super::pdf::save_pdf(&contents, options, path)
+            }
+            OutputFormat::Docx => {
+                super::docx::save_docx(&contents, options, path)
+            }
+            OutputFormat::Epub => {
+                super::epub::save_epub(&contents, options, path)
+            }
+            _ => {
+                let output = Self::compile(binder, options)?;
+                std::fs::write(path, output)?;
+                Ok(())
+            }
+        }
+    }
+
+    /// Collect contents from the binder tree in order
+    fn collect_contents(item: &BinderItem, options: &CompileOptions) -> Vec<CompileContent> {
+        let mut contents = Vec::new();
+        Self::collect_recursive(item, options, 0, &mut contents);
+        contents
+    }
+
+    fn collect_recursive(
+        item: &BinderItem,
+        options: &CompileOptions,
+        depth: usize,
+        contents: &mut Vec<CompileContent>,
+    ) {
+        if options.compile_marked_only && !item.include_in_compile {
+            return;
+        }
+
+        match item.kind {
+            BinderItemKind::Text => {
+                if let Some(ref doc) = item.document {
+                    contents.push(CompileContent {
+                        title: item.title.clone(),
+                        text: doc.content.clone(),
+                        depth,
+                        is_folder: false,
+                    });
+                }
+            }
+            BinderItemKind::Folder => {
+                // Add folder as a heading
+                contents.push(CompileContent {
+                    title: item.title.clone(),
+                    text: String::new(),
+                    depth,
+                    is_folder: true,
+                });
+            }
+            _ => {}
+        }
+
+        for child in &item.children {
+            Self::collect_recursive(child, options, depth + 1, contents);
+        }
+    }
+}
+
+/// Content ready for compilation
+#[derive(Debug, Clone)]
+pub struct CompileContent {
+    pub title: String,
+    pub text: String,
+    pub depth: usize,
+    pub is_folder: bool,
+}
+
+impl CompileContent {
+    /// Word count for this content item
+    pub fn word_count(&self) -> usize {
+        self.text.split_whitespace().count()
+    }
+
+    /// Character count for this content item
+    pub fn char_count(&self) -> usize {
+        self.text.len()
+    }
+
+    /// Check if this content item is empty
+    pub fn is_empty(&self) -> bool {
+        self.text.trim().is_empty() && !self.is_folder
+    }
+}
+
+impl SeparatorType {
+    /// Human-readable label
+    pub fn label(&self) -> &str {
+        match self {
+            SeparatorType::EmptyLine => "Empty Line",
+            SeparatorType::PageBreak => "Page Break",
+            SeparatorType::SectionBreak => "Section Break (***)",
+            SeparatorType::Custom(_) => "Custom",
+            SeparatorType::None => "None",
+        }
+    }
+
+    /// All standard separator types
+    pub fn all_standard() -> Vec<Self> {
+        vec![
+            SeparatorType::EmptyLine,
+            SeparatorType::PageBreak,
+            SeparatorType::SectionBreak,
+            SeparatorType::None,
+        ]
+    }
+}
+
+impl OutputFormat {
+    /// Check if this format requires save_to_file (binary formats)
+    pub fn is_binary(&self) -> bool {
+        matches!(self, OutputFormat::Pdf | OutputFormat::Docx | OutputFormat::Epub)
+    }
+
+    /// MIME type for this format
+    pub fn mime_type(&self) -> &str {
+        match self {
+            OutputFormat::PlainText => "text/plain",
+            OutputFormat::Markdown => "text/markdown",
+            OutputFormat::Html => "text/html",
+            OutputFormat::Pdf => "application/pdf",
+            OutputFormat::Latex => "application/x-latex",
+            OutputFormat::Docx => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            OutputFormat::Epub => "application/epub+zip",
+            OutputFormat::Rtf => "application/rtf",
+            OutputFormat::Opml => "text/x-opml",
+            OutputFormat::Fountain => "text/plain",
+        }
+    }
+}
+
+fn plain_text_compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
+    super::plain_text::compile(contents, options)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_output_format_extension() {
+        assert_eq!(OutputFormat::PlainText.extension(), "txt");
+        assert_eq!(OutputFormat::Markdown.extension(), "md");
+        assert_eq!(OutputFormat::Html.extension(), "html");
+        assert_eq!(OutputFormat::Pdf.extension(), "pdf");
+        assert_eq!(OutputFormat::Latex.extension(), "tex");
+        assert_eq!(OutputFormat::Docx.extension(), "docx");
+        assert_eq!(OutputFormat::Epub.extension(), "epub");
+    }
+
+    #[test]
+    fn test_output_format_display_name() {
+        assert_eq!(OutputFormat::PlainText.display_name(), "Plain Text");
+        assert_eq!(OutputFormat::Html.display_name(), "HTML");
+        assert_eq!(OutputFormat::Docx.display_name(), "Word (DOCX)");
+    }
+
+    #[test]
+    fn test_all_formats() {
+        let all = OutputFormat::all();
+        assert_eq!(all.len(), 10);
+    }
+
+    #[test]
+    fn test_is_binary() {
+        assert!(OutputFormat::Pdf.is_binary());
+        assert!(OutputFormat::Docx.is_binary());
+        assert!(OutputFormat::Epub.is_binary());
+        assert!(!OutputFormat::Html.is_binary());
+        assert!(!OutputFormat::Markdown.is_binary());
+    }
+
+    #[test]
+    fn test_mime_types() {
+        assert_eq!(OutputFormat::Html.mime_type(), "text/html");
+        assert_eq!(OutputFormat::Pdf.mime_type(), "application/pdf");
+        assert_eq!(OutputFormat::Markdown.mime_type(), "text/markdown");
+    }
+
+    #[test]
+    fn test_compile_options_default() {
+        let opts = CompileOptions::default();
+        assert_eq!(opts.format, OutputFormat::Markdown);
+        assert!(opts.include_front_matter);
+        assert!(opts.compile_marked_only);
+        assert_eq!(opts.font_size, 12.0);
+    }
+
+    #[test]
+    fn test_compile_content() {
+        let content = CompileContent {
+            title: "Test Chapter".to_string(),
+            text: "Hello world this is content".to_string(),
+            depth: 0,
+            is_folder: false,
+        };
+        assert_eq!(content.word_count(), 5);
+        assert!(!content.is_empty());
+    }
+
+    #[test]
+    fn test_compile_content_empty() {
+        let content = CompileContent {
+            title: "Empty".to_string(),
+            text: "  \n  ".to_string(),
+            depth: 0,
+            is_folder: false,
+        };
+        assert!(content.is_empty());
+    }
+
+    #[test]
+    fn test_separator_type_labels() {
+        assert_eq!(SeparatorType::EmptyLine.label(), "Empty Line");
+        assert_eq!(SeparatorType::PageBreak.label(), "Page Break");
+        assert_eq!(SeparatorType::None.label(), "None");
+    }
+
+    #[test]
+    fn test_separator_all_standard() {
+        let all = SeparatorType::all_standard();
+        assert_eq!(all.len(), 4);
+    }
+
+    #[test]
+    fn test_collect_contents() {
+        let mut binder = Binder::default_structure();
+        let mut item1 = BinderItem::new_text("Chapter 1");
+        if let Some(ref mut doc) = item1.document {
+            doc.content = "Hello world".to_string();
+        }
+        item1.include_in_compile = true;
+        binder.draft.add_child(item1);
+
+        let mut item2 = BinderItem::new_text("Chapter 2");
+        if let Some(ref mut doc) = item2.document {
+            doc.content = "Second chapter".to_string();
+        }
+        item2.include_in_compile = true;
+        binder.draft.add_child(item2);
+
+        let opts = CompileOptions::default();
+        let contents = Compiler::collect_contents(&binder.draft, &opts);
+        // Draft folder + 2 chapters
+        assert!(contents.len() >= 2);
+    }
+
+    #[test]
+    fn test_compile_plain_text() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Test");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Hello world".to_string();
+        }
+        item.include_in_compile = true;
+        binder.draft.add_child(item);
+
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::PlainText;
+        opts.include_front_matter = false;
+        opts.include_toc = false;
+        opts.replace_placeholders = false;
+
+        let result = Compiler::compile(&binder, &opts);
+        assert!(result.is_ok());
+        let text = result.unwrap();
+        assert!(text.contains("Hello world"));
+    }
+
+    #[test]
+    fn test_compile_markdown() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Chapter One");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "The story begins.".to_string();
+        }
+        item.include_in_compile = true;
+        binder.draft.add_child(item);
+
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::Markdown;
+        opts.title = "My Book".to_string();
+        opts.include_front_matter = true;
+        opts.include_toc = false;
+        opts.replace_placeholders = false;
+
+        let result = Compiler::compile(&binder, &opts);
+        assert!(result.is_ok());
+        let text = result.unwrap();
+        assert!(text.contains("The story begins"));
+    }
+
+    #[test]
+    fn test_compile_html() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Scene");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Some text here.".to_string();
+        }
+        item.include_in_compile = true;
+        binder.draft.add_child(item);
+
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::Html;
+        opts.include_toc = false;
+        opts.replace_placeholders = false;
+
+        let result = Compiler::compile(&binder, &opts);
+        assert!(result.is_ok());
+        let html = result.unwrap();
+        assert!(html.contains("<") && html.contains(">"));
+    }
+}

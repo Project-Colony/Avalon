@@ -1,0 +1,693 @@
+use serde::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
+
+/// A Document represents the text content of a binder item.
+/// It stores the content as plain text / Markdown with optional rich text spans.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Document {
+    /// The raw text content (Markdown-compatible)
+    pub content: String,
+    /// Rich text spans for formatting beyond Markdown
+    pub spans: Vec<TextSpan>,
+    /// Notes/comments associated with this document
+    pub notes: String,
+    /// Document-level references/links
+    pub references: Vec<Reference>,
+    /// Footnotes / endnotes
+    #[serde(default)]
+    pub footnotes: Vec<Footnote>,
+    /// Inline annotations / comments
+    #[serde(default)]
+    pub annotations: Vec<crate::core::annotation::Annotation>,
+    /// Last modification time
+    pub modified_at: DateTime<Utc>,
+    /// Cursor position (for restoring editing state)
+    pub cursor_position: usize,
+}
+
+impl Document {
+    pub fn new() -> Self {
+        Self {
+            content: String::new(),
+            spans: Vec::new(),
+            notes: String::new(),
+            references: Vec::new(),
+            footnotes: Vec::new(),
+            annotations: Vec::new(),
+            modified_at: Utc::now(),
+            cursor_position: 0,
+        }
+    }
+
+    pub fn with_content(content: &str) -> Self {
+        let mut doc = Self::new();
+        doc.content = content.to_string();
+        doc
+    }
+
+    /// Get word count
+    pub fn word_count(&self) -> usize {
+        self.content.split_whitespace().count()
+    }
+
+    /// Get character count (with spaces)
+    pub fn char_count(&self) -> usize {
+        self.content.len()
+    }
+
+    /// Get character count (without spaces)
+    pub fn char_count_no_spaces(&self) -> usize {
+        self.content.chars().filter(|c| !c.is_whitespace()).count()
+    }
+
+    /// Get paragraph count
+    pub fn paragraph_count(&self) -> usize {
+        if self.content.is_empty() {
+            return 0;
+        }
+        self.content.split("\n\n").filter(|p| !p.trim().is_empty()).count()
+    }
+
+    /// Get sentence count (approximate)
+    pub fn sentence_count(&self) -> usize {
+        self.content.chars()
+            .filter(|c| *c == '.' || *c == '!' || *c == '?')
+            .count()
+            .max(if self.content.is_empty() { 0 } else { 1 })
+    }
+
+    /// Get line count
+    pub fn line_count(&self) -> usize {
+        if self.content.is_empty() {
+            return 0;
+        }
+        self.content.lines().count()
+    }
+
+    /// Estimate page count (250 words per page)
+    pub fn page_count(&self) -> f64 {
+        self.word_count() as f64 / 250.0
+    }
+
+    /// Reading time estimate in minutes (250 WPM)
+    pub fn reading_time_minutes(&self) -> f64 {
+        self.word_count() as f64 / 250.0
+    }
+
+    /// Speaking time estimate in minutes (150 WPM)
+    pub fn speaking_time_minutes(&self) -> f64 {
+        self.word_count() as f64 / 150.0
+    }
+
+    /// Unique word count
+    pub fn unique_word_count(&self) -> usize {
+        let mut seen = std::collections::HashSet::new();
+        for word in self.content.split_whitespace() {
+            let clean: String = word.chars()
+                .filter(|c| c.is_alphanumeric() || *c == '\'')
+                .collect();
+            if !clean.is_empty() {
+                seen.insert(clean.to_lowercase());
+            }
+        }
+        seen.len()
+    }
+
+    /// Average word length in characters
+    pub fn avg_word_length(&self) -> f64 {
+        let words: Vec<&str> = self.content.split_whitespace().collect();
+        if words.is_empty() {
+            return 0.0;
+        }
+        let total_chars: usize = words.iter()
+            .map(|w| w.chars().filter(|c| c.is_alphanumeric()).count())
+            .sum();
+        total_chars as f64 / words.len() as f64
+    }
+
+    /// Average sentence length in words (approximate)
+    pub fn avg_sentence_length(&self) -> f64 {
+        let sentences = self.sentence_count();
+        if sentences == 0 {
+            return 0.0;
+        }
+        self.word_count() as f64 / sentences as f64
+    }
+
+    /// Count syllables in a word (approximate English syllable counter)
+    fn count_syllables(word: &str) -> usize {
+        let word = word.to_lowercase();
+        if word.len() <= 3 {
+            return 1;
+        }
+        let mut count = 0;
+        let mut prev_vowel = false;
+        let vowels = ['a', 'e', 'i', 'o', 'u', 'y'];
+        for ch in word.chars() {
+            let is_vowel = vowels.contains(&ch);
+            if is_vowel && !prev_vowel {
+                count += 1;
+            }
+            prev_vowel = is_vowel;
+        }
+        // Adjust: silent 'e' at end
+        if word.ends_with('e') && count > 1 {
+            count -= 1;
+        }
+        count.max(1)
+    }
+
+    /// Flesch-Kincaid readability grade level
+    /// Higher = more difficult reading; typical novel is 7-9
+    pub fn readability_grade(&self) -> f64 {
+        let words = self.word_count() as f64;
+        let sentences = self.sentence_count() as f64;
+        if words == 0.0 || sentences == 0.0 {
+            return 0.0;
+        }
+        let syllables: usize = self.content.split_whitespace()
+            .map(|w| Self::count_syllables(w))
+            .sum();
+        // Flesch-Kincaid Grade Level formula
+        0.39 * (words / sentences) + 11.8 * (syllables as f64 / words) - 15.59
+    }
+
+    /// Flesch Reading Ease score (0-100, higher = easier to read)
+    pub fn reading_ease(&self) -> f64 {
+        let words = self.word_count() as f64;
+        let sentences = self.sentence_count() as f64;
+        if words == 0.0 || sentences == 0.0 {
+            return 0.0;
+        }
+        let syllables: usize = self.content.split_whitespace()
+            .map(|w| Self::count_syllables(w))
+            .sum();
+        206.835 - 1.015 * (words / sentences) - 84.6 * (syllables as f64 / words)
+    }
+
+    /// Update content and refresh modification time
+    pub fn set_content(&mut self, content: String) {
+        self.content = content;
+        self.modified_at = Utc::now();
+    }
+
+    /// Insert text at a given byte position
+    pub fn insert_text(&mut self, position: usize, text: &str) {
+        let pos = position.min(self.content.len());
+        self.content.insert_str(pos, text);
+        self.modified_at = Utc::now();
+    }
+
+    /// Delete text in a range
+    pub fn delete_range(&mut self, start: usize, end: usize) {
+        let start = start.min(self.content.len());
+        let end = end.min(self.content.len());
+        if start < end {
+            self.content.drain(start..end);
+            self.modified_at = Utc::now();
+        }
+    }
+}
+
+impl Document {
+    /// Get all unique words in the document
+    pub fn unique_words(&self) -> Vec<String> {
+        let mut words: Vec<String> = self.content.split_whitespace()
+            .map(|w| w.chars().filter(|c| c.is_alphanumeric() || *c == '\'').collect::<String>())
+            .filter(|w| !w.is_empty())
+            .map(|w| w.to_lowercase())
+            .collect();
+        words.sort();
+        words.dedup();
+        words
+    }
+
+    /// Get word frequency map (word -> count)
+    pub fn word_frequency(&self) -> std::collections::HashMap<String, usize> {
+        let mut freq = std::collections::HashMap::new();
+        for word in self.content.split_whitespace() {
+            let clean: String = word.chars()
+                .filter(|c| c.is_alphanumeric() || *c == '\'')
+                .collect::<String>()
+                .to_lowercase();
+            if !clean.is_empty() {
+                *freq.entry(clean).or_insert(0) += 1;
+            }
+        }
+        freq
+    }
+
+    /// Get the N most frequent words
+    pub fn most_frequent_words(&self, n: usize) -> Vec<(String, usize)> {
+        let freq = self.word_frequency();
+        let mut pairs: Vec<(String, usize)> = freq.into_iter().collect();
+        pairs.sort_by(|a, b| b.1.cmp(&a.1));
+        pairs.truncate(n);
+        pairs
+    }
+
+    /// Count occurrences of a word (case-insensitive)
+    pub fn count_word(&self, word: &str) -> usize {
+        let lower = word.to_lowercase();
+        self.content.split_whitespace()
+            .filter(|w| {
+                w.chars()
+                    .filter(|c| c.is_alphanumeric() || *c == '\'')
+                    .collect::<String>()
+                    .to_lowercase() == lower
+            })
+            .count()
+    }
+
+    /// Get a text excerpt around a byte position
+    pub fn excerpt_around(&self, pos: usize, radius: usize) -> String {
+        let start = pos.saturating_sub(radius);
+        let end = (pos + radius).min(self.content.len());
+        let snippet = &self.content[start..end];
+        if start > 0 && end < self.content.len() {
+            format!("...{}...", snippet)
+        } else if start > 0 {
+            format!("...{}", snippet)
+        } else if end < self.content.len() {
+            format!("{}...", snippet)
+        } else {
+            snippet.to_string()
+        }
+    }
+
+    /// Check if the document contains a substring (case-insensitive)
+    pub fn contains_text(&self, query: &str) -> bool {
+        self.content.to_lowercase().contains(&query.to_lowercase())
+    }
+
+    /// Get the first N characters as a preview
+    pub fn preview(&self, max_chars: usize) -> String {
+        if self.content.len() <= max_chars {
+            self.content.clone()
+        } else {
+            let truncated = &self.content[..max_chars];
+            format!("{}...", truncated.trim_end())
+        }
+    }
+
+    /// Count the number of annotations
+    pub fn annotation_count(&self) -> usize {
+        self.annotations.len()
+    }
+
+    /// Count open (unresolved) annotations
+    pub fn open_annotation_count(&self) -> usize {
+        self.annotations.iter().filter(|a| !a.resolved).count()
+    }
+
+    /// Count footnotes
+    pub fn footnote_count(&self) -> usize {
+        self.footnotes.len()
+    }
+
+    /// Check if the document has any formatting spans
+    pub fn has_formatting(&self) -> bool {
+        !self.spans.is_empty()
+    }
+
+    /// Check if the document has notes
+    pub fn has_notes(&self) -> bool {
+        !self.notes.trim().is_empty()
+    }
+
+    /// Check if the document is empty
+    pub fn is_empty(&self) -> bool {
+        self.content.trim().is_empty()
+    }
+
+    /// Get a summary string
+    pub fn summary(&self) -> String {
+        let wc = self.word_count();
+        let lc = self.line_count();
+        let pc = self.paragraph_count();
+        format!("{} words, {} lines, {} paragraphs", wc, lc, pc)
+    }
+
+    /// Vocabulary richness (unique words / total words)
+    pub fn vocabulary_richness(&self) -> f64 {
+        let total = self.word_count();
+        if total == 0 {
+            return 0.0;
+        }
+        self.unique_word_count() as f64 / total as f64
+    }
+
+    /// Average paragraph length in words
+    pub fn avg_paragraph_length(&self) -> f64 {
+        let para = self.paragraph_count();
+        if para == 0 {
+            return 0.0;
+        }
+        self.word_count() as f64 / para as f64
+    }
+
+    /// Find all positions of a substring (case-insensitive)
+    pub fn find_positions(&self, query: &str) -> Vec<usize> {
+        if query.is_empty() {
+            return Vec::new();
+        }
+        let lower = self.content.to_lowercase();
+        let lower_query = query.to_lowercase();
+        lower.match_indices(&lower_query).map(|(pos, _)| pos).collect()
+    }
+}
+
+impl Default for Document {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A span of styled text within a document
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TextSpan {
+    pub start: usize,
+    pub end: usize,
+    pub style: SpanStyle,
+}
+
+/// Styling for a text span
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpanStyle {
+    pub bold: bool,
+    pub italic: bool,
+    pub underline: bool,
+    pub strikethrough: bool,
+    pub font_size: Option<f32>,
+    pub font_family: Option<String>,
+    pub color: Option<String>,
+    pub highlight: Option<String>,
+}
+
+impl Default for SpanStyle {
+    fn default() -> Self {
+        Self {
+            bold: false,
+            italic: false,
+            underline: false,
+            strikethrough: false,
+            font_size: None,
+            font_family: None,
+            color: None,
+            highlight: None,
+        }
+    }
+}
+
+/// A reference/link to an external resource
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Reference {
+    pub title: String,
+    pub url: Option<String>,
+    pub path: Option<String>,
+    pub notes: String,
+}
+
+impl Reference {
+    /// Create a URL reference
+    pub fn from_url(title: &str, url: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            url: Some(url.to_string()),
+            path: None,
+            notes: String::new(),
+        }
+    }
+
+    /// Create a file path reference
+    pub fn from_path(title: &str, path: &str) -> Self {
+        Self {
+            title: title.to_string(),
+            url: None,
+            path: Some(path.to_string()),
+            notes: String::new(),
+        }
+    }
+
+    /// Check if this is a web reference
+    pub fn is_web(&self) -> bool {
+        self.url.is_some()
+    }
+
+    /// Check if this is a file reference
+    pub fn is_file(&self) -> bool {
+        self.path.is_some()
+    }
+}
+
+/// A footnote or endnote
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Footnote {
+    pub marker: usize,
+    pub text: String,
+    pub is_endnote: bool,
+}
+
+impl Footnote {
+    /// Create a new footnote
+    pub fn new(marker: usize, text: &str) -> Self {
+        Self {
+            marker,
+            text: text.to_string(),
+            is_endnote: false,
+        }
+    }
+
+    /// Create a new endnote
+    pub fn endnote(marker: usize, text: &str) -> Self {
+        Self {
+            marker,
+            text: text.to_string(),
+            is_endnote: true,
+        }
+    }
+}
+
+impl TextSpan {
+    /// Create a new span with a given style
+    pub fn new(start: usize, end: usize, style: SpanStyle) -> Self {
+        Self { start, end, style }
+    }
+
+    /// Length of the span in characters
+    pub fn len(&self) -> usize {
+        self.end.saturating_sub(self.start)
+    }
+
+    /// Check if span is empty
+    pub fn is_empty(&self) -> bool {
+        self.start >= self.end
+    }
+
+    /// Check if a position is within this span
+    pub fn contains(&self, pos: usize) -> bool {
+        pos >= self.start && pos < self.end
+    }
+
+    /// Check if two spans overlap
+    pub fn overlaps(&self, other: &TextSpan) -> bool {
+        self.start < other.end && other.start < self.end
+    }
+}
+
+impl SpanStyle {
+    /// Create a bold style
+    pub fn bold() -> Self {
+        Self { bold: true, ..Default::default() }
+    }
+
+    /// Create an italic style
+    pub fn italic() -> Self {
+        Self { italic: true, ..Default::default() }
+    }
+
+    /// Create a bold + italic style
+    pub fn bold_italic() -> Self {
+        Self { bold: true, italic: true, ..Default::default() }
+    }
+
+    /// Check if this span has any styling applied
+    pub fn has_formatting(&self) -> bool {
+        self.bold || self.italic || self.underline || self.strikethrough
+            || self.font_size.is_some() || self.font_family.is_some()
+            || self.color.is_some() || self.highlight.is_some()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_document_new() {
+        let doc = Document::new();
+        assert!(doc.content.is_empty());
+        assert_eq!(doc.word_count(), 0);
+        assert_eq!(doc.char_count(), 0);
+        assert!(doc.is_empty());
+    }
+
+    #[test]
+    fn test_document_with_content() {
+        let doc = Document::with_content("Hello world. This is a test.");
+        assert_eq!(doc.word_count(), 6);
+        assert_eq!(doc.sentence_count(), 2);
+        assert!(!doc.is_empty());
+    }
+
+    #[test]
+    fn test_word_count() {
+        let doc = Document::with_content("one two three four five");
+        assert_eq!(doc.word_count(), 5);
+    }
+
+    #[test]
+    fn test_paragraph_count() {
+        let doc = Document::with_content("First paragraph.\n\nSecond paragraph.\n\nThird paragraph.");
+        assert_eq!(doc.paragraph_count(), 3);
+    }
+
+    #[test]
+    fn test_sentence_count() {
+        let doc = Document::with_content("Hello! How are you? I am fine.");
+        assert_eq!(doc.sentence_count(), 3);
+    }
+
+    #[test]
+    fn test_char_counts() {
+        let doc = Document::with_content("a b c");
+        assert_eq!(doc.char_count(), 5);
+        assert_eq!(doc.char_count_no_spaces(), 3);
+    }
+
+    #[test]
+    fn test_unique_word_count() {
+        let doc = Document::with_content("the cat sat on the mat the cat");
+        assert_eq!(doc.unique_word_count(), 5); // the, cat, sat, on, mat
+    }
+
+    #[test]
+    fn test_word_frequency() {
+        let doc = Document::with_content("the cat the dog the cat");
+        let freq = doc.word_frequency();
+        assert_eq!(freq.get("the"), Some(&3));
+        assert_eq!(freq.get("cat"), Some(&2));
+        assert_eq!(freq.get("dog"), Some(&1));
+    }
+
+    #[test]
+    fn test_most_frequent_words() {
+        let doc = Document::with_content("a a a b b c");
+        let top = doc.most_frequent_words(2);
+        assert_eq!(top.len(), 2);
+        assert_eq!(top[0].0, "a");
+        assert_eq!(top[0].1, 3);
+    }
+
+    #[test]
+    fn test_vocabulary_richness() {
+        let doc = Document::with_content("the the the");
+        assert!((doc.vocabulary_richness() - 1.0 / 3.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_readability() {
+        let doc = Document::with_content("The cat sat on the mat. The dog ran away.");
+        let grade = doc.readability_grade();
+        // Simple text should be low grade level
+        assert!(grade < 10.0);
+        let ease = doc.reading_ease();
+        assert!(ease > 0.0);
+    }
+
+    #[test]
+    fn test_insert_text() {
+        let mut doc = Document::with_content("Hello world");
+        doc.insert_text(5, " beautiful");
+        assert_eq!(doc.content, "Hello beautiful world");
+    }
+
+    #[test]
+    fn test_delete_range() {
+        let mut doc = Document::with_content("Hello beautiful world");
+        doc.delete_range(5, 15);
+        assert_eq!(doc.content, "Hello world");
+    }
+
+    #[test]
+    fn test_set_content() {
+        let mut doc = Document::new();
+        doc.set_content("New content".to_string());
+        assert_eq!(doc.content, "New content");
+    }
+
+    #[test]
+    fn test_find_positions() {
+        let doc = Document::with_content("the cat and the dog and the mouse");
+        let positions = doc.find_positions("the");
+        assert_eq!(positions.len(), 3);
+        assert_eq!(positions[0], 0);
+    }
+
+    #[test]
+    fn test_preview() {
+        let doc = Document::with_content("This is a very long text that should be truncated");
+        let preview = doc.preview(10);
+        assert!(preview.ends_with("..."));
+        assert!(preview.len() <= 15);
+    }
+
+    #[test]
+    fn test_contains_text() {
+        let doc = Document::with_content("Hello World");
+        assert!(doc.contains_text("hello"));
+        assert!(doc.contains_text("WORLD"));
+        assert!(!doc.contains_text("foo"));
+    }
+
+    #[test]
+    fn test_summary() {
+        let doc = Document::with_content("Hello world.\n\nAnother paragraph.");
+        let summary = doc.summary();
+        assert!(summary.contains("4 words"));
+        assert!(summary.contains("2 paragraphs"));
+    }
+
+    #[test]
+    fn test_footnote_creation() {
+        let fn1 = Footnote::new(1, "A footnote");
+        assert_eq!(fn1.marker, 1);
+        assert!(!fn1.is_endnote);
+
+        let en1 = Footnote::endnote(2, "An endnote");
+        assert!(en1.is_endnote);
+    }
+
+    #[test]
+    fn test_text_span() {
+        let span = TextSpan::new(5, 10, SpanStyle::bold());
+        assert_eq!(span.len(), 5);
+        assert!(!span.is_empty());
+        assert!(span.contains(7));
+        assert!(!span.contains(11));
+
+        let other = TextSpan::new(8, 15, SpanStyle::italic());
+        assert!(span.overlaps(&other));
+    }
+
+    #[test]
+    fn test_reference_types() {
+        let web = Reference::from_url("Google", "https://google.com");
+        assert!(web.is_web());
+        assert!(!web.is_file());
+
+        let file = Reference::from_path("Notes", "/path/to/notes.txt");
+        assert!(file.is_file());
+        assert!(!file.is_web());
+    }
+}
