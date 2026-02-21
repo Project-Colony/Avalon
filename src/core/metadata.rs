@@ -370,6 +370,257 @@ impl ProjectSettings {
                 })
         })
     }
+
+    /// Add a new custom label
+    pub fn add_label(&mut self, name: &str, color: LabelColor) {
+        if !self.labels.iter().any(|l| l.name == name) {
+            self.labels.push(Label::new(name, color));
+        }
+    }
+
+    /// Remove a label by name
+    pub fn remove_label(&mut self, name: &str) {
+        self.labels.retain(|l| l.name != name);
+    }
+
+    /// Add a new custom status
+    pub fn add_status(&mut self, name: &str) {
+        if !self.statuses.iter().any(|s| s.name == name) {
+            self.statuses.push(Status::new(name));
+        }
+    }
+
+    /// Remove a status by name
+    pub fn remove_status(&mut self, name: &str) {
+        self.statuses.retain(|s| s.name != name);
+    }
+
+    /// Save settings to a standalone file (for sharing/backup)
+    pub fn save_to_file(&self, path: &std::path::Path) -> anyhow::Result<()> {
+        let json = serde_json::to_string_pretty(self)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize settings: {}", e))?;
+        std::fs::write(path, json)
+            .map_err(|e| anyhow::anyhow!("Failed to write settings file: {}", e))?;
+        Ok(())
+    }
+
+    /// Load settings from a standalone file
+    pub fn load_from_file(path: &std::path::Path) -> anyhow::Result<Self> {
+        let json = std::fs::read_to_string(path)
+            .map_err(|e| anyhow::anyhow!("Failed to read settings file: {}", e))?;
+        let settings: ProjectSettings = serde_json::from_str(&json)
+            .map_err(|e| anyhow::anyhow!("Failed to parse settings: {}", e))?;
+        Ok(settings)
+    }
+}
+
+/// Application-level preferences (persisted across sessions, independent of project)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppPreferences {
+    /// Preferred window width
+    pub window_width: f32,
+    /// Preferred window height
+    pub window_height: f32,
+    /// Show binder sidebar
+    pub show_binder: bool,
+    /// Show inspector panel
+    pub show_inspector: bool,
+    /// Last used export format
+    pub last_export_format: String,
+    /// Theme preference (light/dark)
+    pub theme: String,
+    /// Spell checker enabled by default
+    pub spell_check_enabled: bool,
+    /// Default project template
+    pub default_template: String,
+    /// Auto-save enabled
+    pub auto_save_enabled: bool,
+    /// Auto-backup interval (in saves)
+    pub auto_backup_interval: u32,
+    /// Maximum number of recent projects
+    pub max_recent_projects: usize,
+    /// Default compile options
+    #[serde(default)]
+    pub default_compile_author: String,
+    /// Custom dictionary words
+    #[serde(default)]
+    pub custom_dictionary: Vec<String>,
+    /// Keyboard shortcut overrides
+    #[serde(default)]
+    pub shortcut_overrides: std::collections::HashMap<String, String>,
+}
+
+impl Default for AppPreferences {
+    fn default() -> Self {
+        Self {
+            window_width: 1280.0,
+            window_height: 800.0,
+            show_binder: true,
+            show_inspector: true,
+            last_export_format: "Markdown".to_string(),
+            theme: "dark".to_string(),
+            spell_check_enabled: true,
+            default_template: String::new(),
+            auto_save_enabled: true,
+            auto_backup_interval: 10,
+            max_recent_projects: 10,
+            default_compile_author: String::new(),
+            custom_dictionary: Vec::new(),
+            shortcut_overrides: std::collections::HashMap::new(),
+        }
+    }
+}
+
+impl AppPreferences {
+    /// Get the preferences file path
+    pub fn file_path() -> std::path::PathBuf {
+        let home = dirs::home_dir().unwrap_or_default();
+        home.join(".avalon").join("preferences.json")
+    }
+
+    /// Load preferences from disk (returns default if file doesn't exist)
+    pub fn load() -> Self {
+        let path = Self::file_path();
+        if path.exists() {
+            match std::fs::read_to_string(&path) {
+                Ok(json) => {
+                    serde_json::from_str(&json).unwrap_or_default()
+                }
+                Err(_) => Self::default(),
+            }
+        } else {
+            Self::default()
+        }
+    }
+
+    /// Save preferences to disk
+    pub fn save(&self) -> anyhow::Result<()> {
+        let path = Self::file_path();
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let json = serde_json::to_string_pretty(self)?;
+        std::fs::write(&path, json)?;
+        Ok(())
+    }
+
+    /// Add a word to the custom dictionary
+    pub fn add_dictionary_word(&mut self, word: &str) {
+        let lower = word.to_lowercase();
+        if !self.custom_dictionary.contains(&lower) {
+            self.custom_dictionary.push(lower);
+        }
+    }
+
+    /// Check if a word is in the custom dictionary
+    pub fn has_dictionary_word(&self, word: &str) -> bool {
+        let lower = word.to_lowercase();
+        self.custom_dictionary.contains(&lower)
+    }
+
+    /// Set a shortcut override
+    pub fn set_shortcut(&mut self, action: &str, shortcut: &str) {
+        self.shortcut_overrides.insert(action.to_string(), shortcut.to_string());
+    }
+
+    /// Get a shortcut for an action (returns the override or None)
+    pub fn get_shortcut(&self, action: &str) -> Option<&str> {
+        self.shortcut_overrides.get(action).map(|s| s.as_str())
+    }
+}
+
+/// Schema definition for custom metadata fields
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomMetadataSchema {
+    /// Field definitions
+    pub fields: Vec<CustomFieldDefinition>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomFieldDefinition {
+    /// Field name
+    pub name: String,
+    /// Field type
+    pub field_type: CustomFieldType,
+    /// Default value (as string)
+    pub default_value: String,
+    /// Whether this field is required
+    pub required: bool,
+    /// Allowed values (for enum-type fields)
+    pub allowed_values: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum CustomFieldType {
+    Text,
+    Number,
+    Checkbox,
+    Date,
+    Enum,
+}
+
+impl CustomMetadataSchema {
+    pub fn new() -> Self {
+        Self { fields: Vec::new() }
+    }
+
+    /// Add a text field definition
+    pub fn add_text_field(&mut self, name: &str, required: bool) {
+        self.fields.push(CustomFieldDefinition {
+            name: name.to_string(),
+            field_type: CustomFieldType::Text,
+            default_value: String::new(),
+            required,
+            allowed_values: Vec::new(),
+        });
+    }
+
+    /// Add an enum field definition with allowed values
+    pub fn add_enum_field(&mut self, name: &str, values: Vec<String>, required: bool) {
+        self.fields.push(CustomFieldDefinition {
+            name: name.to_string(),
+            field_type: CustomFieldType::Enum,
+            default_value: values.first().cloned().unwrap_or_default(),
+            required,
+            allowed_values: values,
+        });
+    }
+
+    /// Add a checkbox field definition
+    pub fn add_checkbox_field(&mut self, name: &str) {
+        self.fields.push(CustomFieldDefinition {
+            name: name.to_string(),
+            field_type: CustomFieldType::Checkbox,
+            default_value: "false".to_string(),
+            required: false,
+            allowed_values: Vec::new(),
+        });
+    }
+
+    /// Get field definition by name
+    pub fn get_field(&self, name: &str) -> Option<&CustomFieldDefinition> {
+        self.fields.iter().find(|f| f.name == name)
+    }
+
+    /// Remove a field definition
+    pub fn remove_field(&mut self, name: &str) {
+        self.fields.retain(|f| f.name != name);
+    }
+
+    /// Validate a field value against its definition
+    pub fn validate_field(&self, name: &str, value: &str) -> bool {
+        match self.get_field(name) {
+            Some(def) => {
+                match def.field_type {
+                    CustomFieldType::Number => value.parse::<f64>().is_ok(),
+                    CustomFieldType::Checkbox => value == "true" || value == "false",
+                    CustomFieldType::Enum => def.allowed_values.contains(&value.to_string()),
+                    _ => true,
+                }
+            }
+            None => false,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -483,5 +734,96 @@ mod tests {
         meta.status = Some(Status { name: "Done".into() });
         assert_eq!(meta.label_name(), Some("Scene"));
         assert_eq!(meta.status_name(), Some("Done"));
+    }
+
+    #[test]
+    fn test_add_remove_label() {
+        let mut settings = ProjectSettings::default();
+        let initial_count = settings.labels.len();
+        settings.add_label("Custom Label", LabelColor::Red);
+        assert_eq!(settings.labels.len(), initial_count + 1);
+        // No duplicate
+        settings.add_label("Custom Label", LabelColor::Blue);
+        assert_eq!(settings.labels.len(), initial_count + 1);
+        // Remove
+        settings.remove_label("Custom Label");
+        assert_eq!(settings.labels.len(), initial_count);
+    }
+
+    #[test]
+    fn test_add_remove_status() {
+        let mut settings = ProjectSettings::default();
+        let initial_count = settings.statuses.len();
+        settings.add_status("In Review");
+        assert_eq!(settings.statuses.len(), initial_count + 1);
+        settings.add_status("In Review"); // duplicate
+        assert_eq!(settings.statuses.len(), initial_count + 1);
+        settings.remove_status("In Review");
+        assert_eq!(settings.statuses.len(), initial_count);
+    }
+
+    #[test]
+    fn test_settings_serialization() {
+        let settings = ProjectSettings::default();
+        let json = serde_json::to_string(&settings).unwrap();
+        let parsed: ProjectSettings = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.editor_font_size, 16.0);
+        assert_eq!(parsed.labels.len(), settings.labels.len());
+    }
+
+    #[test]
+    fn test_app_preferences_default() {
+        let prefs = AppPreferences::default();
+        assert_eq!(prefs.window_width, 1280.0);
+        assert!(prefs.show_binder);
+        assert!(prefs.auto_save_enabled);
+        assert!(prefs.custom_dictionary.is_empty());
+    }
+
+    #[test]
+    fn test_app_preferences_dictionary() {
+        let mut prefs = AppPreferences::default();
+        prefs.add_dictionary_word("Scrinever");
+        assert!(prefs.has_dictionary_word("scrinever"));
+        prefs.add_dictionary_word("scrinever"); // no duplicate
+        assert_eq!(prefs.custom_dictionary.len(), 1);
+    }
+
+    #[test]
+    fn test_app_preferences_shortcuts() {
+        let mut prefs = AppPreferences::default();
+        prefs.set_shortcut("save", "Ctrl+S");
+        assert_eq!(prefs.get_shortcut("save"), Some("Ctrl+S"));
+        assert_eq!(prefs.get_shortcut("undefined"), None);
+    }
+
+    #[test]
+    fn test_app_preferences_serialization() {
+        let prefs = AppPreferences::default();
+        let json = serde_json::to_string(&prefs).unwrap();
+        let parsed: AppPreferences = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.window_width, 1280.0);
+    }
+
+    #[test]
+    fn test_custom_metadata_schema() {
+        let mut schema = CustomMetadataSchema::new();
+        schema.add_text_field("POV", false);
+        schema.add_enum_field("Genre", vec!["Fantasy".into(), "Sci-Fi".into()], true);
+        schema.add_checkbox_field("Reviewed");
+
+        assert_eq!(schema.fields.len(), 3);
+        assert!(schema.get_field("POV").is_some());
+        assert!(schema.get_field("NotExists").is_none());
+
+        // Validate
+        assert!(schema.validate_field("Genre", "Fantasy"));
+        assert!(!schema.validate_field("Genre", "Romance"));
+        assert!(schema.validate_field("Reviewed", "true"));
+        assert!(!schema.validate_field("Reviewed", "maybe"));
+
+        // Remove
+        schema.remove_field("POV");
+        assert_eq!(schema.fields.len(), 2);
     }
 }

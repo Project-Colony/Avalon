@@ -800,12 +800,11 @@ mod tests {
         let text = "the cat the cat the cat the dog the dog";
         let analysis = WordFrequencyAnalysis::from_text(text);
         // Should have bigrams with count > 1
-        // "the cat" x3, "cat the" x2, "the dog" x2
         assert!(analysis.top_bigrams.len() >= 2);
-        // Most frequent bigram should be "the cat" (3x)
-        let top = &analysis.top_bigrams[0];
-        assert_eq!(top.0, "the cat");
-        assert_eq!(top.1, 3);
+        // "the cat" should appear with count 3
+        let the_cat = analysis.top_bigrams.iter().find(|(b, _)| b == "the cat");
+        assert!(the_cat.is_some());
+        assert_eq!(the_cat.unwrap().1, 3);
     }
 
     #[test]
