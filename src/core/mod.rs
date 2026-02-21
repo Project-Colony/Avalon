@@ -19,4 +19,5 @@ pub mod targets;
 pub mod autosave;
 pub mod links;
 pub mod validation;
+pub mod timer;
 
