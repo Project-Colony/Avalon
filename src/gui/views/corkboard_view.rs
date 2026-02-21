@@ -7,10 +7,17 @@ use crate::gui::theme::Theme;
 
 /// Render the corkboard view — index cards on a cork background
 pub fn view(items: &[&BinderItem], parent_title: &str) -> Element<'static, Message> {
+    let item_count = items.len();
     let header = container(
-        text(format!("Corkboard: {}", parent_title))
-            .size(14)
-            .color(Theme::TEXT_SECONDARY),
+        row![
+            text(format!("Corkboard: {}", parent_title))
+                .size(14)
+                .color(Theme::TEXT_SECONDARY),
+            Space::with_width(Length::Fill),
+            text(format!("{} cards", item_count))
+                .size(11)
+                .color(Theme::TEXT_MUTED),
+        ]
     )
     .padding(Padding::from([8, 16]));
 
@@ -58,7 +65,7 @@ pub fn view(items: &[&BinderItem], parent_title: &str) -> Element<'static, Messa
         .into()
 }
 
-/// Render a single index card with editable synopsis
+/// Render a single index card with editable synopsis, status color bar, and label
 fn render_card(item: &BinderItem) -> Element<'static, Message> {
     let title = item.title.clone();
     let id = item.id;
@@ -71,9 +78,37 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
         .map(|s| s.name.clone())
         .unwrap_or_default();
 
-    // Card title bar
+    // Status color indicator (colored dot before status text)
+    let status_color = match item.metadata.status.as_ref().map(|s| s.name.as_str()) {
+        Some("To Do") => Theme::ERROR,
+        Some("First Draft") => Theme::WARNING,
+        Some("Revised Draft") => Theme::TEXT_ACCENT,
+        Some("Final Draft") => Theme::SUCCESS,
+        Some("Done") => Theme::SUCCESS,
+        _ => Theme::TEXT_MUTED,
+    };
+
+    // Include in compile indicator
+    let compile_indicator = if item.include_in_compile {
+        text("C").size(9).color(Theme::SUCCESS)
+    } else {
+        text("C").size(9).color(Theme::TEXT_MUTED)
+    };
+
+    // Card title bar with label color stripe
+    let title_color = if let Some(ref lbl) = item.metadata.label {
+        lbl.color.to_iced_color()
+    } else {
+        Theme::CARD_TEXT
+    };
+
     let title_bar = container(
-        text(title).size(13).color(Theme::CARD_TEXT),
+        row![
+            text(title).size(13).color(title_color),
+            Space::with_width(Length::Fill),
+            compile_indicator,
+        ]
+        .align_y(iced::Alignment::Center)
     )
     .padding(Padding::from([6, 8]))
     .width(Length::Fill);
@@ -90,28 +125,50 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
         .width(Length::Fill)
         .height(Length::Fixed(70.0));
 
+    // Label color indicator
+    let label_indicator: Element<'static, Message> = if let Some(ref lbl) = item.metadata.label {
+        let color = lbl.color.to_iced_color();
+        container(
+            text(format!(" {} ", lbl.name)).size(9).color(color)
+        )
+        .padding(Padding::from([2, 8]))
+        .into()
+    } else {
+        Space::with_height(0).into()
+    };
+
+    // Keywords indicator
+    let keywords_line: Element<'static, Message> = if !item.metadata.keywords.is_empty() {
+        let kw_text = item.metadata.keywords.iter()
+            .take(3)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ");
+        let suffix = if item.metadata.keywords.len() > 3 {
+            format!("... (+{})", item.metadata.keywords.len() - 3)
+        } else {
+            String::new()
+        };
+        text(format!("{}{}", kw_text, suffix)).size(9).color(Theme::TEXT_MUTED).into()
+    } else {
+        Space::with_height(0).into()
+    };
+
     // Footer with status and word count
     let footer = container(
         row![
             text(word_count).size(10).color(Theme::TEXT_MUTED),
             Space::with_width(Length::Fill),
-            text(status_text).size(10).color(Theme::TEXT_MUTED),
+            text(status_text).size(10).color(status_color),
         ]
     )
     .padding(Padding::from([4, 8]));
-
-    // Label color indicator
-    let label_indicator: Element<'static, Message> = if let Some(ref lbl) = item.metadata.label {
-        let color = lbl.color.to_iced_color();
-        text(format!(" {} ", lbl.name)).size(9).color(color).into()
-    } else {
-        Space::with_height(0).into()
-    };
 
     let card_content = column![
         title_bar,
         synopsis_area,
         label_indicator,
+        keywords_line,
         footer,
     ];
 

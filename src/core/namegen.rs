@@ -1,7 +1,9 @@
 /// Random name generator for characters, places, etc.
+/// Supports multiple cultures and name types.
 pub struct NameGenerator;
 
 impl NameGenerator {
+    // === English/Western names ===
     const FIRST_NAMES_M: &'static [&'static str] = &[
         "James", "John", "Robert", "Michael", "William", "David", "Richard",
         "Joseph", "Thomas", "Charles", "Christopher", "Daniel", "Matthew",
@@ -30,6 +32,110 @@ impl NameGenerator {
         "Sinclair", "Whitfield", "Beaumont", "Lockhart", "Castleberry",
     ];
 
+    // === Japanese names ===
+    const JAPANESE_GIVEN_M: &'static [&'static str] = &[
+        "Haruto", "Ren", "Sota", "Yuto", "Hiroto", "Minato", "Kaito",
+        "Asahi", "Riku", "Hinata", "Takeshi", "Kenji", "Akira", "Yuki",
+        "Ryota", "Daichi", "Sho", "Hayato", "Kenta", "Makoto",
+    ];
+
+    const JAPANESE_GIVEN_F: &'static [&'static str] = &[
+        "Yui", "Hina", "Koharu", "Aoi", "Akari", "Sakura", "Mei",
+        "Himari", "Rin", "Mio", "Ichika", "Yuna", "Haruka", "Saki",
+        "Nanami", "Kaede", "Misaki", "Ayaka", "Chihiro", "Yuki",
+    ];
+
+    const JAPANESE_FAMILY: &'static [&'static str] = &[
+        "Sato", "Suzuki", "Takahashi", "Tanaka", "Watanabe", "Ito",
+        "Yamamoto", "Nakamura", "Kobayashi", "Kato", "Yoshida",
+        "Yamada", "Sasaki", "Yamaguchi", "Matsumoto", "Inoue",
+        "Kimura", "Hayashi", "Shimizu", "Yamazaki",
+    ];
+
+    // === Chinese names ===
+    const CHINESE_GIVEN_M: &'static [&'static str] = &[
+        "Wei", "Jian", "Hao", "Lei", "Jun", "Yong", "Ming",
+        "Long", "Tao", "Feng", "Chen", "Zhi", "Xiang", "Yang",
+        "Bo", "Peng", "Kai", "Liang", "Cheng", "Jie",
+    ];
+
+    const CHINESE_GIVEN_F: &'static [&'static str] = &[
+        "Li", "Fang", "Na", "Ying", "Xia", "Mei", "Jing",
+        "Yan", "Juan", "Min", "Hua", "Qin", "Yun", "Xue",
+        "Ping", "Hong", "Lan", "Wen", "Zhen", "Rui",
+    ];
+
+    const CHINESE_FAMILY: &'static [&'static str] = &[
+        "Wang", "Li", "Zhang", "Liu", "Chen", "Yang", "Zhao",
+        "Huang", "Zhou", "Wu", "Xu", "Sun", "Hu", "Zhu",
+        "Gao", "Lin", "He", "Guo", "Ma", "Luo",
+    ];
+
+    // === Spanish/Latin names ===
+    const SPANISH_GIVEN_M: &'static [&'static str] = &[
+        "Santiago", "Mateo", "Sebastian", "Leonardo", "Emiliano",
+        "Diego", "Miguel", "Alejandro", "Daniel", "Pablo",
+        "Rafael", "Carlos", "Fernando", "Andres", "Luis",
+        "Jorge", "Eduardo", "Francisco", "Javier", "Rodrigo",
+    ];
+
+    const SPANISH_GIVEN_F: &'static [&'static str] = &[
+        "Sofia", "Valentina", "Isabella", "Camila", "Lucia",
+        "Mariana", "Gabriela", "Victoria", "Elena", "Daniela",
+        "Carmen", "Rosa", "Pilar", "Esperanza", "Paloma",
+        "Catalina", "Dolores", "Marisol", "Alejandra", "Ximena",
+    ];
+
+    const SPANISH_FAMILY: &'static [&'static str] = &[
+        "Garcia", "Rodriguez", "Martinez", "Lopez", "Gonzalez",
+        "Hernandez", "Perez", "Sanchez", "Ramirez", "Torres",
+        "Flores", "Rivera", "Gomez", "Diaz", "Morales",
+        "Reyes", "Cruz", "Ortiz", "Gutierrez", "Chavez",
+    ];
+
+    // === Indian names ===
+    const INDIAN_GIVEN_M: &'static [&'static str] = &[
+        "Aarav", "Vihaan", "Aditya", "Sai", "Arjun", "Rohan",
+        "Vivaan", "Krishna", "Ishaan", "Shaurya", "Dhruv", "Anish",
+        "Ravi", "Dev", "Raj", "Pranav", "Vikram", "Amit", "Nikhil", "Karan",
+    ];
+
+    const INDIAN_GIVEN_F: &'static [&'static str] = &[
+        "Aadhya", "Ananya", "Diya", "Saanvi", "Isha", "Aanya",
+        "Kiara", "Priya", "Riya", "Meera", "Kavya", "Nisha",
+        "Sita", "Lakshmi", "Anjali", "Divya", "Pooja", "Neha", "Shreya", "Aisha",
+    ];
+
+    const INDIAN_FAMILY: &'static [&'static str] = &[
+        "Patel", "Sharma", "Singh", "Kumar", "Das", "Reddy",
+        "Gupta", "Nair", "Joshi", "Rao", "Shah", "Mehta",
+        "Iyer", "Mishra", "Verma", "Chatterjee", "Mukherjee",
+        "Desai", "Pillai", "Menon",
+    ];
+
+    // === Arabic names ===
+    const ARABIC_GIVEN_M: &'static [&'static str] = &[
+        "Omar", "Yusuf", "Ahmed", "Ali", "Hassan", "Ibrahim",
+        "Khalid", "Tariq", "Farid", "Rashid", "Zaid", "Nabil",
+        "Karim", "Samir", "Hamza", "Bilal", "Jamal", "Walid",
+        "Faisal", "Salim",
+    ];
+
+    const ARABIC_GIVEN_F: &'static [&'static str] = &[
+        "Fatima", "Aisha", "Zahra", "Maryam", "Noor", "Leila",
+        "Yasmin", "Amira", "Sara", "Hana", "Layla", "Dina",
+        "Samira", "Nadia", "Rania", "Farida", "Khadija", "Zainab",
+        "Salma", "Malika",
+    ];
+
+    const ARABIC_FAMILY: &'static [&'static str] = &[
+        "Al-Rashid", "Al-Farsi", "Al-Hashimi", "Al-Mahmoud", "Al-Sharif",
+        "Al-Qasim", "Al-Zahri", "Al-Salem", "Al-Hussein", "Al-Bakri",
+        "Al-Nasser", "Al-Khatib", "Al-Razi", "Al-Wazir", "Al-Hakim",
+        "Al-Mansour", "Al-Farouk", "Al-Ghazi", "Al-Tayeb", "Al-Sayed",
+    ];
+
+    // === Fantasy names ===
     const FANTASY_PREFIXES: &'static [&'static str] = &[
         "Ael", "Thr", "Val", "Mor", "Kal", "Zan", "Eld", "Fen", "Gar",
         "Lyn", "Nyr", "Sar", "Dra", "Kor", "Xen", "Bel", "Lor", "Mir",
@@ -38,10 +144,11 @@ impl NameGenerator {
 
     const FANTASY_SUFFIXES: &'static [&'static str] = &[
         "iel", "wen", "dor", "rin", "eth", "ael", "ara", "ith", "orn",
-        "wyn", "las", "mir", "oth", "enn", "iel", "dra", "val", "ien",
-        "eon", "ala", "ion", "iel", "yon", "ath", "ess", "ora", "iel",
+        "wyn", "las", "mir", "oth", "enn", "dra", "val", "ien",
+        "eon", "ala", "ion", "yon", "ath", "ess", "ora", "iel",
     ];
 
+    // === Place names ===
     const PLACE_PREFIXES: &'static [&'static str] = &[
         "New", "Old", "East", "West", "North", "South", "Upper", "Lower",
         "Great", "Little", "Dark", "Bright", "Shadow", "Silver", "Golden",
@@ -54,6 +161,18 @@ impl NameGenerator {
         "watch", "reach", "keep", "hold", "port", "crest", "grove",
     ];
 
+    // === Sci-fi names ===
+    const SCIFI_PREFIXES: &'static [&'static str] = &[
+        "Zyx", "Kael", "Nex", "Vex", "Cyr", "Aeth", "Orx", "Tyx",
+        "Rynn", "Jace", "Zara", "Kira", "Nova", "Axel", "Syr", "Nyx",
+        "Cael", "Dex", "Hex", "Lex", "Myx", "Rex", "Tex", "Wex",
+    ];
+
+    const SCIFI_SUFFIXES: &'static [&'static str] = &[
+        "-7", "-X", "on", "ar", "ix", "us", "ax", "ex",
+        "os", "is", "an", "en", "um", "or", "al", "el",
+    ];
+
     /// Simple pseudo-random using current time
     fn rand_index(max: usize) -> usize {
         let t = std::time::SystemTime::now()
@@ -64,7 +183,6 @@ impl NameGenerator {
     }
 
     fn rand_index_seeded(max: usize, seed: usize) -> usize {
-        // Simple hash-based offset
         let mixed = seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
         mixed % max
     }
@@ -97,6 +215,74 @@ impl NameGenerator {
         format!("{}{}", prefix, suffix)
     }
 
+    pub fn scifi_name() -> String {
+        let seed = Self::rand_index(1000000);
+        let prefix = Self::SCIFI_PREFIXES[Self::rand_index_seeded(Self::SCIFI_PREFIXES.len(), seed)];
+        let suffix = Self::SCIFI_SUFFIXES[Self::rand_index_seeded(Self::SCIFI_SUFFIXES.len(), seed.wrapping_add(67))];
+        format!("{}{}", prefix, suffix)
+    }
+
+    /// Generate a culture-specific name
+    pub fn culture_name(culture: &str, gender: &str) -> String {
+        let seed = Self::rand_index(1000000);
+        match culture {
+            "japanese" => {
+                let family = Self::JAPANESE_FAMILY[Self::rand_index_seeded(Self::JAPANESE_FAMILY.len(), seed)];
+                let given = if gender == "female" {
+                    Self::JAPANESE_GIVEN_F[Self::rand_index_seeded(Self::JAPANESE_GIVEN_F.len(), seed.wrapping_add(37))]
+                } else {
+                    Self::JAPANESE_GIVEN_M[Self::rand_index_seeded(Self::JAPANESE_GIVEN_M.len(), seed.wrapping_add(37))]
+                };
+                format!("{} {}", family, given) // Family name first in Japanese
+            }
+            "chinese" => {
+                let family = Self::CHINESE_FAMILY[Self::rand_index_seeded(Self::CHINESE_FAMILY.len(), seed)];
+                let given = if gender == "female" {
+                    Self::CHINESE_GIVEN_F[Self::rand_index_seeded(Self::CHINESE_GIVEN_F.len(), seed.wrapping_add(37))]
+                } else {
+                    Self::CHINESE_GIVEN_M[Self::rand_index_seeded(Self::CHINESE_GIVEN_M.len(), seed.wrapping_add(37))]
+                };
+                format!("{} {}", family, given)
+            }
+            "spanish" => {
+                let given = if gender == "female" {
+                    Self::SPANISH_GIVEN_F[Self::rand_index_seeded(Self::SPANISH_GIVEN_F.len(), seed)]
+                } else {
+                    Self::SPANISH_GIVEN_M[Self::rand_index_seeded(Self::SPANISH_GIVEN_M.len(), seed)]
+                };
+                let family1 = Self::SPANISH_FAMILY[Self::rand_index_seeded(Self::SPANISH_FAMILY.len(), seed.wrapping_add(37))];
+                let family2 = Self::SPANISH_FAMILY[Self::rand_index_seeded(Self::SPANISH_FAMILY.len(), seed.wrapping_add(71))];
+                format!("{} {} {}", given, family1, family2) // Spanish double surname
+            }
+            "indian" => {
+                let given = if gender == "female" {
+                    Self::INDIAN_GIVEN_F[Self::rand_index_seeded(Self::INDIAN_GIVEN_F.len(), seed)]
+                } else {
+                    Self::INDIAN_GIVEN_M[Self::rand_index_seeded(Self::INDIAN_GIVEN_M.len(), seed)]
+                };
+                let family = Self::INDIAN_FAMILY[Self::rand_index_seeded(Self::INDIAN_FAMILY.len(), seed.wrapping_add(37))];
+                format!("{} {}", given, family)
+            }
+            "arabic" => {
+                let given = if gender == "female" {
+                    Self::ARABIC_GIVEN_F[Self::rand_index_seeded(Self::ARABIC_GIVEN_F.len(), seed)]
+                } else {
+                    Self::ARABIC_GIVEN_M[Self::rand_index_seeded(Self::ARABIC_GIVEN_M.len(), seed)]
+                };
+                let family = Self::ARABIC_FAMILY[Self::rand_index_seeded(Self::ARABIC_FAMILY.len(), seed.wrapping_add(37))];
+                format!("{} {}", given, family)
+            }
+            _ => {
+                // Default to English
+                if gender == "female" {
+                    Self::female_name()
+                } else {
+                    Self::male_name()
+                }
+            }
+        }
+    }
+
     /// Generate multiple names of a given type
     pub fn generate_batch(kind: &str, count: usize) -> Vec<String> {
         let mut names = Vec::new();
@@ -106,6 +292,17 @@ impl NameGenerator {
                 "female" => Self::female_name(),
                 "fantasy" => Self::fantasy_name(),
                 "place" => Self::place_name(),
+                "scifi" => Self::scifi_name(),
+                "japanese_m" => Self::culture_name("japanese", "male"),
+                "japanese_f" => Self::culture_name("japanese", "female"),
+                "chinese_m" => Self::culture_name("chinese", "male"),
+                "chinese_f" => Self::culture_name("chinese", "female"),
+                "spanish_m" => Self::culture_name("spanish", "male"),
+                "spanish_f" => Self::culture_name("spanish", "female"),
+                "indian_m" => Self::culture_name("indian", "male"),
+                "indian_f" => Self::culture_name("indian", "female"),
+                "arabic_m" => Self::culture_name("arabic", "male"),
+                "arabic_f" => Self::culture_name("arabic", "female"),
                 _ => Self::male_name(),
             };
             // Small delay to get different seeds
@@ -115,5 +312,26 @@ impl NameGenerator {
             }
         }
         names
+    }
+
+    /// List all available name generator types
+    pub fn available_types() -> Vec<(&'static str, &'static str)> {
+        vec![
+            ("male", "Male (English)"),
+            ("female", "Female (English)"),
+            ("fantasy", "Fantasy"),
+            ("place", "Place"),
+            ("scifi", "Sci-Fi"),
+            ("japanese_m", "Japanese (M)"),
+            ("japanese_f", "Japanese (F)"),
+            ("chinese_m", "Chinese (M)"),
+            ("chinese_f", "Chinese (F)"),
+            ("spanish_m", "Spanish (M)"),
+            ("spanish_f", "Spanish (F)"),
+            ("indian_m", "Indian (M)"),
+            ("indian_f", "Indian (F)"),
+            ("arabic_m", "Arabic (M)"),
+            ("arabic_f", "Arabic (F)"),
+        ]
     }
 }

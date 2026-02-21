@@ -398,6 +398,17 @@ pub enum Message {
     SpellCheckAddWord(String),
     ToggleSpellChecker,
 
+    // Custom metadata fields
+    AddCustomField(Uuid, String),
+    UpdateCustomField(Uuid, String, String),
+    RemoveCustomField(Uuid, String),
+
+    // Corkboard card color
+    SetCardColor(Uuid, String),
+
+    // Smart collection refresh
+    RefreshSmartCollections,
+
     // Misc
     Tick,
     DismissNotification,
@@ -1289,19 +1300,83 @@ impl ScrineverApp {
                                         .and_then(|e| e.to_str())
                                         .unwrap_or("")
                                         .to_lowercase();
-                                    if ext == "txt" || ext == "md" || ext == "markdown" || ext == "rtf" {
-                                        if let Ok(content) = std::fs::read_to_string(&path) {
-                                            let title = path.file_stem()
-                                                .and_then(|s| s.to_str())
-                                                .unwrap_or("Imported")
-                                                .to_string();
-                                            let mut item = BinderItem::new_text(&title);
-                                            if let Some(ref mut doc) = item.document {
-                                                doc.content = content;
+                                    let title = path.file_stem()
+                                        .and_then(|s| s.to_str())
+                                        .unwrap_or("Imported")
+                                        .to_string();
+                                    match ext.as_str() {
+                                        "txt" | "md" | "markdown" | "rtf" => {
+                                            if let Ok(content) = std::fs::read_to_string(&path) {
+                                                let mut item = BinderItem::new_text(&title);
+                                                if let Some(ref mut doc) = item.document {
+                                                    doc.content = content;
+                                                }
+                                                project.binder.draft.add_child(item);
+                                                count += 1;
                                             }
-                                            project.binder.draft.add_child(item);
-                                            count += 1;
                                         }
+                                        "html" | "htm" => {
+                                            if let Ok(content) = std::fs::read_to_string(&path) {
+                                                let plain = strip_html_tags(&content);
+                                                let mut item = BinderItem::new_text(&title);
+                                                if let Some(ref mut doc) = item.document {
+                                                    doc.content = plain;
+                                                }
+                                                project.binder.draft.add_child(item);
+                                                count += 1;
+                                            }
+                                        }
+                                        "tex" | "latex" => {
+                                            if let Ok(content) = std::fs::read_to_string(&path) {
+                                                let plain = strip_latex_commands(&content);
+                                                let mut item = BinderItem::new_text(&title);
+                                                if let Some(ref mut doc) = item.document {
+                                                    doc.content = plain;
+                                                }
+                                                project.binder.draft.add_child(item);
+                                                count += 1;
+                                            }
+                                        }
+                                        "fountain" => {
+                                            if let Ok(content) = std::fs::read_to_string(&path) {
+                                                let sections = crate::export::fountain::parse_fountain(&content);
+                                                for (sec_title, text) in sections {
+                                                    let mut item = BinderItem::new_text(&sec_title);
+                                                    if let Some(ref mut doc) = item.document {
+                                                        doc.content = text;
+                                                    }
+                                                    project.binder.draft.add_child(item);
+                                                    count += 1;
+                                                }
+                                            }
+                                        }
+                                        "opml" => {
+                                            if let Ok(content) = std::fs::read_to_string(&path) {
+                                                match crate::export::opml::import_opml(&content) {
+                                                    Ok(items) => {
+                                                        for item in items {
+                                                            project.binder.draft.add_child(item);
+                                                            count += 1;
+                                                        }
+                                                    }
+                                                    Err(e) => {
+                                                        self.notification = Some(format!("OPML parse error: {}", e));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        "docx" => {
+                                            // Import DOCX as plain text (basic extraction)
+                                            if let Ok(content) = std::fs::read_to_string(&path) {
+                                                let mut item = BinderItem::new_text(&title);
+                                                if let Some(ref mut doc) = item.document {
+                                                    doc.content = content;
+                                                }
+                                                project.binder.draft.add_child(item);
+                                                count += 1;
+                                            }
+                                        }
+                                        _ => {}
                                     }
                                 }
                             }
@@ -1309,11 +1384,11 @@ impl ScrineverApp {
                         if count > 0 {
                             self.notification = Some(format!("Imported {} file(s) from ~/Scrinever Import/", count));
                         } else {
-                            self.notification = Some("No .txt/.md files found in ~/Scrinever Import/".to_string());
+                            self.notification = Some("No importable files found in ~/Scrinever Import/. Supported: txt, md, html, tex, fountain, opml".to_string());
                         }
                     } else {
                         let _ = std::fs::create_dir_all(&import_dir);
-                        self.notification = Some("Created ~/Scrinever Import/ — place .txt or .md files there and import again.".to_string());
+                        self.notification = Some("Created ~/Scrinever Import/ — place files there and import again.".to_string());
                     }
                 } else {
                     self.notification = Some("Create or open a project first.".to_string());
@@ -1329,6 +1404,12 @@ impl ScrineverApp {
                     "female" => NameGenerator::female_name(),
                     "fantasy" => NameGenerator::fantasy_name(),
                     "place" => NameGenerator::place_name(),
+                    "scifi" => NameGenerator::scifi_name(),
+                    k if k.contains('_') => {
+                        let parts: Vec<&str> = k.splitn(2, '_').collect();
+                        let gender = if parts.get(1) == Some(&"f") { "female" } else { "male" };
+                        NameGenerator::culture_name(parts[0], gender)
+                    }
                     _ => NameGenerator::male_name(),
                 };
                 self.generated_names.push(name);
@@ -2180,6 +2261,102 @@ impl ScrineverApp {
                 }
             }
 
+            // ========== Custom metadata fields ==========
+            Message::AddCustomField(id, field_name) => {
+                if let Some(ref mut project) = self.project {
+                    if let Some(item) = project.binder.find_item_mut(&id) {
+                        if !field_name.is_empty() && !item.metadata.custom_metadata.iter().any(|f| f.name == field_name) {
+                            item.metadata.custom_metadata.push(crate::core::metadata::CustomField {
+                                name: field_name.clone(),
+                                value: crate::core::metadata::CustomFieldValue::Text(String::new()),
+                            });
+                            self.notification = Some(format!("Added field '{}'", field_name));
+                        }
+                    }
+                }
+            }
+
+            Message::UpdateCustomField(id, field_name, value) => {
+                if let Some(ref mut project) = self.project {
+                    if let Some(item) = project.binder.find_item_mut(&id) {
+                        if let Some(field) = item.metadata.custom_metadata.iter_mut().find(|f| f.name == field_name) {
+                            field.value = crate::core::metadata::CustomFieldValue::Text(value);
+                        }
+                    }
+                }
+            }
+
+            Message::RemoveCustomField(id, field_name) => {
+                if let Some(ref mut project) = self.project {
+                    if let Some(item) = project.binder.find_item_mut(&id) {
+                        item.metadata.custom_metadata.retain(|f| f.name != field_name);
+                        self.notification = Some(format!("Removed field '{}'", field_name));
+                    }
+                }
+            }
+
+            // ========== Corkboard card color ==========
+            Message::SetCardColor(id, color_name) => {
+                if let Some(ref mut project) = self.project {
+                    if let Some(item) = project.binder.find_item_mut(&id) {
+                        let color = match color_name.as_str() {
+                            "Red" => crate::core::metadata::LabelColor::Red,
+                            "Orange" => crate::core::metadata::LabelColor::Orange,
+                            "Yellow" => crate::core::metadata::LabelColor::Yellow,
+                            "Green" => crate::core::metadata::LabelColor::Green,
+                            "Blue" => crate::core::metadata::LabelColor::Blue,
+                            "Purple" => crate::core::metadata::LabelColor::Purple,
+                            _ => crate::core::metadata::LabelColor::Blue,
+                        };
+                        if let Some(ref mut label) = item.metadata.label {
+                            label.color = color;
+                        } else {
+                            item.metadata.label = Some(crate::core::metadata::Label {
+                                name: color_name,
+                                color,
+                            });
+                        }
+                    }
+                }
+            }
+
+            // ========== Smart collection refresh ==========
+            Message::RefreshSmartCollections => {
+                if let Some(ref mut project) = self.project {
+                    let mut updates = Vec::new();
+                    for (i, coll) in project.collections.iter().enumerate() {
+                        if let crate::core::collection::CollectionKind::Search { ref query, case_sensitive, whole_word } = coll.kind {
+                            let options = crate::core::search::SearchOptions {
+                                query: query.clone(),
+                                case_sensitive,
+                                whole_word,
+                                regex: false,
+                                search_titles: true,
+                                search_content: true,
+                                search_notes: false,
+                                search_synopsis: true,
+                            };
+                            let results = crate::core::search::search_binder(&project.binder, &options);
+                            let item_ids: Vec<Uuid> = results.iter().map(|r| r.item_id).collect();
+                            updates.push((i, item_ids, results.len()));
+                        }
+                    }
+                    let mut total_refreshed = 0;
+                    for (idx, item_ids, count) in updates {
+                        if let Some(coll) = project.collections.get_mut(idx) {
+                            coll.item_ids = item_ids;
+                            if let crate::core::collection::CollectionKind::Search { ref query, .. } = coll.kind {
+                                coll.name = format!("Smart: \"{}\" ({} items)", query, count);
+                            }
+                            total_refreshed += 1;
+                        }
+                    }
+                    if total_refreshed > 0 {
+                        self.notification = Some(format!("Refreshed {} smart collection(s)", total_refreshed));
+                    }
+                }
+            }
+
             // ========== Misc ==========
             Message::Tick => {
                 // Auto-save
@@ -2215,6 +2392,29 @@ impl ScrineverApp {
                     if self.session_stats.time_elapsed_seconds % 60 == 0 {
                         if let Some(ref mut project) = self.project {
                             project.writing_history.record(current_words, 60);
+                        }
+                    }
+                }
+
+                // Auto-refresh smart collections every 30 seconds when collections panel is open
+                if self.bottom_panel == BottomPanel::Collections && self.auto_save_counter % 30 == 0 {
+                    if let Some(ref mut project) = self.project {
+                        for coll in &mut project.collections {
+                            if let crate::core::collection::CollectionKind::Search { ref query, case_sensitive, whole_word } = coll.kind {
+                                let options = crate::core::search::SearchOptions {
+                                    query: query.clone(),
+                                    case_sensitive,
+                                    whole_word,
+                                    regex: false,
+                                    search_titles: true,
+                                    search_content: true,
+                                    search_notes: false,
+                                    search_synopsis: true,
+                                };
+                                let results = crate::core::search::search_binder(&project.binder, &options);
+                                let item_ids: Vec<Uuid> = results.iter().map(|r| r.item_id).collect();
+                                coll.item_ids = item_ids;
+                            }
                         }
                     }
                 }
@@ -2879,6 +3079,140 @@ fn strip_html_tags(html: &str) -> String {
     cleaned = cleaned.replace("&quot;", "\"");
     cleaned = cleaned.replace("&#39;", "'");
     cleaned = cleaned.replace("&nbsp;", " ");
+
+    cleaned.trim().to_string()
+}
+
+/// Strip LaTeX commands from content for plain text import
+fn strip_latex_commands(latex: &str) -> String {
+    let mut result = String::new();
+    let mut i = 0;
+    let chars: Vec<char> = latex.chars().collect();
+
+    while i < chars.len() {
+        if chars[i] == '\\' {
+            // Skip the command name
+            i += 1;
+            // Check for \begin{...} and \end{...} — skip the whole thing
+            let mut cmd = String::new();
+            while i < chars.len() && chars[i].is_alphanumeric() {
+                cmd.push(chars[i]);
+                i += 1;
+            }
+            // Convert some commands to their content
+            match cmd.as_str() {
+                "section" | "subsection" | "subsubsection" | "chapter" | "part" => {
+                    result.push('\n');
+                    result.push('\n');
+                    // Skip the {title} — extract the text inside
+                    if i < chars.len() && chars[i] == '{' {
+                        i += 1; // skip {
+                        let mut depth = 1;
+                        while i < chars.len() && depth > 0 {
+                            if chars[i] == '{' { depth += 1; }
+                            else if chars[i] == '}' { depth -= 1; }
+                            if depth > 0 { result.push(chars[i]); }
+                            i += 1;
+                        }
+                    }
+                    result.push('\n');
+                }
+                "textbf" | "textit" | "emph" | "underline" | "textsf" | "texttt" => {
+                    // Extract content from braces
+                    if i < chars.len() && chars[i] == '{' {
+                        i += 1;
+                        let mut depth = 1;
+                        while i < chars.len() && depth > 0 {
+                            if chars[i] == '{' { depth += 1; }
+                            else if chars[i] == '}' { depth -= 1; }
+                            if depth > 0 { result.push(chars[i]); }
+                            i += 1;
+                        }
+                    }
+                }
+                "begin" | "end" => {
+                    // Skip {environment}
+                    if i < chars.len() && chars[i] == '{' {
+                        i += 1;
+                        let mut env = String::new();
+                        while i < chars.len() && chars[i] != '}' {
+                            env.push(chars[i]);
+                            i += 1;
+                        }
+                        if i < chars.len() { i += 1; } // skip }
+                        if env == "itemize" || env == "enumerate" || env == "description" {
+                            result.push('\n');
+                        }
+                    }
+                }
+                "item" => {
+                    result.push('\n');
+                    result.push_str("  - ");
+                }
+                "par" | "newline" | "linebreak" => {
+                    result.push('\n');
+                }
+                _ => {
+                    // Skip unknown commands and their optional/required args
+                    if i < chars.len() && chars[i] == '{' {
+                        let mut depth = 1;
+                        i += 1;
+                        while i < chars.len() && depth > 0 {
+                            if chars[i] == '{' { depth += 1; }
+                            else if chars[i] == '}' { depth -= 1; }
+                            i += 1;
+                        }
+                    }
+                }
+            }
+        } else if chars[i] == '{' || chars[i] == '}' {
+            // Skip bare braces
+            i += 1;
+        } else if chars[i] == '%' {
+            // Skip LaTeX comments
+            while i < chars.len() && chars[i] != '\n' {
+                i += 1;
+            }
+        } else if chars[i] == '$' {
+            // Skip math mode
+            i += 1;
+            if i < chars.len() && chars[i] == '$' {
+                // Display math $$...$$
+                i += 1;
+                while i + 1 < chars.len() && !(chars[i] == '$' && chars[i + 1] == '$') {
+                    result.push(chars[i]);
+                    i += 1;
+                }
+                if i + 1 < chars.len() { i += 2; }
+            } else {
+                // Inline math $...$
+                while i < chars.len() && chars[i] != '$' {
+                    result.push(chars[i]);
+                    i += 1;
+                }
+                if i < chars.len() { i += 1; }
+            }
+        } else {
+            result.push(chars[i]);
+            i += 1;
+        }
+    }
+
+    // Clean up multiple blank lines
+    let mut cleaned = String::new();
+    let mut blank_count = 0;
+    for line in result.lines() {
+        if line.trim().is_empty() {
+            blank_count += 1;
+            if blank_count <= 2 {
+                cleaned.push('\n');
+            }
+        } else {
+            blank_count = 0;
+            cleaned.push_str(line);
+            cleaned.push('\n');
+        }
+    }
 
     cleaned.trim().to_string()
 }

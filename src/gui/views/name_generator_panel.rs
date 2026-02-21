@@ -10,21 +10,36 @@ pub fn view(generated_names: &[String]) -> Element<'static, Message> {
         .size(11)
         .color(Theme::TEXT_SECONDARY);
 
-    let male_btn = gen_button("Male Name", Message::GenerateName("male".to_string()));
-    let female_btn = gen_button("Female Name", Message::GenerateName("female".to_string()));
-    let fantasy_btn = gen_button("Fantasy Name", Message::GenerateName("fantasy".to_string()));
-    let place_btn = gen_button("Place Name", Message::GenerateName("place".to_string()));
-    let batch_btn = gen_button("Batch (5)", Message::GenerateNameBatch);
-
-    let button_row = row![
-        male_btn,
-        female_btn,
-        fantasy_btn,
-        place_btn,
-        Space::with_width(12),
-        batch_btn,
+    // Row 1: Basic name types
+    let row1 = row![
+        gen_button("Male", Message::GenerateName("male".to_string())),
+        gen_button("Female", Message::GenerateName("female".to_string())),
+        gen_button("Fantasy", Message::GenerateName("fantasy".to_string())),
+        gen_button("Place", Message::GenerateName("place".to_string())),
+        gen_button("Sci-Fi", Message::GenerateName("scifi".to_string())),
+        Space::with_width(8),
+        gen_button("Batch (5)", Message::GenerateNameBatch),
     ]
     .spacing(4)
+    .align_y(iced::Alignment::Center);
+
+    // Row 2: Culture-specific names
+    let culture_label = text("Cultures:").size(10).color(Theme::TEXT_MUTED);
+    let row2 = row![
+        culture_label,
+        Space::with_width(4),
+        gen_button("JP(M)", Message::GenerateName("japanese_m".to_string())),
+        gen_button("JP(F)", Message::GenerateName("japanese_f".to_string())),
+        gen_button("CN(M)", Message::GenerateName("chinese_m".to_string())),
+        gen_button("CN(F)", Message::GenerateName("chinese_f".to_string())),
+        gen_button("ES(M)", Message::GenerateName("spanish_m".to_string())),
+        gen_button("ES(F)", Message::GenerateName("spanish_f".to_string())),
+        gen_button("IN(M)", Message::GenerateName("indian_m".to_string())),
+        gen_button("IN(F)", Message::GenerateName("indian_f".to_string())),
+        gen_button("AR(M)", Message::GenerateName("arabic_m".to_string())),
+        gen_button("AR(F)", Message::GenerateName("arabic_f".to_string())),
+    ]
+    .spacing(3)
     .align_y(iced::Alignment::Center);
 
     let mut names_list = column![].spacing(2);
@@ -45,7 +60,9 @@ pub fn view(generated_names: &[String]) -> Element<'static, Message> {
     let content = column![
         header,
         Space::with_height(4),
-        button_row,
+        row1,
+        Space::with_height(2),
+        row2,
         Space::with_height(6),
         scrollable(names_list).height(Length::Fixed(120.0)),
     ]
@@ -58,9 +75,9 @@ pub fn view(generated_names: &[String]) -> Element<'static, Message> {
 
 fn gen_button(label: &str, message: Message) -> Element<'static, Message> {
     button(
-        text(label.to_string()).size(12).color(Theme::TEXT_PRIMARY),
+        text(label.to_string()).size(11).color(Theme::TEXT_PRIMARY),
     )
     .on_press(message)
-    .padding(Padding::from([4, 10]))
+    .padding(Padding::from([3, 7]))
     .into()
 }

@@ -29,6 +29,29 @@ pub fn view<'a>(
     )
     .padding(Padding::from([8, 16]));
 
+    // Script element picker bar (only shown in script mode)
+    let script_bar: Element<'a, Message> = if script_mode {
+        container(
+            row![
+                script_el_btn("Scene", "Scene Heading", script_element),
+                script_el_btn("Action", "Action", script_element),
+                script_el_btn("Char", "Character", script_element),
+                script_el_btn("Dial", "Dialogue", script_element),
+                script_el_btn("Paren", "Parenthetical", script_element),
+                script_el_btn("Trans", "Transition", script_element),
+                script_el_btn("Shot", "Shot", script_element),
+                script_el_btn("Note", "Note", script_element),
+                Space::with_width(8),
+                text("Tab: cycle element").size(9).color(Theme::TEXT_MUTED),
+            ]
+            .spacing(3)
+        )
+        .padding(Padding::from([2, 16]))
+        .into()
+    } else {
+        Space::with_height(0).into()
+    };
+
     // Formatting toolbar
     let format_bar = container(
         row![
@@ -79,6 +102,7 @@ pub fn view<'a>(
 
     let content = column![
         header,
+        script_bar,
         format_bar,
         editor,
         stats_bar,
@@ -88,6 +112,17 @@ pub fn view<'a>(
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
+}
+
+fn script_el_btn(label: &str, element_name: &str, current: Option<&str>) -> Element<'static, Message> {
+    let is_active = current == Some(element_name);
+    let color = if is_active { Theme::TEXT_ACCENT } else { Theme::TEXT_MUTED };
+    button(
+        text(label.to_string()).size(10).color(color),
+    )
+    .on_press(Message::SetScriptElement(element_name.to_string()))
+    .padding(Padding::from([2, 5]))
+    .into()
 }
 
 fn fmt_btn(label: &str, message: Message) -> Element<'static, Message> {
@@ -100,14 +135,18 @@ fn fmt_btn(label: &str, message: Message) -> Element<'static, Message> {
 }
 
 /// Render composition mode — minimal, distraction-free writing environment
+/// Features: centered text, session stats, ambient fade, word count goal tracking
 pub fn view_composition<'a>(editor_state: &'a EditorState, title: &str, word_count: usize, session_words: i64) -> Element<'a, Message> {
-    let exit_hint = text("Press Esc to exit  |  F5 to toggle")
+    let exit_hint = text("Esc: exit  |  F5: toggle  |  Ctrl+S: save")
         .size(10)
-        .color(iced::Color::from_rgba(1.0, 1.0, 1.0, 0.3));
+        .color(iced::Color::from_rgba(1.0, 1.0, 1.0, 0.25));
 
     let title_text = text(title.to_string())
         .size(16)
         .color(iced::Color::from_rgba(1.0, 1.0, 1.0, 0.5));
+
+    // Reading time estimate
+    let reading_min = word_count as f64 / 250.0;
 
     let header = container(
         row![
@@ -124,6 +163,7 @@ pub fn view_composition<'a>(editor_state: &'a EditorState, title: &str, word_cou
         .padding(Padding::from([32, 120]))
         .height(Length::Fill);
 
+    // Session progress
     let session_str = if session_words != 0 {
         let sign = if session_words > 0 { "+" } else { "" };
         format!("  |  Session: {}{}", sign, session_words)
@@ -131,10 +171,16 @@ pub fn view_composition<'a>(editor_state: &'a EditorState, title: &str, word_cou
         String::new()
     };
 
+    // Paragraph count
+    let para_count = editor_state.document.paragraph_count();
+
     let footer = container(
         row![
             Space::with_width(Length::Fill),
-            text(format!("{} words  |  ~{:.1} pages{}", word_count, word_count as f64 / 250.0, session_str))
+            text(format!(
+                "{} words  |  {} para  |  ~{:.1} pages  |  ~{:.0} min read{}",
+                word_count, para_count, word_count as f64 / 250.0, reading_min, session_str
+            ))
                 .size(11)
                 .color(iced::Color::from_rgba(1.0, 1.0, 1.0, 0.4)),
             Space::with_width(Length::Fill),

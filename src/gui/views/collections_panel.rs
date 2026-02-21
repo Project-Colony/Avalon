@@ -18,6 +18,12 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
     let header = row![
         text("COLLECTIONS").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(Length::Fill),
+        button(
+            text("Refresh Smart").size(10).color(Theme::TEXT_ACCENT),
+        )
+        .on_press(Message::RefreshSmartCollections)
+        .padding(Padding::from([2, 6])),
+        Space::with_width(4),
         text(format!("{} collection(s)", data.collections.len()))
             .size(10)
             .color(Theme::TEXT_MUTED),

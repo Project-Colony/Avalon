@@ -277,15 +277,40 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
         Space::with_height(0).into()
     };
 
-    // Custom metadata
+    // Custom metadata — editable fields with add/remove
     let mut custom_col = column![].spacing(2);
-    if !data.custom_fields.is_empty() {
+    custom_col = custom_col.push(
+        row![
+            text("Custom Metadata").size(11).color(Theme::TEXT_MUTED),
+            Space::with_width(Length::Fill),
+            button(
+                text("+Field").size(9).color(Theme::TEXT_ACCENT),
+            )
+            .on_press(Message::AddCustomField(id, "New Field".to_string()))
+            .padding(Padding::from([1, 4])),
+        ]
+    );
+    for (name, value) in &data.custom_fields {
+        let field_name = name.clone();
+        let field_name2 = name.clone();
+        let field_val = value.clone();
         custom_col = custom_col.push(
-            text("Custom Metadata").size(11).color(Theme::TEXT_MUTED)
+            row![
+                text(field_name.clone()).size(10).color(Theme::TEXT_MUTED).width(Length::FillPortion(2)),
+                text_input("value...", &field_val)
+                    .on_input(move |val| Message::UpdateCustomField(id, field_name.clone(), val))
+                    .size(10)
+                    .padding(2)
+                    .width(Length::FillPortion(3)),
+                button(
+                    text("x").size(9).color(Theme::ERROR),
+                )
+                .on_press(Message::RemoveCustomField(id, field_name2))
+                .padding(Padding::from([1, 3])),
+            ]
+            .spacing(2)
+            .align_y(iced::Alignment::Center)
         );
-        for (name, value) in &data.custom_fields {
-            custom_col = custom_col.push(stat_row(name, value.clone()));
-        }
     }
 
     // Quick ref button
