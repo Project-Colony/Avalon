@@ -20,4 +20,5 @@ pub mod autosave;
 pub mod links;
 pub mod validation;
 pub mod timer;
+pub mod doc_templates;
 
