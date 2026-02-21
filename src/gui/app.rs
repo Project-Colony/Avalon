@@ -47,6 +47,7 @@ pub enum BottomPanel {
     WritingGoals,
     DocLinks,
     Backups,
+    SpellCheck,
 }
 
 /// Application state
@@ -155,6 +156,9 @@ pub struct ScrineverApp {
 
     // === Snapshot comparison ===
     pub selected_snapshot: Option<usize>,
+
+    // === Spell check results ===
+    pub spell_check_results: Vec<crate::spelling::SpellSuggestion>,
 }
 
 /// Messages for the application
@@ -385,6 +389,15 @@ pub enum Message {
     // Export OPML
     ExportOpml,
 
+    // Print
+    PrintCurrent,
+    PrintProject,
+
+    // Spell check
+    RunSpellCheck,
+    SpellCheckAddWord(String),
+    ToggleSpellChecker,
+
     // Misc
     Tick,
     DismissNotification,
@@ -452,6 +465,7 @@ impl ScrineverApp {
             weekly_goal_text: String::new(),
             composition_mode: false,
             selected_snapshot: None,
+            spell_check_results: Vec::new(),
         };
 
         (app, IcedTask::none())
@@ -2073,6 +2087,99 @@ impl ScrineverApp {
                 }
             }
 
+            // ========== Print ==========
+            Message::PrintCurrent => {
+                self.sync_editor_to_project();
+                if let (Some(ref project), Some(item_id)) = (&self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item(&item_id) {
+                        if let Some(ref doc) = item.document {
+                            use crate::export::compiler::{CompileContent, CompileOptions};
+                            let contents = vec![CompileContent {
+                                title: item.title.clone(),
+                                text: doc.content.clone(),
+                                is_folder: false,
+                                depth: 0,
+                            }];
+                            let mut opts = CompileOptions::default();
+                            opts.title = item.title.clone();
+                            let home = dirs::home_dir().unwrap_or_default();
+                            let print_path = home.join("Scrinever Projects").join("print.pdf");
+                            let _ = std::fs::create_dir_all(print_path.parent().unwrap());
+                            match crate::export::pdf::save_pdf(&contents, &opts, &print_path) {
+                                Ok(_) => {
+                                    self.notification = Some(format!("PDF saved to {:?} — open to print", print_path));
+                                }
+                                Err(e) => {
+                                    self.notification = Some(format!("Print error: {}", e));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Message::PrintProject => {
+                self.sync_editor_to_project();
+                if let Some(ref project) = self.project {
+                    let mut opts = self.compile_options.clone();
+                    opts.format = crate::export::compiler::OutputFormat::Pdf;
+                    let home = dirs::home_dir().unwrap_or_default();
+                    let print_path = home.join("Scrinever Projects").join(format!("{}_print.pdf", project.title));
+                    let _ = std::fs::create_dir_all(print_path.parent().unwrap());
+                    match crate::export::compiler::Compiler::save_to_file(&project.binder, &opts, &print_path) {
+                        Ok(_) => {
+                            self.notification = Some(format!("Project PDF saved to {:?}", print_path));
+                        }
+                        Err(e) => {
+                            self.notification = Some(format!("Print error: {}", e));
+                        }
+                    }
+                }
+            }
+
+            // ========== Spell check ==========
+            Message::RunSpellCheck => {
+                self.sync_editor_to_project();
+                if let (Some(ref project), Some(item_id)) = (&self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item(&item_id) {
+                        if let Some(ref doc) = item.document {
+                            self.spell_check_results = self.spell_checker.check_text(&doc.content);
+                            let count = self.spell_check_results.len();
+                            if count == 0 {
+                                self.notification = Some("No spelling errors found!".to_string());
+                            } else {
+                                self.notification = Some(format!("Found {} potential spelling issue(s)", count));
+                            }
+                            self.bottom_panel = BottomPanel::SpellCheck;
+                        }
+                    }
+                }
+            }
+
+            Message::SpellCheckAddWord(word) => {
+                self.spell_checker.add_to_dictionary(&word);
+                self.spell_check_results.retain(|r| r.word.to_lowercase() != word.to_lowercase());
+                self.notification = Some(format!("Added \"{}\" to dictionary", word));
+            }
+
+            Message::ToggleSpellChecker => {
+                if self.spell_checker.active {
+                    self.spell_checker.active = false;
+                    self.spell_check_results.clear();
+                    self.notification = Some("Spell checker disabled".to_string());
+                } else {
+                    self.spell_checker.try_init();
+                    if self.spell_checker.active {
+                        self.notification = Some(format!(
+                            "Spell checker enabled ({} words loaded)",
+                            self.spell_checker.dictionary_size()
+                        ));
+                    } else {
+                        self.notification = Some("Failed to initialize spell checker".to_string());
+                    }
+                }
+            }
+
             // ========== Misc ==========
             Message::Tick => {
                 // Auto-save
@@ -2543,6 +2650,13 @@ impl ScrineverApp {
                     &project.title.replace(' ', "_")
                 ).unwrap_or_default();
                 Some(views::backup_panel::view(&backups, &project.title))
+            }
+            BottomPanel::SpellCheck => {
+                Some(views::spell_check_panel::view(
+                    &self.spell_check_results,
+                    self.spell_checker.active,
+                    self.spell_checker.dictionary_size(),
+                ))
             }
             BottomPanel::None => None,
         };

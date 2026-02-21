@@ -28,3 +28,4 @@ pub mod project_stats_dialog;
 pub mod writing_goals_panel;
 pub mod doc_links_panel;
 pub mod backup_panel;
+pub mod spell_check_panel;
