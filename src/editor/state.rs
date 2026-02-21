@@ -204,9 +204,99 @@ impl EditorState {
     }
 }
 
+impl EditorState {
+    /// Get the current line text
+    pub fn current_line_text(&self) -> String {
+        let text = self.text();
+        let pos = self.cursor.min(text.len());
+        let start = text[..pos].rfind('\n').map(|p| p + 1).unwrap_or(0);
+        let end = text[pos..].find('\n').map(|p| pos + p).unwrap_or(text.len());
+        text[start..end].to_string()
+    }
+
+    /// Get the current paragraph text (delimited by blank lines)
+    pub fn current_paragraph_text(&self) -> String {
+        let text = self.text();
+        let pos = self.cursor.min(text.len());
+
+        // Find paragraph start
+        let mut start = pos;
+        while start > 1 {
+            if text[..start].ends_with("\n\n") {
+                break;
+            }
+            start -= 1;
+        }
+
+        // Find paragraph end
+        let end = text[pos..]
+            .find("\n\n")
+            .map(|p| pos + p)
+            .unwrap_or(text.len());
+
+        text[start..end].trim().to_string()
+    }
+
+    /// Character count of the document
+    pub fn char_count(&self) -> usize {
+        self.text().len()
+    }
+
+    /// Word count of the document
+    pub fn word_count(&self) -> usize {
+        self.text().split_whitespace().count()
+    }
+
+    /// Paragraph count of the document
+    pub fn paragraph_count(&self) -> usize {
+        let text = self.text();
+        if text.is_empty() {
+            return 0;
+        }
+        text.split("\n\n")
+            .filter(|p| !p.trim().is_empty())
+            .count()
+    }
+
+    /// Sentence count of the document
+    pub fn sentence_count(&self) -> usize {
+        self.text()
+            .chars()
+            .filter(|c| *c == '.' || *c == '!' || *c == '?')
+            .count()
+    }
+
+    /// Get the redo stack depth
+    pub fn redo_depth(&self) -> usize {
+        self.redo_stack.len()
+    }
+
+    /// Check if the document is empty
+    pub fn is_empty(&self) -> bool {
+        self.text().trim().is_empty()
+    }
+
+    /// Get the content length in bytes
+    pub fn content_length(&self) -> usize {
+        self.text().len()
+    }
+
+    /// Clear undo and redo stacks
+    pub fn clear_history(&mut self) {
+        self.undo_stack.clear();
+        self.redo_stack.clear();
+    }
+}
+
 /// An entry in the undo/redo stack
 #[derive(Debug, Clone)]
 pub struct UndoEntry {
     pub content: String,
     pub cursor: usize,
+}
+
+impl Default for EditorState {
+    fn default() -> Self {
+        Self::new()
+    }
 }

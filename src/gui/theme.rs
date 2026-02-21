@@ -101,4 +101,63 @@ impl Theme {
     pub fn with_alpha(color: Color, alpha: f32) -> Color {
         Color::from_rgba(color.r, color.g, color.b, alpha)
     }
+
+    /// Blend two colors by a given ratio (0.0 = color_a, 1.0 = color_b)
+    pub fn blend(color_a: Color, color_b: Color, ratio: f32) -> Color {
+        let r = ratio.clamp(0.0, 1.0);
+        Color::from_rgb(
+            color_a.r * (1.0 - r) + color_b.r * r,
+            color_a.g * (1.0 - r) + color_b.g * r,
+            color_a.b * (1.0 - r) + color_b.b * r,
+        )
+    }
+
+    /// Convert an iced Color to a hex string (#RRGGBB)
+    pub fn to_hex(color: Color) -> String {
+        let r = (color.r * 255.0) as u8;
+        let g = (color.g * 255.0) as u8;
+        let b = (color.b * 255.0) as u8;
+        format!("#{:02x}{:02x}{:02x}", r, g, b)
+    }
+
+    /// Get a label color by index (cycling through predefined colors)
+    pub fn label_color(index: usize) -> Color {
+        const LABEL_COLORS: [Color; 8] = [
+            Color::from_rgb(0.91, 0.30, 0.24), // Red
+            Color::from_rgb(0.90, 0.49, 0.13), // Orange
+            Color::from_rgb(0.95, 0.77, 0.06), // Yellow
+            Color::from_rgb(0.18, 0.80, 0.44), // Green
+            Color::from_rgb(0.20, 0.60, 0.86), // Blue
+            Color::from_rgb(0.61, 0.35, 0.71), // Purple
+            Color::from_rgb(0.58, 0.29, 0.16), // Brown
+            Color::from_rgb(0.50, 0.55, 0.60), // Gray
+        ];
+        LABEL_COLORS[index % LABEL_COLORS.len()]
+    }
+
+    /// Get a progress bar color based on percentage (red->yellow->green)
+    pub fn progress_color(pct: f64) -> Color {
+        if pct >= 100.0 {
+            Self::SUCCESS
+        } else if pct >= 75.0 {
+            Color::from_rgb(0.30, 0.70, 0.35)
+        } else if pct >= 50.0 {
+            Self::WARNING
+        } else if pct >= 25.0 {
+            Color::from_rgb(0.85, 0.55, 0.20)
+        } else {
+            Color::from_rgb(0.75, 0.35, 0.25)
+        }
+    }
+
+    /// Desaturate a color (move toward gray)
+    pub fn desaturate(color: Color, amount: f32) -> Color {
+        let gray = color.r * 0.299 + color.g * 0.587 + color.b * 0.114;
+        let a = amount.clamp(0.0, 1.0);
+        Color::from_rgb(
+            color.r * (1.0 - a) + gray * a,
+            color.g * (1.0 - a) + gray * a,
+            color.b * (1.0 - a) + gray * a,
+        )
+    }
 }

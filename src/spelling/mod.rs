@@ -164,10 +164,76 @@ impl SpellChecker {
     pub fn dictionary_size(&self) -> usize {
         self.dictionary.len()
     }
+
+    /// Get the user dictionary words
+    pub fn user_words(&self) -> &[String] {
+        &self.user_dictionary
+    }
+
+    /// User dictionary size
+    pub fn user_dictionary_size(&self) -> usize {
+        self.user_dictionary.len()
+    }
+
+    /// Remove a word from the user dictionary
+    pub fn remove_from_dictionary(&mut self, word: &str) {
+        let lower = word.to_lowercase();
+        self.user_dictionary.retain(|w| *w != lower);
+        self.dictionary.remove(&lower);
+    }
+
+    /// Clear the user dictionary
+    pub fn clear_user_dictionary(&mut self) {
+        for word in &self.user_dictionary {
+            self.dictionary.remove(word);
+        }
+        self.user_dictionary.clear();
+    }
+
+    /// Check multiple words, returning only misspelled ones
+    pub fn check_words(&self, words: &[&str]) -> Vec<String> {
+        words
+            .iter()
+            .filter(|w| !self.check_word(w))
+            .map(|w| w.to_string())
+            .collect()
+    }
+
+    /// Get the top N most similar words to a given word
+    pub fn similar_words(&self, word: &str, max_results: usize) -> Vec<(String, usize)> {
+        if !self.active || self.dictionary.is_empty() {
+            return Vec::new();
+        }
+        let lower = word.to_lowercase();
+        let mut candidates: Vec<(String, usize)> = self
+            .dictionary
+            .iter()
+            .map(|dict_word| {
+                let dist = edit_distance(&lower, dict_word);
+                (dict_word.clone(), dist)
+            })
+            .filter(|(_, dist)| *dist > 0)
+            .collect();
+        candidates.sort_by_key(|(_, dist)| *dist);
+        candidates.truncate(max_results);
+        candidates
+    }
 }
 
 impl Default for SpellChecker {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl SpellSuggestion {
+    /// Whether this misspelling has any suggestions
+    pub fn has_suggestions(&self) -> bool {
+        !self.suggestions.is_empty()
+    }
+
+    /// Get the best (first) suggestion
+    pub fn best_suggestion(&self) -> Option<&str> {
+        self.suggestions.first().map(|s| s.as_str())
     }
 }
