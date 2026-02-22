@@ -3634,6 +3634,8 @@ impl ScrineverApp {
                             "k" | "K" => Some(Message::DeleteLine),
                             "d" | "D" => Some(Message::DuplicateLine),
                             "j" | "J" => Some(Message::JoinLines),
+                            "l" | "L" => Some(Message::SortLines),
+                            "u" | "U" => Some(Message::RemoveDuplicateLines),
                             _ => None,
                         }
                     }
@@ -3678,6 +3680,16 @@ impl ScrineverApp {
                     }
                     keyboard::Key::Named(keyboard::key::Named::ArrowDown) => {
                         Some(Message::MoveLineDown)
+                    }
+                    keyboard::Key::Character(c) => {
+                        let c = c.as_str();
+                        match c {
+                            "[" => Some(Message::UnindentLine),
+                            "]" => Some(Message::IndentLine),
+                            "u" => Some(Message::TextToUppercase),
+                            "l" => Some(Message::TextToLowercase),
+                            _ => None,
+                        }
                     }
                     _ => None,
                 }
