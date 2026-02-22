@@ -807,6 +807,142 @@ impl EditorState {
     }
 }
 
+impl EditorState {
+    /// Reverse the order of all lines in the document
+    pub fn reverse_lines(&mut self) {
+        let text = self.document.content.clone();
+        let lines: Vec<&str> = text.lines().collect();
+        if lines.len() < 2 {
+            return;
+        }
+        self.push_undo();
+        let reversed: Vec<&str> = lines.into_iter().rev().collect();
+        let new_content = reversed.join("\n");
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.dirty = true;
+    }
+
+    /// Strip trailing whitespace from every line
+    pub fn strip_trailing_whitespace(&mut self) {
+        let text = self.document.content.clone();
+        let trimmed: Vec<&str> = text.lines().map(|l| l.trim_end()).collect();
+        let new_content = trimmed.join("\n");
+        if new_content == text {
+            return;
+        }
+        self.push_undo();
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.dirty = true;
+    }
+
+    /// Collapse runs of multiple spaces into single spaces on every line
+    pub fn collapse_whitespace(&mut self) {
+        let text = self.document.content.clone();
+        let mut new_lines = Vec::new();
+        let mut changed = false;
+        for line in text.lines() {
+            let collapsed: String = line.split_whitespace().collect::<Vec<_>>().join(" ");
+            if collapsed != line {
+                changed = true;
+            }
+            new_lines.push(collapsed);
+        }
+        if !changed {
+            return;
+        }
+        self.push_undo();
+        let new_content = new_lines.join("\n");
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.dirty = true;
+    }
+
+    /// Prepend line numbers to every line (1-indexed)
+    pub fn number_lines(&mut self) {
+        let text = self.document.content.clone();
+        let lines: Vec<&str> = text.lines().collect();
+        if lines.is_empty() {
+            return;
+        }
+        self.push_undo();
+        let width = lines.len().to_string().len();
+        let numbered: Vec<String> = lines
+            .iter()
+            .enumerate()
+            .map(|(i, l)| format!("{:>width$}  {}", i + 1, l, width = width))
+            .collect();
+        let new_content = numbered.join("\n");
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.dirty = true;
+    }
+
+    /// Extract all sentences from the document (split by .!?)
+    pub fn extract_sentences(&self) -> Vec<String> {
+        let text = &self.document.content;
+        if text.trim().is_empty() {
+            return Vec::new();
+        }
+        let mut sentences = Vec::new();
+        let mut current = String::new();
+        for ch in text.chars() {
+            current.push(ch);
+            if ch == '.' || ch == '!' || ch == '?' {
+                let trimmed = current.trim().to_string();
+                if !trimmed.is_empty() {
+                    sentences.push(trimmed);
+                }
+                current.clear();
+            }
+        }
+        let leftover = current.trim().to_string();
+        if !leftover.is_empty() {
+            sentences.push(leftover);
+        }
+        sentences
+    }
+
+    /// Get word frequency map (case-insensitive)
+    pub fn word_frequency(&self) -> std::collections::HashMap<String, usize> {
+        let mut freq = std::collections::HashMap::new();
+        for word in self.document.content.split_whitespace() {
+            let lower = word
+                .trim_matches(|c: char| !c.is_alphanumeric())
+                .to_lowercase();
+            if !lower.is_empty() {
+                *freq.entry(lower).or_insert(0) += 1;
+            }
+        }
+        freq
+    }
+
+    /// Get the lengths of all lines
+    pub fn line_lengths(&self) -> Vec<usize> {
+        self.document.content.lines().map(|l| l.len()).collect()
+    }
+
+    /// Get the longest line's length and its 0-based line number
+    pub fn longest_line(&self) -> Option<(usize, usize)> {
+        self.document
+            .content
+            .lines()
+            .enumerate()
+            .max_by_key(|(_, l)| l.len())
+            .map(|(i, l)| (i, l.len()))
+    }
+
+    /// Get average line length
+    pub fn avg_line_length(&self) -> f64 {
+        let lengths = self.line_lengths();
+        if lengths.is_empty() {
+            return 0.0;
+        }
+        lengths.iter().sum::<usize>() as f64 / lengths.len() as f64
+    }
+}
+
 impl Default for EditorState {
     fn default() -> Self {
         Self::new()
@@ -1742,5 +1878,209 @@ mod tests {
         assert!(!editor.dirty);
         assert!(!editor.can_undo());
         assert!(editor.selection_start.is_none());
+    }
+
+    // ---- New text transform tests ----
+
+    #[test]
+    fn test_reverse_lines() {
+        let mut editor = editor_with("first\nsecond\nthird");
+        editor.reverse_lines();
+        assert_eq!(editor.document.content, "third\nsecond\nfirst");
+    }
+
+    #[test]
+    fn test_reverse_lines_single() {
+        let mut editor = editor_with("only one");
+        editor.reverse_lines();
+        assert_eq!(editor.document.content, "only one");
+    }
+
+    #[test]
+    fn test_reverse_lines_sets_dirty() {
+        let mut editor = editor_with("a\nb");
+        assert!(!editor.dirty);
+        editor.reverse_lines();
+        assert!(editor.dirty);
+    }
+
+    #[test]
+    fn test_strip_trailing_whitespace() {
+        let mut editor = editor_with("hello   \nworld  \nclean");
+        editor.strip_trailing_whitespace();
+        assert_eq!(editor.document.content, "hello\nworld\nclean");
+    }
+
+    #[test]
+    fn test_strip_trailing_whitespace_no_change() {
+        let mut editor = editor_with("clean\nlines");
+        editor.strip_trailing_whitespace();
+        assert_eq!(editor.document.content, "clean\nlines");
+        assert!(!editor.dirty);
+    }
+
+    #[test]
+    fn test_collapse_whitespace() {
+        let mut editor = editor_with("hello    world\nfoo   bar");
+        editor.collapse_whitespace();
+        assert_eq!(editor.document.content, "hello world\nfoo bar");
+    }
+
+    #[test]
+    fn test_collapse_whitespace_no_change() {
+        let mut editor = editor_with("clean text\nhere");
+        editor.collapse_whitespace();
+        assert_eq!(editor.document.content, "clean text\nhere");
+        assert!(!editor.dirty);
+    }
+
+    #[test]
+    fn test_number_lines() {
+        let mut editor = editor_with("alpha\nbeta\ngamma");
+        editor.number_lines();
+        assert_eq!(editor.document.content, "1  alpha\n2  beta\n3  gamma");
+    }
+
+    #[test]
+    fn test_number_lines_padding() {
+        let mut editor = editor_with(
+            &(0..12).map(|i| format!("line {}", i)).collect::<Vec<_>>().join("\n"),
+        );
+        editor.number_lines();
+        // 12 lines → width 2, so lines padded: " 1  line 0"
+        assert!(editor.document.content.starts_with(" 1  line 0"));
+        assert!(editor.document.content.contains("12  line 11"));
+    }
+
+    #[test]
+    fn test_number_lines_empty() {
+        let mut editor = editor_with("");
+        editor.number_lines();
+        // Empty doc has no lines from .lines(), so no change
+        assert_eq!(editor.document.content, "");
+    }
+
+    #[test]
+    fn test_extract_sentences() {
+        let editor = editor_with("Hello world. How are you? I'm fine! Thanks.");
+        let sentences = editor.extract_sentences();
+        assert_eq!(sentences.len(), 4);
+        assert_eq!(sentences[0], "Hello world.");
+        assert_eq!(sentences[1], "How are you?");
+        assert_eq!(sentences[2], "I'm fine!");
+        assert_eq!(sentences[3], "Thanks.");
+    }
+
+    #[test]
+    fn test_extract_sentences_empty() {
+        let editor = editor_with("");
+        let sentences = editor.extract_sentences();
+        assert!(sentences.is_empty());
+    }
+
+    #[test]
+    fn test_extract_sentences_no_terminator() {
+        let editor = editor_with("No punctuation at end");
+        let sentences = editor.extract_sentences();
+        assert_eq!(sentences.len(), 1);
+        assert_eq!(sentences[0], "No punctuation at end");
+    }
+
+    #[test]
+    fn test_word_frequency() {
+        let editor = editor_with("hello world hello rust world hello");
+        let freq = editor.word_frequency();
+        assert_eq!(freq.get("hello"), Some(&3));
+        assert_eq!(freq.get("world"), Some(&2));
+        assert_eq!(freq.get("rust"), Some(&1));
+    }
+
+    #[test]
+    fn test_word_frequency_case_insensitive() {
+        let editor = editor_with("Hello HELLO hello");
+        let freq = editor.word_frequency();
+        assert_eq!(freq.get("hello"), Some(&3));
+    }
+
+    #[test]
+    fn test_word_frequency_empty() {
+        let editor = editor_with("");
+        let freq = editor.word_frequency();
+        assert!(freq.is_empty());
+    }
+
+    #[test]
+    fn test_line_lengths() {
+        let editor = editor_with("hi\nhello\nworld!");
+        let lengths = editor.line_lengths();
+        assert_eq!(lengths, vec![2, 5, 6]);
+    }
+
+    #[test]
+    fn test_line_lengths_empty() {
+        let editor = editor_with("");
+        let lengths = editor.line_lengths();
+        // "".lines() yields nothing in Rust
+        assert!(lengths.is_empty());
+    }
+
+    #[test]
+    fn test_longest_line() {
+        let editor = editor_with("short\na very long line here\nmed");
+        let (line_idx, len) = editor.longest_line().unwrap();
+        assert_eq!(line_idx, 1);
+        assert_eq!(len, "a very long line here".len());
+    }
+
+    #[test]
+    fn test_longest_line_empty() {
+        let editor = editor_with("");
+        // "".lines() yields nothing, so longest_line returns None
+        assert!(editor.longest_line().is_none());
+    }
+
+    #[test]
+    fn test_avg_line_length() {
+        let editor = editor_with("aaa\nbbbbbb\nccc");
+        // lengths: 3, 6, 3 → avg = 4.0
+        let avg = editor.avg_line_length();
+        assert!((avg - 4.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_reverse_lines_undo() {
+        let mut editor = editor_with("a\nb\nc");
+        editor.reverse_lines();
+        assert_eq!(editor.document.content, "c\nb\na");
+        assert!(editor.can_undo());
+        editor.undo();
+        assert_eq!(editor.document.content, "a\nb\nc");
+    }
+
+    #[test]
+    fn test_strip_trailing_whitespace_undo() {
+        let mut editor = editor_with("hello   \nworld  ");
+        editor.strip_trailing_whitespace();
+        assert_eq!(editor.document.content, "hello\nworld");
+        editor.undo();
+        assert_eq!(editor.document.content, "hello   \nworld  ");
+    }
+
+    #[test]
+    fn test_number_lines_undo() {
+        let mut editor = editor_with("foo\nbar");
+        editor.number_lines();
+        assert!(editor.document.content.contains("1"));
+        editor.undo();
+        assert_eq!(editor.document.content, "foo\nbar");
+    }
+
+    #[test]
+    fn test_collapse_whitespace_undo() {
+        let mut editor = editor_with("a   b");
+        editor.collapse_whitespace();
+        assert_eq!(editor.document.content, "a b");
+        editor.undo();
+        assert_eq!(editor.document.content, "a   b");
     }
 }

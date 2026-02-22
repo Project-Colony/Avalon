@@ -296,6 +296,62 @@ impl EditorAction {
         self.is_editing()
     }
 
+    /// Whether this action requires a text selection to be meaningful
+    pub fn requires_selection(&self) -> bool {
+        matches!(
+            self,
+            EditorAction::WrapSelection { .. }
+                | EditorAction::ToUppercase
+                | EditorAction::ToLowercase
+                | EditorAction::ToTitleCase
+                | EditorAction::SortLines
+                | EditorAction::RemoveDuplicateLines
+        )
+    }
+
+    /// Menu path for nested menu organization (e.g., "Format > Case")
+    pub fn menu_path(&self) -> Vec<&str> {
+        match self {
+            EditorAction::ToggleBold
+            | EditorAction::ToggleItalic
+            | EditorAction::ToggleUnderline
+            | EditorAction::ToggleStrikethrough => vec!["Format", "Style"],
+
+            EditorAction::ToUppercase
+            | EditorAction::ToLowercase
+            | EditorAction::ToTitleCase => vec!["Format", "Case"],
+
+            EditorAction::InsertHeading(_) => vec!["Insert", "Heading"],
+            EditorAction::InsertListItem(_) => vec!["Insert", "List"],
+
+            EditorAction::MoveLineUp
+            | EditorAction::MoveLineDown
+            | EditorAction::DeleteLine
+            | EditorAction::DuplicateLine
+            | EditorAction::JoinLines => vec!["Edit", "Line"],
+
+            EditorAction::SortLines
+            | EditorAction::RemoveDuplicateLines => vec!["Edit", "Lines"],
+
+            EditorAction::Indent | EditorAction::Unindent => vec!["Edit", "Indentation"],
+
+            _ => vec![self.category()],
+        }
+    }
+
+    /// Get a combined batch description for a list of actions
+    pub fn batch_description(actions: &[EditorAction]) -> String {
+        if actions.is_empty() {
+            return "No actions".to_string();
+        }
+        if actions.len() == 1 {
+            return actions[0].description().to_string();
+        }
+        let editing: usize = actions.iter().filter(|a| a.is_editing()).count();
+        let nav: usize = actions.iter().filter(|a| a.is_movement()).count();
+        format!("{} actions ({} edits, {} navigation)", actions.len(), editing, nav)
+    }
+
     /// Category string for grouping in menus
     pub fn category(&self) -> &str {
         if self.is_movement() {
@@ -334,6 +390,20 @@ impl ListStyle {
             ListStyle::Checkbox => "Checkbox List",
         }
     }
+
+    /// All available list styles
+    pub fn all() -> Vec<Self> {
+        vec![ListStyle::Bullet, ListStyle::Numbered, ListStyle::Checkbox]
+    }
+
+    /// Continuation prefix for subsequent items (numbered lists increment)
+    pub fn continuation_prefix(&self, index: usize) -> String {
+        match self {
+            ListStyle::Bullet => "- ".to_string(),
+            ListStyle::Numbered => format!("{}. ", index + 1),
+            ListStyle::Checkbox => "- [ ] ".to_string(),
+        }
+    }
 }
 
 impl DateTimeFormat {
@@ -355,6 +425,26 @@ impl DateTimeFormat {
             DateTimeFormat::TimeOnly => "Time Only",
             DateTimeFormat::DateTime => "Date & Time",
             DateTimeFormat::Iso8601 => "ISO 8601",
+        }
+    }
+
+    /// All available date/time formats
+    pub fn all() -> Vec<Self> {
+        vec![
+            DateTimeFormat::DateOnly,
+            DateTimeFormat::TimeOnly,
+            DateTimeFormat::DateTime,
+            DateTimeFormat::Iso8601,
+        ]
+    }
+
+    /// Format string pattern (for display to users)
+    pub fn pattern(&self) -> &str {
+        match self {
+            DateTimeFormat::DateOnly => "YYYY-MM-DD",
+            DateTimeFormat::TimeOnly => "HH:MM",
+            DateTimeFormat::DateTime => "YYYY-MM-DD HH:MM",
+            DateTimeFormat::Iso8601 => "YYYY-MM-DDTHH:MM:SS+ZZZZ",
         }
     }
 }
@@ -747,5 +837,111 @@ mod tests {
         assert!(action.is_editing());
         assert!(action.is_undoable());
         assert_eq!(action.category(), "Insert");
+    }
+
+    // ---- New tests for batch_description, requires_selection, menu_path, list/datetime helpers ----
+
+    #[test]
+    fn test_requires_selection() {
+        assert!(EditorAction::WrapSelection { prefix: "[".into(), suffix: "]".into() }.requires_selection());
+        assert!(EditorAction::ToUppercase.requires_selection());
+        assert!(EditorAction::ToLowercase.requires_selection());
+        assert!(EditorAction::ToTitleCase.requires_selection());
+        assert!(EditorAction::SortLines.requires_selection());
+        assert!(EditorAction::RemoveDuplicateLines.requires_selection());
+        assert!(!EditorAction::ToggleBold.requires_selection());
+        assert!(!EditorAction::Undo.requires_selection());
+        assert!(!EditorAction::DeleteLine.requires_selection());
+    }
+
+    #[test]
+    fn test_menu_path_formatting() {
+        let path = EditorAction::ToggleBold.menu_path();
+        assert_eq!(path, vec!["Format", "Style"]);
+    }
+
+    #[test]
+    fn test_menu_path_case() {
+        let path = EditorAction::ToUppercase.menu_path();
+        assert_eq!(path, vec!["Format", "Case"]);
+    }
+
+    #[test]
+    fn test_menu_path_headings() {
+        let path = EditorAction::InsertHeading(2).menu_path();
+        assert_eq!(path, vec!["Insert", "Heading"]);
+    }
+
+    #[test]
+    fn test_menu_path_line_edit() {
+        let path = EditorAction::MoveLineUp.menu_path();
+        assert_eq!(path, vec!["Edit", "Line"]);
+    }
+
+    #[test]
+    fn test_menu_path_indent() {
+        let path = EditorAction::Indent.menu_path();
+        assert_eq!(path, vec!["Edit", "Indentation"]);
+    }
+
+    #[test]
+    fn test_menu_path_fallback() {
+        let path = EditorAction::Undo.menu_path();
+        assert_eq!(path, vec!["History"]);
+    }
+
+    #[test]
+    fn test_batch_description_empty() {
+        let desc = EditorAction::batch_description(&[]);
+        assert_eq!(desc, "No actions");
+    }
+
+    #[test]
+    fn test_batch_description_single() {
+        let actions = vec![EditorAction::ToggleBold];
+        let desc = EditorAction::batch_description(&actions);
+        assert_eq!(desc, "Toggle bold");
+    }
+
+    #[test]
+    fn test_batch_description_multiple() {
+        let actions = vec![
+            EditorAction::ToggleBold,
+            EditorAction::MoveToDocStart,
+            EditorAction::ToUppercase,
+        ];
+        let desc = EditorAction::batch_description(&actions);
+        assert!(desc.contains("3 actions"));
+        assert!(desc.contains("2 edits"));
+        assert!(desc.contains("1 navigation"));
+    }
+
+    #[test]
+    fn test_list_style_all() {
+        let all = ListStyle::all();
+        assert_eq!(all.len(), 3);
+    }
+
+    #[test]
+    fn test_list_style_continuation_prefix() {
+        assert_eq!(ListStyle::Bullet.continuation_prefix(0), "- ");
+        assert_eq!(ListStyle::Bullet.continuation_prefix(5), "- ");
+        assert_eq!(ListStyle::Numbered.continuation_prefix(0), "1. ");
+        assert_eq!(ListStyle::Numbered.continuation_prefix(4), "5. ");
+        assert_eq!(ListStyle::Checkbox.continuation_prefix(0), "- [ ] ");
+    }
+
+    #[test]
+    fn test_datetime_format_all() {
+        let all = DateTimeFormat::all();
+        assert_eq!(all.len(), 4);
+    }
+
+    #[test]
+    fn test_datetime_format_pattern() {
+        assert_eq!(DateTimeFormat::DateOnly.pattern(), "YYYY-MM-DD");
+        assert_eq!(DateTimeFormat::TimeOnly.pattern(), "HH:MM");
+        assert!(DateTimeFormat::DateTime.pattern().contains("YYYY"));
+        assert!(DateTimeFormat::Iso8601.pattern().contains("T"));
     }
 }
