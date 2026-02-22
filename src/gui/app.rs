@@ -927,9 +927,27 @@ impl ScrineverApp {
             // ========== Editor operations ==========
             Message::EditorAction(action) => {
                 let is_edit = action.is_edit();
+                let old_len = self.editor.content.text().len();
+                let cursor_before = self.editor.cursor;
                 self.editor.content.perform(action);
                 if is_edit {
                     self.editor.mark_dirty();
+                    // Shift annotation positions when text is edited
+                    let new_len = self.editor.content.text().len();
+                    let delta = new_len as i64 - old_len as i64;
+                    if delta != 0 {
+                        if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                            if let Some(item) = project.binder.find_item_mut(&item_id) {
+                                if let Some(ref mut doc) = item.document {
+                                    for ann in &mut doc.annotations {
+                                        if ann.start >= cursor_before {
+                                            ann.shift(delta);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -2935,10 +2953,23 @@ impl ScrineverApp {
 
             // ========== Project validation ==========
             Message::ShowValidation => {
+                self.sync_editor_to_project();
                 if let Some(ref project) = self.project {
-                    let result = crate::core::validation::validate_project(&project.binder);
+                    let mut result = crate::core::validation::validate_project(&project.binder);
+                    // Also include link health in validation
+                    // Add orphan document info (broken links already handled by validation)
+                    let link_health = crate::core::links::link_health_summary(&project.binder);
+                    if link_health.orphan_documents > 0 {
+                        result.issues.push(crate::core::validation::ValidationIssue {
+                            severity: crate::core::validation::Severity::Info,
+                            kind: crate::core::validation::IssueKind::Orphan,
+                            message: format!("{} orphan document(s) with no incoming links", link_health.orphan_documents),
+                            item_id: None,
+                        });
+                    }
                     self.notification = Some(result.display());
                     self.validation_result = Some(result);
+                    self.bottom_panel = BottomPanel::Validation;
                 }
             }
 

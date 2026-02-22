@@ -221,6 +221,7 @@ pub enum IssueKind {
     EmptyFolder,
     BrokenLink,
     LargeDocument,
+    Orphan,
 }
 
 #[cfg(test)]
