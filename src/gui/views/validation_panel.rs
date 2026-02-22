@@ -22,14 +22,28 @@ pub fn view(result: Option<&ProjectValidation>) -> Element<'static, Message> {
     let body: Element<'static, Message> = match result {
         Some(validation) => {
             if validation.issues.is_empty() {
+                let health_label = if validation.trash_items == 0 {
+                    "Excellent project health"
+                } else if validation.trash_items <= 5 {
+                    "Good project health"
+                } else {
+                    "Consider emptying trash"
+                };
+
                 column![
                     text(format!("Project is clean ({} items)", validation.total_items))
                         .size(13)
                         .color(Theme::SUCCESS),
                     Space::with_height(4),
-                    text(format!("{} items in trash", validation.trash_items))
-                        .size(10)
-                        .color(Theme::TEXT_MUTED),
+                    row![
+                        text(format!("{} items in trash", validation.trash_items))
+                            .size(10)
+                            .color(Theme::TEXT_MUTED),
+                        Space::with_width(12),
+                        text(health_label)
+                            .size(10)
+                            .color(Theme::SUCCESS),
+                    ],
                 ]
                 .spacing(2)
                 .into()

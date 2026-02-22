@@ -111,6 +111,19 @@ pub fn view(history: &WritingHistory) -> Element<'static, Message> {
     let longest = history.longest_streak();
     let week_words = history.words_this_week();
 
+    // Productivity trend and consistency
+    let trend = history.productivity_trend();
+    let trend_label = history.trend_label();
+    let trend_color = if trend >= 1.1 { Theme::SUCCESS }
+    else if trend >= 0.9 { Theme::TEXT_ACCENT }
+    else { Theme::WARNING };
+
+    let consistency = history.consistency_score();
+    let cons_label = history.consistency_label();
+    let cons_color = if consistency >= 60.0 { Theme::SUCCESS }
+    else if consistency >= 40.0 { Theme::WARNING }
+    else { Theme::TEXT_MUTED };
+
     let extra_stats = row![
         text(format!("Longest streak: {}d", longest)).size(10).color(Theme::TEXT_MUTED),
         Space::with_width(12),
@@ -118,6 +131,10 @@ pub fn view(history: &WritingHistory) -> Element<'static, Message> {
             .size(10).color(Theme::TEXT_ACCENT),
         Space::with_width(12),
         text(activity_pct).size(10).color(activity_color),
+        Space::with_width(12),
+        text(format!("Trend: {}", trend_label)).size(10).color(trend_color),
+        Space::with_width(12),
+        text(format!("Consistency: {}", cons_label)).size(10).color(cons_color),
     ];
 
     let content = column![
