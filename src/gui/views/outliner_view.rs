@@ -11,16 +11,17 @@ use crate::gui::theme::Theme;
 pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>) -> Element<'static, Message> {
     let header_row = container(
         row![
-            text("#").size(12).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
-            text("Title").size(12).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(4)),
-            text("Status").size(12).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(2)),
-            text("Label").size(12).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(2)),
-            text("Words").size(12).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
-            text("Target").size(12).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
-            text("Progress").size(12).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
-            text("Compile").size(12).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
+            text("#").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
+            text("Title").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(4)),
+            text("Synopsis").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(3)),
+            text("Status").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(2)),
+            text("Label").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(2)),
+            text("Words").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
+            text("Target").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
+            text("Pgs").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
+            text("Compile").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
         ]
-        .spacing(8)
+        .spacing(6)
     )
     .padding(Padding::from([8, 16]));
 
@@ -84,8 +85,8 @@ fn collect_outline_rows(
     };
 
     let icon = match item.kind {
-        BinderItemKind::Folder => if item.expanded { "v " } else { "> " },
-        BinderItemKind::Text => "  ",
+        BinderItemKind::Folder => if item.expanded { "\u{25BE} " } else { "\u{25B8} " },
+        BinderItemKind::Text => "\u{2022} ",
         _ => "  ",
     };
 
@@ -149,17 +150,34 @@ fn collect_outline_rows(
     .padding(0)
     .width(Length::FillPortion(4));
 
+    // Synopsis (truncated)
+    let synopsis = if item.synopsis.is_empty() {
+        "-".to_string()
+    } else if item.synopsis.len() > 40 {
+        format!("{}...", &item.synopsis[..40])
+    } else {
+        item.synopsis.clone()
+    };
+
+    // Pages estimate
+    let pages_text = if word_count > 0 {
+        format!("{:.1}", word_count as f64 / 250.0)
+    } else {
+        "-".to_string()
+    };
+
     let row_content = row![
-        text(section_num).size(11).color(Theme::TEXT_MUTED).width(Length::FillPortion(1)),
+        text(section_num).size(10).color(Theme::TEXT_MUTED).width(Length::FillPortion(1)),
         title_btn,
-        text(status).size(12).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(2)),
-        text(label).size(12).color(label_color).width(Length::FillPortion(2)),
-        text(format!("{}", word_count)).size(12).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
-        text(target_text).size(12).color(Theme::TEXT_MUTED).width(Length::FillPortion(1)),
-        text(progress_text).size(12).color(progress_color).width(Length::FillPortion(1)),
-        text(compile_text).size(12).color(compile_color).width(Length::FillPortion(1)),
+        text(synopsis).size(10).color(Theme::TEXT_MUTED).width(Length::FillPortion(3)),
+        text(status).size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(2)),
+        text(label).size(11).color(label_color).width(Length::FillPortion(2)),
+        text(format!("{}", word_count)).size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
+        text(target_text).size(11).color(Theme::TEXT_MUTED).width(Length::FillPortion(1)),
+        text(pages_text).size(11).color(Theme::TEXT_MUTED).width(Length::FillPortion(1)),
+        text(compile_text).size(11).color(compile_color).width(Length::FillPortion(1)),
     ]
-    .spacing(8);
+    .spacing(6);
 
     let row_container = container(row_content)
         .padding(Padding::from([4, 16]))
