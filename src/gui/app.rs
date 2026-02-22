@@ -3036,7 +3036,14 @@ impl ScrineverApp {
                 // Writing focus timer tick
                 if self.writing_timer.is_running() {
                     if self.writing_timer.tick() {
-                        self.notification = Some("Timer completed! Great writing session!".to_string());
+                        // Timer completed - auto-stop and record session
+                        let word_count = self.current_word_count();
+                        self.writing_timer.stop(word_count);
+                        let summary = self.writing_timer.summary();
+                        self.notification = Some(format!(
+                            "\u{2713} Timer completed! {} | Great writing session!",
+                            summary
+                        ));
                     }
                 }
 
@@ -3543,7 +3550,8 @@ impl ScrineverApp {
                 ))
             }
             BottomPanel::Timer => {
-                Some(views::timer_panel::view(&self.writing_timer))
+                let wc = self.current_word_count();
+                Some(views::timer_panel::view(&self.writing_timer, wc))
             }
             BottomPanel::Validation => {
                 Some(views::validation_panel::view(self.validation_result.as_ref()))
