@@ -129,6 +129,8 @@ pub struct ScrineverApp {
     pub doc_find_text: String,
     pub doc_replace_text: String,
     pub doc_find_case_sensitive: bool,
+    pub doc_find_whole_word: bool,
+    pub doc_find_use_regex: bool,
     pub doc_find_match_count: usize,
     pub doc_find_current_match: usize,
     pub doc_find_positions: Vec<usize>,
@@ -334,6 +336,8 @@ pub enum Message {
     DocReplaceAll,
     DocReplaceChanged(String),
     DocFindToggleCase,
+    DocFindToggleWholeWord,
+    DocFindToggleRegex,
 
     // Quick reference
     ShowQuickRef(Uuid),
@@ -527,6 +531,8 @@ impl ScrineverApp {
             doc_find_text: String::new(),
             doc_replace_text: String::new(),
             doc_find_case_sensitive: false,
+            doc_find_whole_word: false,
+            doc_find_use_regex: false,
             doc_find_match_count: 0,
             doc_find_current_match: 0,
             doc_find_positions: Vec::new(),
@@ -2017,6 +2023,14 @@ impl ScrineverApp {
                         }
                     }
                 }
+            }
+
+            Message::DocFindToggleWholeWord => {
+                self.doc_find_whole_word = !self.doc_find_whole_word;
+            }
+
+            Message::DocFindToggleRegex => {
+                self.doc_find_use_regex = !self.doc_find_use_regex;
             }
 
             // ========== Quick reference ==========
@@ -3539,8 +3553,8 @@ impl ScrineverApp {
                     match_count: self.doc_find_match_count,
                     case_sensitive: self.doc_find_case_sensitive,
                     current_match: self.doc_find_current_match,
-                    whole_word: false,
-                    use_regex: false,
+                    whole_word: self.doc_find_whole_word,
+                    use_regex: self.doc_find_use_regex,
                 };
                 Some(views::find_replace_panel::view(&data))
             }

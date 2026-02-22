@@ -1,4 +1,4 @@
-use iced::widget::{button, column, container, row, text, text_input, toggler, Space};
+use iced::widget::{button, column, container, row, text, text_input, Space};
 use iced::{Element, Length, Padding};
 
 use crate::gui::app::Message;
@@ -120,10 +120,19 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
     ]
     .align_y(iced::Alignment::Center);
 
-    let case_label = if data.case_sensitive {
-        "Case: ON"
+    let case_label = if data.case_sensitive { "Aa" } else { "Aa" };
+    let case_color = if data.case_sensitive { Theme::TEXT_ACCENT } else { Theme::TEXT_MUTED };
+    let word_label = if data.whole_word { "W" } else { "W" };
+    let word_color = if data.whole_word { Theme::TEXT_ACCENT } else { Theme::TEXT_MUTED };
+    let regex_label = if data.use_regex { ".*" } else { ".*" };
+    let regex_color = if data.use_regex { Theme::TEXT_ACCENT } else { Theme::TEXT_MUTED };
+
+    let mode_hint = if data.use_regex {
+        "Regex mode active"
+    } else if data.whole_word {
+        "Whole word matching"
     } else {
-        "Case: off"
+        "Substring matching"
     };
 
     let info = row![
@@ -131,11 +140,21 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
             .size(10)
             .color(match_color),
         Space::with_width(12),
-        toggler(data.case_sensitive)
-            .label(case_label)
-            .on_toggle(|_| Message::DocFindToggleCase),
+        button(text(case_label).size(11).color(case_color))
+            .on_press(Message::DocFindToggleCase)
+            .padding(Padding::from([2, 6])),
+        Space::with_width(4),
+        button(text(word_label).size(11).color(word_color))
+            .on_press(Message::DocFindToggleWholeWord)
+            .padding(Padding::from([2, 6])),
+        Space::with_width(4),
+        button(text(regex_label).size(11).color(regex_color))
+            .on_press(Message::DocFindToggleRegex)
+            .padding(Padding::from([2, 6])),
+        Space::with_width(8),
+        text(mode_hint).size(9).color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
-        text("Enter: next | Shift+Enter: prev | Ctrl+G: go to line")
+        text("Enter: next | Shift+Enter: prev")
             .size(9)
             .color(Theme::TEXT_MUTED),
     ];

@@ -49,10 +49,18 @@ pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
             "just now".to_string()
         };
 
+        // Color indicator
+        let color_indicator = if let Some(ref color) = bm.color {
+            text(format!("[{}]", color)).size(9).color(Theme::TEXT_ACCENT)
+        } else {
+            text("").size(9)
+        };
+
         let bm_row = row![
             text(index_str).size(10).color(Theme::TEXT_MUTED).width(Length::Fixed(20.0)),
             text("\u{2605}").size(10).color(Theme::WARNING),
             Space::with_width(4),
+            color_indicator,
             button(
                 text(bm.name.clone()).size(12).color(Theme::TEXT_PRIMARY),
             )
@@ -76,6 +84,18 @@ pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
         .align_y(iced::Alignment::Center);
 
         list = list.push(bm_row);
+
+        // Show note below the bookmark if present
+        if let Some(ref note) = bm.note {
+            let note_display = if note.len() > 80 {
+                format!("  {} ...", &note[..80])
+            } else {
+                format!("  {}", note)
+            };
+            list = list.push(
+                text(note_display).size(9).color(Theme::TEXT_MUTED)
+            );
+        }
     }
 
     // Bookmarks with notes count
