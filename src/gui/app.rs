@@ -1355,17 +1355,49 @@ impl ScrineverApp {
 
             // ========== Writing session ==========
             Message::SessionToggle => {
-                self.session_active = !self.session_active;
                 if self.session_active {
+                    // Stopping session - show summary
+                    self.session_active = false;
+                    let elapsed_min = self.session_stats.time_elapsed_seconds as f64 / 60.0;
+                    let words = self.session_stats.words_written;
+                    let wpm = self.session_stats.words_per_minute;
+                    let goal_msg = if self.session_goal > 0 {
+                        let pct = (words as f64 / self.session_goal as f64 * 100.0).min(999.9);
+                        if pct >= 100.0 {
+                            " | Goal reached!".to_string()
+                        } else {
+                            format!(" | {:.0}% of goal", pct)
+                        }
+                    } else {
+                        String::new()
+                    };
+                    self.notification = Some(format!(
+                        "Session ended: {} words in {:.1}m ({:.1} wpm){}",
+                        words, elapsed_min, wpm, goal_msg
+                    ));
+                    // Record to writing history
+                    let current_wc = self.current_word_count();
+                    let elapsed = self.session_stats.time_elapsed_seconds;
+                    if let Some(ref mut project) = self.project {
+                        project.writing_history.record(current_wc, elapsed);
+                    }
+                } else {
+                    // Starting session
+                    self.session_active = true;
                     self.session_start_word_count = self.current_word_count();
                     self.session_stats = SessionStats::new();
+                    self.notification = Some("Writing session started. Happy writing!".to_string());
                 }
             }
 
             Message::SessionReset => {
+                let had_words = self.session_stats.words_written > 0;
                 self.session_active = false;
                 self.session_stats = SessionStats::new();
                 self.session_start_word_count = self.current_word_count();
+                if had_words {
+                    self.notification = Some("Session reset. Previous session data cleared.".to_string());
+                }
             }
 
             Message::SessionSetGoal(goal_str) => {
@@ -3023,13 +3055,46 @@ impl ScrineverApp {
                 if self.session_active {
                     let current_words = self.current_word_count();
                     let word_delta = current_words as i64 - self.session_start_word_count as i64;
+                    let prev_words = self.session_stats.words_written;
                     self.session_stats.update(word_delta, self.session_stats.time_elapsed_seconds + 1);
+
+                    // Check session goal milestone
+                    if self.session_goal > 0 {
+                        let new_words = self.session_stats.words_written;
+                        let goal = self.session_goal as i64;
+                        // Just crossed the goal threshold
+                        if prev_words < goal && new_words >= goal {
+                            self.notification = Some(format!(
+                                "\u{2713} Session goal of {} words reached! Keep going!",
+                                self.session_goal
+                            ));
+                        }
+                    }
+
+                    // Check daily goal milestone
+                    if self.daily_goal > 0 && self.session_stats.time_elapsed_seconds % 10 == 0 {
+                        let words_today = self.session_stats.words_written;
+                        let daily_goal = self.daily_goal as i64;
+                        if words_today >= daily_goal && (words_today - 10) < daily_goal {
+                            self.notification = Some(format!(
+                                "\u{2713} Daily goal of {} words reached!",
+                                self.daily_goal
+                            ));
+                        }
+                    }
 
                     // Record writing history every 60 seconds
                     if self.session_stats.time_elapsed_seconds % 60 == 0 {
                         if let Some(ref mut project) = self.project {
                             project.writing_history.record(current_words, 60);
                         }
+                    }
+
+                    // Pomodoro break reminder at 25 min
+                    if self.session_stats.time_elapsed_seconds == 1500 && self.notification.is_none() {
+                        self.notification = Some(
+                            "\u{2615} 25 minutes of writing! Consider a short break.".to_string()
+                        );
                     }
                 }
 
@@ -3572,6 +3637,7 @@ impl ScrineverApp {
         } else {
             String::new()
         };
+        let streak = project.writing_history.current_streak();
         let status_bar = views::status_bar::view(
             &stats,
             project.settings.target_word_count,
@@ -3582,6 +3648,7 @@ impl ScrineverApp {
             self.editor.current_column(),
             self.writing_timer.is_running(),
             &timer_remaining,
+            streak,
         );
 
         // Notification bar
