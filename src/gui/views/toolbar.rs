@@ -186,10 +186,15 @@ fn section_label(label: &str) -> Element<'static, Message> {
 
 /// Horizontal separator line
 fn dropdown_separator() -> Element<'static, Message> {
-    container(Space::with_height(1))
-        .width(Length::Fill)
-        .padding(Padding::from([3, 0]))
-        .into()
+    container(
+        container(Space::with_height(1))
+            .style(|_theme: &iced::Theme| container::Style {
+                background: Some(iced::Background::Color(Theme::BORDER_SUBTLE)),
+                ..Default::default()
+            })
+    )
+    .padding(Padding::from([3, 8]))
+    .into()
 }
 
 /// Regular dropdown menu item
@@ -199,7 +204,6 @@ fn dropdown_btn(label: &str, message: Message) -> Element<'static, Message> {
     )
     .on_press(message)
     .padding(Padding::from([4, 12]))
-    .width(Length::Fill)
     .into()
 }
 
@@ -213,7 +217,6 @@ fn view_btn(label: &str, mode: ViewMode, current: &ViewMode) -> Element<'static,
     )
     .on_press(Message::SwitchView(mode))
     .padding(Padding::from([4, 12]))
-    .width(Length::Fill)
     .into()
 }
 
@@ -226,7 +229,6 @@ fn toggle_btn(label: &str, active: bool, message: Message) -> Element<'static, M
     )
     .on_press(message)
     .padding(Padding::from([4, 12]))
-    .width(Length::Fill)
     .into()
 }
 
@@ -240,6 +242,5 @@ fn panel_btn(label: &str, panel: BottomPanel, current: &BottomPanel) -> Element<
     )
     .on_press(Message::ShowBottomPanel(panel))
     .padding(Padding::from([4, 12]))
-    .width(Length::Fill)
     .into()
 }
