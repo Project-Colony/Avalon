@@ -3565,12 +3565,21 @@ impl ScrineverApp {
 
         // Status bar
         let stats = Statistics::from_binder(&project.binder);
+        let timer_remaining = if self.writing_timer.is_running() {
+            self.writing_timer.remaining_display()
+        } else {
+            String::new()
+        };
         let status_bar = views::status_bar::view(
             &stats,
             project.settings.target_word_count,
             self.editor.dirty,
             &project.title,
             self.session_active,
+            self.editor.current_line(),
+            self.editor.current_column(),
+            self.writing_timer.is_running(),
+            &timer_remaining,
         );
 
         // Notification bar
