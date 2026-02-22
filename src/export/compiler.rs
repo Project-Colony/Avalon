@@ -449,6 +449,104 @@ impl OutputFormat {
     }
 }
 
+/// Statistics gathered from compiled content
+#[derive(Debug, Clone)]
+pub struct CompileStatistics {
+    pub total_words: usize,
+    pub total_chars: usize,
+    pub total_paragraphs: usize,
+    pub total_sentences: usize,
+    pub section_count: usize,
+    pub folder_count: usize,
+    pub avg_words_per_section: f64,
+    pub longest_section: Option<(String, usize)>,
+    pub shortest_section: Option<(String, usize)>,
+    pub estimated_pages: usize,
+    pub estimated_reading_minutes: usize,
+}
+
+impl CompileStatistics {
+    /// Compute statistics from a set of compile contents
+    pub fn from_contents(contents: &[CompileContent]) -> Self {
+        let sections: Vec<&CompileContent> = contents.iter().filter(|c| !c.is_folder).collect();
+        let folders: Vec<&CompileContent> = contents.iter().filter(|c| c.is_folder).collect();
+
+        let total_words: usize = sections.iter().map(|c| c.word_count()).sum();
+        let total_chars: usize = sections.iter().map(|c| c.char_count()).sum();
+        let total_paragraphs: usize = sections.iter().map(|c| c.paragraph_count()).sum();
+        let total_sentences: usize = sections.iter().map(|c| c.sentence_count()).sum();
+
+        let avg_words_per_section = if sections.is_empty() {
+            0.0
+        } else {
+            total_words as f64 / sections.len() as f64
+        };
+
+        let longest_section = sections
+            .iter()
+            .max_by_key(|c| c.word_count())
+            .map(|c| (c.title.clone(), c.word_count()));
+
+        let shortest_section = sections
+            .iter()
+            .filter(|c| c.word_count() > 0)
+            .min_by_key(|c| c.word_count())
+            .map(|c| (c.title.clone(), c.word_count()));
+
+        Self {
+            total_words,
+            total_chars,
+            total_paragraphs,
+            total_sentences,
+            section_count: sections.len(),
+            folder_count: folders.len(),
+            avg_words_per_section,
+            longest_section,
+            shortest_section,
+            estimated_pages: (total_words / 250).max(if total_words > 0 { 1 } else { 0 }),
+            estimated_reading_minutes: (total_words / 200).max(if total_words > 0 { 1 } else { 0 }),
+        }
+    }
+
+    /// Format as a compact summary string
+    pub fn summary(&self) -> String {
+        format!(
+            "{} words, {} pages, ~{} min read ({} sections, {} folders)",
+            self.total_words,
+            self.estimated_pages,
+            self.estimated_reading_minutes,
+            self.section_count,
+            self.folder_count,
+        )
+    }
+}
+
+impl OutputFormat {
+    /// Parse an OutputFormat from a file extension string
+    pub fn from_extension(ext: &str) -> Option<Self> {
+        match ext.to_lowercase().trim_start_matches('.') {
+            "txt" | "text" => Some(OutputFormat::PlainText),
+            "md" | "markdown" => Some(OutputFormat::Markdown),
+            "html" | "htm" => Some(OutputFormat::Html),
+            "pdf" => Some(OutputFormat::Pdf),
+            "tex" | "latex" => Some(OutputFormat::Latex),
+            "docx" => Some(OutputFormat::Docx),
+            "epub" => Some(OutputFormat::Epub),
+            "rtf" => Some(OutputFormat::Rtf),
+            "opml" => Some(OutputFormat::Opml),
+            "fountain" => Some(OutputFormat::Fountain),
+            _ => None,
+        }
+    }
+
+    /// Parse an OutputFormat from a file path
+    pub fn from_path(path: &Path) -> Option<Self> {
+        path.extension()
+            .and_then(|e| e.to_str())
+            .and_then(Self::from_extension)
+    }
+}
+
 fn plain_text_compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
     super::plain_text::compile(contents, options)
 }
@@ -456,6 +554,7 @@ fn plain_text_compile(contents: &[CompileContent], options: &CompileOptions) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn test_output_format_extension() {
@@ -1128,5 +1227,143 @@ mod tests {
     fn test_output_format_equality() {
         assert_eq!(OutputFormat::Pdf, OutputFormat::Pdf);
         assert_ne!(OutputFormat::Pdf, OutputFormat::Html);
+    }
+
+    // ---- New: CompileStatistics tests ----
+
+    #[test]
+    fn test_compile_statistics_basic() {
+        let contents = vec![
+            CompileContent { title: "Ch1".into(), text: "Hello world foo bar.".into(), depth: 0, is_folder: false },
+            CompileContent { title: "Ch2".into(), text: "Second chapter here.".into(), depth: 0, is_folder: false },
+            CompileContent { title: "Part".into(), text: String::new(), depth: 0, is_folder: true },
+        ];
+        let stats = CompileStatistics::from_contents(&contents);
+        assert_eq!(stats.section_count, 2);
+        assert_eq!(stats.folder_count, 1);
+        assert_eq!(stats.total_words, 7);
+        assert!(stats.total_chars > 0);
+        assert!(stats.avg_words_per_section > 0.0);
+    }
+
+    #[test]
+    fn test_compile_statistics_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        let stats = CompileStatistics::from_contents(&contents);
+        assert_eq!(stats.total_words, 0);
+        assert_eq!(stats.section_count, 0);
+        assert_eq!(stats.folder_count, 0);
+        assert_eq!(stats.estimated_pages, 0);
+        assert_eq!(stats.estimated_reading_minutes, 0);
+        assert!(stats.longest_section.is_none());
+        assert!(stats.shortest_section.is_none());
+    }
+
+    #[test]
+    fn test_compile_statistics_longest_shortest() {
+        let contents = vec![
+            CompileContent { title: "Short".into(), text: "Two words.".into(), depth: 0, is_folder: false },
+            CompileContent { title: "Long".into(), text: "This is a much longer section with many more words in it.".into(), depth: 0, is_folder: false },
+        ];
+        let stats = CompileStatistics::from_contents(&contents);
+        let (longest_title, _) = stats.longest_section.unwrap();
+        assert_eq!(longest_title, "Long");
+        let (shortest_title, _) = stats.shortest_section.unwrap();
+        assert_eq!(shortest_title, "Short");
+    }
+
+    #[test]
+    fn test_compile_statistics_summary() {
+        let contents = vec![
+            CompileContent { title: "Scene".into(), text: "Hello world.".into(), depth: 0, is_folder: false },
+        ];
+        let stats = CompileStatistics::from_contents(&contents);
+        let summary = stats.summary();
+        assert!(summary.contains("2 words"));
+        assert!(summary.contains("1 sections"));
+    }
+
+    #[test]
+    fn test_compile_statistics_pages_and_reading_time() {
+        let long_text = "word ".repeat(1000);
+        let contents = vec![
+            CompileContent { title: "Big".into(), text: long_text, depth: 0, is_folder: false },
+        ];
+        let stats = CompileStatistics::from_contents(&contents);
+        assert_eq!(stats.estimated_pages, 4); // 1000 / 250
+        assert_eq!(stats.estimated_reading_minutes, 5); // 1000 / 200
+    }
+
+    // ---- New: OutputFormat::from_extension / from_path tests ----
+
+    #[test]
+    fn test_format_from_extension() {
+        assert_eq!(OutputFormat::from_extension("txt"), Some(OutputFormat::PlainText));
+        assert_eq!(OutputFormat::from_extension("text"), Some(OutputFormat::PlainText));
+        assert_eq!(OutputFormat::from_extension("md"), Some(OutputFormat::Markdown));
+        assert_eq!(OutputFormat::from_extension("markdown"), Some(OutputFormat::Markdown));
+        assert_eq!(OutputFormat::from_extension("html"), Some(OutputFormat::Html));
+        assert_eq!(OutputFormat::from_extension("htm"), Some(OutputFormat::Html));
+        assert_eq!(OutputFormat::from_extension("pdf"), Some(OutputFormat::Pdf));
+        assert_eq!(OutputFormat::from_extension("tex"), Some(OutputFormat::Latex));
+        assert_eq!(OutputFormat::from_extension("latex"), Some(OutputFormat::Latex));
+        assert_eq!(OutputFormat::from_extension("docx"), Some(OutputFormat::Docx));
+        assert_eq!(OutputFormat::from_extension("epub"), Some(OutputFormat::Epub));
+        assert_eq!(OutputFormat::from_extension("rtf"), Some(OutputFormat::Rtf));
+        assert_eq!(OutputFormat::from_extension("opml"), Some(OutputFormat::Opml));
+        assert_eq!(OutputFormat::from_extension("fountain"), Some(OutputFormat::Fountain));
+    }
+
+    #[test]
+    fn test_format_from_extension_case_insensitive() {
+        assert_eq!(OutputFormat::from_extension("TXT"), Some(OutputFormat::PlainText));
+        assert_eq!(OutputFormat::from_extension("MD"), Some(OutputFormat::Markdown));
+        assert_eq!(OutputFormat::from_extension("Html"), Some(OutputFormat::Html));
+    }
+
+    #[test]
+    fn test_format_from_extension_with_dot() {
+        assert_eq!(OutputFormat::from_extension(".pdf"), Some(OutputFormat::Pdf));
+        assert_eq!(OutputFormat::from_extension(".md"), Some(OutputFormat::Markdown));
+    }
+
+    #[test]
+    fn test_format_from_extension_unknown() {
+        assert_eq!(OutputFormat::from_extension("xyz"), None);
+        assert_eq!(OutputFormat::from_extension(""), None);
+        assert_eq!(OutputFormat::from_extension("jpg"), None);
+    }
+
+    #[test]
+    fn test_format_from_path() {
+        let path = PathBuf::from("/some/file.md");
+        assert_eq!(OutputFormat::from_path(&path), Some(OutputFormat::Markdown));
+
+        let path = PathBuf::from("document.pdf");
+        assert_eq!(OutputFormat::from_path(&path), Some(OutputFormat::Pdf));
+
+        let path = PathBuf::from("output.html");
+        assert_eq!(OutputFormat::from_path(&path), Some(OutputFormat::Html));
+    }
+
+    #[test]
+    fn test_format_from_path_no_extension() {
+        let path = PathBuf::from("noext");
+        assert_eq!(OutputFormat::from_path(&path), None);
+    }
+
+    #[test]
+    fn test_format_from_path_unknown_ext() {
+        let path = PathBuf::from("image.png");
+        assert_eq!(OutputFormat::from_path(&path), None);
+    }
+
+    #[test]
+    fn test_format_roundtrip() {
+        for fmt in OutputFormat::all() {
+            let ext = fmt.extension();
+            let parsed = OutputFormat::from_extension(ext).unwrap();
+            assert_eq!(parsed, fmt, "Roundtrip failed for {:?}", fmt);
+        }
     }
 }

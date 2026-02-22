@@ -151,6 +151,40 @@ impl PlaceholderContext {
             .collect::<Vec<_>>()
             .join("")
     }
+
+    /// Estimated reading time in minutes (assuming 200 words/minute)
+    pub fn estimated_reading_time(&self) -> usize {
+        (self.word_count / 200).max(if self.word_count > 0 { 1 } else { 0 })
+    }
+
+    /// Build context from compile contents
+    pub fn from_contents(
+        contents: &[super::compiler::CompileContent],
+        title: &str,
+        author: &str,
+    ) -> Self {
+        let word_count: usize = contents.iter().map(|c| c.text.split_whitespace().count()).sum();
+        let char_count: usize = contents.iter().map(|c| c.text.len()).sum();
+        Self {
+            project_title: title.to_string(),
+            author: author.to_string(),
+            word_count,
+            char_count,
+            page_count: (word_count / 250).max(if word_count > 0 { 1 } else { 0 }),
+        }
+    }
+
+    /// Format a compact credit line like "Title by Author (N words)"
+    pub fn credit_line(&self) -> String {
+        if self.author.is_empty() {
+            format!("{} ({} words)", self.project_title, self.word_count)
+        } else {
+            format!(
+                "{} by {} ({} words)",
+                self.project_title, self.author, self.word_count,
+            )
+        }
+    }
 }
 
 /// List all supported placeholders for documentation
@@ -601,5 +635,83 @@ mod tests {
         // Should be a 4-digit year
         assert_eq!(result.len(), 4);
         assert!(result.parse::<u32>().is_ok());
+    }
+
+    // ---- New placeholder context helpers ----
+
+    #[test]
+    fn test_estimated_reading_time() {
+        let ctx = PlaceholderContext {
+            project_title: "Test".to_string(),
+            author: "Author".to_string(),
+            word_count: 1000,
+            char_count: 5000,
+            page_count: 4,
+        };
+        assert_eq!(ctx.estimated_reading_time(), 5); // 1000/200 = 5
+    }
+
+    #[test]
+    fn test_estimated_reading_time_short() {
+        let ctx = PlaceholderContext {
+            project_title: "T".to_string(),
+            author: "A".to_string(),
+            word_count: 50,
+            char_count: 250,
+            page_count: 1,
+        };
+        assert_eq!(ctx.estimated_reading_time(), 1); // min 1
+    }
+
+    #[test]
+    fn test_estimated_reading_time_zero() {
+        let ctx = PlaceholderContext::default_with_title("Empty");
+        assert_eq!(ctx.estimated_reading_time(), 0);
+    }
+
+    #[test]
+    fn test_from_contents() {
+        use crate::export::compiler::CompileContent;
+        let contents = vec![
+            CompileContent { title: "Ch1".into(), text: "one two three four five".into(), depth: 0, is_folder: false },
+            CompileContent { title: "Ch2".into(), text: "six seven eight".into(), depth: 0, is_folder: false },
+        ];
+        let ctx = PlaceholderContext::from_contents(&contents, "My Book", "Jane Smith");
+        assert_eq!(ctx.project_title, "My Book");
+        assert_eq!(ctx.author, "Jane Smith");
+        assert_eq!(ctx.word_count, 8);
+        assert_eq!(ctx.page_count, 1);
+    }
+
+    #[test]
+    fn test_from_contents_empty() {
+        use crate::export::compiler::CompileContent;
+        let contents: Vec<CompileContent> = vec![];
+        let ctx = PlaceholderContext::from_contents(&contents, "Empty", "");
+        assert_eq!(ctx.word_count, 0);
+        assert_eq!(ctx.page_count, 0);
+    }
+
+    #[test]
+    fn test_credit_line() {
+        let ctx = make_context();
+        let line = ctx.credit_line();
+        assert!(line.contains("My Novel"));
+        assert!(line.contains("John Doe"));
+        assert!(line.contains("50000"));
+    }
+
+    #[test]
+    fn test_credit_line_no_author() {
+        let ctx = PlaceholderContext {
+            project_title: "Solo".to_string(),
+            author: String::new(),
+            word_count: 100,
+            char_count: 500,
+            page_count: 1,
+        };
+        let line = ctx.credit_line();
+        assert!(line.contains("Solo"));
+        assert!(!line.contains("by"));
     }
 }
