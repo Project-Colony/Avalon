@@ -620,4 +620,132 @@ mod tests {
     fn test_set_script_element_is_editing() {
         assert!(EditorAction::SetScriptElement("Action".into()).is_editing());
     }
+
+    #[test]
+    fn test_action_debug_format() {
+        let action = EditorAction::ToggleBold;
+        let debug = format!("{:?}", action);
+        assert!(debug.contains("ToggleBold"));
+    }
+
+    #[test]
+    fn test_action_clone() {
+        let action = EditorAction::Insert("hello".to_string());
+        let cloned = action.clone();
+        assert_eq!(cloned.description(), "Insert text");
+    }
+
+    #[test]
+    fn test_list_style_debug_clone() {
+        let bullet = ListStyle::Bullet;
+        let cloned = bullet.clone();
+        assert_eq!(cloned.prefix(), "- ");
+        let debug = format!("{:?}", bullet);
+        assert!(debug.contains("Bullet"));
+    }
+
+    #[test]
+    fn test_datetime_format_debug_clone() {
+        let fmt = DateTimeFormat::Iso8601;
+        let cloned = fmt.clone();
+        assert_eq!(cloned.label(), "ISO 8601");
+        let debug = format!("{:?}", fmt);
+        assert!(debug.contains("Iso8601"));
+    }
+
+    #[test]
+    fn test_all_shortcut_hints_non_panicking() {
+        let actions = vec![
+            EditorAction::ToggleBold,
+            EditorAction::ToggleItalic,
+            EditorAction::ToggleUnderline,
+            EditorAction::Undo,
+            EditorAction::Redo,
+            EditorAction::SelectAll,
+            EditorAction::Find("q".into()),
+            EditorAction::Replace { find: "a".into(), replace: "b".into() },
+            EditorAction::MoveToLineStart,
+            EditorAction::MoveToLineEnd,
+            EditorAction::MoveToDocStart,
+            EditorAction::MoveToDocEnd,
+            EditorAction::Indent,
+            EditorAction::Unindent,
+            EditorAction::DeleteLine,
+            EditorAction::DuplicateLine,
+            EditorAction::MoveLineUp,
+            EditorAction::MoveLineDown,
+            EditorAction::GoToLine(1),
+            EditorAction::ToggleComment,
+            EditorAction::InsertBlockQuote,
+            EditorAction::SortLines,
+            EditorAction::TransposeChars,
+        ];
+        for action in &actions {
+            let _ = action.shortcut_hint();
+        }
+    }
+
+    #[test]
+    fn test_category_completeness() {
+        let actions: Vec<EditorAction> = vec![
+            EditorAction::MoveToLineStart,
+            EditorAction::MoveToDocEnd,
+            EditorAction::GoToLine(1),
+            EditorAction::SelectAll,
+            EditorAction::SelectWord,
+            EditorAction::ToggleBold,
+            EditorAction::ToUppercase,
+            EditorAction::Insert("x".into()),
+            EditorAction::InsertHeading(1),
+            EditorAction::Undo,
+            EditorAction::Redo,
+            EditorAction::Find("x".into()),
+            EditorAction::Replace { find: "a".into(), replace: "b".into() },
+            EditorAction::DeleteLine,
+            EditorAction::SortLines,
+        ];
+        let categories: Vec<&str> = actions.iter().map(|a| a.category()).collect();
+        assert!(categories.contains(&"Navigation"));
+        assert!(categories.contains(&"Selection"));
+        assert!(categories.contains(&"Formatting"));
+        assert!(categories.contains(&"Insert"));
+        assert!(categories.contains(&"History"));
+        assert!(categories.contains(&"Find & Replace"));
+        assert!(categories.contains(&"Edit"));
+    }
+
+    #[test]
+    fn test_focus_mode_not_editing() {
+        assert!(!EditorAction::ToggleFocusMode.is_editing());
+        assert!(!EditorAction::ToggleFocusMode.is_movement());
+        assert!(!EditorAction::ToggleFocusMode.is_selection());
+        assert!(!EditorAction::ToggleFocusMode.is_formatting());
+        assert!(!EditorAction::ToggleFocusMode.is_insertion());
+    }
+
+    #[test]
+    fn test_insert_code_block_with_language() {
+        let action = EditorAction::InsertCodeBlock(Some("rust".into()));
+        assert!(action.is_insertion());
+        assert_eq!(action.description(), "Insert code block");
+    }
+
+    #[test]
+    fn test_insert_heading_levels() {
+        for level in 1..=6 {
+            let action = EditorAction::InsertHeading(level);
+            assert!(action.is_insertion());
+            assert!(action.is_editing());
+            assert_eq!(action.description(), "Insert heading");
+        }
+    }
+
+    #[test]
+    fn test_page_break_properties() {
+        let action = EditorAction::InsertPageBreak;
+        assert!(action.is_insertion());
+        assert!(action.is_editing());
+        assert!(action.is_undoable());
+        assert_eq!(action.category(), "Insert");
+    }
 }

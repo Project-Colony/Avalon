@@ -1631,4 +1631,225 @@ mod tests {
         let siblings = folder.sibling_ids(&fake_id);
         assert!(siblings.is_empty());
     }
+
+    #[test]
+    fn test_reparent_item_to_self() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("Scene");
+        let id = item.id;
+        binder.draft.add_child(item);
+        assert!(!binder.reparent_item(&id, &id, 0));
+    }
+
+    #[test]
+    fn test_reparent_item_to_research() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("Move me");
+        let item_id = item.id;
+        let research_id = binder.research.id;
+        binder.draft.add_child(item);
+
+        assert!(binder.reparent_item(&item_id, &research_id, 0));
+        assert!(binder.draft.find(&item_id).is_none());
+        assert!(binder.research.find(&item_id).is_some());
+    }
+
+    #[test]
+    fn test_move_item_to_position_same() {
+        let mut binder = Binder::default_structure();
+        let a = BinderItem::new_text("A");
+        let a_id = a.id;
+        binder.draft.add_child(a);
+        binder.draft.add_child(BinderItem::new_text("B"));
+
+        // Move to same position should return false
+        assert!(!binder.move_item_to_position(&a_id, 0));
+    }
+
+    #[test]
+    fn test_group_items_empty_list() {
+        let mut binder = Binder::default_structure();
+        assert!(binder.group_items_into_folder(&[], "Empty").is_none());
+    }
+
+    #[test]
+    fn test_flatten_folder_not_a_folder() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("Not a folder");
+        let id = item.id;
+        binder.draft.add_child(item);
+        assert!(!binder.flatten_folder(&id));
+    }
+
+    #[test]
+    fn test_flatten_empty_folder() {
+        let mut binder = Binder::default_structure();
+        let folder = BinderItem::new_folder("Empty");
+        let id = folder.id;
+        binder.draft.add_child(folder);
+        assert!(!binder.flatten_folder(&id));
+    }
+
+    #[test]
+    fn test_split_nonexistent_item() {
+        let mut binder = Binder::default_structure();
+        let fake_id = Uuid::new_v4();
+        let result = binder.split_item(&fake_id, "---");
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_merge_no_content() {
+        let mut binder = Binder::default_structure();
+        let a = BinderItem::new_folder("Folder A");
+        let b = BinderItem::new_folder("Folder B");
+        let a_id = a.id;
+        let b_id = b.id;
+        binder.draft.add_child(a);
+        binder.draft.add_child(b);
+        // Folders have no document content
+        assert!(binder.merge_items(&[a_id, b_id], "\n\n").is_none());
+    }
+
+    #[test]
+    fn test_path_to_item_not_found() {
+        let folder = BinderItem::new_folder("Root");
+        let fake_id = Uuid::new_v4();
+        assert!(folder.path_to_item(&fake_id).is_none());
+    }
+
+    #[test]
+    fn test_path_to_item_self() {
+        let folder = BinderItem::new_folder("Root");
+        let path = folder.path_to_item(&folder.id).unwrap();
+        assert_eq!(path, vec!["Root"]);
+    }
+
+    #[test]
+    fn test_deep_clone_preserves_structure() {
+        let mut root = BinderItem::new_folder("Root");
+        let mut sub = BinderItem::new_folder("Sub");
+        sub.add_child(BinderItem::new_text("Leaf A"));
+        sub.add_child(BinderItem::new_text("Leaf B"));
+        root.add_child(sub);
+
+        let cloned = root.deep_clone();
+        assert_ne!(cloned.id, root.id);
+        assert_eq!(cloned.children.len(), 1);
+        assert_eq!(cloned.children[0].children.len(), 2);
+        assert_ne!(cloned.children[0].id, root.children[0].id);
+    }
+
+    #[test]
+    fn test_merge_children_content_empty() {
+        let folder = BinderItem::new_folder("Empty");
+        assert!(folder.merge_children_content().is_empty());
+    }
+
+    #[test]
+    fn test_total_char_count() {
+        let mut binder = Binder::default_structure();
+        let mut a = BinderItem::new_text("A");
+        if let Some(ref mut doc) = a.document {
+            doc.content = "Hello".to_string();
+        }
+        binder.draft.add_child(a);
+        assert!(binder.total_char_count() > 0);
+    }
+
+    #[test]
+    fn test_duplicate_item_not_found() {
+        let mut binder = Binder::default_structure();
+        let fake_id = Uuid::new_v4();
+        assert!(binder.duplicate_item(&fake_id).is_none());
+    }
+
+    #[test]
+    fn test_next_sibling_not_found() {
+        let folder = BinderItem::new_folder("Root");
+        let fake_id = Uuid::new_v4();
+        assert!(folder.next_sibling(&fake_id).is_none());
+    }
+
+    #[test]
+    fn test_prev_sibling_not_found() {
+        let folder = BinderItem::new_folder("Root");
+        let fake_id = Uuid::new_v4();
+        assert!(folder.prev_sibling(&fake_id).is_none());
+    }
+
+    #[test]
+    fn test_move_child_up_nested() {
+        let mut binder = Binder::default_structure();
+        let mut folder = BinderItem::new_folder("Ch");
+        let a = BinderItem::new_text("A");
+        let b = BinderItem::new_text("B");
+        let b_id = b.id;
+        folder.add_child(a);
+        folder.add_child(b);
+        binder.draft.add_child(folder);
+
+        assert!(binder.move_item_up(&b_id));
+    }
+
+    #[test]
+    fn test_move_child_down_nested() {
+        let mut binder = Binder::default_structure();
+        let mut folder = BinderItem::new_folder("Ch");
+        let a = BinderItem::new_text("A");
+        let b = BinderItem::new_text("B");
+        let a_id = a.id;
+        folder.add_child(a);
+        folder.add_child(b);
+        binder.draft.add_child(folder);
+
+        assert!(binder.move_item_down(&a_id));
+    }
+
+    #[test]
+    fn test_longest_document_empty_binder() {
+        let binder = Binder::default_structure();
+        assert!(binder.longest_document().is_none());
+    }
+
+    #[test]
+    fn test_all_text_empty() {
+        let binder = Binder::default_structure();
+        assert!(binder.all_text().is_empty());
+    }
+
+    #[test]
+    fn test_find_item_in_trash() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("Trashed");
+        let id = item.id;
+        binder.trash.add_child(item);
+        assert!(binder.find_item(&id).is_some());
+    }
+
+    #[test]
+    fn test_find_item_mut_in_research() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("Research item");
+        let id = item.id;
+        binder.research.add_child(item);
+        let found = binder.find_item_mut(&id).unwrap();
+        found.title = "Renamed".to_string();
+        assert_eq!(binder.find_item(&id).unwrap().title, "Renamed");
+    }
+
+    #[test]
+    fn test_binder_item_kind_all_variants() {
+        let kinds = vec![
+            BinderItemKind::Folder,
+            BinderItemKind::Text,
+            BinderItemKind::Image,
+            BinderItemKind::Pdf,
+            BinderItemKind::WebPage,
+        ];
+        for kind in &kinds {
+            assert!(!kind.label().is_empty());
+            assert!(!kind.icon().is_empty());
+        }
+    }
 }

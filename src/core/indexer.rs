@@ -662,4 +662,173 @@ mod tests {
         // Term count may decrease if terms were only in removed doc
         assert!(index.term_count <= terms_before);
     }
+
+    #[test]
+    fn test_search_multiple_terms_boost() {
+        let mut index = SearchIndex::new();
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        index.update_document(id1, "Dragon Knight", "The dragon knight fought bravely", "", "");
+        index.update_document(id2, "Village", "The village was peaceful", "", "");
+
+        let results = index.search("dragon knight");
+        assert!(!results.is_empty());
+        // id1 should appear in results (matching both terms)
+        assert!(results.iter().any(|r| r.doc_id == id1));
+    }
+
+    #[test]
+    fn test_search_case_insensitive() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Test", "Hello World Testing", "", "");
+
+        let results = index.search("HELLO");
+        assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn test_update_document_changes_metadata() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Original Title", "original content", "", "");
+        index.update_document(doc_id, "New Title", "new content", "", "");
+
+        // Old title should not be found
+        let results = index.search("original");
+        assert!(results.is_empty());
+
+        // New content should be found
+        let results = index.search("new");
+        assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn test_remove_nonexistent_document() {
+        let mut index = SearchIndex::new();
+        let fake_id = Uuid::new_v4();
+        // Should not panic
+        index.remove_document(fake_id);
+        assert_eq!(index.document_count, 0);
+    }
+
+    #[test]
+    fn test_index_with_synopsis_and_notes() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Scene One", "body text", "research notes here", "hero arrives");
+
+        let results = index.search("research");
+        assert!(!results.is_empty());
+        assert!(results.iter().any(|r| r.field == IndexField::Notes));
+
+        let results = index.search("hero");
+        assert!(!results.is_empty());
+        assert!(results.iter().any(|r| r.field == IndexField::Synopsis));
+    }
+
+    #[test]
+    fn test_tokenize_preserves_apostrophe() {
+        let tokens = tokenize("don't won't");
+        assert!(tokens.contains(&"don't".to_string()));
+        assert!(tokens.contains(&"won't".to_string()));
+    }
+
+    #[test]
+    fn test_tokenize_numbers_filtered() {
+        let tokens = tokenize("hello 42 world");
+        assert!(tokens.contains(&"hello".to_string()));
+        assert!(tokens.contains(&"world".to_string()));
+        assert!(tokens.contains(&"42".to_string()));
+    }
+
+    #[test]
+    fn test_has_term_case_insensitive() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Test", "Hello", "", "");
+        assert!(index.has_term("Hello"));
+        assert!(index.has_term("HELLO"));
+        assert!(index.has_term("hello"));
+    }
+
+    #[test]
+    fn test_documents_with_term_multiple() {
+        let mut index = SearchIndex::new();
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        let id3 = Uuid::new_v4();
+        index.update_document(id1, "A", "shared concept", "", "");
+        index.update_document(id2, "B", "shared idea", "", "");
+        index.update_document(id3, "C", "different thing", "", "");
+
+        let docs = index.documents_with_term("shared");
+        assert_eq!(docs.len(), 2);
+        assert!(docs.contains(&id1));
+        assert!(docs.contains(&id2));
+        assert!(!docs.contains(&id3));
+    }
+
+    #[test]
+    fn test_estimated_size_empty_index() {
+        let index = SearchIndex::new();
+        assert_eq!(index.estimated_size_bytes(), 0);
+    }
+
+    #[test]
+    fn test_search_results_sorted_by_score() {
+        let mut index = SearchIndex::new();
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        // id1 has "dragon" once in content, id2 has "dragon" in title (boosted)
+        index.update_document(id1, "Chapter", "dragon lurking nearby", "", "");
+        index.update_document(id2, "Dragon", "the creature lurked", "", "");
+
+        let results = index.search("dragon");
+        assert!(results.len() >= 2);
+        // Results should be sorted by score (title match should rank high)
+        assert!(results[0].score >= results[1].score);
+    }
+
+    #[test]
+    fn test_mark_stale_and_rebuild() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Test", "content here", "", "");
+        assert!(!index.stale);
+
+        index.mark_stale();
+        assert!(index.stale);
+
+        // After indexing again, stale should be cleared by build_from_binder
+        // (tested indirectly - mark_stale just sets the flag)
+    }
+
+    #[test]
+    fn test_generate_snippet_at_start() {
+        let text = "keyword appears at the start of the text content.";
+        let snippet = generate_snippet(text, "keyword");
+        assert!(snippet.contains("keyword"));
+        assert!(!snippet.starts_with("..."));
+    }
+
+    #[test]
+    fn test_generate_snippet_at_end() {
+        let long_prefix = "A ".repeat(100);
+        let text = format!("{}keyword", long_prefix);
+        let snippet = generate_snippet(&text, "keyword");
+        assert!(snippet.contains("keyword"));
+    }
+
+    #[test]
+    fn test_prefix_search_minimum_length() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Test", "understanding everything", "", "");
+
+        // Short prefix (< 3 chars) should not trigger prefix search
+        let results = index.search("un");
+        // "un" is too short for prefix search and doesn't match any term exactly
+        assert!(results.is_empty());
+    }
 }

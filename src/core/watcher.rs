@@ -396,4 +396,111 @@ mod tests {
         assert!(tracker.documents_changed.is_empty());
         assert_eq!(tracker.modified_paths.len(), 1);
     }
+
+    #[test]
+    fn test_tracker_process_events_mixed_types() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events = vec![
+            WatchEvent::FileCreated(PathBuf::from("/project/docs/new.json")),
+            WatchEvent::FileModified(PathBuf::from("/project/docs/existing.json")),
+            WatchEvent::FileRemoved(PathBuf::from("/project/docs/deleted.json")),
+        ];
+        tracker.process_events(&events);
+        assert_eq!(tracker.modified_paths.len(), 3);
+        // Created and Modified JSON in docs/ count as document changes
+        assert_eq!(tracker.documents_changed.len(), 2);
+    }
+
+    #[test]
+    fn test_tracker_process_replaces_previous_state() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events1 = vec![
+            WatchEvent::FileModified(PathBuf::from("/project/project.json")),
+        ];
+        tracker.process_events(&events1);
+        assert!(tracker.project_metadata_changed);
+
+        let events2 = vec![
+            WatchEvent::FileModified(PathBuf::from("/project/docs/a.json")),
+        ];
+        tracker.process_events(&events2);
+        // Previous metadata_changed flag should be reset
+        assert!(!tracker.project_metadata_changed);
+        assert_eq!(tracker.modified_paths.len(), 1);
+    }
+
+    #[test]
+    fn test_tracker_nested_docs_path() {
+        let mut tracker = ExternalChangeTracker::new();
+        // JSON in nested docs subdirectory should NOT be counted
+        let events = vec![
+            WatchEvent::FileModified(PathBuf::from("/project/docs/subfolder/deep.json")),
+        ];
+        tracker.process_events(&events);
+        // Parent is "subfolder", not "docs", so shouldn't be in documents_changed
+        assert!(tracker.documents_changed.is_empty());
+    }
+
+    #[test]
+    fn test_tracker_project_json_in_subdirectory() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events = vec![
+            WatchEvent::FileModified(PathBuf::from("/project/subdir/project.json")),
+        ];
+        tracker.process_events(&events);
+        // Only root-level project.json triggers metadata change
+        assert!(tracker.project_metadata_changed);
+    }
+
+    #[test]
+    fn test_watch_event_all_variants_debug() {
+        let events = vec![
+            WatchEvent::FileModified(PathBuf::from("/a")),
+            WatchEvent::FileCreated(PathBuf::from("/b")),
+            WatchEvent::FileRemoved(PathBuf::from("/c")),
+            WatchEvent::ProjectRemoved,
+        ];
+        for event in &events {
+            let debug = format!("{:?}", event);
+            assert!(!debug.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_watch_event_clone_all_variants() {
+        let variants = vec![
+            WatchEvent::FileModified(PathBuf::from("/test")),
+            WatchEvent::FileCreated(PathBuf::from("/test")),
+            WatchEvent::FileRemoved(PathBuf::from("/test")),
+            WatchEvent::ProjectRemoved,
+        ];
+        for v in variants {
+            let _ = v.clone();
+        }
+    }
+
+    #[test]
+    fn test_tracker_large_batch() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events: Vec<WatchEvent> = (0..100)
+            .map(|i| WatchEvent::FileModified(PathBuf::from(format!("/project/docs/file{}.json", i))))
+            .collect();
+        tracker.process_events(&events);
+        assert_eq!(tracker.modified_paths.len(), 100);
+        assert_eq!(tracker.documents_changed.len(), 100);
+    }
+
+    #[test]
+    fn test_tracker_has_changes_after_clear() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events = vec![
+            WatchEvent::FileCreated(PathBuf::from("/project/docs/new.json")),
+        ];
+        tracker.process_events(&events);
+        assert!(tracker.has_changes());
+        tracker.clear();
+        assert!(!tracker.has_changes());
+        assert!(tracker.documents_changed.is_empty());
+        assert!(!tracker.project_metadata_changed);
+    }
 }

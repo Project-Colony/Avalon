@@ -474,4 +474,180 @@ mod tests {
         let line = r#"<outline text="Hello"/>"#;
         assert!(extract_attr(line, "missing").is_none());
     }
+
+    #[test]
+    fn test_export_opml_escaped_title() {
+        let binder = Binder::default_structure();
+        let opml = export_opml(&binder, "A & B <C>").unwrap();
+        assert!(opml.contains("A &amp; B &lt;C&gt;"));
+    }
+
+    #[test]
+    fn test_import_opml_deeply_nested() {
+        let opml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head><title>Deep</title></head>
+  <body>
+    <outline text="Level 1">
+      <outline text="Level 2">
+        <outline text="Level 3">
+          <outline text="Level 4"/>
+        </outline>
+      </outline>
+    </outline>
+  </body>
+</opml>"#;
+        let items = import_opml(opml).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].title, "Level 1");
+        assert_eq!(items[0].children.len(), 1);
+        assert_eq!(items[0].children[0].children.len(), 1);
+        assert_eq!(items[0].children[0].children[0].children.len(), 1);
+        assert_eq!(items[0].children[0].children[0].children[0].title, "Level 4");
+    }
+
+    #[test]
+    fn test_import_opml_mixed_content() {
+        let opml = r#"<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head><title>Mixed</title></head>
+  <body>
+    <outline text="Folder">
+      <outline text="Text 1" _note="Content"/>
+    </outline>
+    <outline text="Standalone" _note="Solo content"/>
+  </body>
+</opml>"#;
+        let items = import_opml(opml).unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].children.len(), 1);
+        assert!(!items[1].synopsis.is_empty());
+    }
+
+    #[test]
+    fn test_escape_xml_all_entities() {
+        let result = escape_xml("A & B < C > D \"E\"");
+        assert_eq!(result, "A &amp; B &lt; C &gt; D &quot;E&quot;");
+    }
+
+    #[test]
+    fn test_escape_xml_no_special() {
+        assert_eq!(escape_xml("plain text"), "plain text");
+    }
+
+    #[test]
+    fn test_unescape_xml_all_entities() {
+        assert_eq!(unescape_xml("A &amp; B &lt; C &gt; D &quot;E&quot;"), "A & B < C > D \"E\"");
+    }
+
+    #[test]
+    fn test_count_items_deep_tree() {
+        let mut root = BinderItem::new_folder("Root");
+        let mut l1 = BinderItem::new_folder("L1");
+        let mut l2 = BinderItem::new_folder("L2");
+        l2.add_child(BinderItem::new_text("L3a"));
+        l2.add_child(BinderItem::new_text("L3b"));
+        l1.add_child(l2);
+        l1.add_child(BinderItem::new_text("L2b"));
+        root.add_child(l1);
+        assert_eq!(count_items(&root), 6); // Root + L1 + L2 + L3a + L3b + L2b
+    }
+
+    #[test]
+    fn test_max_depth_flat() {
+        let mut root = BinderItem::new_folder("Root");
+        root.add_child(BinderItem::new_text("A"));
+        root.add_child(BinderItem::new_text("B"));
+        root.add_child(BinderItem::new_text("C"));
+        assert_eq!(max_depth(&root), 1);
+    }
+
+    #[test]
+    fn test_flat_titles_deep() {
+        let mut root = BinderItem::new_folder("Root");
+        let mut ch = BinderItem::new_folder("Ch");
+        ch.add_child(BinderItem::new_text("Scene"));
+        root.add_child(ch);
+        let titles = flat_titles(&root, 0);
+        assert_eq!(titles.len(), 3);
+        assert_eq!(titles[0], (0, "Root".to_string()));
+        assert_eq!(titles[1], (1, "Ch".to_string()));
+        assert_eq!(titles[2], (2, "Scene".to_string()));
+    }
+
+    #[test]
+    fn test_validate_opml_complete() {
+        let valid = r#"<?xml version="1.0"?>
+<opml version="2.0">
+  <head><title>T</title></head>
+  <body>
+    <outline text="Item"/>
+  </body>
+</opml>"#;
+        assert!(validate_opml(valid).is_ok());
+    }
+
+    #[test]
+    fn test_validate_opml_partial_no_opml() {
+        assert!(validate_opml("<head></head><body></body>").is_err());
+    }
+
+    #[test]
+    fn test_export_import_roundtrip_with_content() {
+        let mut binder = Binder::default_structure();
+        let mut ch = BinderItem::new_folder("Chapter 1");
+        let mut scene = BinderItem::new_text("Scene A");
+        scene.synopsis = "A dramatic opening.".to_string();
+        if let Some(ref mut doc) = scene.document {
+            doc.content = "It was a dark and stormy night.".to_string();
+        }
+        ch.add_child(scene);
+        binder.draft.add_child(ch);
+
+        let opml = export_opml(&binder, "My Novel").unwrap();
+        assert!(validate_opml(&opml).is_ok());
+        assert!(opml.contains("My Novel"));
+        assert!(opml.contains("Draft"));
+        assert!(opml.contains("Research"));
+        assert!(opml.contains("Chapter 1"));
+        assert!(opml.contains("Scene A"));
+    }
+
+    #[test]
+    fn test_export_opml_with_special_chars_in_content() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Scene & Story");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "He said \"hello\" & she said <goodbye>.".to_string();
+        }
+        binder.draft.add_child(item);
+
+        let opml = export_opml(&binder, "Test").unwrap();
+        // Should be properly escaped
+        assert!(opml.contains("Scene &amp; Story"));
+        assert!(opml.contains("&amp;"));
+    }
+
+    #[test]
+    fn test_extract_attr_with_equals_in_value() {
+        let line = r#"<outline text="a=b"/>"#;
+        // extract_attr finds first quote after attr="
+        let result = extract_attr(line, "text");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_import_opml_ignores_outside_body() {
+        let opml = r#"<?xml version="1.0"?>
+<opml version="2.0">
+  <head><title>Test</title></head>
+  <outline text="Outside"/>
+  <body>
+    <outline text="Inside"/>
+  </body>
+</opml>"#;
+        let items = import_opml(opml).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].title, "Inside");
+    }
 }

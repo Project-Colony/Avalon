@@ -960,4 +960,185 @@ mod tests {
         let patch = compute_patch(text, text);
         assert!(patch.is_empty());
     }
+
+    #[test]
+    fn test_snapshot_from_empty_document() {
+        let doc = Document::new();
+        let snap = Snapshot::from_document(&doc, "Empty snap");
+        assert_eq!(snap.word_count, 0);
+        assert_eq!(snap.content, "");
+        assert_eq!(snap.title, "Empty snap");
+    }
+
+    #[test]
+    fn test_snapshot_diff_with_completely_different() {
+        let doc = Document::with_content("Old line one\nOld line two");
+        let snap = Snapshot::from_document(&doc, "v1");
+        let chunks = snap.diff_with("New content entirely\nNothing similar");
+        let has_added = chunks.iter().any(|c| matches!(c, DiffChunk::Added(_)));
+        let has_removed = chunks.iter().any(|c| matches!(c, DiffChunk::Removed(_)));
+        assert!(has_added);
+        assert!(has_removed);
+    }
+
+    #[test]
+    fn test_diff_stats_all_added() {
+        let chunks = vec![
+            DiffChunk::Added("line 1".to_string()),
+            DiffChunk::Added("line 2".to_string()),
+            DiffChunk::Added("line 3".to_string()),
+        ];
+        let stats = DiffStats::from_chunks(&chunks);
+        assert_eq!(stats.lines_added, 3);
+        assert_eq!(stats.lines_removed, 0);
+        assert_eq!(stats.lines_unchanged, 0);
+        assert!(stats.words_added > 0);
+    }
+
+    #[test]
+    fn test_diff_stats_all_removed() {
+        let chunks = vec![
+            DiffChunk::Removed("line 1".to_string()),
+            DiffChunk::Removed("line 2".to_string()),
+        ];
+        let stats = DiffStats::from_chunks(&chunks);
+        assert_eq!(stats.lines_added, 0);
+        assert_eq!(stats.lines_removed, 2);
+        assert!(stats.words_added < 0);
+    }
+
+    #[test]
+    fn test_diff_stats_empty_chunks() {
+        let chunks: Vec<DiffChunk> = vec![];
+        let stats = DiffStats::from_chunks(&chunks);
+        assert_eq!(stats.total_changes(), 0);
+        assert_eq!(stats.total_lines(), 0);
+        assert!(!stats.has_changes());
+    }
+
+    #[test]
+    fn test_snapshot_similarity_completely_different() {
+        let doc = Document::with_content("AAA\nBBB\nCCC");
+        let snap = Snapshot::from_document(&doc, "v1");
+        let sim = snap.similarity("XXX\nYYY\nZZZ");
+        assert!(sim < 0.5);
+    }
+
+    #[test]
+    fn test_snapshot_has_changed_same() {
+        let doc = Document::with_content("Same text");
+        let snap = Snapshot::from_document(&doc, "v1");
+        assert!(!snap.has_changed("Same text"));
+    }
+
+    #[test]
+    fn test_snapshot_paragraph_count_single() {
+        let doc = Document::with_content("Single paragraph with no double newlines.");
+        let snap = Snapshot::from_document(&doc, "v1");
+        assert_eq!(snap.paragraph_count(), 1);
+    }
+
+    #[test]
+    fn test_snapshot_sentence_count_none() {
+        let doc = Document::with_content("No sentence endings here");
+        let snap = Snapshot::from_document(&doc, "v1");
+        assert_eq!(snap.sentence_count(), 0);
+    }
+
+    #[test]
+    fn test_diff_summary_added_only() {
+        let chunks = vec![
+            DiffChunk::Added("new".to_string()),
+        ];
+        let summary = diff_summary(&chunks);
+        assert!(summary.contains("1 added"));
+        assert!(!summary.contains("removed"));
+    }
+
+    #[test]
+    fn test_diff_summary_removed_only() {
+        let chunks = vec![
+            DiffChunk::Removed("old".to_string()),
+        ];
+        let summary = diff_summary(&chunks);
+        assert!(summary.contains("1 removed"));
+        assert!(!summary.contains("added"));
+    }
+
+    #[test]
+    fn test_compute_patch_add_at_end() {
+        let old = "line1\nline2";
+        let new = "line1\nline2\nline3";
+        let patch = compute_patch(old, new);
+        assert!(!patch.is_empty());
+        let inserts = patch.iter().filter(|op| matches!(op, PatchOp::Insert { .. })).count();
+        assert!(inserts >= 1);
+    }
+
+    #[test]
+    fn test_compute_patch_delete_first() {
+        let old = "first\nsecond\nthird";
+        let new = "second\nthird";
+        let patch = compute_patch(old, new);
+        let deletes = patch.iter().filter(|op| matches!(op, PatchOp::Delete { .. })).count();
+        assert!(deletes >= 1);
+    }
+
+    #[test]
+    fn test_lcs_diff_single_line() {
+        let old = vec!["only line"];
+        let new = vec!["different line"];
+        let diff = lcs_diff(&old, &new);
+        assert!(!diff.is_empty());
+    }
+
+    #[test]
+    fn test_inline_diff_partial_overlap() {
+        let old = "the cat sat on the mat";
+        let new = "the cat lay on the rug";
+        let chunks = inline_diff(old, new);
+        let equal = chunks.iter().filter(|c| matches!(c, InlineDiffChunk::Equal(_))).count();
+        assert!(equal >= 3); // "the", "cat", "on", "the"
+    }
+
+    #[test]
+    fn test_inline_diff_empty_both() {
+        let chunks = inline_diff("", "");
+        assert!(chunks.is_empty());
+    }
+
+    #[test]
+    fn test_unified_diff_format_with_multiple_hunks() {
+        // Create a diff with changes far apart to get multiple hunks
+        let mut old_lines = Vec::new();
+        let mut new_lines = Vec::new();
+        for i in 0..20 {
+            old_lines.push(format!("line {}", i));
+            new_lines.push(format!("line {}", i));
+        }
+        old_lines[2] = "old line 2".to_string();
+        new_lines[2] = "new line 2".to_string();
+        old_lines[15] = "old line 15".to_string();
+        new_lines[15] = "new line 15".to_string();
+
+        let old_refs: Vec<&str> = old_lines.iter().map(|s| s.as_str()).collect();
+        let new_refs: Vec<&str> = new_lines.iter().map(|s| s.as_str()).collect();
+        let diff = lcs_diff(&old_refs, &new_refs);
+        let unified = format_unified_diff(&diff, "old", "new");
+        assert!(unified.contains("@@"));
+        assert!(unified.contains("--- old"));
+        assert!(unified.contains("+++ new"));
+    }
+
+    #[test]
+    fn test_diff_snapshots_added_content() {
+        let doc1 = Document::with_content("Line 1");
+        let snap1 = Snapshot::from_document(&doc1, "v1");
+        let doc2 = Document::with_content("Line 1\nLine 2\nLine 3");
+        let snap2 = Snapshot::from_document(&doc2, "v2");
+
+        let diff = diff_snapshots(&snap1, &snap2);
+        let added = diff.iter().filter(|c| matches!(c, DiffChunk::Added(_))).count();
+        assert_eq!(added, 2);
+    }
 }

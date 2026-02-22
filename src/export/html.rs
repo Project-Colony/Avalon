@@ -528,4 +528,225 @@ mod tests {
         let result = compile(&contents, &opts).unwrap();
         assert!(result.contains("Georgia"));
     }
+
+    #[test]
+    fn test_compile_nested_folders() {
+        let contents = vec![
+            make_content("Part I", "", true, 0),
+            make_content("Chapter 1", "", true, 1),
+            make_content("Scene 1", "Deep content.", false, 2),
+        ];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("<h1"));
+        assert!(result.contains("<h2"));
+        assert!(result.contains("Deep content."));
+    }
+
+    #[test]
+    fn test_compile_folder_heading_depth_values() {
+        for depth in 0..=7 {
+            let contents = vec![make_content("Title", "", true, depth)];
+            let result = compile(&contents, &make_opts()).unwrap();
+            let expected_level = (depth + 1).min(6);
+            assert!(result.contains(&format!("<h{}", expected_level)));
+        }
+    }
+
+    #[test]
+    fn test_compile_document_index_increments() {
+        let contents = vec![
+            make_content("S1", "Text 1.", false, 0),
+            make_content("S2", "Text 2.", false, 0),
+            make_content("S3", "Text 3.", false, 0),
+        ];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("data-index=\"1\""));
+        assert!(result.contains("data-index=\"2\""));
+        assert!(result.contains("data-index=\"3\""));
+    }
+
+    #[test]
+    fn test_compile_separator_between_docs_not_after_folder() {
+        let mut opts = make_opts();
+        opts.separator = SeparatorType::SectionBreak;
+        let contents = vec![
+            make_content("Chapter", "", true, 0),
+            make_content("Scene 1", "Text.", false, 1),
+            make_content("Scene 2", "More.", false, 1),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        // Separator appears between consecutive non-folder items
+        // Count actual separator <p> tags (not CSS class references)
+        let break_count = result.matches("<p class=\"section-break\">").count();
+        assert_eq!(break_count, 1);
+    }
+
+    #[test]
+    fn test_escape_html_all_five_entities() {
+        let result = escape_html("&<>\"'");
+        assert_eq!(result, "&amp;&lt;&gt;&quot;&#39;");
+    }
+
+    #[test]
+    fn test_escape_html_empty() {
+        assert_eq!(escape_html(""), "");
+    }
+
+    #[test]
+    fn test_escape_html_no_special() {
+        assert_eq!(escape_html("hello world"), "hello world");
+    }
+
+    #[test]
+    fn test_slug_unicode() {
+        // Unicode alphanumeric chars are kept by is_alphanumeric()
+        let result = slug("Café Résumé");
+        assert!(result.contains("caf"));
+        assert!(result.contains("sum"));
+    }
+
+    #[test]
+    fn test_slug_empty() {
+        assert_eq!(slug(""), "");
+    }
+
+    #[test]
+    fn test_slug_all_special() {
+        assert_eq!(slug("!@#$%"), "");
+    }
+
+    #[test]
+    fn test_generate_toc_nested_indentation() {
+        let contents = vec![
+            make_content("Part I", "", true, 0),
+            make_content("Chapter 1", "", true, 1),
+            make_content("Scene 1", "text.", false, 2),
+        ];
+        let toc = generate_toc(&contents);
+        assert!(toc.contains("Part I"));
+        assert!(toc.contains("Chapter 1"));
+        assert!(toc.contains("Scene 1"));
+        // Check indentation
+        assert!(toc.contains("  <li>"));
+    }
+
+    #[test]
+    fn test_word_count_multiple_spaces() {
+        let contents = vec![make_content("A", "  one   two   three  ", false, 0)];
+        assert_eq!(word_count(&contents), 3);
+    }
+
+    #[test]
+    fn test_char_count_unicode() {
+        let contents = vec![make_content("A", "café", false, 0)];
+        assert_eq!(char_count(&contents), 5); // bytes, not chars
+    }
+
+    #[test]
+    fn test_estimate_output_size_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        let size = estimate_output_size(&contents, &make_opts());
+        assert_eq!(size, 1500); // Base size only
+    }
+
+    #[test]
+    fn test_strip_html_self_closing() {
+        assert_eq!(strip_html_tags("<br/>text<br />more"), "textmore");
+    }
+
+    #[test]
+    fn test_strip_html_empty_input() {
+        assert_eq!(strip_html_tags(""), "");
+    }
+
+    #[test]
+    fn test_extract_headings_preserves_depth() {
+        let contents = vec![
+            make_content("Part", "", true, 0),
+            make_content("Chapter", "", true, 1),
+            make_content("Section", "", true, 2),
+        ];
+        let headings = extract_headings(&contents);
+        assert_eq!(headings.len(), 3);
+        assert_eq!(headings[0].1, 0);
+        assert_eq!(headings[1].1, 1);
+        assert_eq!(headings[2].1, 2);
+    }
+
+    #[test]
+    fn test_compile_html_structure_complete() {
+        let result = compile(&[], &make_opts()).unwrap();
+        assert!(result.contains("<!DOCTYPE html>"));
+        assert!(result.contains("<html lang=\"en\">"));
+        assert!(result.contains("<head>"));
+        assert!(result.contains("</head>"));
+        assert!(result.contains("<body>"));
+        assert!(result.contains("</body>"));
+        assert!(result.contains("</html>"));
+        assert!(result.contains("<meta charset=\"UTF-8\">"));
+    }
+
+    #[test]
+    fn test_compile_css_contains_print_media() {
+        let result = compile(&[], &make_opts()).unwrap();
+        assert!(result.contains("@media print"));
+    }
+
+    #[test]
+    fn test_compile_large_document() {
+        let contents: Vec<CompileContent> = (0..50)
+            .map(|i| make_content(&format!("Scene {}", i), &format!("Content for scene {}", i), false, 0))
+            .collect();
+        let result = compile(&contents, &make_opts()).unwrap();
+        // Non-folder items only include their text, not title, in the HTML body
+        assert!(result.contains("Content for scene 0"));
+        assert!(result.contains("Content for scene 49"));
+        assert!(result.contains("data-index=\"50\""));
+    }
+
+    #[test]
+    fn test_compile_xss_safe_title() {
+        let mut opts = make_opts();
+        opts.title = "<script>alert('xss')</script>".to_string();
+        let result = compile(&[], &opts).unwrap();
+        assert!(!result.contains("<script>"));
+        assert!(result.contains("&lt;script&gt;"));
+    }
+
+    #[test]
+    fn test_compile_xss_safe_content_titles() {
+        let mut opts = make_opts();
+        opts.include_front_matter = true;
+        opts.author = "<b>Author</b>".to_string();
+        let result = compile(&[], &opts).unwrap();
+        assert!(!result.contains("<b>Author</b>"));
+    }
+
+    #[test]
+    fn test_separator_custom_escaping() {
+        let sep = separator_html(&SeparatorType::Custom("<script>evil</script>".to_string()));
+        assert!(!sep.contains("<script>"));
+        assert!(sep.contains("&lt;script&gt;"));
+    }
+
+    #[test]
+    fn test_toc_links_match_heading_ids() {
+        let contents = vec![
+            make_content("Introduction", "", true, 0),
+            make_content("Scene A", "text", false, 1),
+        ];
+        let toc = generate_toc(&contents);
+        let result = compile(&contents, &make_opts()).unwrap();
+        let intro_slug = slug("Introduction");
+        assert!(toc.contains(&format!("href=\"#{}\"", intro_slug)));
+        assert!(result.contains(&format!("id=\"{}\"", intro_slug)));
+    }
+
+    #[test]
+    fn test_estimate_output_size_grows_with_content() {
+        let small = vec![make_content("A", "short", false, 0)];
+        let big = vec![make_content("A", &"word ".repeat(500), false, 0)];
+        let opts = make_opts();
+        assert!(estimate_output_size(&big, &opts) > estimate_output_size(&small, &opts));
+    }
 }

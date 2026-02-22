@@ -1153,4 +1153,156 @@ mod tests {
         stats.word_count = 200000;
         assert_eq!(stats.size_label(), "Epic / Tome");
     }
+
+    #[test]
+    fn test_statistics_from_text_single_sentence() {
+        let stats = Statistics::from_text("Hello world");
+        assert_eq!(stats.word_count, 2);
+        assert_eq!(stats.sentence_count, 1); // max(0, 1) for non-empty text
+        assert_eq!(stats.paragraph_count, 1);
+    }
+
+    #[test]
+    fn test_statistics_char_count_no_spaces() {
+        let stats = Statistics::from_text("a b c");
+        assert_eq!(stats.char_count, 5);
+        assert_eq!(stats.char_count_no_spaces, 3);
+    }
+
+    #[test]
+    fn test_statistics_page_count() {
+        let stats = Statistics::from_text(&"word ".repeat(500));
+        assert!((stats.page_count - 2.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_progress_string_exceeded() {
+        let mut stats = Statistics::default();
+        stats.word_count = 100;
+        let progress = stats.progress_string(Some(50));
+        assert!(progress.contains("100.0%")); // Capped at 100%
+    }
+
+    #[test]
+    fn test_session_stats_wpm_calculation() {
+        let mut session = SessionStats::new();
+        session.update(300, 120); // 300 words in 2 minutes
+        assert!((session.words_per_minute - 150.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_text_analysis_most_common_words() {
+        let text = "the great great great story about the great adventure adventure";
+        let analysis = TextAnalysis::from_text(text);
+        assert!(!analysis.most_common_words.is_empty());
+        // "great" should be in most common (4 occurrences, len > 3)
+        assert!(analysis.most_common_words.iter().any(|(w, _)| w == "great"));
+    }
+
+    #[test]
+    fn test_text_analysis_short_words_excluded_from_common() {
+        let text = "the the the the big big big";
+        let analysis = TextAnalysis::from_text(text);
+        // "the" is 3 chars, should be excluded from most_common_words (filter > 3)
+        assert!(analysis.most_common_words.iter().all(|(w, _)| w.len() > 3));
+    }
+
+    #[test]
+    fn test_readability_metrics_smog_with_enough_sentences() {
+        // Text with many sentences for SMOG calculation
+        let text = "The cat sat. The dog ran. The bird flew. The fish swam. He walked home.";
+        let metrics = ReadabilityMetrics::from_text(text);
+        assert!(metrics.smog_grade >= 0.0);
+    }
+
+    #[test]
+    fn test_readability_metrics_avg_syllables() {
+        let text = "Simple words here.";
+        let metrics = ReadabilityMetrics::from_text(text);
+        assert!(metrics.avg_syllables_per_word >= 1.0);
+    }
+
+    #[test]
+    fn test_word_frequency_single_word() {
+        let analysis = WordFrequencyAnalysis::from_text("hello");
+        assert_eq!(analysis.total_count, 1);
+        assert_eq!(analysis.unique_count, 1);
+        assert_eq!(analysis.hapax_count, 1);
+        assert_eq!(analysis.type_token_ratio, 100.0);
+    }
+
+    #[test]
+    fn test_word_frequency_punctuation_stripping() {
+        let analysis = WordFrequencyAnalysis::from_text("hello, world! hello.");
+        assert_eq!(analysis.total_count, 3);
+        // "hello" appears twice, "world" once
+        assert_eq!(analysis.unique_count, 2);
+    }
+
+    #[test]
+    fn test_count_syllables_polysyllabic() {
+        assert!(count_syllables("extraordinary") >= 4);
+        assert!(count_syllables("communication") >= 4);
+    }
+
+    #[test]
+    fn test_count_syllables_silent_e() {
+        // "time" has silent e: should be 1 syllable
+        assert_eq!(count_syllables("time"), 1);
+        assert_eq!(count_syllables("came"), 1);
+    }
+
+    #[test]
+    fn test_days_to_completion_non_divisible() {
+        let mut stats = Statistics::default();
+        stats.word_count = 0;
+        // 1001 words at 500/day = ceil(1001/500) = 3 days
+        assert_eq!(stats.days_to_completion(1001, 500), Some(3));
+    }
+
+    #[test]
+    fn test_text_analysis_vocabulary_richness_exact() {
+        let mut analysis = TextAnalysis::default();
+        analysis.word_count = 100;
+        analysis.unique_words = 70;
+        assert!((analysis.vocabulary_richness() - 70.0).abs() < 0.01);
+        assert_eq!(analysis.vocabulary_label(), "Rich");
+    }
+
+    #[test]
+    fn test_readability_labels_boundary_values() {
+        let mut analysis = TextAnalysis::default();
+        analysis.readability_score = 90.0;
+        assert_eq!(analysis.readability_label(), "Very Easy");
+        analysis.readability_score = 80.0;
+        assert_eq!(analysis.readability_label(), "Easy");
+        analysis.readability_score = 70.0;
+        assert_eq!(analysis.readability_label(), "Fairly Easy");
+        analysis.readability_score = 60.0;
+        assert_eq!(analysis.readability_label(), "Standard");
+        analysis.readability_score = 50.0;
+        assert_eq!(analysis.readability_label(), "Fairly Difficult");
+        analysis.readability_score = 30.0;
+        assert_eq!(analysis.readability_label(), "Difficult");
+        analysis.readability_score = 29.9;
+        assert_eq!(analysis.readability_label(), "Very Difficult");
+    }
+
+    #[test]
+    fn test_word_frequency_bigrams_minimum_count() {
+        // Bigrams with count == 1 are filtered out
+        let text = "unique pair only once";
+        let analysis = WordFrequencyAnalysis::from_text(text);
+        assert!(analysis.top_bigrams.is_empty());
+    }
+
+    #[test]
+    fn test_statistics_from_binder_empty() {
+        use crate::core::binder::Binder;
+        let binder = Binder::default_structure();
+        let stats = Statistics::from_binder(&binder);
+        assert_eq!(stats.word_count, 0);
+        assert_eq!(stats.document_count, 0);
+        assert!(stats.folder_count >= 3); // Draft, Research, Trash
+    }
 }

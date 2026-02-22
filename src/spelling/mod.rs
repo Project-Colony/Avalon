@@ -654,4 +654,97 @@ mod tests {
         assert!(summary.contains("4 suggestions"));
         assert!(summary.contains("the"));
     }
+
+    #[test]
+    fn test_edit_distance_identical() {
+        assert_eq!(edit_distance("same", "same"), 0);
+        assert_eq!(edit_distance("", ""), 0);
+    }
+
+    #[test]
+    fn test_edit_distance_one_empty() {
+        assert_eq!(edit_distance("hello", ""), 5);
+        assert_eq!(edit_distance("", "world"), 5);
+    }
+
+    #[test]
+    fn test_edit_distance_transposition() {
+        // Transposition is two operations (delete + insert)
+        assert_eq!(edit_distance("ab", "ba"), 2);
+    }
+
+    #[test]
+    fn test_check_word_with_unicode() {
+        let checker = make_checker();
+        // Unicode words should not crash
+        let _ = checker.check_word("café");
+        let _ = checker.check_word("naïve");
+    }
+
+    #[test]
+    fn test_suggest_for_known_word() {
+        let checker = make_checker();
+        // Suggestions for an already-correct word should include similar words (not itself)
+        let suggestions = checker.suggest("hello");
+        for s in &suggestions {
+            assert_ne!(s, "hello");
+        }
+    }
+
+    #[test]
+    fn test_suggest_short_word_max_distance_1() {
+        let checker = make_checker();
+        // For words <= 4 chars, max distance is 1
+        let suggestions = checker.suggest("cat");
+        for s in &suggestions {
+            let dist = edit_distance("cat", s);
+            assert!(dist <= 1, "Suggestion '{}' has distance {}", s, dist);
+        }
+    }
+
+    #[test]
+    fn test_suggest_long_word_max_distance_2() {
+        let checker = make_checker();
+        // For words > 4 chars, max distance is 2
+        let suggestions = checker.suggest("helloo");
+        for s in &suggestions {
+            let dist = edit_distance("helloo", s);
+            assert!(dist <= 2, "Suggestion '{}' has distance {}", s, dist);
+        }
+    }
+
+    #[test]
+    fn test_check_text_preserves_positions() {
+        let checker = make_checker();
+        let text = "hello xyzfakeword world";
+        let results = checker.check_text(text);
+        for r in &results {
+            if r.word == "xyzfakeword" {
+                // Position should be somewhere after "hello "
+                assert!(r.position >= 6);
+            }
+        }
+    }
+
+    #[test]
+    fn test_count_misspellings_empty() {
+        let checker = make_checker();
+        assert_eq!(count_misspellings(&checker, ""), 0);
+    }
+
+    #[test]
+    fn test_multiple_user_dictionary_operations() {
+        let mut checker = make_checker();
+        checker.add_to_dictionary("alpha");
+        checker.add_to_dictionary("beta");
+        checker.add_to_dictionary("gamma");
+        assert_eq!(checker.user_dictionary_size(), 3);
+
+        checker.remove_from_dictionary("beta");
+        assert_eq!(checker.user_dictionary_size(), 2);
+        assert!(!checker.check_word("beta") || checker.dictionary.contains("beta"));
+
+        checker.clear_user_dictionary();
+        assert_eq!(checker.user_dictionary_size(), 0);
+    }
 }

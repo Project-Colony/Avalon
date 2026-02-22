@@ -471,4 +471,161 @@ mod tests {
         assert!(result.contains("First"));
         assert!(result.contains("Second"));
     }
+
+    #[test]
+    fn test_rtf_escape_all_special() {
+        let result = rtf_escape("a\\b{c}d");
+        assert_eq!(result, "a\\\\b\\{c\\}d");
+    }
+
+    #[test]
+    fn test_rtf_escape_no_special() {
+        let result = rtf_escape("plain text 123");
+        assert_eq!(result, "plain text 123");
+    }
+
+    #[test]
+    fn test_rtf_escape_unicode_multi() {
+        let result = rtf_escape("\u{00E9}\u{00F1}");
+        assert!(result.contains("\\u233?"));
+        assert!(result.contains("\\u241?"));
+    }
+
+    #[test]
+    fn test_convert_markdown_bold_and_italic() {
+        let result = convert_basic_markdown("**bold** and *italic* text");
+        assert!(result.contains("\\b "));
+        assert!(result.contains("\\b0 "));
+        assert!(result.contains("\\i "));
+        assert!(result.contains("\\i0 "));
+    }
+
+    #[test]
+    fn test_convert_markdown_no_formatting() {
+        let result = convert_basic_markdown("plain text");
+        assert_eq!(result, "plain text");
+    }
+
+    #[test]
+    fn test_compile_folder_depth_sizes() {
+        let options = make_options();
+        let contents = vec![
+            CompileContent { title: "D0".to_string(), text: String::new(), is_folder: true, depth: 0 },
+            CompileContent { title: "D1".to_string(), text: String::new(), is_folder: true, depth: 1 },
+            CompileContent { title: "D2".to_string(), text: String::new(), is_folder: true, depth: 2 },
+            CompileContent { title: "D3".to_string(), text: String::new(), is_folder: true, depth: 3 },
+        ];
+        let result = compile(&contents, &options).unwrap();
+        assert!(result.contains("D0"));
+        assert!(result.contains("D1"));
+        assert!(result.contains("D2"));
+        assert!(result.contains("D3"));
+    }
+
+    #[test]
+    fn test_compile_page_break_between_folders() {
+        let mut options = make_options();
+        options.page_break_between_folders = true;
+        let contents = vec![
+            CompileContent { title: "Folder".to_string(), text: String::new(), is_folder: true, depth: 0 },
+            make_content("Ch1", "Text here.", false),
+            CompileContent { title: "Folder2".to_string(), text: String::new(), is_folder: true, depth: 0 },
+        ];
+        let result = compile(&contents, &options).unwrap();
+        assert!(result.contains("Folder"));
+        assert!(result.contains("Folder2"));
+    }
+
+    #[test]
+    fn test_compile_heading_levels_in_content() {
+        let options = make_options();
+        let contents = vec![make_content("Ch1", "# H1\n\n## H2\n\n### H3", false)];
+        let result = compile(&contents, &options).unwrap();
+        assert!(result.contains("H1"));
+        assert!(result.contains("H2"));
+        assert!(result.contains("H3"));
+    }
+
+    #[test]
+    fn test_compile_custom_separator() {
+        let mut options = make_options();
+        options.separator = SeparatorType::Custom("~~~".to_string());
+        let contents = vec![
+            make_content("A", "First.", false),
+            make_content("B", "Second.", false),
+        ];
+        let result = compile(&contents, &options).unwrap();
+        assert!(result.contains("~~~"));
+    }
+
+    #[test]
+    fn test_compile_font_size_default() {
+        let options = make_options();
+        let result = compile(&[], &options).unwrap();
+        // Default font size 12.0 => fs24
+        assert!(result.contains("\\fs24"));
+    }
+
+    #[test]
+    fn test_compile_font_size_custom() {
+        let mut options = make_options();
+        options.font_size = 14.0;
+        let result = compile(&[], &options).unwrap();
+        // 14.0 * 2 = 28
+        assert!(result.contains("\\fs28"));
+    }
+
+    #[test]
+    fn test_compile_font_family_in_header() {
+        let mut options = make_options();
+        options.font_family = "Georgia".to_string();
+        let result = compile(&[], &options).unwrap();
+        assert!(result.contains("Georgia"));
+    }
+
+    #[test]
+    fn test_word_count_with_formatting() {
+        let contents = vec![
+            make_content("Ch1", "**bold** and *italic* words", false),
+        ];
+        // word_count counts raw text split_whitespace, so formatting markers count
+        assert!(word_count(&contents) >= 4);
+    }
+
+    #[test]
+    fn test_estimate_size_grows_with_content() {
+        let small = vec![make_content("A", "short", false)];
+        let big = vec![make_content("A", &"word ".repeat(1000), false)];
+        let opts = make_options();
+        assert!(estimate_output_size(&big, &opts) > estimate_output_size(&small, &opts));
+    }
+
+    #[test]
+    fn test_compile_rtf_structure() {
+        let options = make_options();
+        let result = compile(&[], &options).unwrap();
+        // Verify RTF structural elements
+        assert!(result.contains("{\\rtf1\\ansi"));
+        assert!(result.contains("{\\fonttbl"));
+        assert!(result.contains("{\\colortbl"));
+        assert!(result.ends_with("}\n"));
+    }
+
+    #[test]
+    fn test_separator_rtf_all_types() {
+        let empty = separator_rtf(&SeparatorType::EmptyLine);
+        assert!(empty.contains("\\par\\par"));
+
+        let page = separator_rtf(&SeparatorType::PageBreak);
+        assert_eq!(page, "\\page\n");
+
+        let section = separator_rtf(&SeparatorType::SectionBreak);
+        assert!(section.contains("* * *"));
+
+        let none = separator_rtf(&SeparatorType::None);
+        assert!(none.is_empty());
+
+        let custom = separator_rtf(&SeparatorType::Custom("ooo".to_string()));
+        assert!(custom.contains("ooo"));
+    }
 }

@@ -1393,4 +1393,354 @@ mod tests {
         editor.cursor = 3;
         assert_eq!(editor.selection_range(), Some((3, 3)));
     }
+
+    #[test]
+    fn test_find_all_basic() {
+        let editor = editor_with("hello world hello");
+        // find_all uses text() from iced, which may add trailing \n
+        let results = editor.find_all("hello", true);
+        assert!(results.len() >= 2);
+        assert_eq!(results[0].0, 0); // First match starts at 0
+    }
+
+    #[test]
+    fn test_find_all_case_insensitive() {
+        let editor = editor_with("Hello HELLO hello");
+        let results = editor.find_all("hello", false);
+        assert!(results.len() >= 3);
+    }
+
+    #[test]
+    fn test_find_all_case_sensitive() {
+        let editor = editor_with("Hello HELLO hello");
+        let results = editor.find_all("hello", true);
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_find_all_empty_query() {
+        let editor = editor_with("hello");
+        let results = editor.find_all("", true);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_find_all_no_match() {
+        let editor = editor_with("hello world");
+        let results = editor.find_all("xyz", true);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_replace_all_basic() {
+        let mut editor = editor_with("foo bar foo baz");
+        let count = editor.replace_all("foo", "qux", true);
+        assert_eq!(count, 2);
+        assert!(editor.document.content.contains("qux bar qux baz"));
+    }
+
+    #[test]
+    fn test_replace_all_case_insensitive() {
+        let mut editor = editor_with("Hello HELLO hello");
+        let count = editor.replace_all("hello", "hi", false);
+        assert_eq!(count, 3);
+    }
+
+    #[test]
+    fn test_replace_all_no_match() {
+        let mut editor = editor_with("hello world");
+        let count = editor.replace_all("xyz", "abc", true);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_replace_all_empty_find() {
+        let mut editor = editor_with("hello");
+        let count = editor.replace_all("", "abc", true);
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_insert_at_cursor_beginning() {
+        let mut editor = editor_with("world");
+        editor.cursor = 0;
+        editor.insert_at_cursor("hello ");
+        assert!(editor.document.content.starts_with("hello world"));
+    }
+
+    #[test]
+    fn test_insert_at_cursor_end() {
+        let mut editor = editor_with("hello");
+        editor.cursor = 5;
+        editor.insert_at_cursor(" world");
+        assert!(editor.document.content.contains("hello world"));
+    }
+
+    #[test]
+    fn test_insert_at_cursor_middle() {
+        let mut editor = editor_with("helloworld");
+        editor.cursor = 5;
+        editor.insert_at_cursor(" ");
+        assert!(editor.document.content.contains("hello world"));
+    }
+
+    #[test]
+    fn test_delete_selection() {
+        let mut editor = editor_with("hello world");
+        editor.selection_start = Some(5);
+        editor.cursor = 11;
+        let deleted = editor.delete_selection();
+        assert!(deleted.is_some());
+        assert!(editor.document.content.starts_with("hello"));
+        assert!(!editor.document.content.contains("world"));
+    }
+
+    #[test]
+    fn test_delete_selection_none() {
+        let mut editor = editor_with("hello");
+        let deleted = editor.delete_selection();
+        assert!(deleted.is_none());
+    }
+
+    #[test]
+    fn test_wrap_selection_with_selection() {
+        let mut editor = editor_with("hello world");
+        editor.selection_start = Some(0);
+        editor.cursor = 5;
+        editor.wrap_selection("**", "**");
+        assert!(editor.document.content.starts_with("**hello**"));
+    }
+
+    #[test]
+    fn test_wrap_selection_no_selection() {
+        let mut editor = editor_with("hello");
+        editor.cursor = 5;
+        editor.wrap_selection("**", "**");
+        assert!(editor.document.content.contains("****"));
+    }
+
+    #[test]
+    fn test_line_at_valid() {
+        let editor = editor_with("first\nsecond\nthird");
+        assert_eq!(editor.line_at(0), Some("first".to_string()));
+        assert_eq!(editor.line_at(1), Some("second".to_string()));
+        assert_eq!(editor.line_at(2), Some("third".to_string()));
+    }
+
+    #[test]
+    fn test_line_at_invalid() {
+        let editor = editor_with("only");
+        assert_eq!(editor.line_at(5), None);
+    }
+
+    #[test]
+    fn test_move_cursor_to() {
+        let mut editor = editor_with("hello world");
+        editor.selection_start = Some(0);
+        editor.move_cursor_to(5);
+        assert_eq!(editor.cursor, 5);
+        assert!(editor.selection_start.is_none());
+    }
+
+    #[test]
+    fn test_move_cursor_to_beyond_length() {
+        let mut editor = editor_with("hi");
+        editor.move_cursor_to(100);
+        // text() may add trailing \n so cursor is clamped to text() length
+        assert!(editor.cursor <= 3);
+    }
+
+    #[test]
+    fn test_select_range() {
+        let mut editor = editor_with("hello world");
+        editor.select_range(0, 5);
+        assert_eq!(editor.selection_start, Some(0));
+        assert_eq!(editor.cursor, 5);
+        assert_eq!(editor.selected_text(), Some("hello".to_string()));
+    }
+
+    #[test]
+    fn test_select_all() {
+        let mut editor = editor_with("hello world");
+        editor.select_all();
+        assert_eq!(editor.selection_start, Some(0));
+        // cursor is set to text().len() which may include trailing \n
+        assert!(editor.cursor >= 11);
+    }
+
+    #[test]
+    fn test_paragraph_count() {
+        let editor = editor_with("Para 1\n\nPara 2\n\nPara 3");
+        assert_eq!(editor.paragraph_count(), 3);
+    }
+
+    #[test]
+    fn test_paragraph_count_empty() {
+        let editor = editor_with("");
+        assert_eq!(editor.paragraph_count(), 0);
+    }
+
+    #[test]
+    fn test_sentence_count() {
+        let editor = editor_with("Hello. World! How? Fine.");
+        assert_eq!(editor.sentence_count(), 4);
+    }
+
+    #[test]
+    fn test_is_empty() {
+        let editor = editor_with("");
+        assert!(editor.is_empty());
+        let editor2 = editor_with("  \n  ");
+        assert!(editor2.is_empty());
+        let editor3 = editor_with("hello");
+        assert!(!editor3.is_empty());
+    }
+
+    #[test]
+    fn test_content_length() {
+        let editor = editor_with("hello");
+        // content_length() uses text() from iced which may add trailing \n
+        assert!(editor.content_length() >= 5);
+    }
+
+    #[test]
+    fn test_clear_history() {
+        let mut editor = editor_with("test");
+        editor.to_uppercase(false);
+        editor.undo();
+        assert!(editor.can_undo() || editor.can_redo());
+        editor.clear_history();
+        assert!(!editor.can_undo());
+        assert!(!editor.can_redo());
+    }
+
+    #[test]
+    fn test_word_at_cursor() {
+        let mut editor = editor_with("hello world");
+        editor.cursor = 3; // in "hello"
+        assert_eq!(editor.word_at_cursor(), Some("hello".to_string()));
+    }
+
+    #[test]
+    fn test_word_at_cursor_at_start() {
+        let mut editor = editor_with("hello");
+        editor.cursor = 0;
+        assert!(editor.word_at_cursor().is_none());
+    }
+
+    #[test]
+    fn test_word_at_cursor_between_words() {
+        let mut editor = editor_with("hello world");
+        editor.cursor = 6; // start of "world"
+        assert_eq!(editor.word_at_cursor(), Some("world".to_string()));
+    }
+
+    #[test]
+    fn test_current_line_text() {
+        let mut editor = editor_with("first line\nsecond line\nthird line");
+        editor.cursor = 15; // in "second line"
+        assert_eq!(editor.current_line_text(), "second line");
+    }
+
+    #[test]
+    fn test_current_paragraph_text() {
+        let mut editor = editor_with("Para one line one.\nPara one line two.\n\nPara two.");
+        editor.cursor = 5; // in first paragraph
+        let para = editor.current_paragraph_text();
+        assert!(para.contains("Para one"));
+    }
+
+    #[test]
+    fn test_line_word_count() {
+        let editor = editor_with("one two three\nfour five");
+        assert_eq!(editor.line_word_count(0), 3);
+        assert_eq!(editor.line_word_count(1), 2);
+        assert_eq!(editor.line_word_count(5), 0); // non-existent line
+    }
+
+    #[test]
+    fn test_debug_summary() {
+        let editor = editor_with("hello world");
+        let summary = editor.debug_summary();
+        assert!(summary.contains("cursor="));
+        assert!(summary.contains("lines="));
+        assert!(summary.contains("words="));
+    }
+
+    #[test]
+    fn test_undo_stack_limit() {
+        let mut editor = editor_with("a");
+        for _ in 0..110 {
+            editor.push_undo();
+        }
+        assert!(editor.undo_depth() <= 100);
+    }
+
+    #[test]
+    fn test_redo_cleared_on_new_action() {
+        let mut editor = editor_with("original");
+        editor.to_uppercase(false);
+        editor.undo();
+        assert!(editor.can_redo());
+        // New action should clear redo stack
+        editor.push_undo();
+        assert!(!editor.can_redo());
+    }
+
+    #[test]
+    fn test_trimmed_length() {
+        let editor = editor_with("hello   ");
+        assert_eq!(editor.trimmed_length(), 5);
+    }
+
+    #[test]
+    fn test_cursor_line_and_column() {
+        let mut editor = editor_with("abc\ndef\nghi");
+        editor.cursor = 5; // "ef" - line 1, column 1
+        assert_eq!(editor.cursor_line(), 1);
+        assert_eq!(editor.cursor_column(), 1);
+    }
+
+    #[test]
+    fn test_has_selection() {
+        let mut editor = editor_with("hello");
+        assert!(!editor.has_selection());
+        editor.selection_start = Some(0);
+        assert!(editor.has_selection());
+    }
+
+    #[test]
+    fn test_replace_all_creates_undo() {
+        let mut editor = editor_with("foo bar foo");
+        assert!(!editor.can_undo());
+        editor.replace_all("foo", "baz", true);
+        assert!(editor.can_undo());
+        editor.undo();
+        // After undo, content should be restored (may include trailing \n from iced)
+        assert!(editor.document.content.contains("foo bar foo"));
+    }
+
+    #[test]
+    fn test_editor_default() {
+        let editor = EditorState::default();
+        assert!(!editor.dirty);
+        assert_eq!(editor.cursor, 0);
+        assert!(!editor.can_undo());
+    }
+
+    #[test]
+    fn test_load_document_resets_state() {
+        let mut editor = editor_with("hello");
+        editor.cursor = 3;
+        editor.dirty = true;
+        editor.push_undo();
+        editor.selection_start = Some(0);
+
+        let new_doc = Document::with_content("new content");
+        editor.load_document(&new_doc);
+        assert_eq!(editor.cursor, 0);
+        assert!(!editor.dirty);
+        assert!(!editor.can_undo());
+        assert!(editor.selection_start.is_none());
+    }
 }
