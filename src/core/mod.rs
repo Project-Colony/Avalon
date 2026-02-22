@@ -24,3 +24,4 @@ pub mod doc_templates;
 pub mod comments;
 pub mod media_import;
 pub mod revision;
+pub mod linguistic;
