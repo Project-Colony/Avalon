@@ -345,4 +345,114 @@ mod tests {
         assert_eq!(color.to_hex(), "#e74c3c");
         assert_eq!(color.label(), "Red");
     }
+
+    #[test]
+    fn test_annotation_color_all_labels() {
+        assert_eq!(AnnotationColor::Yellow.label(), "Yellow");
+        assert_eq!(AnnotationColor::Blue.label(), "Blue");
+        assert_eq!(AnnotationColor::Green.label(), "Green");
+        assert_eq!(AnnotationColor::Red.label(), "Red");
+        assert_eq!(AnnotationColor::Purple.label(), "Purple");
+    }
+
+    #[test]
+    fn test_annotation_color_all_hex() {
+        // All hex values should start with '#' and have 7 chars
+        for color in AnnotationColor::all() {
+            let hex = color.to_hex();
+            assert!(hex.starts_with('#'));
+            assert_eq!(hex.len(), 7);
+        }
+    }
+
+    #[test]
+    fn test_annotation_color_cycle_full() {
+        let start = AnnotationColor::Yellow;
+        let b = start.next();
+        let g = b.next();
+        let r = g.next();
+        let p = r.next();
+        let y = p.next();
+        assert!(matches!(y, AnnotationColor::Yellow)); // Full cycle
+    }
+
+    #[test]
+    fn test_annotation_color_to_iced() {
+        for color in AnnotationColor::all() {
+            let iced_color = color.to_iced_color();
+            assert!(iced_color.r >= 0.0 && iced_color.r <= 1.0);
+            assert!(iced_color.g >= 0.0 && iced_color.g <= 1.0);
+            assert!(iced_color.b >= 0.0 && iced_color.b <= 1.0);
+        }
+    }
+
+    #[test]
+    fn test_shift_negative_saturating() {
+        let mut ann = Annotation::new(5, 15, "Test");
+        ann.shift(-10); // More than start
+        assert_eq!(ann.start, 0); // Saturates at 0
+        assert_eq!(ann.end, 5);
+    }
+
+    #[test]
+    fn test_age_string() {
+        let ann = Annotation::new(0, 10, "Recent");
+        let age = ann.age_string();
+        assert_eq!(age, "recent"); // Just created
+    }
+
+    #[test]
+    fn test_summary_long_text() {
+        let long_text = "A".repeat(100);
+        let ann = Annotation::new(0, 10, &long_text);
+        let summary = ann.summary();
+        assert!(summary.contains("..."));
+        assert!(summary.len() < 100);
+    }
+
+    #[test]
+    fn test_summary_resolved() {
+        let mut ann = Annotation::new(0, 10, "Fixed");
+        ann.toggle_resolved();
+        let summary = ann.summary();
+        assert!(summary.contains("resolved"));
+    }
+
+    #[test]
+    fn test_multiple_edits() {
+        let mut ann = Annotation::new(0, 10, "Version 1");
+        ann.edit_text("Version 2");
+        ann.edit_text("Version 3");
+        assert_eq!(ann.edit_count(), 2);
+        assert_eq!(ann.text, "Version 3");
+        assert_eq!(ann.edit_history[0].1, "Version 1");
+        assert_eq!(ann.edit_history[1].1, "Version 2");
+    }
+
+    #[test]
+    fn test_span_length_zero() {
+        let ann = Annotation::new(5, 5, "Zero span");
+        assert_eq!(ann.span_length(), 0);
+    }
+
+    #[test]
+    fn test_overlaps_same_range() {
+        let ann = Annotation::new(10, 20, "Test");
+        assert!(ann.overlaps(10, 20)); // Exact same range
+    }
+
+    #[test]
+    fn test_overlaps_contains() {
+        let ann = Annotation::new(10, 20, "Test");
+        assert!(ann.overlaps(0, 100)); // Range contains annotation
+    }
+
+    #[test]
+    fn test_default_categories_count() {
+        let cats = default_categories();
+        assert_eq!(cats.len(), 6);
+        assert!(cats.contains(&"Continuity"));
+        assert!(cats.contains(&"Revision"));
+        assert!(cats.contains(&"Research"));
+    }
 }

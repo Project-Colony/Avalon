@@ -481,4 +481,123 @@ mod tests {
         let suggestions = suggest_link_targets("Introducton", &binder);
         assert!(suggestions.contains(&"Introduction".to_string()));
     }
+
+    #[test]
+    fn test_extract_links_adjacent() {
+        let content = "[[A]][[B]]";
+        let links = extract_links(content);
+        assert_eq!(links.len(), 2);
+        assert_eq!(links[0].link_text, "A");
+        assert_eq!(links[1].link_text, "B");
+    }
+
+    #[test]
+    fn test_extract_links_whitespace_trimmed() {
+        let content = "[[  Chapter 1  ]]";
+        let links = extract_links(content);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].link_text, "Chapter 1");
+    }
+
+    #[test]
+    fn test_validate_ambiguous_link() {
+        let mut binder = Binder::default_structure();
+        // Two items with the same title
+        let mut source = BinderItem::new_text("Source");
+        if let Some(ref mut doc) = source.document {
+            doc.content = "See [[Duplicate]].".to_string();
+        }
+        binder.draft.children.push(source);
+        binder.draft.children.push(BinderItem::new_text("Duplicate"));
+        binder.draft.children.push(BinderItem::new_text("Duplicate"));
+
+        let validations = validate_document_links(&binder.draft.children[0], &binder);
+        assert_eq!(validations.len(), 1);
+        assert!(matches!(validations[0].status, LinkStatus::Ambiguous(_)));
+    }
+
+    #[test]
+    fn test_validate_no_document() {
+        let binder = Binder::default_structure();
+        let folder = BinderItem::new_folder("Folder");
+        // Folder has no document — should return empty
+        let validations = validate_document_links(&folder, &binder);
+        assert!(validations.is_empty());
+    }
+
+    #[test]
+    fn test_link_health_orphan_detection() {
+        let mut binder = Binder::default_structure();
+        // Create items where one links to the other but a third is orphaned
+        let mut a = BinderItem::new_text("A");
+        if let Some(ref mut doc) = a.document {
+            doc.content = "See [[B]].".to_string();
+        }
+        let b = BinderItem::new_text("B");
+        let orphan = BinderItem::new_text("Orphan");
+        binder.draft.children.push(a);
+        binder.draft.children.push(b);
+        binder.draft.children.push(orphan);
+
+        let summary = link_health_summary(&binder);
+        // Orphan should be detected (A and Orphan are never linked to)
+        assert!(summary.orphan_documents > 0);
+    }
+
+    #[test]
+    fn test_link_health_display_orphans() {
+        let mut binder = Binder::default_structure();
+        let orphan = BinderItem::new_text("Lone Doc");
+        binder.draft.children.push(orphan);
+
+        let summary = link_health_summary(&binder);
+        let display = summary.display();
+        assert!(display.contains("No internal links"));
+    }
+
+    #[test]
+    fn test_edit_distance_same() {
+        assert_eq!(edit_distance("test", "test"), 0);
+    }
+
+    #[test]
+    fn test_edit_distance_single_char() {
+        assert_eq!(edit_distance("a", "b"), 1);
+        assert_eq!(edit_distance("a", "a"), 0);
+    }
+
+    #[test]
+    fn test_suggest_link_targets_no_match() {
+        let mut binder = Binder::default_structure();
+        binder.draft.children.push(BinderItem::new_text("Alpha"));
+
+        let suggestions = suggest_link_targets("Completely Different Long Title", &binder);
+        // Should not match (edit distance > 3 and no substring match)
+        assert!(suggestions.is_empty());
+    }
+
+    #[test]
+    fn test_link_status_equality() {
+        assert_eq!(LinkStatus::Broken, LinkStatus::Broken);
+        let id = Uuid::new_v4();
+        assert_eq!(LinkStatus::Valid(id), LinkStatus::Valid(id));
+        assert_ne!(LinkStatus::Broken, LinkStatus::Valid(id));
+    }
+
+    #[test]
+    fn test_doc_link_equality() {
+        let a = DocLink {
+            link_text: "Test".to_string(),
+            display_text: None,
+            start: 0,
+            end: 8,
+        };
+        let b = DocLink {
+            link_text: "Test".to_string(),
+            display_text: None,
+            start: 0,
+            end: 8,
+        };
+        assert_eq!(a, b);
+    }
 }
