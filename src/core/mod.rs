@@ -25,3 +25,7 @@ pub mod comments;
 pub mod media_import;
 pub mod revision;
 pub mod linguistic;
+pub mod text_analysis;
+pub mod corkboard;
+pub mod outliner;
+pub mod find_replace;
