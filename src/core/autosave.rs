@@ -397,4 +397,151 @@ mod tests {
         queue.clear();
         assert_eq!(queue.pending_count(), 0);
     }
+
+    #[test]
+    fn test_autosave_skip_count() {
+        let mut manager = AutoSaveManager::new(30);
+        assert_eq!(manager.skip_count(), 0);
+        manager.record_skip();
+        manager.record_skip();
+        assert_eq!(manager.skip_count(), 2);
+    }
+
+    #[test]
+    fn test_autosave_time_since_last_save_none() {
+        let manager = AutoSaveManager::new(30);
+        assert!(manager.time_since_last_save().is_none());
+    }
+
+    #[test]
+    fn test_autosave_time_since_last_save_some() {
+        let mut manager = AutoSaveManager::new(30);
+        manager.mark_dirty();
+        manager.mark_saved();
+        assert!(manager.time_since_last_save().is_some());
+    }
+
+    #[test]
+    fn test_autosave_time_since_last_edit_none() {
+        let manager = AutoSaveManager::new(30);
+        assert!(manager.time_since_last_edit().is_none());
+    }
+
+    #[test]
+    fn test_autosave_time_since_last_edit_some() {
+        let mut manager = AutoSaveManager::new(30);
+        manager.mark_dirty();
+        assert!(manager.time_since_last_edit().is_some());
+    }
+
+    #[test]
+    fn test_autosave_status_dirty() {
+        let mut manager = AutoSaveManager::new(30);
+        manager.mark_dirty();
+        let status = manager.status();
+        assert!(status.dirty);
+        assert!(status.display().contains("Unsaved"));
+    }
+
+    #[test]
+    fn test_autosave_status_saved() {
+        let mut manager = AutoSaveManager::new(30);
+        manager.mark_dirty();
+        manager.mark_saved();
+        let status = manager.status();
+        assert!(!status.dirty);
+        assert!(status.display().contains("Saved"));
+    }
+
+    #[test]
+    fn test_autosave_should_backup_not_yet() {
+        let mut manager = AutoSaveManager::new(30);
+        manager.backup_every_n_saves = 5;
+        for _ in 0..3 {
+            manager.mark_dirty();
+            manager.mark_saved();
+        }
+        assert!(!manager.should_backup());
+    }
+
+    #[test]
+    fn test_autosave_backup_path() {
+        let mut manager = AutoSaveManager::new(30);
+        assert!(manager.backup_path.is_none());
+        manager.backup_path = Some(PathBuf::from("/tmp/backups"));
+        assert_eq!(manager.backup_path.as_ref().unwrap().to_str().unwrap(), "/tmp/backups");
+    }
+
+    #[test]
+    fn test_save_queue_different_kinds() {
+        let mut queue = SaveQueue::new();
+        queue.enqueue(Path::new("/tmp/a"), SaveKind::AutoSave);
+        queue.enqueue(Path::new("/tmp/a"), SaveKind::Manual);
+        queue.enqueue(Path::new("/tmp/a"), SaveKind::PreCompile);
+        queue.enqueue(Path::new("/tmp/a"), SaveKind::PreClose);
+        assert_eq!(queue.pending_count(), 4);
+    }
+
+    #[test]
+    fn test_save_queue_dequeue_fifo() {
+        let mut queue = SaveQueue::new();
+        queue.enqueue(Path::new("/tmp/a"), SaveKind::AutoSave);
+        queue.enqueue(Path::new("/tmp/a"), SaveKind::Manual);
+        let first = queue.dequeue().unwrap();
+        assert_eq!(first.kind, SaveKind::AutoSave);
+        let second = queue.dequeue().unwrap();
+        assert_eq!(second.kind, SaveKind::Manual);
+    }
+
+    #[test]
+    fn test_save_queue_dequeue_empty() {
+        let mut queue = SaveQueue::new();
+        assert!(queue.dequeue().is_none());
+    }
+
+    #[test]
+    fn test_save_queue_max_size() {
+        let mut queue = SaveQueue::new();
+        // Enqueue many different kinds - since dedup only applies to same kind,
+        // we need to use different paths
+        for i in 0..10 {
+            queue.enqueue(Path::new(&format!("/tmp/{}", i)), SaveKind::AutoSave);
+        }
+        // Should be capped at max_queue_size (5)
+        assert!(queue.pending_count() <= 5);
+    }
+
+    #[test]
+    fn test_save_queue_no_manual_save() {
+        let mut queue = SaveQueue::new();
+        queue.enqueue(Path::new("/tmp/a"), SaveKind::AutoSave);
+        assert!(!queue.has_manual_save());
+    }
+
+    #[test]
+    fn test_save_kind_equality() {
+        assert_eq!(SaveKind::AutoSave, SaveKind::AutoSave);
+        assert_ne!(SaveKind::AutoSave, SaveKind::Manual);
+        assert_ne!(SaveKind::PreCompile, SaveKind::PreClose);
+    }
+
+    #[test]
+    fn test_backup_strategy_equality() {
+        assert_eq!(BackupStrategy::Never, BackupStrategy::Never);
+        assert_eq!(BackupStrategy::EverySaves(10), BackupStrategy::EverySaves(10));
+        assert_ne!(BackupStrategy::EverySaves(10), BackupStrategy::EverySaves(5));
+        assert_ne!(BackupStrategy::Never, BackupStrategy::EverySaves(1));
+    }
+
+    #[test]
+    fn test_autosave_debounce_default() {
+        let manager = AutoSaveManager::new(30);
+        assert_eq!(manager.debounce_ms, 1000);
+    }
+
+    #[test]
+    fn test_autosave_backup_default() {
+        let manager = AutoSaveManager::new(30);
+        assert_eq!(manager.backup_every_n_saves, 10);
+    }
 }

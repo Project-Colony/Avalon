@@ -255,4 +255,104 @@ mod tests {
         ids.dedup();
         assert_eq!(ids.len(), original_len, "Duplicate template IDs found");
     }
+
+    #[test]
+    fn test_world_building_template() {
+        let t = find_template("world_building").unwrap();
+        let item = t.create_item("Arda");
+        let doc = item.document.as_ref().unwrap();
+        assert!(doc.content.contains("Geography"));
+        assert!(doc.content.contains("Culture"));
+        assert!(doc.content.contains("Magic"));
+    }
+
+    #[test]
+    fn test_blog_post_template() {
+        let t = find_template("blog_post").unwrap();
+        let item = t.create_item("My Post");
+        let doc = item.document.as_ref().unwrap();
+        assert!(doc.content.contains("Introduction"));
+        assert!(doc.content.contains("Conclusion"));
+    }
+
+    #[test]
+    fn test_essay_template() {
+        let t = find_template("essay").unwrap();
+        let item = t.create_item("My Essay");
+        let doc = item.document.as_ref().unwrap();
+        assert!(doc.content.contains("Thesis"));
+        assert!(doc.content.contains("Conclusion"));
+    }
+
+    #[test]
+    fn test_screenplay_scene_template() {
+        let t = find_template("screenplay_scene").unwrap();
+        let item = t.create_item("Opening");
+        let doc = item.document.as_ref().unwrap();
+        assert!(doc.content.contains("INT."));
+    }
+
+    #[test]
+    fn test_interview_template() {
+        let t = find_template("interview").unwrap();
+        let item = t.create_item("Interview 1");
+        let doc = item.document.as_ref().unwrap();
+        assert!(doc.content.contains("Subject"));
+        assert!(doc.content.contains("Questions"));
+    }
+
+    #[test]
+    fn test_timeline_template() {
+        let t = find_template("timeline").unwrap();
+        let item = t.create_item("Events");
+        let doc = item.document.as_ref().unwrap();
+        assert!(doc.content.contains("Timeline"));
+        assert!(doc.content.contains("Turning Points"));
+    }
+
+    #[test]
+    fn test_scene_summary_template() {
+        let t = find_template("scene_summary").unwrap();
+        let item = t.create_item("Scene 1");
+        let doc = item.document.as_ref().unwrap();
+        assert!(doc.content.contains("POV"));
+        assert!(doc.content.contains("What happens"));
+    }
+
+    #[test]
+    fn test_chapter_template_empty_content() {
+        let t = find_template("chapter").unwrap();
+        let item = t.create_item("Chapter 1");
+        let doc = item.document.as_ref().unwrap();
+        assert!(doc.content.is_empty());
+    }
+
+    #[test]
+    fn test_templates_by_category_reference() {
+        let ref_templates = templates_by_category(&TemplateCategory::Reference);
+        assert!(!ref_templates.is_empty());
+        for t in &ref_templates {
+            assert_eq!(t.category, TemplateCategory::Reference);
+        }
+    }
+
+    #[test]
+    fn test_templates_by_category_screenplay() {
+        let templates = templates_by_category(&TemplateCategory::Screenplay);
+        assert!(!templates.is_empty());
+    }
+
+    #[test]
+    fn test_create_item_sets_synopsis() {
+        let t = find_template("character_sheet").unwrap();
+        let item = t.create_item("Hero");
+        assert!(!item.synopsis.is_empty());
+    }
+
+    #[test]
+    fn test_create_item_title() {
+        let t = find_template("scene").unwrap();
+        let item = t.create_item("My Custom Title");
+        assert_eq!(item.title, "My Custom Title");
+    }
 }

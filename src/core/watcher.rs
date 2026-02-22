@@ -346,4 +346,54 @@ mod tests {
         assert!(tracker.documents_changed.is_empty());
         assert!(!tracker.project_metadata_changed);
     }
+
+    #[test]
+    fn test_watch_event_debug() {
+        let event = WatchEvent::FileModified(PathBuf::from("/test/file.txt"));
+        let debug = format!("{:?}", event);
+        assert!(debug.contains("FileModified"));
+    }
+
+    #[test]
+    fn test_watch_event_clone() {
+        let event = WatchEvent::FileCreated(PathBuf::from("/test/new.txt"));
+        let cloned = event.clone();
+        match cloned {
+            WatchEvent::FileCreated(p) => assert_eq!(p, PathBuf::from("/test/new.txt")),
+            _ => panic!("Clone produced different variant"),
+        }
+    }
+
+    #[test]
+    fn test_project_removed_event() {
+        let event = WatchEvent::ProjectRemoved;
+        let debug = format!("{:?}", event);
+        assert!(debug.contains("ProjectRemoved"));
+    }
+
+    #[test]
+    fn test_tracker_only_docs_json_counted() {
+        let mut tracker = ExternalChangeTracker::new();
+        // JSON in /project/docs/ should be counted as document change
+        // JSON in /project/other/ should not
+        let events = vec![
+            WatchEvent::FileModified(PathBuf::from("/project/docs/scene.json")),
+            WatchEvent::FileModified(PathBuf::from("/project/other/data.json")),
+            WatchEvent::FileModified(PathBuf::from("/project/docs/chapter.json")),
+        ];
+        tracker.process_events(&events);
+        assert_eq!(tracker.documents_changed.len(), 2);
+        assert_eq!(tracker.modified_paths.len(), 3);
+    }
+
+    #[test]
+    fn test_tracker_non_json_in_docs_not_counted() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events = vec![
+            WatchEvent::FileModified(PathBuf::from("/project/docs/readme.md")),
+        ];
+        tracker.process_events(&events);
+        assert!(tracker.documents_changed.is_empty());
+        assert_eq!(tracker.modified_paths.len(), 1);
+    }
 }

@@ -559,4 +559,65 @@ mod tests {
         assert_eq!(DateTimeFormat::DateTime.label(), "Date & Time");
         assert_eq!(DateTimeFormat::Iso8601.label(), "ISO 8601");
     }
+
+    #[test]
+    fn test_replace_is_editing() {
+        assert!(EditorAction::Replace { find: "a".into(), replace: "b".into() }.is_editing());
+        assert!(EditorAction::ReplaceAll { find: "a".into(), replace: "b".into() }.is_editing());
+    }
+
+    #[test]
+    fn test_replace_category() {
+        assert_eq!(EditorAction::Replace { find: "a".into(), replace: "b".into() }.category(), "Find & Replace");
+        assert_eq!(EditorAction::ReplaceAll { find: "a".into(), replace: "b".into() }.category(), "Find & Replace");
+    }
+
+    #[test]
+    fn test_wrap_selection_is_editing() {
+        assert!(EditorAction::WrapSelection { prefix: "[".into(), suffix: "]".into() }.is_editing());
+    }
+
+    #[test]
+    fn test_insert_link_is_insertion() {
+        assert!(EditorAction::InsertLink { text: "t".into(), url: "u".into() }.is_insertion());
+        assert!(EditorAction::InsertImage { alt: "a".into(), path: "p".into() }.is_insertion());
+        assert!(EditorAction::InsertComment("c".into()).is_insertion());
+    }
+
+    #[test]
+    fn test_smart_paste_is_insertion() {
+        assert!(EditorAction::SmartPaste("pasted text".into()).is_insertion());
+    }
+
+    #[test]
+    fn test_movement_is_not_editing() {
+        assert!(!EditorAction::MoveToDocStart.is_editing());
+        assert!(!EditorAction::MoveToDocEnd.is_editing());
+        assert!(!EditorAction::MoveWordForward.is_editing());
+        assert!(!EditorAction::MoveWordBackward.is_editing());
+    }
+
+    #[test]
+    fn test_sort_lines_is_editing() {
+        assert!(EditorAction::SortLines.is_editing());
+        assert!(EditorAction::RemoveDuplicateLines.is_editing());
+        assert!(EditorAction::TransposeChars.is_editing());
+        assert!(EditorAction::JoinLines.is_editing());
+    }
+
+    #[test]
+    fn test_indent_unindent_editing() {
+        assert!(EditorAction::Indent.is_editing());
+        assert!(EditorAction::Unindent.is_editing());
+    }
+
+    #[test]
+    fn test_insert_table_is_insertion() {
+        assert!(EditorAction::InsertTable { rows: 3, cols: 4 }.is_insertion());
+    }
+
+    #[test]
+    fn test_set_script_element_is_editing() {
+        assert!(EditorAction::SetScriptElement("Action".into()).is_editing());
+    }
 }
