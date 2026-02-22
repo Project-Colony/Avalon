@@ -108,15 +108,31 @@ pub fn view<'a>(
     let word_count = editor_state.document.word_count();
     let char_count = editor_state.document.char_count();
     let page_est = word_count as f64 / 250.0;
+    let para_count = editor_state.document.paragraph_count();
+    let sentence_count = editor_state.document.sentence_count();
+    let reading_min = word_count as f64 / 250.0;
+    let reading_display = if reading_min < 1.0 {
+        "<1m".to_string()
+    } else if reading_min < 60.0 {
+        format!("{:.0}m", reading_min)
+    } else {
+        format!("{:.1}h", reading_min / 60.0)
+    };
+
+    let dirty_indicator = if editor_state.dirty { " \u{2022}" } else { "" };
 
     let stats_text = format!(
-        "Words: {}  |  Chars: {}  |  Pages: {:.1}",
-        word_count, char_count, page_est
+        "{}W  |  {}S  |  {}P  |  {:.1}pg  |  ~{} read{}",
+        word_count, sentence_count, para_count, page_est, reading_display, dirty_indicator
     );
     let stats_bar = container(
-        text(stats_text)
-            .size(12)
-            .color(Theme::TEXT_MUTED),
+        row![
+            text(stats_text).size(11).color(Theme::TEXT_MUTED),
+            Space::with_width(Length::Fill),
+            text(format!("Ln {}, Col {}", editor_state.current_line(), editor_state.current_column()))
+                .size(10)
+                .color(Theme::TEXT_MUTED),
+        ]
     )
     .padding(Padding::from([4, 16]));
 
