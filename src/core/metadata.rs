@@ -1018,4 +1018,138 @@ mod tests {
         let summary = meta.summary();
         assert!(summary.contains("1 custom field"));
     }
+
+    #[test]
+    fn test_metadata_multiple_keywords() {
+        let mut meta = Metadata::default();
+        meta.add_keyword("fantasy");
+        meta.add_keyword("adventure");
+        meta.add_keyword("dragons");
+        assert_eq!(meta.keywords.len(), 3);
+        meta.remove_keyword("adventure");
+        assert_eq!(meta.keywords.len(), 2);
+        assert!(!meta.has_keyword("adventure"));
+    }
+
+    #[test]
+    fn test_metadata_custom_field_update() {
+        let mut meta = Metadata::default();
+        meta.set_custom_field("Version", CustomFieldValue::Number(1.0));
+        meta.set_custom_field("Version", CustomFieldValue::Number(2.0));
+        assert_eq!(meta.custom_metadata.len(), 1);
+        assert_eq!(meta.get_custom_field("Version"), Some(&CustomFieldValue::Number(2.0)));
+    }
+
+    #[test]
+    fn test_custom_field_value_equality() {
+        assert_eq!(
+            CustomFieldValue::Text("hello".into()),
+            CustomFieldValue::Text("hello".into())
+        );
+        assert_ne!(
+            CustomFieldValue::Text("hello".into()),
+            CustomFieldValue::Number(0.0)
+        );
+    }
+
+    #[test]
+    fn test_label_new() {
+        let label = Label::new("Test", LabelColor::Green);
+        assert_eq!(label.name, "Test");
+        assert_eq!(label.color.display_name(), "Green");
+    }
+
+    #[test]
+    fn test_status_new() {
+        let status = Status::new("Review");
+        assert_eq!(status.name, "Review");
+    }
+
+    #[test]
+    fn test_all_label_color_hexes() {
+        for color in LabelColor::all_predefined() {
+            let hex = color.to_hex();
+            assert!(hex.starts_with('#'));
+            assert_eq!(hex.len(), 7);
+        }
+    }
+
+    #[test]
+    fn test_schema_add_fields() {
+        let mut schema = CustomMetadataSchema::new();
+        assert_eq!(schema.fields.len(), 0);
+        schema.add_text_field("Title", true);
+        schema.add_checkbox_field("Reviewed");
+        schema.add_enum_field("Status", vec!["Open".into(), "Closed".into()], false);
+        assert_eq!(schema.fields.len(), 3);
+        assert_eq!(schema.fields[0].field_type, CustomFieldType::Text);
+        assert_eq!(schema.fields[1].field_type, CustomFieldType::Checkbox);
+        assert_eq!(schema.fields[2].field_type, CustomFieldType::Enum);
+    }
+
+    #[test]
+    fn test_schema_remove_field() {
+        let mut schema = CustomMetadataSchema::new();
+        schema.add_text_field("A", false);
+        schema.add_text_field("B", false);
+        schema.remove_field("A");
+        assert_eq!(schema.fields.len(), 1);
+        assert_eq!(schema.fields[0].name, "B");
+    }
+
+    #[test]
+    fn test_schema_enum_default_value() {
+        let mut schema = CustomMetadataSchema::new();
+        schema.add_enum_field("Priority", vec!["Low".into(), "Medium".into(), "High".into()], false);
+        let field = schema.get_field("Priority").unwrap();
+        assert_eq!(field.default_value, "Low");
+    }
+
+    #[test]
+    fn test_app_preferences_serialization_roundtrip() {
+        let mut prefs = AppPreferences::default();
+        prefs.add_dictionary_word("avalon");
+        prefs.set_shortcut("compile", "Ctrl+Shift+C");
+        let json = serde_json::to_string(&prefs).unwrap();
+        let parsed: AppPreferences = serde_json::from_str(&json).unwrap();
+        assert!(parsed.has_dictionary_word("avalon"));
+        assert_eq!(parsed.get_shortcut("compile"), Some("Ctrl+Shift+C"));
+    }
+
+    #[test]
+    fn test_project_settings_add_duplicate_label() {
+        let mut settings = ProjectSettings::default();
+        let initial = settings.labels.len();
+        settings.add_label("Chapter", LabelColor::Red); // "Chapter" already exists
+        assert_eq!(settings.labels.len(), initial); // No duplicate added
+    }
+
+    #[test]
+    fn test_project_settings_remove_nonexistent() {
+        let mut settings = ProjectSettings::default();
+        let initial = settings.labels.len();
+        settings.remove_label("Nonexistent");
+        assert_eq!(settings.labels.len(), initial); // Nothing removed
+    }
+
+    #[test]
+    fn test_custom_field_list_value() {
+        let list = CustomFieldValue::List(vec!["tag1".into(), "tag2".into(), "tag3".into()]);
+        assert_eq!(list.display(), "tag1, tag2, tag3");
+        assert!(!list.is_empty());
+        assert_eq!(list.type_name(), "List");
+    }
+
+    #[test]
+    fn test_project_settings_line_spacing() {
+        let settings = ProjectSettings::default();
+        assert!((settings.line_spacing - 1.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_project_settings_fullscreen_defaults() {
+        let settings = ProjectSettings::default();
+        assert_eq!(settings.fullscreen_bg_color, "#1a1a1e");
+        assert!((settings.fullscreen_text_width - 60.0).abs() < 0.01);
+    }
 }

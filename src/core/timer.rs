@@ -280,6 +280,61 @@ impl WritingTimer {
         if self.duration_secs == 0 { return 0.0; }
         (self.elapsed().as_secs_f64() / self.duration_secs as f64).min(1.0)
     }
+
+    /// Get the best session (most words per minute)
+    pub fn best_session(&self) -> Option<&TimerSession> {
+        self.completed_sessions.iter()
+            .filter(|s| s.duration.as_secs() >= 60)
+            .max_by(|a, b| a.words_per_minute().partial_cmp(&b.words_per_minute()).unwrap_or(std::cmp::Ordering::Equal))
+    }
+
+    /// Get the session with most words written
+    pub fn most_productive_session(&self) -> Option<&TimerSession> {
+        self.completed_sessions.iter().max_by_key(|s| s.words_written)
+    }
+
+    /// Average words per session
+    pub fn avg_words_per_session(&self) -> f64 {
+        if self.completed_sessions.is_empty() {
+            return 0.0;
+        }
+        self.total_words() as f64 / self.completed_sessions.len() as f64
+    }
+
+    /// Total number of sessions (including incomplete)
+    pub fn session_count(&self) -> usize {
+        self.completed_sessions.len()
+    }
+
+    /// Get a progress bar string for display
+    pub fn progress_bar(&self) -> String {
+        let pct = self.progress();
+        let filled = (pct * 20.0).round() as usize;
+        let empty = 20 - filled.min(20);
+        format!("[{}{}] {:.0}%", "#".repeat(filled.min(20)), "-".repeat(empty), pct * 100.0)
+    }
+
+    /// State as a display label
+    pub fn state_label(&self) -> &str {
+        match &self.state {
+            TimerState::Idle => "Idle",
+            TimerState::Running => "Running",
+            TimerState::Paused(_) => "Paused",
+            TimerState::Completed => "Completed",
+        }
+    }
+}
+
+impl TimerSession {
+    /// Session summary for display
+    pub fn summary(&self) -> String {
+        let mins = self.duration.as_secs() / 60;
+        let status = if self.completed { "completed" } else { "stopped" };
+        format!(
+            "{} min, {} words, {:.1} WPM ({})",
+            mins, self.words_written, self.words_per_minute(), status
+        )
+    }
 }
 
 #[cfg(test)]
@@ -573,5 +628,157 @@ mod tests {
             completed: true,
         };
         assert_eq!(session.words_per_minute(), 0.0);
+    }
+
+    #[test]
+    fn test_best_session() {
+        let mut timer = WritingTimer::new();
+        // Need to manually add sessions since timing is instant in tests
+        timer.completed_sessions.push(TimerSession {
+            duration: Duration::from_secs(120),
+            words_written: 60,
+            preset: TimerPreset::Sprint,
+            completed: true,
+        });
+        timer.completed_sessions.push(TimerSession {
+            duration: Duration::from_secs(120),
+            words_written: 100,
+            preset: TimerPreset::Sprint,
+            completed: true,
+        });
+        let best = timer.best_session().unwrap();
+        assert_eq!(best.words_written, 100);
+    }
+
+    #[test]
+    fn test_best_session_empty() {
+        let timer = WritingTimer::new();
+        assert!(timer.best_session().is_none());
+    }
+
+    #[test]
+    fn test_most_productive_session() {
+        let mut timer = WritingTimer::new();
+        timer.completed_sessions.push(TimerSession {
+            duration: Duration::from_secs(600),
+            words_written: 200,
+            preset: TimerPreset::Sprint,
+            completed: true,
+        });
+        timer.completed_sessions.push(TimerSession {
+            duration: Duration::from_secs(600),
+            words_written: 500,
+            preset: TimerPreset::Sprint,
+            completed: true,
+        });
+        let most = timer.most_productive_session().unwrap();
+        assert_eq!(most.words_written, 500);
+    }
+
+    #[test]
+    fn test_most_productive_session_empty() {
+        let timer = WritingTimer::new();
+        assert!(timer.most_productive_session().is_none());
+    }
+
+    #[test]
+    fn test_avg_words_per_session() {
+        let mut timer = WritingTimer::new();
+        timer.completed_sessions.push(TimerSession {
+            duration: Duration::from_secs(600),
+            words_written: 100,
+            preset: TimerPreset::Sprint,
+            completed: true,
+        });
+        timer.completed_sessions.push(TimerSession {
+            duration: Duration::from_secs(600),
+            words_written: 300,
+            preset: TimerPreset::Sprint,
+            completed: true,
+        });
+        assert!((timer.avg_words_per_session() - 200.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_avg_words_per_session_empty() {
+        let timer = WritingTimer::new();
+        assert_eq!(timer.avg_words_per_session(), 0.0);
+    }
+
+    #[test]
+    fn test_session_count() {
+        let mut timer = WritingTimer::new();
+        assert_eq!(timer.session_count(), 0);
+        timer.start(0);
+        timer.stop(100);
+        assert_eq!(timer.session_count(), 1);
+    }
+
+    #[test]
+    fn test_progress_bar() {
+        let timer = WritingTimer::new();
+        let bar = timer.progress_bar();
+        assert!(bar.contains("["));
+        assert!(bar.contains("]"));
+        assert!(bar.contains("0%"));
+    }
+
+    #[test]
+    fn test_state_label() {
+        let mut timer = WritingTimer::new();
+        assert_eq!(timer.state_label(), "Idle");
+
+        timer.start(0);
+        assert_eq!(timer.state_label(), "Running");
+
+        timer.pause();
+        assert_eq!(timer.state_label(), "Paused");
+
+        timer.reset();
+        timer.set_preset(TimerPreset::Custom(0));
+        timer.start(0);
+        timer.tick();
+        assert_eq!(timer.state_label(), "Completed");
+    }
+
+    #[test]
+    fn test_session_summary() {
+        let session = TimerSession {
+            duration: Duration::from_secs(600),
+            words_written: 300,
+            preset: TimerPreset::Sprint,
+            completed: true,
+        };
+        let summary = session.summary();
+        assert!(summary.contains("10 min"));
+        assert!(summary.contains("300 words"));
+        assert!(summary.contains("completed"));
+    }
+
+    #[test]
+    fn test_session_summary_stopped() {
+        let session = TimerSession {
+            duration: Duration::from_secs(180),
+            words_written: 50,
+            preset: TimerPreset::Pomodoro,
+            completed: false,
+        };
+        let summary = session.summary();
+        assert!(summary.contains("stopped"));
+    }
+
+    #[test]
+    fn test_timer_preset_equality() {
+        assert_eq!(TimerPreset::Sprint, TimerPreset::Sprint);
+        assert_ne!(TimerPreset::Sprint, TimerPreset::Pomodoro);
+        assert_eq!(TimerPreset::Custom(60), TimerPreset::Custom(60));
+        assert_ne!(TimerPreset::Custom(60), TimerPreset::Custom(120));
+    }
+
+    #[test]
+    fn test_timer_state_equality() {
+        assert_eq!(TimerState::Idle, TimerState::Idle);
+        assert_eq!(TimerState::Running, TimerState::Running);
+        assert_ne!(TimerState::Idle, TimerState::Running);
     }
 }
