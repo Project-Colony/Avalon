@@ -286,6 +286,67 @@ impl SearchIndex {
         size += self.doc_metadata.len() * 64; // rough estimate
         size
     }
+
+    /// Get the N most common terms across all documents
+    pub fn top_terms(&self, n: usize) -> Vec<(String, usize)> {
+        let mut term_counts: Vec<(String, usize)> = self.index
+            .iter()
+            .map(|(term, entries)| {
+                let total: usize = entries.iter().map(|e| e.positions.len()).sum();
+                (term.clone(), total)
+            })
+            .collect();
+        term_counts.sort_by(|a, b| b.1.cmp(&a.1));
+        term_counts.truncate(n);
+        term_counts
+    }
+
+    /// Get the total number of occurrences of a specific term
+    pub fn term_frequency(&self, term: &str) -> usize {
+        let normalized = term.to_lowercase();
+        self.index.get(&normalized)
+            .map(|entries| entries.iter().map(|e| e.positions.len()).sum())
+            .unwrap_or(0)
+    }
+
+    /// Suggest terms that start with the given prefix
+    pub fn suggest_terms(&self, prefix: &str, limit: usize) -> Vec<String> {
+        let normalized = prefix.to_lowercase();
+        let mut matches: Vec<String> = self.index.keys()
+            .filter(|k| k.starts_with(&normalized))
+            .cloned()
+            .collect();
+        matches.sort();
+        matches.truncate(limit);
+        matches
+    }
+
+    /// Get document metadata by ID
+    pub fn doc_meta(&self, doc_id: &Uuid) -> Option<&DocMeta> {
+        self.doc_metadata.get(doc_id)
+    }
+
+    /// Get all indexed document IDs
+    pub fn indexed_doc_ids(&self) -> Vec<Uuid> {
+        self.doc_metadata.keys().copied().collect()
+    }
+}
+
+impl IndexField {
+    /// All available fields
+    pub fn all() -> Vec<Self> {
+        vec![IndexField::Title, IndexField::Content, IndexField::Notes, IndexField::Synopsis]
+    }
+
+    /// Human-readable label
+    pub fn label(&self) -> &str {
+        match self {
+            IndexField::Title => "Title",
+            IndexField::Content => "Content",
+            IndexField::Notes => "Notes",
+            IndexField::Synopsis => "Synopsis",
+        }
+    }
 }
 
 /// Tokenize text into normalized terms
@@ -830,5 +891,124 @@ mod tests {
         let results = index.search("un");
         // "un" is too short for prefix search and doesn't match any term exactly
         assert!(results.is_empty());
+    }
+
+    // ---- New indexer tests ----
+
+    #[test]
+    fn test_top_terms() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Test", "dragon dragon dragon knight knight castle", "", "");
+
+        let top = index.top_terms(3);
+        assert!(!top.is_empty());
+        // "dragon" should be the most frequent
+        assert_eq!(top[0].0, "dragon");
+        assert_eq!(top[0].1, 3);
+    }
+
+    #[test]
+    fn test_top_terms_empty() {
+        let index = SearchIndex::new();
+        let top = index.top_terms(5);
+        assert!(top.is_empty());
+    }
+
+    #[test]
+    fn test_term_frequency() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Test", "hello hello hello world world", "", "");
+
+        assert_eq!(index.term_frequency("hello"), 3);
+        assert_eq!(index.term_frequency("world"), 2);
+        assert_eq!(index.term_frequency("missing"), 0);
+    }
+
+    #[test]
+    fn test_term_frequency_case_insensitive() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Test", "Dragon dragon DRAGON", "", "");
+        assert_eq!(index.term_frequency("Dragon"), 3);
+    }
+
+    #[test]
+    fn test_suggest_terms() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Test", "dragon dramatic draw dream drift", "", "");
+
+        let suggestions = index.suggest_terms("dr", 10);
+        assert!(suggestions.len() >= 4); // dragon, dramatic, draw, dream, drift
+        for s in &suggestions {
+            assert!(s.starts_with("dr"));
+        }
+    }
+
+    #[test]
+    fn test_suggest_terms_limit() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Test", "alpha also always another animal", "", "");
+
+        let suggestions = index.suggest_terms("al", 2);
+        assert_eq!(suggestions.len(), 2);
+    }
+
+    #[test]
+    fn test_suggest_terms_no_match() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Test", "hello world", "", "");
+
+        let suggestions = index.suggest_terms("xyz", 10);
+        assert!(suggestions.is_empty());
+    }
+
+    #[test]
+    fn test_doc_meta() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "My Document", "three words here", "", "");
+
+        let meta = index.doc_meta(&doc_id).unwrap();
+        assert_eq!(meta.title, "My Document");
+        assert_eq!(meta.word_count, 3);
+    }
+
+    #[test]
+    fn test_doc_meta_nonexistent() {
+        let index = SearchIndex::new();
+        assert!(index.doc_meta(&Uuid::new_v4()).is_none());
+    }
+
+    #[test]
+    fn test_indexed_doc_ids() {
+        let mut index = SearchIndex::new();
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        index.update_document(id1, "A", "content", "", "");
+        index.update_document(id2, "B", "content", "", "");
+
+        let ids = index.indexed_doc_ids();
+        assert_eq!(ids.len(), 2);
+        assert!(ids.contains(&id1));
+        assert!(ids.contains(&id2));
+    }
+
+    #[test]
+    fn test_index_field_all() {
+        let all = IndexField::all();
+        assert_eq!(all.len(), 4);
+    }
+
+    #[test]
+    fn test_index_field_labels() {
+        assert_eq!(IndexField::Title.label(), "Title");
+        assert_eq!(IndexField::Content.label(), "Content");
+        assert_eq!(IndexField::Notes.label(), "Notes");
+        assert_eq!(IndexField::Synopsis.label(), "Synopsis");
     }
 }

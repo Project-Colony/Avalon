@@ -176,6 +176,30 @@ impl Collection {
     pub fn retain<F>(&mut self, f: F) where F: FnMut(&Uuid) -> bool {
         self.item_ids.retain(f);
     }
+
+    /// Get intersection of items with another collection
+    pub fn intersection(&self, other: &Collection) -> Vec<Uuid> {
+        let other_set: std::collections::HashSet<&Uuid> = other.item_ids.iter().collect();
+        self.item_ids.iter().filter(|id| other_set.contains(id)).copied().collect()
+    }
+
+    /// Get union of items with another collection (no duplicates)
+    pub fn union(&self, other: &Collection) -> Vec<Uuid> {
+        let mut seen = std::collections::HashSet::new();
+        let mut result = Vec::new();
+        for id in self.item_ids.iter().chain(other.item_ids.iter()) {
+            if seen.insert(*id) {
+                result.push(*id);
+            }
+        }
+        result
+    }
+
+    /// Get items in this collection but not in the other
+    pub fn difference(&self, other: &Collection) -> Vec<Uuid> {
+        let other_set: std::collections::HashSet<&Uuid> = other.item_ids.iter().collect();
+        self.item_ids.iter().filter(|id| !other_set.contains(id)).copied().collect()
+    }
 }
 
 impl CollectionKind {
@@ -306,6 +330,42 @@ impl CollectionManager {
     /// Check if manager is empty
     pub fn is_empty(&self) -> bool {
         self.collections.is_empty()
+    }
+
+    /// Duplicate a collection with a new name
+    pub fn duplicate(&mut self, id: &Uuid, new_name: &str) -> Option<Uuid> {
+        let original = self.get(id)?.clone();
+        let mut dup = Collection {
+            id: Uuid::new_v4(),
+            name: new_name.to_string(),
+            kind: original.kind,
+            item_ids: original.item_ids,
+        };
+        let new_id = dup.id;
+        self.collections.push(dup);
+        Some(new_id)
+    }
+
+    /// Merge two collections into a new one (union of items)
+    pub fn merge(&mut self, id_a: &Uuid, id_b: &Uuid, name: &str) -> Option<Uuid> {
+        let a = self.get(id_a)?;
+        let b = self.get(id_b)?;
+        let union = a.union(b);
+        let mut merged = Collection::new_manual(name);
+        merged.item_ids = union;
+        let new_id = merged.id;
+        self.collections.push(merged);
+        Some(new_id)
+    }
+
+    /// Get all collection names
+    pub fn names(&self) -> Vec<&str> {
+        self.collections.iter().map(|c| c.name.as_str()).collect()
+    }
+
+    /// Get the largest collection (by item count)
+    pub fn largest(&self) -> Option<&Collection> {
+        self.collections.iter().max_by_key(|c| c.count())
     }
 }
 
@@ -816,5 +876,146 @@ mod tests {
         assert!(summary.contains("2 collections"));
         assert!(summary.contains("1 manual"));
         assert!(summary.contains("1 smart"));
+    }
+
+    // ---- New collection tests ----
+
+    #[test]
+    fn test_intersection() {
+        let mut a = Collection::new_manual("A");
+        let mut b = Collection::new_manual("B");
+        let shared = Uuid::new_v4();
+        let only_a = Uuid::new_v4();
+        let only_b = Uuid::new_v4();
+        a.add_item(shared);
+        a.add_item(only_a);
+        b.add_item(shared);
+        b.add_item(only_b);
+
+        let inter = a.intersection(&b);
+        assert_eq!(inter.len(), 1);
+        assert!(inter.contains(&shared));
+    }
+
+    #[test]
+    fn test_intersection_empty() {
+        let a = Collection::new_manual("A");
+        let b = Collection::new_manual("B");
+        assert!(a.intersection(&b).is_empty());
+    }
+
+    #[test]
+    fn test_union() {
+        let mut a = Collection::new_manual("A");
+        let mut b = Collection::new_manual("B");
+        let shared = Uuid::new_v4();
+        let only_a = Uuid::new_v4();
+        let only_b = Uuid::new_v4();
+        a.add_item(shared);
+        a.add_item(only_a);
+        b.add_item(shared);
+        b.add_item(only_b);
+
+        let un = a.union(&b);
+        assert_eq!(un.len(), 3); // shared + only_a + only_b
+    }
+
+    #[test]
+    fn test_difference() {
+        let mut a = Collection::new_manual("A");
+        let mut b = Collection::new_manual("B");
+        let shared = Uuid::new_v4();
+        let only_a = Uuid::new_v4();
+        a.add_item(shared);
+        a.add_item(only_a);
+        b.add_item(shared);
+
+        let diff = a.difference(&b);
+        assert_eq!(diff.len(), 1);
+        assert!(diff.contains(&only_a));
+    }
+
+    #[test]
+    fn test_difference_empty() {
+        let mut a = Collection::new_manual("A");
+        let mut b = Collection::new_manual("B");
+        let id = Uuid::new_v4();
+        a.add_item(id);
+        b.add_item(id);
+        assert!(a.difference(&b).is_empty());
+    }
+
+    #[test]
+    fn test_manager_duplicate() {
+        let mut mgr = CollectionManager::new();
+        let mut c = Collection::new_manual("Original");
+        c.add_item(Uuid::new_v4());
+        c.add_item(Uuid::new_v4());
+        let orig_id = mgr.add(c);
+
+        let dup_id = mgr.duplicate(&orig_id, "Copy of Original").unwrap();
+        assert_ne!(orig_id, dup_id);
+        assert_eq!(mgr.get(&dup_id).unwrap().name, "Copy of Original");
+        assert_eq!(mgr.get(&dup_id).unwrap().count(), 2);
+    }
+
+    #[test]
+    fn test_manager_duplicate_nonexistent() {
+        let mut mgr = CollectionManager::new();
+        assert!(mgr.duplicate(&Uuid::new_v4(), "Nope").is_none());
+    }
+
+    #[test]
+    fn test_manager_merge() {
+        let mut mgr = CollectionManager::new();
+        let shared = Uuid::new_v4();
+
+        let mut a = Collection::new_manual("A");
+        a.add_item(shared);
+        a.add_item(Uuid::new_v4());
+        let id_a = mgr.add(a);
+
+        let mut b = Collection::new_manual("B");
+        b.add_item(shared);
+        b.add_item(Uuid::new_v4());
+        let id_b = mgr.add(b);
+
+        let merged_id = mgr.merge(&id_a, &id_b, "Merged").unwrap();
+        let merged = mgr.get(&merged_id).unwrap();
+        assert_eq!(merged.name, "Merged");
+        assert_eq!(merged.count(), 3); // 2 unique from A + 1 unique from B
+    }
+
+    #[test]
+    fn test_manager_names() {
+        let mut mgr = CollectionManager::new();
+        mgr.add(Collection::new_manual("Alpha"));
+        mgr.add(Collection::new_manual("Beta"));
+        let names = mgr.names();
+        assert_eq!(names.len(), 2);
+        assert!(names.contains(&"Alpha"));
+        assert!(names.contains(&"Beta"));
+    }
+
+    #[test]
+    fn test_manager_largest() {
+        let mut mgr = CollectionManager::new();
+        let mut big = Collection::new_manual("Big");
+        big.add_item(Uuid::new_v4());
+        big.add_item(Uuid::new_v4());
+        big.add_item(Uuid::new_v4());
+        let mut small = Collection::new_manual("Small");
+        small.add_item(Uuid::new_v4());
+        mgr.add(small);
+        mgr.add(big);
+
+        let largest = mgr.largest().unwrap();
+        assert_eq!(largest.name, "Big");
+    }
+
+    #[test]
+    fn test_manager_largest_empty() {
+        let mgr = CollectionManager::new();
+        assert!(mgr.largest().is_none());
     }
 }
