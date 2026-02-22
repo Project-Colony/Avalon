@@ -196,6 +196,119 @@ impl CollectionKind {
     }
 }
 
+/// Manages a set of collections
+pub struct CollectionManager {
+    pub collections: Vec<Collection>,
+}
+
+impl CollectionManager {
+    pub fn new() -> Self {
+        Self { collections: Vec::new() }
+    }
+
+    /// Add a new collection, returning its UUID
+    pub fn add(&mut self, collection: Collection) -> Uuid {
+        let id = collection.id;
+        self.collections.push(collection);
+        id
+    }
+
+    /// Remove a collection by ID
+    pub fn remove(&mut self, id: &Uuid) -> bool {
+        let before = self.collections.len();
+        self.collections.retain(|c| c.id != *id);
+        self.collections.len() < before
+    }
+
+    /// Find a collection by ID
+    pub fn get(&self, id: &Uuid) -> Option<&Collection> {
+        self.collections.iter().find(|c| &c.id == id)
+    }
+
+    /// Find a mutable collection by ID
+    pub fn get_mut(&mut self, id: &Uuid) -> Option<&mut Collection> {
+        self.collections.iter_mut().find(|c| &c.id == id)
+    }
+
+    /// Find a collection by name (case-insensitive)
+    pub fn find_by_name(&self, name: &str) -> Option<&Collection> {
+        let lower = name.to_lowercase();
+        self.collections.iter().find(|c| c.name.to_lowercase() == lower)
+    }
+
+    /// Get all manual collections
+    pub fn manual_collections(&self) -> Vec<&Collection> {
+        self.collections.iter().filter(|c| !c.is_smart()).collect()
+    }
+
+    /// Get all smart (search) collections
+    pub fn smart_collections(&self) -> Vec<&Collection> {
+        self.collections.iter().filter(|c| c.is_smart()).collect()
+    }
+
+    /// Total number of collections
+    pub fn count(&self) -> usize {
+        self.collections.len()
+    }
+
+    /// Total items across all collections (may include duplicates)
+    pub fn total_items(&self) -> usize {
+        self.collections.iter().map(|c| c.count()).sum()
+    }
+
+    /// Unique items across all collections
+    pub fn unique_items(&self) -> usize {
+        let all: std::collections::HashSet<Uuid> = self.collections.iter()
+            .flat_map(|c| c.item_ids.iter().copied())
+            .collect();
+        all.len()
+    }
+
+    /// Find all collections that contain a given item
+    pub fn collections_containing(&self, item_id: &Uuid) -> Vec<&Collection> {
+        self.collections.iter().filter(|c| c.contains(item_id)).collect()
+    }
+
+    /// Remove an item from all collections
+    pub fn remove_item_from_all(&mut self, item_id: &Uuid) {
+        for coll in &mut self.collections {
+            coll.remove_item(item_id);
+        }
+    }
+
+    /// Get collections sorted by name
+    pub fn sorted_by_name(&self) -> Vec<&Collection> {
+        let mut sorted: Vec<&Collection> = self.collections.iter().collect();
+        sorted.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        sorted
+    }
+
+    /// Get collections sorted by item count (descending)
+    pub fn sorted_by_count(&self) -> Vec<&Collection> {
+        let mut sorted: Vec<&Collection> = self.collections.iter().collect();
+        sorted.sort_by(|a, b| b.count().cmp(&a.count()));
+        sorted
+    }
+
+    /// Check if any collection contains the item
+    pub fn item_in_any_collection(&self, item_id: &Uuid) -> bool {
+        self.collections.iter().any(|c| c.contains(item_id))
+    }
+
+    /// Get a summary string
+    pub fn summary(&self) -> String {
+        let manual = self.manual_collections().len();
+        let smart = self.smart_collections().len();
+        let total = self.total_items();
+        format!("{} collections ({} manual, {} smart), {} total items", self.count(), manual, smart, total)
+    }
+
+    /// Check if manager is empty
+    pub fn is_empty(&self) -> bool {
+        self.collections.is_empty()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -516,5 +629,192 @@ mod tests {
         let coll = Collection::new_manual("Test");
         let fake = Uuid::new_v4();
         assert!(coll.position_of(&fake).is_none());
+    }
+
+    // CollectionManager tests
+
+    #[test]
+    fn test_manager_new() {
+        let mgr = CollectionManager::new();
+        assert!(mgr.is_empty());
+        assert_eq!(mgr.count(), 0);
+    }
+
+    #[test]
+    fn test_manager_add_remove() {
+        let mut mgr = CollectionManager::new();
+        let coll = Collection::new_manual("My List");
+        let id = mgr.add(coll);
+        assert_eq!(mgr.count(), 1);
+        assert!(mgr.get(&id).is_some());
+
+        assert!(mgr.remove(&id));
+        assert!(mgr.is_empty());
+    }
+
+    #[test]
+    fn test_manager_remove_nonexistent() {
+        let mut mgr = CollectionManager::new();
+        assert!(!mgr.remove(&Uuid::new_v4()));
+    }
+
+    #[test]
+    fn test_manager_get_mut() {
+        let mut mgr = CollectionManager::new();
+        let coll = Collection::new_manual("Editable");
+        let id = mgr.add(coll);
+        mgr.get_mut(&id).unwrap().add_item(Uuid::new_v4());
+        assert_eq!(mgr.get(&id).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn test_manager_find_by_name() {
+        let mut mgr = CollectionManager::new();
+        mgr.add(Collection::new_manual("Favorites"));
+        mgr.add(Collection::new_search("Dragon Scenes", "dragon"));
+
+        assert!(mgr.find_by_name("favorites").is_some());
+        assert!(mgr.find_by_name("FAVORITES").is_some());
+        assert!(mgr.find_by_name("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_manager_manual_smart_split() {
+        let mut mgr = CollectionManager::new();
+        mgr.add(Collection::new_manual("Manual 1"));
+        mgr.add(Collection::new_manual("Manual 2"));
+        mgr.add(Collection::new_search("Smart 1", "query"));
+
+        assert_eq!(mgr.manual_collections().len(), 2);
+        assert_eq!(mgr.smart_collections().len(), 1);
+    }
+
+    #[test]
+    fn test_manager_total_items() {
+        let mut mgr = CollectionManager::new();
+        let mut c1 = Collection::new_manual("A");
+        c1.add_item(Uuid::new_v4());
+        c1.add_item(Uuid::new_v4());
+        let mut c2 = Collection::new_manual("B");
+        c2.add_item(Uuid::new_v4());
+        mgr.add(c1);
+        mgr.add(c2);
+
+        assert_eq!(mgr.total_items(), 3);
+    }
+
+    #[test]
+    fn test_manager_unique_items() {
+        let mut mgr = CollectionManager::new();
+        let shared_id = Uuid::new_v4();
+        let unique_id = Uuid::new_v4();
+
+        let mut c1 = Collection::new_manual("A");
+        c1.add_item(shared_id);
+        c1.add_item(unique_id);
+        let mut c2 = Collection::new_manual("B");
+        c2.add_item(shared_id); // same item in both
+
+        mgr.add(c1);
+        mgr.add(c2);
+
+        assert_eq!(mgr.total_items(), 3); // counting duplicates
+        assert_eq!(mgr.unique_items(), 2); // unique items
+    }
+
+    #[test]
+    fn test_manager_collections_containing() {
+        let mut mgr = CollectionManager::new();
+        let item_id = Uuid::new_v4();
+
+        let mut c1 = Collection::new_manual("Has it");
+        c1.add_item(item_id);
+        let c2 = Collection::new_manual("Doesn't have it");
+
+        mgr.add(c1);
+        mgr.add(c2);
+
+        let containing = mgr.collections_containing(&item_id);
+        assert_eq!(containing.len(), 1);
+        assert_eq!(containing[0].name, "Has it");
+    }
+
+    #[test]
+    fn test_manager_remove_item_from_all() {
+        let mut mgr = CollectionManager::new();
+        let item_id = Uuid::new_v4();
+
+        let mut c1 = Collection::new_manual("A");
+        c1.add_item(item_id);
+        let mut c2 = Collection::new_manual("B");
+        c2.add_item(item_id);
+
+        mgr.add(c1);
+        mgr.add(c2);
+
+        mgr.remove_item_from_all(&item_id);
+        assert!(!mgr.item_in_any_collection(&item_id));
+    }
+
+    #[test]
+    fn test_manager_sorted_by_name() {
+        let mut mgr = CollectionManager::new();
+        mgr.add(Collection::new_manual("Zebra"));
+        mgr.add(Collection::new_manual("Alpha"));
+        mgr.add(Collection::new_manual("Middle"));
+
+        let sorted = mgr.sorted_by_name();
+        assert_eq!(sorted[0].name, "Alpha");
+        assert_eq!(sorted[1].name, "Middle");
+        assert_eq!(sorted[2].name, "Zebra");
+    }
+
+    #[test]
+    fn test_manager_sorted_by_count() {
+        let mut mgr = CollectionManager::new();
+        let mut big = Collection::new_manual("Big");
+        big.add_item(Uuid::new_v4());
+        big.add_item(Uuid::new_v4());
+        big.add_item(Uuid::new_v4());
+
+        let small = Collection::new_manual("Small");
+
+        let mut medium = Collection::new_manual("Medium");
+        medium.add_item(Uuid::new_v4());
+
+        mgr.add(small);
+        mgr.add(big);
+        mgr.add(medium);
+
+        let sorted = mgr.sorted_by_count();
+        assert_eq!(sorted[0].name, "Big");
+        assert_eq!(sorted[1].name, "Medium");
+        assert_eq!(sorted[2].name, "Small");
+    }
+
+    #[test]
+    fn test_manager_item_in_any_collection() {
+        let mut mgr = CollectionManager::new();
+        let item_id = Uuid::new_v4();
+
+        assert!(!mgr.item_in_any_collection(&item_id));
+
+        let mut c = Collection::new_manual("Test");
+        c.add_item(item_id);
+        mgr.add(c);
+
+        assert!(mgr.item_in_any_collection(&item_id));
+    }
+
+    #[test]
+    fn test_manager_summary() {
+        let mut mgr = CollectionManager::new();
+        mgr.add(Collection::new_manual("A"));
+        mgr.add(Collection::new_search("B", "q"));
+
+        let summary = mgr.summary();
+        assert!(summary.contains("2 collections"));
+        assert!(summary.contains("1 manual"));
+        assert!(summary.contains("1 smart"));
     }
 }

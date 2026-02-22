@@ -244,6 +244,114 @@ pub fn suggest_link_targets(broken_title: &str, binder: &Binder) -> Vec<String> 
     suggestions.into_iter().map(|(t, _)| t).take(5).collect()
 }
 
+impl DocLink {
+    /// Get the display text, falling back to link_text
+    pub fn display(&self) -> &str {
+        self.display_text.as_deref().unwrap_or(&self.link_text)
+    }
+
+    /// Byte length of the link in the original content
+    pub fn byte_len(&self) -> usize {
+        self.end - self.start
+    }
+
+    /// Whether this link uses a display text override
+    pub fn has_display_override(&self) -> bool {
+        self.display_text.is_some()
+    }
+}
+
+impl LinkStatus {
+    /// Check if the link is valid
+    pub fn is_valid(&self) -> bool {
+        matches!(self, LinkStatus::Valid(_))
+    }
+
+    /// Check if the link is broken
+    pub fn is_broken(&self) -> bool {
+        matches!(self, LinkStatus::Broken)
+    }
+
+    /// Check if the link is ambiguous
+    pub fn is_ambiguous(&self) -> bool {
+        matches!(self, LinkStatus::Ambiguous(_))
+    }
+
+    /// Get the target ID if the link is valid
+    pub fn target_id(&self) -> Option<Uuid> {
+        match self {
+            LinkStatus::Valid(id) => Some(*id),
+            _ => None,
+        }
+    }
+
+    /// Human-readable label
+    pub fn label(&self) -> &str {
+        match self {
+            LinkStatus::Valid(_) => "Valid",
+            LinkStatus::Broken => "Broken",
+            LinkStatus::Ambiguous(_) => "Ambiguous",
+        }
+    }
+}
+
+impl LinkValidation {
+    /// Convenience: is the link valid?
+    pub fn is_valid(&self) -> bool {
+        self.status.is_valid()
+    }
+
+    /// Convenience: is the link broken?
+    pub fn is_broken(&self) -> bool {
+        self.status.is_broken()
+    }
+}
+
+impl LinkHealthSummary {
+    /// Health score as a percentage (0-100)
+    pub fn health_score(&self) -> f64 {
+        if self.total_links == 0 {
+            return 100.0;
+        }
+        (self.valid_links as f64 / self.total_links as f64) * 100.0
+    }
+
+    /// Health grade label
+    pub fn health_grade(&self) -> &str {
+        let score = self.health_score();
+        if score >= 100.0 { "Excellent" }
+        else if score >= 80.0 { "Good" }
+        else if score >= 50.0 { "Needs Work" }
+        else { "Poor" }
+    }
+
+    /// Whether there are broken links that need fixing
+    pub fn needs_attention(&self) -> bool {
+        self.broken_links > 0 || self.ambiguous_links > 0
+    }
+}
+
+/// Count total links in a content string
+pub fn count_links(content: &str) -> usize {
+    extract_links(content).len()
+}
+
+/// Get all unique link targets from a content string
+pub fn unique_link_targets(content: &str) -> Vec<String> {
+    let links = extract_links(content);
+    let mut targets: Vec<String> = links.into_iter().map(|l| l.link_text).collect();
+    targets.sort();
+    targets.dedup();
+    targets
+}
+
+/// Replace a link in content with new text
+pub fn replace_link(content: &str, old_target: &str, new_target: &str) -> String {
+    let pattern = format!("[[{}]]", old_target);
+    let replacement = format!("[[{}]]", new_target);
+    content.replace(&pattern, &replacement)
+}
+
 /// Simple Levenshtein edit distance
 fn edit_distance(a: &str, b: &str) -> usize {
     let a_len = a.len();
@@ -599,5 +707,273 @@ mod tests {
             end: 8,
         };
         assert_eq!(a, b);
+    }
+
+    // DocLink method tests
+
+    #[test]
+    fn test_doc_link_display_no_override() {
+        let link = DocLink {
+            link_text: "Chapter 1".to_string(),
+            display_text: None,
+            start: 0,
+            end: 13,
+        };
+        assert_eq!(link.display(), "Chapter 1");
+        assert!(!link.has_display_override());
+    }
+
+    #[test]
+    fn test_doc_link_display_with_override() {
+        let link = DocLink {
+            link_text: "Chapter 1".to_string(),
+            display_text: Some("the beginning".to_string()),
+            start: 0,
+            end: 27,
+        };
+        assert_eq!(link.display(), "the beginning");
+        assert!(link.has_display_override());
+    }
+
+    #[test]
+    fn test_doc_link_byte_len() {
+        let link = DocLink {
+            link_text: "Test".to_string(),
+            display_text: None,
+            start: 4,
+            end: 12,
+        };
+        assert_eq!(link.byte_len(), 8);
+    }
+
+    // LinkStatus method tests
+
+    #[test]
+    fn test_link_status_is_valid() {
+        let valid = LinkStatus::Valid(Uuid::new_v4());
+        assert!(valid.is_valid());
+        assert!(!valid.is_broken());
+        assert!(!valid.is_ambiguous());
+    }
+
+    #[test]
+    fn test_link_status_is_broken() {
+        let broken = LinkStatus::Broken;
+        assert!(broken.is_broken());
+        assert!(!broken.is_valid());
+    }
+
+    #[test]
+    fn test_link_status_is_ambiguous() {
+        let ambig = LinkStatus::Ambiguous(vec![Uuid::new_v4()]);
+        assert!(ambig.is_ambiguous());
+        assert!(!ambig.is_valid());
+    }
+
+    #[test]
+    fn test_link_status_target_id() {
+        let id = Uuid::new_v4();
+        assert_eq!(LinkStatus::Valid(id).target_id(), Some(id));
+        assert_eq!(LinkStatus::Broken.target_id(), None);
+        assert_eq!(LinkStatus::Ambiguous(vec![]).target_id(), None);
+    }
+
+    #[test]
+    fn test_link_status_label() {
+        assert_eq!(LinkStatus::Valid(Uuid::new_v4()).label(), "Valid");
+        assert_eq!(LinkStatus::Broken.label(), "Broken");
+        assert_eq!(LinkStatus::Ambiguous(vec![]).label(), "Ambiguous");
+    }
+
+    // LinkValidation convenience tests
+
+    #[test]
+    fn test_link_validation_convenience() {
+        let validation = LinkValidation {
+            link: DocLink { link_text: "X".into(), display_text: None, start: 0, end: 5 },
+            source_id: Uuid::new_v4(),
+            status: LinkStatus::Broken,
+        };
+        assert!(validation.is_broken());
+        assert!(!validation.is_valid());
+    }
+
+    // LinkHealthSummary tests
+
+    #[test]
+    fn test_health_score_perfect() {
+        let mut binder = Binder::default_structure();
+        let mut a = BinderItem::new_text("A");
+        if let Some(ref mut doc) = a.document {
+            doc.content = "See [[B]].".to_string();
+        }
+        let mut b = BinderItem::new_text("B");
+        if let Some(ref mut doc) = b.document {
+            doc.content = "See [[A]].".to_string();
+        }
+        binder.draft.children.push(a);
+        binder.draft.children.push(b);
+
+        let summary = link_health_summary(&binder);
+        assert_eq!(summary.health_score(), 100.0);
+        assert_eq!(summary.health_grade(), "Excellent");
+        assert!(!summary.needs_attention());
+    }
+
+    #[test]
+    fn test_health_score_no_links() {
+        let binder = Binder::default_structure();
+        let summary = link_health_summary(&binder);
+        assert_eq!(summary.health_score(), 100.0);
+        assert_eq!(summary.health_grade(), "Excellent");
+    }
+
+    #[test]
+    fn test_health_score_with_broken() {
+        let mut binder = Binder::default_structure();
+        let mut a = BinderItem::new_text("A");
+        if let Some(ref mut doc) = a.document {
+            doc.content = "See [[B]] and [[Missing]].".to_string();
+        }
+        let b = BinderItem::new_text("B");
+        binder.draft.children.push(a);
+        binder.draft.children.push(b);
+
+        let summary = link_health_summary(&binder);
+        assert_eq!(summary.health_score(), 50.0);
+        assert!(summary.needs_attention());
+    }
+
+    #[test]
+    fn test_health_grade_levels() {
+        // Test via direct construction
+        let excellent = LinkHealthSummary {
+            total_links: 10, valid_links: 10, broken_links: 0,
+            ambiguous_links: 0, orphan_documents: 0,
+            broken_link_details: vec![], orphan_ids: vec![],
+        };
+        assert_eq!(excellent.health_grade(), "Excellent");
+
+        let good = LinkHealthSummary {
+            total_links: 10, valid_links: 9, broken_links: 1,
+            ambiguous_links: 0, orphan_documents: 0,
+            broken_link_details: vec![], orphan_ids: vec![],
+        };
+        assert_eq!(good.health_grade(), "Good");
+
+        let needs_work = LinkHealthSummary {
+            total_links: 10, valid_links: 5, broken_links: 5,
+            ambiguous_links: 0, orphan_documents: 0,
+            broken_link_details: vec![], orphan_ids: vec![],
+        };
+        assert_eq!(needs_work.health_grade(), "Needs Work");
+
+        let poor = LinkHealthSummary {
+            total_links: 10, valid_links: 2, broken_links: 8,
+            ambiguous_links: 0, orphan_documents: 0,
+            broken_link_details: vec![], orphan_ids: vec![],
+        };
+        assert_eq!(poor.health_grade(), "Poor");
+    }
+
+    // Utility function tests
+
+    #[test]
+    fn test_count_links() {
+        assert_eq!(count_links("No links"), 0);
+        assert_eq!(count_links("[[A]] and [[B]]"), 2);
+        assert_eq!(count_links("[[A]][[B]][[C]]"), 3);
+    }
+
+    #[test]
+    fn test_unique_link_targets() {
+        let targets = unique_link_targets("[[A]] and [[B]] and [[A]] again");
+        assert_eq!(targets.len(), 2);
+        assert!(targets.contains(&"A".to_string()));
+        assert!(targets.contains(&"B".to_string()));
+    }
+
+    #[test]
+    fn test_unique_link_targets_empty() {
+        let targets = unique_link_targets("No links here");
+        assert!(targets.is_empty());
+    }
+
+    #[test]
+    fn test_replace_link() {
+        let content = "See [[Old Title]] for details.";
+        let result = replace_link(content, "Old Title", "New Title");
+        assert_eq!(result, "See [[New Title]] for details.");
+        assert!(!result.contains("Old Title"));
+    }
+
+    #[test]
+    fn test_replace_link_multiple_occurrences() {
+        let content = "[[A]] and [[A]] again";
+        let result = replace_link(content, "A", "B");
+        assert_eq!(result, "[[B]] and [[B]] again");
+    }
+
+    #[test]
+    fn test_replace_link_no_match() {
+        let content = "See [[Chapter 1]].";
+        let result = replace_link(content, "Missing", "New");
+        assert_eq!(result, content); // Unchanged
+    }
+
+    #[test]
+    fn test_extract_links_nested_brackets() {
+        // Single bracket should not be treated as link
+        let content = "Array [0] and [[Link]]";
+        let links = extract_links(content);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].link_text, "Link");
+    }
+
+    #[test]
+    fn test_extract_links_with_special_chars() {
+        let content = "[[Scene: The Beginning]]";
+        let links = extract_links(content);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].link_text, "Scene: The Beginning");
+    }
+
+    #[test]
+    fn test_link_health_display_ambiguous() {
+        let summary = LinkHealthSummary {
+            total_links: 3, valid_links: 1, broken_links: 1,
+            ambiguous_links: 1, orphan_documents: 0,
+            broken_link_details: vec![], orphan_ids: vec![],
+        };
+        let display = summary.display();
+        assert!(display.contains("3 links"));
+        assert!(display.contains("1 broken"));
+        assert!(display.contains("1 ambiguous"));
+    }
+
+    #[test]
+    fn test_link_health_display_singular() {
+        let summary = LinkHealthSummary {
+            total_links: 1, valid_links: 1, broken_links: 0,
+            ambiguous_links: 0, orphan_documents: 1,
+            broken_link_details: vec![], orphan_ids: vec![],
+        };
+        let display = summary.display();
+        assert!(display.contains("1 link")); // singular
+        assert!(display.contains("1 orphan doc")); // singular
+    }
+
+    #[test]
+    fn test_edit_distance_empty_strings() {
+        assert_eq!(edit_distance("", ""), 0);
+    }
+
+    #[test]
+    fn test_suggest_link_targets_case_insensitive() {
+        let mut binder = Binder::default_structure();
+        binder.draft.children.push(BinderItem::new_text("CHAPTER ONE"));
+
+        let suggestions = suggest_link_targets("chapter one", &binder);
+        assert!(suggestions.contains(&"CHAPTER ONE".to_string()));
     }
 }
