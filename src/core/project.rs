@@ -669,6 +669,74 @@ impl Project {
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| "Unsaved".to_string())
     }
+
+    /// Get the number of compile presets
+    pub fn preset_count(&self) -> usize {
+        self.compile_presets.len()
+    }
+
+    /// Find a compile preset by name
+    pub fn find_preset(&self, name: &str) -> Option<&CompileOptions> {
+        self.compile_presets.iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, opts)| opts)
+    }
+
+    /// Add or update a compile preset
+    pub fn set_preset(&mut self, name: &str, opts: CompileOptions) {
+        if let Some(existing) = self.compile_presets.iter_mut().find(|(n, _)| n == name) {
+            existing.1 = opts;
+        } else {
+            self.compile_presets.push((name.to_string(), opts));
+        }
+    }
+
+    /// Remove a compile preset by name
+    pub fn remove_preset(&mut self, name: &str) -> bool {
+        let before = self.compile_presets.len();
+        self.compile_presets.retain(|(n, _)| n != name);
+        self.compile_presets.len() < before
+    }
+
+    /// Get all available template names
+    pub fn available_templates() -> Vec<&'static str> {
+        vec![
+            "novel", "novel_with_parts", "short_story", "poetry",
+            "screenplay", "stage_play", "nonfiction", "essay",
+            "academic", "research_proposal", "thesis",
+            "recipes", "journal", "blog",
+            "comic_script", "radio_drama", "documentary",
+            "mla_paper", "chicago_essay",
+        ]
+    }
+
+    /// Get a comprehensive status summary
+    pub fn status_summary(&self) -> String {
+        let words = self.total_word_count();
+        let docs = self.document_count();
+        let folders = self.folder_count();
+        let pages = self.estimated_pages();
+        let collections = self.collection_count();
+        let presets = self.preset_count();
+        let has_notes = !self.project_notes.is_empty();
+
+        let mut parts = vec![
+            format!("{} words", words),
+            format!("{} pages", pages),
+            format!("{} documents", docs),
+            format!("{} folders", folders),
+        ];
+        if collections > 0 { parts.push(format!("{} collections", collections)); }
+        if presets > 0 { parts.push(format!("{} presets", presets)); }
+        if has_notes { parts.push("has project notes".to_string()); }
+
+        parts.join(", ")
+    }
+
+    /// Check if a template name is valid
+    pub fn is_valid_template(name: &str) -> bool {
+        Self::available_templates().contains(&name)
+    }
 }
 
 #[cfg(test)]
@@ -997,5 +1065,152 @@ mod tests {
         assert_eq!(loaded_item.snapshots[0].content, "Version 1");
         assert_eq!(loaded_item.snapshots[1].title, "Draft 2");
         assert_eq!(loaded_item.snapshots[1].content, "Version 2 - improved");
+    }
+
+    // New: compile preset tests
+
+    #[test]
+    fn test_preset_count_empty() {
+        let project = Project::new("Test");
+        assert_eq!(project.preset_count(), 0);
+    }
+
+    #[test]
+    fn test_set_and_find_preset() {
+        let mut project = Project::new("Test");
+        let opts = CompileOptions::default();
+        project.set_preset("My Preset", opts);
+
+        assert_eq!(project.preset_count(), 1);
+        assert!(project.find_preset("My Preset").is_some());
+        assert!(project.find_preset("Not Found").is_none());
+    }
+
+    #[test]
+    fn test_set_preset_updates_existing() {
+        let mut project = Project::new("Test");
+        let mut opts1 = CompileOptions::default();
+        opts1.title = "Old".to_string();
+        project.set_preset("Preset", opts1);
+
+        let mut opts2 = CompileOptions::default();
+        opts2.title = "New".to_string();
+        project.set_preset("Preset", opts2);
+
+        assert_eq!(project.preset_count(), 1); // Still only one
+        assert_eq!(project.find_preset("Preset").unwrap().title, "New");
+    }
+
+    #[test]
+    fn test_remove_preset() {
+        let mut project = Project::new("Test");
+        project.set_preset("A", CompileOptions::default());
+        project.set_preset("B", CompileOptions::default());
+
+        assert!(project.remove_preset("A"));
+        assert_eq!(project.preset_count(), 1);
+        assert!(!project.remove_preset("A")); // Already removed
+    }
+
+    // New: template tests
+
+    #[test]
+    fn test_available_templates() {
+        let templates = Project::available_templates();
+        assert!(templates.len() >= 15);
+        assert!(templates.contains(&"novel"));
+        assert!(templates.contains(&"screenplay"));
+        assert!(templates.contains(&"thesis"));
+    }
+
+    #[test]
+    fn test_is_valid_template() {
+        assert!(Project::is_valid_template("novel"));
+        assert!(Project::is_valid_template("essay"));
+        assert!(!Project::is_valid_template("nonexistent"));
+    }
+
+    #[test]
+    fn test_all_templates_produce_valid_projects() {
+        for template in Project::available_templates() {
+            let project = Project::from_template(&format!("Test {}", template), template);
+            assert!(!project.binder.draft.title.is_empty(),
+                "Template '{}' produced empty draft title", template);
+            assert_eq!(project.title, format!("Test {}", template));
+        }
+    }
+
+    // New: status summary tests
+
+    #[test]
+    fn test_status_summary_empty() {
+        let project = Project::new("Test");
+        let summary = project.status_summary();
+        assert!(summary.contains("0 words"));
+        assert!(summary.contains("0 pages"));
+    }
+
+    #[test]
+    fn test_status_summary_with_extras() {
+        let mut project = Project::new("Test");
+        project.collections.push(Collection::new_manual("Fav"));
+        project.set_preset("Default", CompileOptions::default());
+        project.project_notes = "Some notes".to_string();
+
+        let summary = project.status_summary();
+        assert!(summary.contains("1 collections"));
+        assert!(summary.contains("1 presets"));
+        assert!(summary.contains("has project notes"));
+    }
+
+    // New: additional template structure tests
+
+    #[test]
+    fn test_from_template_stage_play() {
+        let project = Project::from_template("Test Play", "stage_play");
+        assert_eq!(project.binder.draft.title, "Play");
+        assert!(project.binder.draft.children.len() >= 3);
+    }
+
+    #[test]
+    fn test_from_template_research_proposal() {
+        let project = Project::from_template("Test", "research_proposal");
+        assert_eq!(project.binder.draft.title, "Proposal");
+    }
+
+    #[test]
+    fn test_from_template_recipes() {
+        let project = Project::from_template("Test", "recipes");
+        assert_eq!(project.binder.draft.title, "Recipe Book");
+    }
+
+    #[test]
+    fn test_from_template_comic_script() {
+        let project = Project::from_template("Test", "comic_script");
+        assert_eq!(project.binder.draft.title, "Comic");
+    }
+
+    #[test]
+    fn test_from_template_radio_drama() {
+        let project = Project::from_template("Test", "radio_drama");
+        assert_eq!(project.binder.draft.title, "Radio Drama");
+    }
+
+    #[test]
+    fn test_from_template_documentary() {
+        let project = Project::from_template("Test", "documentary");
+        assert_eq!(project.binder.draft.title, "Documentary");
+    }
+
+    #[test]
+    fn test_from_template_mla_paper() {
+        let project = Project::from_template("Test", "mla_paper");
+        assert_eq!(project.binder.draft.title, "Paper");
+    }
+
+    #[test]
+    fn test_from_template_chicago_essay() {
+        let project = Project::from_template("Test", "chicago_essay");
+        assert_eq!(project.binder.draft.title, "Essay");
     }
 }
