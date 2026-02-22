@@ -21,4 +21,6 @@ pub mod links;
 pub mod validation;
 pub mod timer;
 pub mod doc_templates;
-
+pub mod comments;
+pub mod media_import;
+pub mod revision;
