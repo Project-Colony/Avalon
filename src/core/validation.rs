@@ -421,6 +421,188 @@ impl ProjectValidation {
     }
 }
 
+/// A record of a single auto-fix that was applied
+#[derive(Debug, Clone)]
+pub struct FixRecord {
+    pub kind: IssueKind,
+    pub item_id: Option<Uuid>,
+    pub description: String,
+}
+
+/// Result of running auto-fix on a binder
+#[derive(Debug)]
+pub struct AutoFixResult {
+    pub fixes_applied: Vec<FixRecord>,
+    pub skipped: Vec<ValidationIssue>,
+}
+
+impl AutoFixResult {
+    pub fn fix_count(&self) -> usize {
+        self.fixes_applied.len()
+    }
+
+    pub fn skip_count(&self) -> usize {
+        self.skipped.len()
+    }
+
+    pub fn summary(&self) -> String {
+        if self.fixes_applied.is_empty() {
+            return "No fixes applied".to_string();
+        }
+        let mut parts = Vec::new();
+        parts.push(format!("{} fixes applied", self.fixes_applied.len()));
+        if !self.skipped.is_empty() {
+            parts.push(format!("{} skipped (not auto-fixable)", self.skipped.len()));
+        }
+        parts.join(", ")
+    }
+}
+
+/// Auto-fix engine: applies fixes to a binder for auto-fixable issues
+pub fn auto_fix(binder: &mut Binder) -> AutoFixResult {
+    let validation = validate_project(binder);
+    let mut fixes_applied = Vec::new();
+    let mut skipped = Vec::new();
+
+    for issue in &validation.issues {
+        if !issue.is_auto_fixable() {
+            skipped.push(issue.clone());
+            continue;
+        }
+
+        match issue.kind {
+            IssueKind::UntitledItem => {
+                if let Some(id) = issue.item_id {
+                    if let Some(item) = binder.find_item_mut(&id) {
+                        let new_title = match item.kind {
+                            BinderItemKind::Folder => "Untitled Folder",
+                            BinderItemKind::Text => "Untitled Document",
+                            _ => "Untitled Item",
+                        };
+                        item.title = new_title.to_string();
+                        fixes_applied.push(FixRecord {
+                            kind: IssueKind::UntitledItem,
+                            item_id: Some(id),
+                            description: format!("Renamed to \"{}\"", new_title),
+                        });
+                    }
+                }
+            }
+            IssueKind::EmptyDocument => {
+                // Don't auto-delete — just mark for the user's attention
+                // by adding a placeholder
+                if let Some(id) = issue.item_id {
+                    if let Some(item) = binder.find_item_mut(&id) {
+                        if let Some(ref mut doc) = item.document {
+                            if doc.content.trim().is_empty() {
+                                doc.content = "[Empty — placeholder added by auto-fix]".to_string();
+                                fixes_applied.push(FixRecord {
+                                    kind: IssueKind::EmptyDocument,
+                                    item_id: Some(id),
+                                    description: "Added placeholder content".to_string(),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            IssueKind::EmptyFolder => {
+                // Move empty folders to trash (if they're in draft)
+                if let Some(id) = issue.item_id {
+                    if binder.move_to_trash(&id) {
+                        fixes_applied.push(FixRecord {
+                            kind: IssueKind::EmptyFolder,
+                            item_id: Some(id),
+                            description: "Moved empty folder to trash".to_string(),
+                        });
+                    }
+                }
+            }
+            // InconsistentMetadata is technically auto-fixable but we skip it
+            // because applying default metadata is too opinionated
+            _ => {
+                skipped.push(issue.clone());
+            }
+        }
+    }
+
+    AutoFixResult {
+        fixes_applied,
+        skipped,
+    }
+}
+
+/// Fix only a specific issue kind
+pub fn fix_issues_of_kind(binder: &mut Binder, kind: &IssueKind) -> Vec<FixRecord> {
+    let validation = validate_project(binder);
+    let matching: Vec<&ValidationIssue> = validation.issues.iter()
+        .filter(|i| &i.kind == kind && i.is_auto_fixable())
+        .collect();
+
+    let mut fixes = Vec::new();
+    for issue in matching {
+        match issue.kind {
+            IssueKind::UntitledItem => {
+                if let Some(id) = issue.item_id {
+                    if let Some(item) = binder.find_item_mut(&id) {
+                        let new_title = match item.kind {
+                            BinderItemKind::Folder => "Untitled Folder",
+                            BinderItemKind::Text => "Untitled Document",
+                            _ => "Untitled Item",
+                        };
+                        item.title = new_title.to_string();
+                        fixes.push(FixRecord {
+                            kind: IssueKind::UntitledItem,
+                            item_id: Some(id),
+                            description: format!("Renamed to \"{}\"", new_title),
+                        });
+                    }
+                }
+            }
+            IssueKind::EmptyDocument => {
+                if let Some(id) = issue.item_id {
+                    if let Some(item) = binder.find_item_mut(&id) {
+                        if let Some(ref mut doc) = item.document {
+                            if doc.content.trim().is_empty() {
+                                doc.content = "[Empty — placeholder added by auto-fix]".to_string();
+                                fixes.push(FixRecord {
+                                    kind: IssueKind::EmptyDocument,
+                                    item_id: Some(id),
+                                    description: "Added placeholder content".to_string(),
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+            IssueKind::EmptyFolder => {
+                if let Some(id) = issue.item_id {
+                    if binder.move_to_trash(&id) {
+                        fixes.push(FixRecord {
+                            kind: IssueKind::EmptyFolder,
+                            item_id: Some(id),
+                            description: "Moved empty folder to trash".to_string(),
+                        });
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    fixes
+}
+
+/// Regenerate a duplicate ID (specific fix for DuplicateId issues)
+pub fn fix_duplicate_id(binder: &mut Binder, id: &Uuid) -> Option<Uuid> {
+    if let Some(item) = binder.find_item_mut(id) {
+        let new_id = Uuid::new_v4();
+        item.id = new_id;
+        Some(new_id)
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1042,5 +1224,168 @@ mod tests {
         assert!(IssueKind::InconsistentMetadata.is_auto_fixable());
         assert!(!IssueKind::DeepNesting.fix_hint().is_empty());
         assert!(!IssueKind::InconsistentMetadata.fix_hint().is_empty());
+    }
+
+    // ---- Auto-fix engine tests ----
+
+    #[test]
+    fn test_auto_fix_untitled_item() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("");
+        let id = item.id;
+        binder.draft.children.push(item);
+
+        // Verify the issue exists
+        let pre = validate_project(&binder);
+        assert!(pre.issues.iter().any(|i| i.kind == IssueKind::UntitledItem));
+
+        // Apply auto-fix
+        let result = auto_fix(&mut binder);
+        assert!(result.fix_count() > 0);
+
+        // Verify title was set
+        let fixed_item = binder.find_item(&id).unwrap();
+        assert_eq!(fixed_item.title, "Untitled Document");
+    }
+
+    #[test]
+    fn test_auto_fix_empty_document() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("Empty Doc");
+        let id = item.id;
+        binder.draft.children.push(item);
+
+        let result = auto_fix(&mut binder);
+        let empty_fixes: Vec<_> = result.fixes_applied.iter()
+            .filter(|f| f.kind == IssueKind::EmptyDocument)
+            .collect();
+        assert!(!empty_fixes.is_empty());
+
+        // Verify placeholder was added
+        let fixed_item = binder.find_item(&id).unwrap();
+        assert!(fixed_item.document.as_ref().unwrap().content.contains("placeholder"));
+    }
+
+    #[test]
+    fn test_auto_fix_empty_folder() {
+        let mut binder = Binder::default_structure();
+        let folder = BinderItem::new_folder("Empty Act");
+        binder.draft.children.push(folder);
+
+        let result = auto_fix(&mut binder);
+        let folder_fixes: Vec<_> = result.fixes_applied.iter()
+            .filter(|f| f.kind == IssueKind::EmptyFolder)
+            .collect();
+        assert!(!folder_fixes.is_empty());
+    }
+
+    #[test]
+    fn test_auto_fix_skips_non_fixable() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Scene");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "See [[Missing Chapter]].".to_string();
+        }
+        binder.draft.children.push(item);
+
+        let result = auto_fix(&mut binder);
+        let broken_link_skips: Vec<_> = result.skipped.iter()
+            .filter(|i| i.kind == IssueKind::BrokenLink)
+            .collect();
+        assert!(!broken_link_skips.is_empty());
+    }
+
+    #[test]
+    fn test_auto_fix_clean_project() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Good Chapter");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "This chapter has content.".to_string();
+        }
+        binder.draft.children.push(item);
+
+        let result = auto_fix(&mut binder);
+        assert_eq!(result.fix_count(), 0);
+    }
+
+    #[test]
+    fn test_auto_fix_result_summary() {
+        let result = AutoFixResult {
+            fixes_applied: vec![
+                FixRecord { kind: IssueKind::UntitledItem, item_id: None, description: "fixed".to_string() },
+            ],
+            skipped: vec![
+                ValidationIssue { severity: Severity::Error, kind: IssueKind::DuplicateId, item_id: None, message: "skip".to_string() },
+            ],
+        };
+        let summary = result.summary();
+        assert!(summary.contains("1 fixes applied"));
+        assert!(summary.contains("1 skipped"));
+    }
+
+    #[test]
+    fn test_auto_fix_result_empty_summary() {
+        let result = AutoFixResult {
+            fixes_applied: vec![],
+            skipped: vec![],
+        };
+        assert_eq!(result.summary(), "No fixes applied");
+    }
+
+    #[test]
+    fn test_fix_issues_of_kind_untitled() {
+        let mut binder = Binder::default_structure();
+        binder.draft.children.push(BinderItem::new_text(""));
+        binder.draft.children.push(BinderItem::new_text(""));
+
+        let fixes = fix_issues_of_kind(&mut binder, &IssueKind::UntitledItem);
+        assert_eq!(fixes.len(), 2);
+        assert!(fixes.iter().all(|f| f.kind == IssueKind::UntitledItem));
+    }
+
+    #[test]
+    fn test_fix_issues_of_kind_wrong_kind() {
+        let mut binder = Binder::default_structure();
+        binder.draft.children.push(BinderItem::new_text("")); // untitled, not broken link
+
+        let fixes = fix_issues_of_kind(&mut binder, &IssueKind::BrokenLink);
+        assert!(fixes.is_empty());
+    }
+
+    #[test]
+    fn test_fix_duplicate_id() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Doc");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Content.".to_string();
+        }
+        let old_id = item.id;
+        binder.draft.children.push(item);
+
+        let new_id = fix_duplicate_id(&mut binder, &old_id).unwrap();
+        assert_ne!(old_id, new_id);
+        // Old ID should no longer be found
+        assert!(binder.find_item(&old_id).is_none());
+        // New ID should be found
+        assert!(binder.find_item(&new_id).is_some());
+    }
+
+    #[test]
+    fn test_fix_duplicate_id_not_found() {
+        let mut binder = Binder::default_structure();
+        let fake = Uuid::new_v4();
+        assert!(fix_duplicate_id(&mut binder, &fake).is_none());
+    }
+
+    #[test]
+    fn test_fix_record_has_description() {
+        let rec = FixRecord {
+            kind: IssueKind::UntitledItem,
+            item_id: Some(Uuid::new_v4()),
+            description: "Renamed to Untitled Document".to_string(),
+        };
+        assert!(!rec.description.is_empty());
+        assert_eq!(rec.kind, IssueKind::UntitledItem);
+        assert!(rec.item_id.is_some());
     }
 }
