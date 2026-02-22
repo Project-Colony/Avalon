@@ -53,6 +53,15 @@ pub enum BottomPanel {
     Templates,
 }
 
+/// Which toolbar dropdown menu is open
+#[derive(Debug, Clone, PartialEq)]
+pub enum ToolbarMenu {
+    File,
+    View,
+    Panels,
+    Tools,
+}
+
 /// Application state
 pub struct ScrineverApp {
     // === Project ===
@@ -65,6 +74,7 @@ pub struct ScrineverApp {
     pub show_inspector: bool,
     pub fullscreen_editor: bool,
     pub bottom_panel: BottomPanel,
+    pub active_toolbar_menu: Option<ToolbarMenu>,
 
     // === Dialogs ===
     pub show_compile_dialog: bool,
@@ -477,6 +487,9 @@ pub enum Message {
     // Project validation
     ShowValidation,
 
+    // Toolbar menus
+    ToggleToolbarMenu(ToolbarMenu),
+
     // Misc
     Tick,
     DismissNotification,
@@ -497,6 +510,7 @@ impl ScrineverApp {
             show_inspector: true,
             fullscreen_editor: false,
             bottom_panel: BottomPanel::None,
+            active_toolbar_menu: None,
             show_compile_dialog: false,
             show_settings_dialog: false,
             compile_options: CompileOptions::default(),
@@ -599,6 +613,11 @@ impl ScrineverApp {
     }
 
     pub fn update(&mut self, message: Message) -> IcedTask<Message> {
+        // Close toolbar menu on any action except menu toggle itself and ticks
+        if !matches!(message, Message::ToggleToolbarMenu(_) | Message::Tick | Message::EscapePressed) {
+            self.active_toolbar_menu = None;
+        }
+
         match message {
             // ========== Project operations ==========
             Message::NewProject => {
@@ -3199,8 +3218,18 @@ impl ScrineverApp {
                 self.notification_timer = 0;
             }
 
+            Message::ToggleToolbarMenu(menu) => {
+                if self.active_toolbar_menu.as_ref() == Some(&menu) {
+                    self.active_toolbar_menu = None;
+                } else {
+                    self.active_toolbar_menu = Some(menu);
+                }
+            }
+
             Message::EscapePressed => {
-                if self.composition_mode {
+                if self.active_toolbar_menu.is_some() {
+                    self.active_toolbar_menu = None;
+                } else if self.composition_mode {
                     self.composition_mode = false;
                 } else if self.fullscreen_editor {
                     self.fullscreen_editor = false;
@@ -3330,6 +3359,7 @@ impl ScrineverApp {
             self.show_inspector,
             self.fullscreen_editor,
             &self.bottom_panel,
+            &self.active_toolbar_menu,
         );
 
         // Binder sidebar

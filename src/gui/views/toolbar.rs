@@ -1,131 +1,154 @@
-use iced::widget::{button, container, row, scrollable, text, Space};
+use iced::widget::{button, column, container, row, text, Space};
 use iced::{Element, Length, Padding};
 
-use crate::gui::app::{BottomPanel, Message, ViewMode};
+use crate::gui::app::{BottomPanel, Message, ToolbarMenu, ViewMode};
 use crate::gui::theme::Theme;
 
-/// Render the main toolbar
+/// Render the menu bar (category headers) + dropdown panel if a menu is open
 pub fn view(
     current_view: &ViewMode,
     show_inspector: bool,
     fullscreen: bool,
     bottom_panel: &BottomPanel,
+    active_menu: &Option<ToolbarMenu>,
 ) -> Element<'static, Message> {
-    let new_btn = tool_button("New", Message::NewProject);
-    let open_btn = tool_button("Open", Message::OpenProject);
-    let save_btn = tool_button("Save", Message::SaveProject);
-    let import_btn = tool_button("Import", Message::ImportFiles);
+    // Menu category buttons
+    let file_menu = menu_header("File", &ToolbarMenu::File, active_menu);
+    let view_menu = menu_header("View", &ToolbarMenu::View, active_menu);
+    let panels_menu = menu_header("Panels", &ToolbarMenu::Panels, active_menu);
+    let tools_menu = menu_header("Tools", &ToolbarMenu::Tools, active_menu);
 
-    let sep1 = text(" | ").size(14).color(Theme::TEXT_MUTED);
+    let menu_bar = container(
+        row![
+            file_menu,
+            view_menu,
+            panels_menu,
+            tools_menu,
+        ]
+        .spacing(2)
+        .padding(Padding::from([4, 8]))
+    )
+    .width(Length::Fill);
 
-    // View mode buttons
-    let editor_btn = view_button("Editor", ViewMode::Editor, current_view);
-    let corkboard_btn = view_button("Cork", ViewMode::Corkboard, current_view);
-    let outliner_btn = view_button("Outline", ViewMode::Outliner, current_view);
-    let scrivenings_btn = view_button("Scriv", ViewMode::Scrivenings, current_view);
+    // Dropdown panel for the active menu
+    let dropdown: Element<'static, Message> = match active_menu {
+        Some(ToolbarMenu::File) => file_dropdown(),
+        Some(ToolbarMenu::View) => view_dropdown(current_view, show_inspector, fullscreen),
+        Some(ToolbarMenu::Panels) => panels_dropdown(bottom_panel),
+        Some(ToolbarMenu::Tools) => tools_dropdown(),
+        None => Space::with_height(0).into(),
+    };
 
-    let sep2 = text(" | ").size(14).color(Theme::TEXT_MUTED);
+    column![menu_bar, dropdown].into()
+}
 
-    let inspector_btn = toggle_tool_button("Insp", show_inspector, Message::ToggleInspector);
+/// A menu header button that toggles its dropdown
+fn menu_header(label: &str, menu: &ToolbarMenu, active: &Option<ToolbarMenu>) -> Element<'static, Message> {
+    let is_open = active.as_ref() == Some(menu);
+    let color = if is_open { Theme::TEXT_ACCENT } else { Theme::TEXT_PRIMARY };
 
-    let fullscreen_label = if fullscreen { "Exit" } else { "Focus" };
-    let fullscreen_btn = tool_button(fullscreen_label, Message::ToggleFullscreen);
-
-    let sep3 = text(" | ").size(14).color(Theme::TEXT_MUTED);
-
-    // Bottom panel toggles - two rows via scrollable
-    let search_btn = panel_button("Search", BottomPanel::Search, bottom_panel);
-    let thesaurus_btn = panel_button("Thes", BottomPanel::Thesaurus, bottom_panel);
-    let snapshots_btn = panel_button("Snap", BottomPanel::Snapshots, bottom_panel);
-    let session_btn = panel_button("Sess", BottomPanel::Session, bottom_panel);
-    let history_btn = panel_button("Hist", BottomPanel::History, bottom_panel);
-    let stats_btn = panel_button("Stats", BottomPanel::TextStats, bottom_panel);
-    let names_btn = panel_button("Names", BottomPanel::NameGen, bottom_panel);
-    let notes_btn = panel_button("Notes", BottomPanel::ProjectNotes, bottom_panel);
-    let colls_btn = panel_button("Coll", BottomPanel::Collections, bottom_panel);
-    let bookmarks_btn = panel_button("Bkmk", BottomPanel::Bookmarks, bottom_panel);
-    let targets_btn = panel_button("Targets", BottomPanel::Targets, bottom_panel);
-    let annot_btn = panel_button("Annot", BottomPanel::Annotations, bottom_panel);
-    let find_btn = panel_button("Find", BottomPanel::FindReplace, bottom_panel);
-    let goals_btn = panel_button("Goals", BottomPanel::WritingGoals, bottom_panel);
-    let links_btn = panel_button("Links", BottomPanel::DocLinks, bottom_panel);
-    let backups_btn = panel_button("Bkups", BottomPanel::Backups, bottom_panel);
-    let spell_btn = panel_button("Spell", BottomPanel::SpellCheck, bottom_panel);
-    let timer_btn = panel_button("Timer", BottomPanel::Timer, bottom_panel);
-    let valid_btn = panel_button("Valid", BottomPanel::Validation, bottom_panel);
-    let templ_btn = panel_button("Tmpl", BottomPanel::Templates, bottom_panel);
-
-    let sep4 = text(" | ").size(14).color(Theme::TEXT_MUTED);
-
-    let compose_btn = tool_button("Compose", Message::ToggleCompositionMode);
-    let stats_dialog_btn = tool_button("ProjStats", Message::ShowProjectStats);
-    let print_btn = tool_button("Print", Message::PrintCurrent);
-    let print_all_btn = tool_button("PrintAll", Message::PrintProject);
-    let import_opml_btn = tool_button("Import+", Message::ImportOpml);
-    let export_opml_btn = tool_button("OPML", Message::ExportOpml);
-    let settings_btn = tool_button("Settings", Message::ShowSettings);
-    let compile_btn = tool_button("Compile", Message::ShowCompileDialog);
-
-    let scrollable_buttons = row![
-        new_btn,
-        open_btn,
-        save_btn,
-        import_btn,
-        sep1,
-        editor_btn,
-        corkboard_btn,
-        outliner_btn,
-        scrivenings_btn,
-        sep2,
-        inspector_btn,
-        fullscreen_btn,
-        sep3,
-        search_btn,
-        thesaurus_btn,
-        snapshots_btn,
-        session_btn,
-        history_btn,
-        stats_btn,
-        names_btn,
-        notes_btn,
-        colls_btn,
-        bookmarks_btn,
-        targets_btn,
-        annot_btn,
-        find_btn,
-        goals_btn,
-        links_btn,
-        backups_btn,
-        spell_btn,
-        timer_btn,
-        valid_btn,
-        templ_btn,
-        sep4,
-        compose_btn,
-        stats_dialog_btn,
-        print_btn,
-        print_all_btn,
-        import_opml_btn,
-        export_opml_btn,
-    ]
-    .spacing(2);
-
-    let toolbar_content = row![
-        scrollable(scrollable_buttons)
-            .direction(scrollable::Direction::Horizontal(scrollable::Scrollbar::new()))
-            .width(Length::Fill),
-        settings_btn,
-        compile_btn,
-    ]
-    .spacing(2)
-    .padding(Padding::from([4, 8]));
-
-    container(toolbar_content)
-    .width(Length::Fill)
+    button(
+        text(label.to_string()).size(13).color(color),
+    )
+    .on_press(Message::ToggleToolbarMenu(menu.clone()))
+    .padding(Padding::from([5, 12]))
     .into()
 }
 
-fn tool_button(label: &str, message: Message) -> Element<'static, Message> {
+/// File menu dropdown: New, Open, Save, Import, Export, Print, Compile
+fn file_dropdown() -> Element<'static, Message> {
+    dropdown_container(
+        row![
+            dropdown_btn("New", Message::NewProject),
+            dropdown_btn("Open", Message::OpenProject),
+            dropdown_btn("Save", Message::SaveProject),
+            dropdown_sep(),
+            dropdown_btn("Import", Message::ImportFiles),
+            dropdown_btn("Import OPML", Message::ImportOpml),
+            dropdown_btn("Export OPML", Message::ExportOpml),
+            dropdown_sep(),
+            dropdown_btn("Print", Message::PrintCurrent),
+            dropdown_btn("Print All", Message::PrintProject),
+            dropdown_sep(),
+            dropdown_btn("Compile", Message::ShowCompileDialog),
+        ]
+        .spacing(2)
+    )
+}
+
+/// View menu dropdown: view modes, inspector, focus, compose
+fn view_dropdown(current_view: &ViewMode, show_inspector: bool, fullscreen: bool) -> Element<'static, Message> {
+    let fullscreen_label = if fullscreen { "Exit Focus" } else { "Focus Mode" };
+
+    dropdown_container(
+        row![
+            view_btn("Editor", ViewMode::Editor, current_view),
+            view_btn("Corkboard", ViewMode::Corkboard, current_view),
+            view_btn("Outliner", ViewMode::Outliner, current_view),
+            view_btn("Scrivenings", ViewMode::Scrivenings, current_view),
+            dropdown_sep(),
+            toggle_btn("Inspector", show_inspector, Message::ToggleInspector),
+            dropdown_btn(fullscreen_label, Message::ToggleFullscreen),
+            dropdown_btn("Compose", Message::ToggleCompositionMode),
+        ]
+        .spacing(2)
+    )
+}
+
+/// Panels menu dropdown: all bottom panel toggles
+fn panels_dropdown(bottom_panel: &BottomPanel) -> Element<'static, Message> {
+    dropdown_container(
+        row![
+            panel_btn("Search", BottomPanel::Search, bottom_panel),
+            panel_btn("Find", BottomPanel::FindReplace, bottom_panel),
+            panel_btn("Thesaurus", BottomPanel::Thesaurus, bottom_panel),
+            panel_btn("Spell", BottomPanel::SpellCheck, bottom_panel),
+            dropdown_sep(),
+            panel_btn("Session", BottomPanel::Session, bottom_panel),
+            panel_btn("Timer", BottomPanel::Timer, bottom_panel),
+            panel_btn("Goals", BottomPanel::WritingGoals, bottom_panel),
+            panel_btn("Targets", BottomPanel::Targets, bottom_panel),
+            panel_btn("Stats", BottomPanel::TextStats, bottom_panel),
+            dropdown_sep(),
+            panel_btn("Snapshots", BottomPanel::Snapshots, bottom_panel),
+            panel_btn("History", BottomPanel::History, bottom_panel),
+            panel_btn("Backups", BottomPanel::Backups, bottom_panel),
+            dropdown_sep(),
+            panel_btn("Notes", BottomPanel::ProjectNotes, bottom_panel),
+            panel_btn("Annot", BottomPanel::Annotations, bottom_panel),
+            panel_btn("Bookmarks", BottomPanel::Bookmarks, bottom_panel),
+            panel_btn("Collections", BottomPanel::Collections, bottom_panel),
+            panel_btn("Links", BottomPanel::DocLinks, bottom_panel),
+            dropdown_sep(),
+            panel_btn("Names", BottomPanel::NameGen, bottom_panel),
+            panel_btn("Templates", BottomPanel::Templates, bottom_panel),
+            panel_btn("Validation", BottomPanel::Validation, bottom_panel),
+        ]
+        .spacing(2)
+    )
+}
+
+/// Tools menu dropdown: settings, project stats
+fn tools_dropdown() -> Element<'static, Message> {
+    dropdown_container(
+        row![
+            dropdown_btn("Settings", Message::ShowSettings),
+            dropdown_btn("Project Stats", Message::ShowProjectStats),
+        ]
+        .spacing(2)
+    )
+}
+
+/// Wrap dropdown items in a styled container
+fn dropdown_container(content: iced::widget::Row<'static, Message>) -> Element<'static, Message> {
+    container(content)
+        .padding(Padding::from([4, 12]))
+        .width(Length::Fill)
+        .into()
+}
+
+/// Regular dropdown button
+fn dropdown_btn(label: &str, message: Message) -> Element<'static, Message> {
     button(
         text(label.to_string()).size(12).color(Theme::TEXT_PRIMARY),
     )
@@ -134,13 +157,10 @@ fn tool_button(label: &str, message: Message) -> Element<'static, Message> {
     .into()
 }
 
-fn view_button(label: &str, mode: ViewMode, current: &ViewMode) -> Element<'static, Message> {
+/// View mode button (highlighted when active)
+fn view_btn(label: &str, mode: ViewMode, current: &ViewMode) -> Element<'static, Message> {
     let is_active = std::mem::discriminant(&mode) == std::mem::discriminant(current);
-    let color = if is_active {
-        Theme::TEXT_ACCENT
-    } else {
-        Theme::TEXT_SECONDARY
-    };
+    let color = if is_active { Theme::TEXT_ACCENT } else { Theme::TEXT_SECONDARY };
 
     button(
         text(label.to_string()).size(12).color(color),
@@ -150,12 +170,9 @@ fn view_button(label: &str, mode: ViewMode, current: &ViewMode) -> Element<'stat
     .into()
 }
 
-fn toggle_tool_button(label: &str, active: bool, message: Message) -> Element<'static, Message> {
-    let color = if active {
-        Theme::TEXT_ACCENT
-    } else {
-        Theme::TEXT_SECONDARY
-    };
+/// Toggle button (highlighted when active)
+fn toggle_btn(label: &str, active: bool, message: Message) -> Element<'static, Message> {
+    let color = if active { Theme::TEXT_ACCENT } else { Theme::TEXT_SECONDARY };
 
     button(
         text(label.to_string()).size(12).color(color),
@@ -165,13 +182,10 @@ fn toggle_tool_button(label: &str, active: bool, message: Message) -> Element<'s
     .into()
 }
 
-fn panel_button(label: &str, panel: BottomPanel, current: &BottomPanel) -> Element<'static, Message> {
+/// Panel toggle button (highlighted when active)
+fn panel_btn(label: &str, panel: BottomPanel, current: &BottomPanel) -> Element<'static, Message> {
     let is_active = std::mem::discriminant(&panel) == std::mem::discriminant(current);
-    let color = if is_active {
-        Theme::TEXT_ACCENT
-    } else {
-        Theme::TEXT_SECONDARY
-    };
+    let color = if is_active { Theme::TEXT_ACCENT } else { Theme::TEXT_SECONDARY };
 
     button(
         text(label.to_string()).size(12).color(color),
@@ -179,4 +193,9 @@ fn panel_button(label: &str, panel: BottomPanel, current: &BottomPanel) -> Eleme
     .on_press(Message::ShowBottomPanel(panel))
     .padding(Padding::from([3, 8]))
     .into()
+}
+
+/// Visual separator between groups
+fn dropdown_sep() -> Element<'static, Message> {
+    text(" | ").size(12).color(Theme::TEXT_MUTED).into()
 }
