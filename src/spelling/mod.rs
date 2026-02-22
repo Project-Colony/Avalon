@@ -528,4 +528,130 @@ mod tests {
         // Should be a no-op
         assert_eq!(checker.user_dictionary_size(), 0);
     }
+
+    #[test]
+    fn test_check_word_case_insensitive() {
+        let checker = make_checker();
+        // "the" is a common word - both cases should pass
+        assert!(checker.check_word("THE"));
+        assert!(checker.check_word("The"));
+        assert!(checker.check_word("the"));
+    }
+
+    #[test]
+    fn test_suggest_max_results() {
+        let checker = make_checker();
+        let suggestions = checker.suggest("hllo");
+        assert!(suggestions.len() <= 5); // Max 5 suggestions
+    }
+
+    #[test]
+    fn test_check_text_empty() {
+        let checker = make_checker();
+        let results = checker.check_text("");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_check_text_punctuation_only() {
+        let checker = make_checker();
+        let results = checker.check_text("... !!! ???");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_edit_distance_single_operations() {
+        // Single insertion
+        assert_eq!(edit_distance("cat", "cats"), 1);
+        // Single deletion
+        assert_eq!(edit_distance("cats", "cat"), 1);
+        // Single substitution
+        assert_eq!(edit_distance("cat", "bat"), 1);
+    }
+
+    #[test]
+    fn test_spell_suggestion_position() {
+        let checker = make_checker();
+        let text = "this is a xyznonword test";
+        let results = checker.check_text(text);
+        // The position should be non-zero (xyznonword is not at start)
+        for r in &results {
+            if r.word == "xyznonword" {
+                assert!(r.position > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_add_then_check_then_remove() {
+        let mut checker = make_checker();
+        let word = "florbington";
+
+        assert!(!checker.check_word(word));
+        checker.add_to_dictionary(word);
+        assert!(checker.check_word(word));
+        checker.remove_from_dictionary(word);
+        assert!(!checker.check_word(word));
+    }
+
+    #[test]
+    fn test_clear_user_dictionary_restores() {
+        let mut checker = make_checker();
+        checker.add_to_dictionary("xyzword1");
+        checker.add_to_dictionary("xyzword2");
+
+        assert!(checker.check_word("xyzword1"));
+        checker.clear_user_dictionary();
+        assert!(!checker.check_word("xyzword1"));
+        assert!(!checker.check_word("xyzword2"));
+    }
+
+    #[test]
+    fn test_check_words_returns_only_bad() {
+        let checker = make_checker();
+        let results = checker.check_words(&["the", "xyzfakeword1", "xyzfakeword2"]);
+        // "the" should not appear in results
+        assert!(!results.contains(&"the".to_string()));
+    }
+
+    #[test]
+    fn test_similar_words_sorted_by_distance() {
+        let checker = make_checker();
+        let similar = checker.similar_words("hello", 10);
+        if similar.len() >= 2 {
+            // Should be sorted by distance (ascending)
+            for i in 1..similar.len() {
+                assert!(similar[i].1 >= similar[i-1].1);
+            }
+        }
+    }
+
+    #[test]
+    fn test_edit_distance_symmetric() {
+        assert_eq!(edit_distance("abc", "def"), edit_distance("def", "abc"));
+        assert_eq!(edit_distance("hello", "world"), edit_distance("world", "hello"));
+    }
+
+    #[test]
+    fn test_spelling_accuracy_mixed() {
+        let checker = make_checker();
+        // Mix of correct and likely incorrect words
+        let accuracy = spelling_accuracy(&checker, "the xyznotaword hello xyzalsonotaword");
+        // Should be less than 100% if the fake words are caught
+        if checker.active {
+            assert!(accuracy < 100.0);
+        }
+    }
+
+    #[test]
+    fn test_suggestion_summary_with_suggestions() {
+        let suggestion = SpellSuggestion {
+            word: "teh".to_string(),
+            suggestions: vec!["the".to_string(), "ten".to_string(), "tea".to_string(), "ted".to_string()],
+            position: 5,
+        };
+        let summary = suggestion.summary();
+        assert!(summary.contains("4 suggestions"));
+        assert!(summary.contains("the"));
+    }
 }

@@ -1219,4 +1219,178 @@ mod tests {
         assert_eq!(editor.current_line(), 2);
         assert_eq!(editor.current_column(), 3);
     }
+
+    // Additional editor tests
+
+    #[test]
+    fn test_word_count() {
+        let editor = editor_with("Hello world foo bar baz");
+        assert_eq!(editor.word_count(), 5);
+    }
+
+    #[test]
+    fn test_word_count_empty() {
+        let editor = editor_with("");
+        assert_eq!(editor.word_count(), 0);
+    }
+
+    #[test]
+    fn test_document_char_count() {
+        let editor = editor_with("abc");
+        assert_eq!(editor.document.content.len(), 3);
+    }
+
+    #[test]
+    fn test_document_line_count() {
+        let editor = editor_with("a\nb\nc");
+        let lines = editor.document.content.matches('\n').count() + 1;
+        assert_eq!(lines, 3);
+    }
+
+    #[test]
+    fn test_document_single_line() {
+        let editor = editor_with("one line");
+        let lines = editor.document.content.matches('\n').count() + 1;
+        assert_eq!(lines, 1);
+    }
+
+    #[test]
+    fn test_to_lowercase() {
+        let mut editor = editor_with("HELLO WORLD");
+        editor.to_lowercase(false);
+        assert_eq!(editor.document.content, "hello world");
+    }
+
+    #[test]
+    fn test_to_uppercase_preserves_structure() {
+        let mut editor = editor_with("hello\nworld");
+        editor.to_uppercase(false);
+        assert_eq!(editor.document.content, "HELLO\nWORLD");
+    }
+
+    #[test]
+    fn test_duplicate_line_first() {
+        let mut editor = editor_with("first\nsecond");
+        editor.cursor = 0;
+        editor.duplicate_line();
+        assert_eq!(editor.document.content, "first\nfirst\nsecond");
+    }
+
+    #[test]
+    fn test_sort_lines_alphabetical() {
+        let mut editor = editor_with("cherry\napple\nbanana");
+        editor.sort_lines();
+        assert_eq!(editor.document.content, "apple\nbanana\ncherry");
+    }
+
+    #[test]
+    fn test_move_line_up_three_lines() {
+        let mut editor = editor_with("aaa\nbbb\nccc");
+        editor.cursor = 5; // in "bbb"
+        editor.move_line_up();
+        assert_eq!(editor.document.content, "bbb\naaa\nccc");
+    }
+
+    #[test]
+    fn test_move_line_up_noop_at_top() {
+        let mut editor = editor_with("first\nsecond");
+        editor.cursor = 0;
+        editor.move_line_up(); // Should be a no-op
+        assert_eq!(editor.document.content, "first\nsecond");
+    }
+
+    #[test]
+    fn test_move_line_down_noop_at_bottom() {
+        let mut editor = editor_with("first\nlast");
+        editor.cursor = 6; // in "last"
+        editor.move_line_down(); // Should be a no-op
+        assert_eq!(editor.document.content, "first\nlast");
+    }
+
+    #[test]
+    fn test_indent_unindent_empty_line() {
+        let mut editor = editor_with("");
+        editor.cursor = 0;
+        editor.indent_line();
+        assert_eq!(editor.document.content, "    ");
+        editor.unindent_line();
+        assert_eq!(editor.document.content, "");
+    }
+
+    #[test]
+    fn test_toggle_comment_already_commented() {
+        let mut editor = editor_with("<!-- commented -->");
+        editor.cursor = 5;
+        editor.toggle_comment();
+        // Should uncomment
+        assert_eq!(editor.document.content, "commented");
+    }
+
+    #[test]
+    fn test_remove_duplicate_lines_no_dupes() {
+        let mut editor = editor_with("one\ntwo\nthree");
+        editor.remove_duplicate_lines();
+        assert_eq!(editor.document.content, "one\ntwo\nthree");
+    }
+
+    #[test]
+    fn test_multiple_undo() {
+        let mut editor = editor_with("start");
+        editor.to_uppercase(false);
+        assert_eq!(editor.document.content, "START");
+        editor.to_lowercase(false);
+        assert_eq!(editor.document.content, "start");
+
+        editor.undo();
+        assert_eq!(editor.document.content, "START");
+        editor.undo();
+        assert_eq!(editor.document.content, "start");
+    }
+
+    #[test]
+    fn test_undo_nothing_to_undo() {
+        let mut editor = editor_with("test");
+        assert!(!editor.can_undo());
+        editor.undo(); // Should be safe no-op
+        assert_eq!(editor.document.content, "test");
+    }
+
+    #[test]
+    fn test_redo_nothing_to_redo() {
+        let mut editor = editor_with("test");
+        assert!(!editor.can_redo());
+        editor.redo(); // Should be safe no-op
+        assert_eq!(editor.document.content, "test");
+    }
+
+    #[test]
+    fn test_join_lines_basic() {
+        let mut editor = editor_with("hello\nworld");
+        editor.cursor = 3;
+        editor.join_lines();
+        assert_eq!(editor.document.content, "hello world");
+    }
+
+    #[test]
+    fn test_transpose_chars_middle() {
+        let mut editor = editor_with("abc");
+        editor.cursor = 1;
+        editor.transpose_chars();
+        assert_eq!(editor.document.content, "bac");
+    }
+
+    #[test]
+    fn test_current_line_last_line() {
+        let mut editor = editor_with("a\nb\nc");
+        editor.cursor = 4; // in "c"
+        assert_eq!(editor.current_line(), 3);
+    }
+
+    #[test]
+    fn test_selection_range_same_position() {
+        let mut editor = editor_with("hello");
+        editor.selection_start = Some(3);
+        editor.cursor = 3;
+        assert_eq!(editor.selection_range(), Some((3, 3)));
+    }
 }
