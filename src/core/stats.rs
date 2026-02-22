@@ -626,6 +626,257 @@ fn count_syllables(word: &str) -> usize {
     count.max(1)
 }
 
+/// A single daily writing record
+#[derive(Debug, Clone)]
+pub struct DailyEntry {
+    pub date: chrono::NaiveDate,
+    pub words_written: i64,
+    pub word_count_start: usize,
+    pub word_count_end: usize,
+    pub time_spent_seconds: u64,
+}
+
+impl DailyEntry {
+    pub fn new(date: chrono::NaiveDate, words_written: i64, start: usize, end: usize, seconds: u64) -> Self {
+        Self {
+            date,
+            words_written,
+            word_count_start: start,
+            word_count_end: end,
+            time_spent_seconds: seconds,
+        }
+    }
+
+    /// Words per minute for this day
+    pub fn wpm(&self) -> f64 {
+        if self.time_spent_seconds == 0 {
+            return 0.0;
+        }
+        self.words_written.unsigned_abs() as f64 / (self.time_spent_seconds as f64 / 60.0)
+    }
+
+    /// Hours spent
+    pub fn hours(&self) -> f64 {
+        self.time_spent_seconds as f64 / 3600.0
+    }
+
+    /// Was this a productive day (net positive words)?
+    pub fn is_productive(&self) -> bool {
+        self.words_written > 0
+    }
+}
+
+/// Tracks writing history over time and computes trends
+#[derive(Debug, Clone, Default)]
+pub struct WritingHistory {
+    pub entries: Vec<DailyEntry>,
+}
+
+impl WritingHistory {
+    pub fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    /// Add an entry for a day
+    pub fn record(&mut self, entry: DailyEntry) {
+        // Replace existing entry for same date
+        self.entries.retain(|e| e.date != entry.date);
+        self.entries.push(entry);
+        self.entries.sort_by_key(|e| e.date);
+    }
+
+    /// Total words written across all days
+    pub fn total_words_written(&self) -> i64 {
+        self.entries.iter().map(|e| e.words_written).sum()
+    }
+
+    /// Total time spent in seconds
+    pub fn total_time_seconds(&self) -> u64 {
+        self.entries.iter().map(|e| e.time_spent_seconds).sum()
+    }
+
+    /// Average words per day (only counting days with entries)
+    pub fn avg_words_per_day(&self) -> f64 {
+        if self.entries.is_empty() {
+            return 0.0;
+        }
+        self.total_words_written() as f64 / self.entries.len() as f64
+    }
+
+    /// Average words per minute across all sessions
+    pub fn avg_wpm(&self) -> f64 {
+        let total_time = self.total_time_seconds();
+        if total_time == 0 {
+            return 0.0;
+        }
+        self.total_words_written().unsigned_abs() as f64 / (total_time as f64 / 60.0)
+    }
+
+    /// Best day (most words written)
+    pub fn best_day(&self) -> Option<&DailyEntry> {
+        self.entries.iter().max_by_key(|e| e.words_written)
+    }
+
+    /// Current writing streak (consecutive days with entries from the end)
+    pub fn current_streak(&self) -> usize {
+        if self.entries.is_empty() {
+            return 0;
+        }
+        let mut streak = 1;
+        let mut i = self.entries.len() - 1;
+        while i > 0 {
+            let prev_date = self.entries[i - 1].date;
+            let curr_date = self.entries[i].date;
+            if curr_date - prev_date == chrono::Duration::days(1) {
+                streak += 1;
+                i -= 1;
+            } else {
+                break;
+            }
+        }
+        streak
+    }
+
+    /// Longest streak of consecutive writing days
+    pub fn longest_streak(&self) -> usize {
+        if self.entries.is_empty() {
+            return 0;
+        }
+        let mut best = 1;
+        let mut current = 1;
+        for i in 1..self.entries.len() {
+            if self.entries[i].date - self.entries[i - 1].date == chrono::Duration::days(1) {
+                current += 1;
+                best = best.max(current);
+            } else {
+                current = 1;
+            }
+        }
+        best
+    }
+
+    /// Days with entries in the last N days
+    pub fn active_days_in_last(&self, days: i64) -> usize {
+        let cutoff = chrono::Utc::now().date_naive() - chrono::Duration::days(days);
+        self.entries.iter().filter(|e| e.date > cutoff).count()
+    }
+
+    /// Moving average of words/day over a window of N entries
+    pub fn moving_average(&self, window: usize) -> Vec<(chrono::NaiveDate, f64)> {
+        if self.entries.len() < window || window == 0 {
+            return Vec::new();
+        }
+        let mut result = Vec::new();
+        for i in (window - 1)..self.entries.len() {
+            let sum: i64 = self.entries[i + 1 - window..=i]
+                .iter()
+                .map(|e| e.words_written)
+                .sum();
+            let avg = sum as f64 / window as f64;
+            result.push((self.entries[i].date, avg));
+        }
+        result
+    }
+
+    /// Compute a WritingTrend from the entries
+    pub fn analyze_trend(&self) -> WritingTrend {
+        let total_words = self.total_words_written();
+        let total_days = self.entries.len();
+        let productive_days = self.entries.iter().filter(|e| e.is_productive()).count();
+
+        let direction = if self.entries.len() < 2 {
+            TrendDirection::Stable
+        } else {
+            let mid = self.entries.len() / 2;
+            let first_half: f64 = self.entries[..mid].iter().map(|e| e.words_written as f64).sum::<f64>()
+                / mid as f64;
+            let second_half: f64 = self.entries[mid..].iter().map(|e| e.words_written as f64).sum::<f64>()
+                / (self.entries.len() - mid) as f64;
+            let diff = second_half - first_half;
+            if diff > first_half.abs() * 0.1 {
+                TrendDirection::Increasing
+            } else if diff < -(first_half.abs() * 0.1) {
+                TrendDirection::Decreasing
+            } else {
+                TrendDirection::Stable
+            }
+        };
+
+        WritingTrend {
+            total_words,
+            total_days,
+            productive_days,
+            avg_words_per_day: self.avg_words_per_day(),
+            avg_wpm: self.avg_wpm(),
+            best_day_words: self.best_day().map(|d| d.words_written).unwrap_or(0),
+            current_streak: self.current_streak(),
+            longest_streak: self.longest_streak(),
+            direction,
+        }
+    }
+
+    /// Number of entries
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether the history is empty
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+/// Overall trend analysis
+#[derive(Debug, Clone)]
+pub struct WritingTrend {
+    pub total_words: i64,
+    pub total_days: usize,
+    pub productive_days: usize,
+    pub avg_words_per_day: f64,
+    pub avg_wpm: f64,
+    pub best_day_words: i64,
+    pub current_streak: usize,
+    pub longest_streak: usize,
+    pub direction: TrendDirection,
+}
+
+impl WritingTrend {
+    /// Productivity ratio (productive days / total days)
+    pub fn productivity_ratio(&self) -> f64 {
+        if self.total_days == 0 {
+            return 0.0;
+        }
+        self.productive_days as f64 / self.total_days as f64
+    }
+
+    /// Summary string
+    pub fn summary(&self) -> String {
+        format!(
+            "{} words over {} days ({} productive), avg {:.0}/day, streak: {}, trend: {}",
+            self.total_words, self.total_days, self.productive_days,
+            self.avg_words_per_day, self.current_streak, self.direction.label()
+        )
+    }
+}
+
+/// Direction of the writing trend
+#[derive(Debug, Clone, PartialEq)]
+pub enum TrendDirection {
+    Increasing,
+    Decreasing,
+    Stable,
+}
+
+impl TrendDirection {
+    pub fn label(&self) -> &str {
+        match self {
+            TrendDirection::Increasing => "Increasing",
+            TrendDirection::Decreasing => "Decreasing",
+            TrendDirection::Stable => "Stable",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1304,5 +1555,265 @@ mod tests {
         assert_eq!(stats.word_count, 0);
         assert_eq!(stats.document_count, 0);
         assert!(stats.folder_count >= 3); // Draft, Research, Trash
+    }
+
+    // ---- DailyEntry tests ----
+
+    fn date(y: i32, m: u32, d: u32) -> chrono::NaiveDate {
+        chrono::NaiveDate::from_ymd_opt(y, m, d).unwrap()
+    }
+
+    #[test]
+    fn test_daily_entry_new() {
+        let e = DailyEntry::new(date(2025, 1, 1), 500, 1000, 1500, 3600);
+        assert_eq!(e.words_written, 500);
+        assert_eq!(e.word_count_start, 1000);
+        assert_eq!(e.word_count_end, 1500);
+        assert_eq!(e.time_spent_seconds, 3600);
+    }
+
+    #[test]
+    fn test_daily_entry_wpm() {
+        let e = DailyEntry::new(date(2025, 1, 1), 600, 0, 600, 3600);
+        assert!((e.wpm() - 10.0).abs() < 0.01); // 600 words / 60 min
+    }
+
+    #[test]
+    fn test_daily_entry_wpm_zero_time() {
+        let e = DailyEntry::new(date(2025, 1, 1), 100, 0, 100, 0);
+        assert_eq!(e.wpm(), 0.0);
+    }
+
+    #[test]
+    fn test_daily_entry_hours() {
+        let e = DailyEntry::new(date(2025, 1, 1), 100, 0, 100, 7200);
+        assert!((e.hours() - 2.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_daily_entry_is_productive() {
+        let good = DailyEntry::new(date(2025, 1, 1), 500, 0, 500, 3600);
+        assert!(good.is_productive());
+        let bad = DailyEntry::new(date(2025, 1, 2), -100, 500, 400, 3600);
+        assert!(!bad.is_productive());
+        let zero = DailyEntry::new(date(2025, 1, 3), 0, 500, 500, 1800);
+        assert!(!zero.is_productive());
+    }
+
+    // ---- WritingHistory tests ----
+
+    #[test]
+    fn test_writing_history_new() {
+        let h = WritingHistory::new();
+        assert!(h.is_empty());
+        assert_eq!(h.len(), 0);
+    }
+
+    #[test]
+    fn test_writing_history_record() {
+        let mut h = WritingHistory::new();
+        h.record(DailyEntry::new(date(2025, 1, 1), 500, 0, 500, 3600));
+        h.record(DailyEntry::new(date(2025, 1, 2), 300, 500, 800, 1800));
+        assert_eq!(h.len(), 2);
+        assert!(!h.is_empty());
+    }
+
+    #[test]
+    fn test_writing_history_record_replaces_same_date() {
+        let mut h = WritingHistory::new();
+        h.record(DailyEntry::new(date(2025, 1, 1), 200, 0, 200, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 1), 500, 0, 500, 3600));
+        assert_eq!(h.len(), 1);
+        assert_eq!(h.total_words_written(), 500);
+    }
+
+    #[test]
+    fn test_writing_history_totals() {
+        let mut h = WritingHistory::new();
+        h.record(DailyEntry::new(date(2025, 1, 1), 500, 0, 500, 3600));
+        h.record(DailyEntry::new(date(2025, 1, 2), 300, 500, 800, 1800));
+
+        assert_eq!(h.total_words_written(), 800);
+        assert_eq!(h.total_time_seconds(), 5400);
+    }
+
+    #[test]
+    fn test_writing_history_avg_words_per_day() {
+        let mut h = WritingHistory::new();
+        h.record(DailyEntry::new(date(2025, 1, 1), 400, 0, 400, 3600));
+        h.record(DailyEntry::new(date(2025, 1, 2), 600, 400, 1000, 3600));
+        assert!((h.avg_words_per_day() - 500.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_writing_history_avg_words_per_day_empty() {
+        let h = WritingHistory::new();
+        assert_eq!(h.avg_words_per_day(), 0.0);
+    }
+
+    #[test]
+    fn test_writing_history_avg_wpm() {
+        let mut h = WritingHistory::new();
+        h.record(DailyEntry::new(date(2025, 1, 1), 600, 0, 600, 3600));
+        // 600 words / 60 min = 10 wpm
+        assert!((h.avg_wpm() - 10.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_writing_history_best_day() {
+        let mut h = WritingHistory::new();
+        h.record(DailyEntry::new(date(2025, 1, 1), 200, 0, 200, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 2), 800, 200, 1000, 3600));
+        h.record(DailyEntry::new(date(2025, 1, 3), 500, 1000, 1500, 2700));
+
+        let best = h.best_day().unwrap();
+        assert_eq!(best.date, date(2025, 1, 2));
+        assert_eq!(best.words_written, 800);
+    }
+
+    #[test]
+    fn test_writing_history_best_day_empty() {
+        let h = WritingHistory::new();
+        assert!(h.best_day().is_none());
+    }
+
+    #[test]
+    fn test_writing_history_current_streak() {
+        let mut h = WritingHistory::new();
+        h.record(DailyEntry::new(date(2025, 1, 1), 100, 0, 100, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 2), 200, 100, 300, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 3), 300, 300, 600, 1800));
+        assert_eq!(h.current_streak(), 3);
+    }
+
+    #[test]
+    fn test_writing_history_streak_broken() {
+        let mut h = WritingHistory::new();
+        h.record(DailyEntry::new(date(2025, 1, 1), 100, 0, 100, 1800));
+        // Gap on Jan 2
+        h.record(DailyEntry::new(date(2025, 1, 3), 200, 100, 300, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 4), 300, 300, 600, 1800));
+        assert_eq!(h.current_streak(), 2);
+    }
+
+    #[test]
+    fn test_writing_history_streak_single() {
+        let mut h = WritingHistory::new();
+        h.record(DailyEntry::new(date(2025, 1, 10), 100, 0, 100, 1800));
+        assert_eq!(h.current_streak(), 1);
+    }
+
+    #[test]
+    fn test_writing_history_longest_streak() {
+        let mut h = WritingHistory::new();
+        // 3-day streak
+        h.record(DailyEntry::new(date(2025, 1, 1), 100, 0, 100, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 2), 200, 0, 200, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 3), 150, 0, 150, 1800));
+        // Gap
+        // 2-day streak
+        h.record(DailyEntry::new(date(2025, 1, 10), 100, 0, 100, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 11), 100, 0, 100, 1800));
+
+        assert_eq!(h.longest_streak(), 3);
+    }
+
+    #[test]
+    fn test_writing_history_moving_average() {
+        let mut h = WritingHistory::new();
+        h.record(DailyEntry::new(date(2025, 1, 1), 100, 0, 100, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 2), 200, 100, 300, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 3), 300, 300, 600, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 4), 400, 600, 1000, 1800));
+
+        let ma = h.moving_average(3);
+        assert_eq!(ma.len(), 2); // 4 entries - 3 window + 1
+        assert!((ma[0].1 - 200.0).abs() < 0.01); // avg(100,200,300)
+        assert!((ma[1].1 - 300.0).abs() < 0.01); // avg(200,300,400)
+    }
+
+    #[test]
+    fn test_writing_history_moving_average_too_small() {
+        let mut h = WritingHistory::new();
+        h.record(DailyEntry::new(date(2025, 1, 1), 100, 0, 100, 1800));
+        let ma = h.moving_average(3);
+        assert!(ma.is_empty());
+    }
+
+    #[test]
+    fn test_writing_history_moving_average_zero_window() {
+        let mut h = WritingHistory::new();
+        h.record(DailyEntry::new(date(2025, 1, 1), 100, 0, 100, 1800));
+        let ma = h.moving_average(0);
+        assert!(ma.is_empty());
+    }
+
+    // ---- WritingTrend & analyze_trend tests ----
+
+    #[test]
+    fn test_analyze_trend_empty() {
+        let h = WritingHistory::new();
+        let trend = h.analyze_trend();
+        assert_eq!(trend.total_words, 0);
+        assert_eq!(trend.total_days, 0);
+        assert_eq!(trend.direction, TrendDirection::Stable);
+    }
+
+    #[test]
+    fn test_analyze_trend_increasing() {
+        let mut h = WritingHistory::new();
+        // First half: small numbers
+        h.record(DailyEntry::new(date(2025, 1, 1), 100, 0, 100, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 2), 120, 100, 220, 1800));
+        // Second half: much bigger numbers
+        h.record(DailyEntry::new(date(2025, 1, 3), 500, 220, 720, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 4), 600, 720, 1320, 1800));
+
+        let trend = h.analyze_trend();
+        assert_eq!(trend.direction, TrendDirection::Increasing);
+    }
+
+    #[test]
+    fn test_analyze_trend_decreasing() {
+        let mut h = WritingHistory::new();
+        h.record(DailyEntry::new(date(2025, 1, 1), 800, 0, 800, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 2), 700, 800, 1500, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 3), 100, 1500, 1600, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 4), 50, 1600, 1650, 1800));
+
+        let trend = h.analyze_trend();
+        assert_eq!(trend.direction, TrendDirection::Decreasing);
+    }
+
+    #[test]
+    fn test_trend_productivity_ratio() {
+        let mut h = WritingHistory::new();
+        h.record(DailyEntry::new(date(2025, 1, 1), 500, 0, 500, 3600));
+        h.record(DailyEntry::new(date(2025, 1, 2), -50, 500, 450, 1800));
+        h.record(DailyEntry::new(date(2025, 1, 3), 300, 450, 750, 2700));
+
+        let trend = h.analyze_trend();
+        assert_eq!(trend.productive_days, 2);
+        assert!((trend.productivity_ratio() - 2.0 / 3.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_trend_summary() {
+        let mut h = WritingHistory::new();
+        h.record(DailyEntry::new(date(2025, 1, 1), 500, 0, 500, 3600));
+        h.record(DailyEntry::new(date(2025, 1, 2), 300, 500, 800, 1800));
+
+        let trend = h.analyze_trend();
+        let summary = trend.summary();
+        assert!(summary.contains("800 words"));
+        assert!(summary.contains("2 days"));
+        assert!(summary.contains("streak"));
+    }
+
+    #[test]
+    fn test_trend_direction_labels() {
+        assert_eq!(TrendDirection::Increasing.label(), "Increasing");
+        assert_eq!(TrendDirection::Decreasing.label(), "Decreasing");
+        assert_eq!(TrendDirection::Stable.label(), "Stable");
     }
 }
