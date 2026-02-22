@@ -547,6 +547,209 @@ impl OutputFormat {
     }
 }
 
+/// A structured compile plan describing the assembled output
+#[derive(Debug, Clone)]
+pub struct CompileManifest {
+    pub title: String,
+    pub author: String,
+    pub format: OutputFormat,
+    pub sections: Vec<ManifestEntry>,
+    pub total_words: usize,
+    pub total_sections: usize,
+    pub total_folders: usize,
+}
+
+/// An entry in the compile manifest describing one section
+#[derive(Debug, Clone)]
+pub struct ManifestEntry {
+    pub title: String,
+    pub depth: usize,
+    pub heading_level: usize,
+    pub is_folder: bool,
+    pub word_count: usize,
+    pub has_page_break_before: bool,
+}
+
+impl CompileManifest {
+    /// Build a manifest from collected contents and compile options
+    pub fn from_contents(contents: &[CompileContent], options: &CompileOptions) -> Self {
+        let mut sections = Vec::new();
+        let mut prev_was_folder_at_depth_0 = false;
+
+        for (i, c) in contents.iter().enumerate() {
+            let heading_level = (c.depth + 1).min(6); // HTML h1-h6
+            let has_page_break_before = if i == 0 {
+                false
+            } else if c.is_folder && c.depth == 0 && options.page_break_between_folders {
+                true
+            } else if prev_was_folder_at_depth_0 && options.page_break_between_folders {
+                false // Already handled by the folder entry
+            } else {
+                matches!(options.separator, SeparatorType::PageBreak)
+            };
+
+            sections.push(ManifestEntry {
+                title: c.title.clone(),
+                depth: c.depth,
+                heading_level,
+                is_folder: c.is_folder,
+                word_count: c.word_count(),
+                has_page_break_before,
+            });
+
+            prev_was_folder_at_depth_0 = c.is_folder && c.depth == 0;
+        }
+
+        let total_words = contents.iter().filter(|c| !c.is_folder).map(|c| c.word_count()).sum();
+        let total_sections = contents.iter().filter(|c| !c.is_folder).count();
+        let total_folders = contents.iter().filter(|c| c.is_folder).count();
+
+        Self {
+            title: options.title.clone(),
+            author: options.author.clone(),
+            format: options.format.clone(),
+            sections,
+            total_words,
+            total_sections,
+            total_folders,
+        }
+    }
+
+    /// Generate a textual outline of the compile plan
+    pub fn outline(&self) -> String {
+        let mut out = String::new();
+        for entry in &self.sections {
+            let indent = "  ".repeat(entry.depth);
+            let kind = if entry.is_folder { "+" } else { "-" };
+            let pb = if entry.has_page_break_before { " [PAGE BREAK]" } else { "" };
+            out.push_str(&format!(
+                "{}{} {} ({} words){}\n",
+                indent, kind, entry.title, entry.word_count, pb
+            ));
+        }
+        out
+    }
+
+    /// Get word counts grouped by top-level section (depth 0 folders)
+    pub fn word_count_by_chapter(&self) -> Vec<(String, usize)> {
+        let mut chapters: Vec<(String, usize)> = Vec::new();
+        let mut current_chapter: Option<(String, usize)> = None;
+
+        for entry in &self.sections {
+            if entry.is_folder && entry.depth == 0 {
+                if let Some(ch) = current_chapter.take() {
+                    chapters.push(ch);
+                }
+                current_chapter = Some((entry.title.clone(), 0));
+            } else if let Some(ref mut ch) = current_chapter {
+                ch.1 += entry.word_count;
+            } else {
+                // Content before any folder
+                if chapters.is_empty() && !entry.is_folder {
+                    chapters.push((entry.title.clone(), entry.word_count));
+                }
+            }
+        }
+        if let Some(ch) = current_chapter {
+            chapters.push(ch);
+        }
+        chapters
+    }
+
+    /// Entries that have page breaks
+    pub fn page_break_count(&self) -> usize {
+        self.sections.iter().filter(|s| s.has_page_break_before).count()
+    }
+
+    /// Summary of the manifest
+    pub fn summary(&self) -> String {
+        format!(
+            "\"{}\" by {} — {} format, {} words, {} sections, {} folders, {} page breaks",
+            self.title, self.author, self.format.display_name(),
+            self.total_words, self.total_sections, self.total_folders,
+            self.page_break_count(),
+        )
+    }
+}
+
+/// Assembles document sections into a single output string with proper
+/// separators, headings, and page breaks.
+pub struct SectionAssembler;
+
+impl SectionAssembler {
+    /// Assemble contents into a single text with headings and separators
+    pub fn assemble(contents: &[CompileContent], options: &CompileOptions) -> String {
+        let mut output = String::new();
+        let manifest = CompileManifest::from_contents(contents, options);
+
+        for (i, entry) in manifest.sections.iter().enumerate() {
+            let content = &contents[i];
+
+            // Page break
+            if entry.has_page_break_before && !output.is_empty() {
+                output.push_str("\n\n---\n\n");
+            } else if i > 0 && !entry.has_page_break_before && !output.is_empty() {
+                output.push_str(options.separator.separator_string());
+            }
+
+            // Heading for folders and section titles
+            if entry.is_folder {
+                let heading = Self::format_heading(&entry.title, entry.heading_level, &options.format);
+                output.push_str(&heading);
+                output.push('\n');
+            } else {
+                if !content.title.is_empty() {
+                    let heading = Self::format_heading(&content.title, entry.heading_level, &options.format);
+                    output.push_str(&heading);
+                    output.push('\n');
+                }
+                if !content.text.is_empty() {
+                    output.push_str(&content.text);
+                }
+            }
+        }
+
+        output
+    }
+
+    /// Format a heading appropriate for the output format
+    fn format_heading(title: &str, level: usize, format: &OutputFormat) -> String {
+        match format {
+            OutputFormat::Markdown => {
+                format!("{} {}", "#".repeat(level), title)
+            }
+            OutputFormat::Html => {
+                format!("<h{}>{}</h{}>", level, title, level)
+            }
+            OutputFormat::Latex => {
+                let cmd = match level {
+                    1 => "chapter",
+                    2 => "section",
+                    3 => "subsection",
+                    4 => "subsubsection",
+                    _ => "paragraph",
+                };
+                format!("\\{}{{{}}}",  cmd, title)
+            }
+            _ => {
+                // Plain text: uppercase for top-level, indented for deeper
+                if level <= 1 {
+                    title.to_uppercase()
+                } else {
+                    format!("{}{}", "  ".repeat(level - 1), title)
+                }
+            }
+        }
+    }
+}
+
+impl CompileContent {
+    /// Compute heading level based on depth (h1 = depth 0, capped at h6)
+    pub fn heading_level(&self) -> usize {
+        (self.depth + 1).min(6)
+    }
+}
+
 fn plain_text_compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
     super::plain_text::compile(contents, options)
 }
@@ -1365,5 +1568,217 @@ mod tests {
             let parsed = OutputFormat::from_extension(ext).unwrap();
             assert_eq!(parsed, fmt, "Roundtrip failed for {:?}", fmt);
         }
+    }
+
+    // ---- Compile Manifest tests ----
+
+    fn sample_contents() -> Vec<CompileContent> {
+        vec![
+            CompileContent { title: "Part One".into(), text: String::new(), depth: 0, is_folder: true },
+            CompileContent { title: "Chapter 1".into(), text: "The hero set out on the journey.".into(), depth: 1, is_folder: false },
+            CompileContent { title: "Chapter 2".into(), text: "The villain appeared from the shadows of the old castle.".into(), depth: 1, is_folder: false },
+            CompileContent { title: "Part Two".into(), text: String::new(), depth: 0, is_folder: true },
+            CompileContent { title: "Chapter 3".into(), text: "A battle ensued between the hero and the villain.".into(), depth: 1, is_folder: false },
+        ]
+    }
+
+    #[test]
+    fn test_compile_manifest_from_contents() {
+        let contents = sample_contents();
+        let opts = CompileOptions::default();
+        let manifest = CompileManifest::from_contents(&contents, &opts);
+
+        assert_eq!(manifest.sections.len(), 5);
+        assert_eq!(manifest.total_sections, 3); // 3 text items
+        assert_eq!(manifest.total_folders, 2);  // 2 folders
+        assert!(manifest.total_words > 0);
+    }
+
+    #[test]
+    fn test_compile_manifest_heading_levels() {
+        let contents = sample_contents();
+        let opts = CompileOptions::default();
+        let manifest = CompileManifest::from_contents(&contents, &opts);
+
+        // Part One at depth 0 -> heading level 1
+        assert_eq!(manifest.sections[0].heading_level, 1);
+        // Chapter 1 at depth 1 -> heading level 2
+        assert_eq!(manifest.sections[1].heading_level, 2);
+    }
+
+    #[test]
+    fn test_compile_manifest_page_breaks() {
+        let contents = sample_contents();
+        let mut opts = CompileOptions::default();
+        opts.page_break_between_folders = true;
+        let manifest = CompileManifest::from_contents(&contents, &opts);
+
+        // First section should never have page break
+        assert!(!manifest.sections[0].has_page_break_before);
+        // Part Two (second folder at depth 0) should have page break
+        assert!(manifest.sections[3].has_page_break_before);
+    }
+
+    #[test]
+    fn test_compile_manifest_outline() {
+        let contents = sample_contents();
+        let opts = CompileOptions::default();
+        let manifest = CompileManifest::from_contents(&contents, &opts);
+        let outline = manifest.outline();
+
+        assert!(outline.contains("+ Part One"));
+        assert!(outline.contains("  - Chapter 1"));
+        assert!(outline.contains("  - Chapter 2"));
+        assert!(outline.contains("+ Part Two"));
+        assert!(outline.contains("  - Chapter 3"));
+    }
+
+    #[test]
+    fn test_compile_manifest_word_count_by_chapter() {
+        let contents = sample_contents();
+        let opts = CompileOptions::default();
+        let manifest = CompileManifest::from_contents(&contents, &opts);
+        let chapters = manifest.word_count_by_chapter();
+
+        assert_eq!(chapters.len(), 2); // Part One and Part Two
+        assert_eq!(chapters[0].0, "Part One");
+        assert!(chapters[0].1 > 0); // Sum of Ch1 + Ch2 words
+        assert_eq!(chapters[1].0, "Part Two");
+        assert!(chapters[1].1 > 0); // Sum of Ch3 words
+    }
+
+    #[test]
+    fn test_compile_manifest_summary() {
+        let contents = sample_contents();
+        let opts = CompileOptions::default();
+        let manifest = CompileManifest::from_contents(&contents, &opts);
+        let summary = manifest.summary();
+
+        assert!(summary.contains("Markdown"));
+        assert!(summary.contains("3 sections"));
+        assert!(summary.contains("2 folders"));
+    }
+
+    #[test]
+    fn test_compile_manifest_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        let opts = CompileOptions::default();
+        let manifest = CompileManifest::from_contents(&contents, &opts);
+
+        assert_eq!(manifest.total_words, 0);
+        assert_eq!(manifest.total_sections, 0);
+        assert_eq!(manifest.total_folders, 0);
+        assert!(manifest.outline().is_empty());
+        assert!(manifest.word_count_by_chapter().is_empty());
+    }
+
+    // ---- SectionAssembler tests ----
+
+    #[test]
+    fn test_section_assembler_plain_text() {
+        let contents = vec![
+            CompileContent { title: "Scene 1".into(), text: "The morning arrived.".into(), depth: 0, is_folder: false },
+            CompileContent { title: "Scene 2".into(), text: "The hero departed.".into(), depth: 0, is_folder: false },
+        ];
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::PlainText;
+        let result = SectionAssembler::assemble(&contents, &opts);
+
+        assert!(result.contains("SCENE 1"));
+        assert!(result.contains("The morning arrived."));
+        assert!(result.contains("SCENE 2"));
+        assert!(result.contains("The hero departed."));
+    }
+
+    #[test]
+    fn test_section_assembler_markdown_headings() {
+        let contents = vec![
+            CompileContent { title: "Part One".into(), text: String::new(), depth: 0, is_folder: true },
+            CompileContent { title: "Chapter 1".into(), text: "Content here.".into(), depth: 1, is_folder: false },
+        ];
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::Markdown;
+        let result = SectionAssembler::assemble(&contents, &opts);
+
+        assert!(result.contains("# Part One"));
+        assert!(result.contains("## Chapter 1"));
+        assert!(result.contains("Content here."));
+    }
+
+    #[test]
+    fn test_section_assembler_html_headings() {
+        let contents = vec![
+            CompileContent { title: "Title".into(), text: String::new(), depth: 0, is_folder: true },
+            CompileContent { title: "Sub".into(), text: "Text.".into(), depth: 1, is_folder: false },
+        ];
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::Html;
+        let result = SectionAssembler::assemble(&contents, &opts);
+
+        assert!(result.contains("<h1>Title</h1>"));
+        assert!(result.contains("<h2>Sub</h2>"));
+    }
+
+    #[test]
+    fn test_section_assembler_latex_headings() {
+        let contents = vec![
+            CompileContent { title: "Introduction".into(), text: String::new(), depth: 0, is_folder: true },
+            CompileContent { title: "Subsec".into(), text: "Body.".into(), depth: 2, is_folder: false },
+        ];
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::Latex;
+        let result = SectionAssembler::assemble(&contents, &opts);
+
+        assert!(result.contains("\\chapter{Introduction}"));
+        assert!(result.contains("\\subsection{Subsec}"));
+    }
+
+    #[test]
+    fn test_section_assembler_page_breaks() {
+        let contents = vec![
+            CompileContent { title: "Part 1".into(), text: String::new(), depth: 0, is_folder: true },
+            CompileContent { title: "Ch1".into(), text: "First.".into(), depth: 1, is_folder: false },
+            CompileContent { title: "Part 2".into(), text: String::new(), depth: 0, is_folder: true },
+            CompileContent { title: "Ch2".into(), text: "Second.".into(), depth: 1, is_folder: false },
+        ];
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::Markdown;
+        opts.page_break_between_folders = true;
+        let result = SectionAssembler::assemble(&contents, &opts);
+
+        // Should contain page break before Part 2
+        assert!(result.contains("---"));
+    }
+
+    #[test]
+    fn test_section_assembler_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        let opts = CompileOptions::default();
+        let result = SectionAssembler::assemble(&contents, &opts);
+        assert!(result.is_empty());
+    }
+
+    // ---- CompileContent heading_level tests ----
+
+    #[test]
+    fn test_compile_content_heading_level() {
+        let c0 = CompileContent { title: "A".into(), text: String::new(), depth: 0, is_folder: false };
+        assert_eq!(c0.heading_level(), 1);
+
+        let c3 = CompileContent { title: "B".into(), text: String::new(), depth: 3, is_folder: false };
+        assert_eq!(c3.heading_level(), 4);
+
+        // Capped at 6
+        let c10 = CompileContent { title: "C".into(), text: String::new(), depth: 10, is_folder: false };
+        assert_eq!(c10.heading_level(), 6);
+    }
+
+    #[test]
+    fn test_manifest_page_break_count() {
+        let contents = sample_contents();
+        let mut opts = CompileOptions::default();
+        opts.page_break_between_folders = true;
+        let manifest = CompileManifest::from_contents(&contents, &opts);
+        assert!(manifest.page_break_count() >= 1);
     }
 }
