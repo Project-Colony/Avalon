@@ -44,6 +44,27 @@ pub fn view(data: &ProjectStatsData) -> Element<'static, Message> {
         .size(14)
         .color(Theme::TEXT_SECONDARY);
 
+    // Project classification
+    let size_label = match data.word_count {
+        0..=999 => "Flash Fiction / Note",
+        1000..=7499 => "Short Story",
+        7500..=17499 => "Novelette",
+        17500..=39999 => "Novella",
+        40000..=79999 => "Novel",
+        80000..=119999 => "Full Novel",
+        _ => "Epic / Tome",
+    };
+
+    let classification = row![
+        text(format!("\u{1F4D6} {}", size_label))
+            .size(13)
+            .color(Theme::TEXT_ACCENT),
+        Space::with_width(8),
+        text(format!("({} words)", format_number(data.word_count)))
+            .size(11)
+            .color(Theme::TEXT_MUTED),
+    ];
+
     // Document metrics
     let doc_section = section("Document Metrics", vec![
         stat("Total Words", &format_number(data.word_count)),
@@ -141,6 +162,8 @@ pub fn view(data: &ProjectStatsData) -> Element<'static, Message> {
     let content = column![
         header,
         subtitle,
+        Space::with_height(8),
+        classification,
         Space::with_height(12),
         doc_section,
         Space::with_height(8),
