@@ -106,9 +106,28 @@ fn render_section(
 ) -> Element<'static, Message> {
     let mut col = column![];
 
-    // Section header
-    let icon = if item.expanded { "v " } else { "> " };
-    let header_text = format!("{}{}", icon, label.to_uppercase());
+    // Section header with item counts
+    let icon = if item.expanded { "\u{25BE} " } else { "\u{25B8} " };
+    let doc_count = count_docs(item);
+    let folder_count = count_folders(item);
+    let total_words = item.total_word_count();
+    let count_info = if doc_count > 0 || folder_count > 0 {
+        let mut parts = Vec::new();
+        if doc_count > 0 { parts.push(format!("{}d", doc_count)); }
+        if folder_count > 0 { parts.push(format!("{}f", folder_count)); }
+        if total_words > 0 {
+            let word_label = if total_words >= 1000 {
+                format!("{:.1}k", total_words as f64 / 1000.0)
+            } else {
+                total_words.to_string()
+            };
+            parts.push(format!("{}w", word_label));
+        }
+        format!(" ({})", parts.join(" "))
+    } else {
+        String::new()
+    };
+    let header_text = format!("{}{}{}", icon, label.to_uppercase(), count_info);
 
     let header_btn = button(
         text(header_text)
@@ -131,6 +150,20 @@ fn render_section(
     col.into()
 }
 
+/// Count documents in a binder section (recursive)
+fn count_docs(item: &BinderItem) -> usize {
+    let self_count = if item.kind == BinderItemKind::Text { 1 } else { 0 };
+    self_count + item.children.iter().map(|c| count_docs(c)).sum::<usize>()
+}
+
+/// Count folders in a binder section (recursive, excluding root)
+fn count_folders(item: &BinderItem) -> usize {
+    item.children.iter().map(|c| {
+        let self_count = if c.kind == BinderItemKind::Folder { 1 } else { 0 };
+        self_count + count_folders(c)
+    }).sum::<usize>()
+}
+
 /// Render a single binder item and its children
 fn render_item(
     item: &BinderItem,
@@ -144,12 +177,12 @@ fn render_item(
 
     let icon = match item.kind {
         BinderItemKind::Folder => {
-            if item.expanded { "v " } else { "> " }
+            if item.expanded { "\u{1F4C2} " } else { "\u{1F4C1} " }
         }
-        BinderItemKind::Text => "# ",
-        BinderItemKind::Image => "@ ",
-        BinderItemKind::Pdf => "P ",
-        BinderItemKind::WebPage => "W ",
+        BinderItemKind::Text => "\u{1F4C4} ",
+        BinderItemKind::Image => "\u{1F5BC} ",
+        BinderItemKind::Pdf => "\u{1F4D1} ",
+        BinderItemKind::WebPage => "\u{1F310} ",
     };
 
     // Compile indicator
