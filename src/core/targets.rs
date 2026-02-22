@@ -317,6 +317,81 @@ impl DocumentTarget {
         self.deadline = Some(deadline.to_string());
         self
     }
+
+    /// Check if this target has a deadline
+    pub fn has_deadline(&self) -> bool {
+        self.deadline.is_some()
+    }
+
+    /// Get the target type as a label
+    pub fn type_label(&self) -> &str {
+        match &self.target_type {
+            TargetType::Minimum => "Minimum",
+            TargetType::Maximum => "Maximum",
+            TargetType::Range { .. } => "Range",
+        }
+    }
+
+    /// Get a summary of the target configuration
+    pub fn summary(&self) -> String {
+        let type_str = match &self.target_type {
+            TargetType::Minimum => format!("min {} words", self.word_count),
+            TargetType::Maximum => format!("max {} words", self.word_count),
+            TargetType::Range { min, max } => format!("{}-{} words", min, max),
+        };
+        if let Some(ref dl) = self.deadline {
+            format!("{} by {}", type_str, dl)
+        } else {
+            type_str
+        }
+    }
+}
+
+impl TargetStatus {
+    /// Get a short emoji representation
+    pub fn icon(&self) -> &str {
+        match self {
+            TargetStatus::NotStarted => "-",
+            TargetStatus::InProgress => ">",
+            TargetStatus::AlmostDone => "!",
+            TargetStatus::Complete => "+",
+            TargetStatus::OverLimit => "X",
+        }
+    }
+
+    /// Check if this represents a completed target
+    pub fn is_complete(&self) -> bool {
+        matches!(self, TargetStatus::Complete)
+    }
+
+    /// Check if this needs attention
+    pub fn needs_attention(&self) -> bool {
+        matches!(self, TargetStatus::AlmostDone | TargetStatus::OverLimit)
+    }
+}
+
+impl TargetProgress {
+    /// Format with deadline info
+    pub fn full_display(&self) -> String {
+        let mut display = self.compact_display();
+        if let Some(days) = self.days_remaining {
+            display.push_str(&format!(", {} days left", days));
+        }
+        if let Some(wpd) = self.words_per_day_needed {
+            display.push_str(&format!(", {} words/day needed", wpd));
+        }
+        display
+    }
+
+    /// Check if deadline is approaching (less than 7 days)
+    pub fn deadline_approaching(&self) -> bool {
+        self.days_remaining.map_or(false, |d| d > 0 && d <= 7)
+    }
+
+    /// Check if deadline is overdue
+    pub fn deadline_overdue(&self) -> bool {
+        self.days_remaining.map_or(false, |d| d < 0)
+    }
 }
 
 #[cfg(test)]
@@ -529,5 +604,189 @@ mod tests {
         let json = serde_json::to_string(&targets).unwrap();
         let parsed: DocumentTargets = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.target_words(&id), Some(5000));
+    }
+
+    #[test]
+    fn test_document_target_has_deadline() {
+        let target = DocumentTarget::minimum(1000);
+        assert!(!target.has_deadline());
+        let target_dl = DocumentTarget::minimum(1000).with_deadline("2026-12-31");
+        assert!(target_dl.has_deadline());
+    }
+
+    #[test]
+    fn test_document_target_type_label() {
+        assert_eq!(DocumentTarget::minimum(100).type_label(), "Minimum");
+        assert_eq!(DocumentTarget::maximum(100).type_label(), "Maximum");
+        assert_eq!(DocumentTarget::range(50, 100).type_label(), "Range");
+    }
+
+    #[test]
+    fn test_document_target_summary() {
+        let t = DocumentTarget::minimum(5000);
+        assert_eq!(t.summary(), "min 5000 words");
+
+        let t = DocumentTarget::maximum(3000);
+        assert_eq!(t.summary(), "max 3000 words");
+
+        let t = DocumentTarget::range(100, 500);
+        assert_eq!(t.summary(), "100-500 words");
+
+        let t = DocumentTarget::minimum(1000).with_deadline("2026-06-01");
+        assert!(t.summary().contains("by 2026-06-01"));
+    }
+
+    #[test]
+    fn test_target_status_icon() {
+        assert_eq!(TargetStatus::NotStarted.icon(), "-");
+        assert_eq!(TargetStatus::InProgress.icon(), ">");
+        assert_eq!(TargetStatus::AlmostDone.icon(), "!");
+        assert_eq!(TargetStatus::Complete.icon(), "+");
+        assert_eq!(TargetStatus::OverLimit.icon(), "X");
+    }
+
+    #[test]
+    fn test_target_status_is_complete() {
+        assert!(TargetStatus::Complete.is_complete());
+        assert!(!TargetStatus::InProgress.is_complete());
+        assert!(!TargetStatus::NotStarted.is_complete());
+    }
+
+    #[test]
+    fn test_target_status_needs_attention() {
+        assert!(TargetStatus::AlmostDone.needs_attention());
+        assert!(TargetStatus::OverLimit.needs_attention());
+        assert!(!TargetStatus::InProgress.needs_attention());
+        assert!(!TargetStatus::Complete.needs_attention());
+    }
+
+    #[test]
+    fn test_target_progress_full_display() {
+        let progress = TargetProgress {
+            doc_id: Uuid::new_v4(),
+            current_words: 500,
+            target_words: 1000,
+            percentage: 50.0,
+            status: TargetStatus::InProgress,
+            words_remaining: 500,
+            days_remaining: Some(10),
+            words_per_day_needed: Some(50),
+        };
+        let display = progress.full_display();
+        assert!(display.contains("500/1000"));
+        assert!(display.contains("10 days left"));
+        assert!(display.contains("50 words/day needed"));
+    }
+
+    #[test]
+    fn test_target_progress_deadline_approaching() {
+        let mut progress = TargetProgress {
+            doc_id: Uuid::new_v4(),
+            current_words: 500,
+            target_words: 1000,
+            percentage: 50.0,
+            status: TargetStatus::InProgress,
+            words_remaining: 500,
+            days_remaining: Some(5),
+            words_per_day_needed: Some(100),
+        };
+        assert!(progress.deadline_approaching());
+
+        progress.days_remaining = Some(14);
+        assert!(!progress.deadline_approaching());
+
+        progress.days_remaining = None;
+        assert!(!progress.deadline_approaching());
+    }
+
+    #[test]
+    fn test_target_progress_deadline_overdue() {
+        let mut progress = TargetProgress {
+            doc_id: Uuid::new_v4(),
+            current_words: 500,
+            target_words: 1000,
+            percentage: 50.0,
+            status: TargetStatus::InProgress,
+            words_remaining: 500,
+            days_remaining: Some(-3),
+            words_per_day_needed: None,
+        };
+        assert!(progress.deadline_overdue());
+
+        progress.days_remaining = Some(5);
+        assert!(!progress.deadline_overdue());
+    }
+
+    #[test]
+    fn test_over_limit_docs() {
+        let mut targets = DocumentTargets::new();
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        targets.set_target_full(id1, DocumentTarget::maximum(100));
+        targets.set_target_full(id2, DocumentTarget::maximum(200));
+
+        let mut word_counts = HashMap::new();
+        word_counts.insert(id1, 150); // Over limit
+        word_counts.insert(id2, 100); // Under limit
+
+        let over = targets.over_limit_docs(&word_counts);
+        assert_eq!(over.len(), 1);
+        assert_eq!(over[0], id1);
+    }
+
+    #[test]
+    fn test_all_progress() {
+        let mut targets = DocumentTargets::new();
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        targets.set_target(id1, 100);
+        targets.set_target(id2, 200);
+
+        let mut word_counts = HashMap::new();
+        word_counts.insert(id1, 50);
+        word_counts.insert(id2, 200);
+
+        let progress = targets.all_progress(&word_counts);
+        assert_eq!(progress.len(), 2);
+    }
+
+    #[test]
+    fn test_overall_progress_empty() {
+        let targets = DocumentTargets::new();
+        let word_counts = HashMap::new();
+        assert_eq!(targets.overall_progress(&word_counts), 0.0);
+    }
+
+    #[test]
+    fn test_status_label() {
+        let progress = TargetProgress {
+            doc_id: Uuid::new_v4(),
+            current_words: 0,
+            target_words: 100,
+            percentage: 0.0,
+            status: TargetStatus::NotStarted,
+            words_remaining: 100,
+            days_remaining: None,
+            words_per_day_needed: None,
+        };
+        assert_eq!(progress.status_label(), "Not Started");
+    }
+
+    #[test]
+    fn test_progress_zero_target() {
+        let mut targets = DocumentTargets::new();
+        let id = Uuid::new_v4();
+        targets.set_target(id, 0);
+        let progress = targets.progress(&id, 0).unwrap();
+        assert_eq!(progress.percentage, 100.0);
+    }
+
+    #[test]
+    fn test_get_target() {
+        let mut targets = DocumentTargets::new();
+        let id = Uuid::new_v4();
+        targets.set_target_full(id, DocumentTarget::range(100, 500));
+        let t = targets.get_target(&id).unwrap();
+        assert_eq!(t.type_label(), "Range");
     }
 }

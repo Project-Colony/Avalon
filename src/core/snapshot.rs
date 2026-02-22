@@ -160,6 +160,107 @@ impl Snapshot {
         let diff = self.diff_with(current);
         DiffStats::from_chunks(&diff)
     }
+
+    /// Paragraph count at snapshot time
+    pub fn paragraph_count(&self) -> usize {
+        if self.content.is_empty() {
+            0
+        } else {
+            self.content.split("\n\n").filter(|p| !p.trim().is_empty()).count()
+        }
+    }
+
+    /// Sentence count at snapshot time (approximate)
+    pub fn sentence_count(&self) -> usize {
+        self.content.chars().filter(|c| *c == '.' || *c == '!' || *c == '?').count()
+    }
+
+    /// Check if content has changed since snapshot
+    pub fn has_changed(&self, current: &str) -> bool {
+        self.content != current
+    }
+
+    /// Get a short label summarizing the snapshot
+    pub fn label(&self) -> String {
+        format!("{} ({} words, {})", self.title, self.word_count, self.age_string())
+    }
+
+    /// Similarity ratio with current content (0.0 - 1.0)
+    pub fn similarity(&self, current: &str) -> f64 {
+        let diff = self.diff_with(current);
+        let stats = DiffStats::from_chunks(&diff);
+        if stats.total_lines() == 0 {
+            return 1.0;
+        }
+        stats.lines_unchanged as f64 / stats.total_lines() as f64
+    }
+}
+
+/// Render a diff as a simple side-by-side summary
+pub fn diff_summary(chunks: &[DiffChunk]) -> String {
+    let stats = DiffStats::from_chunks(chunks);
+    if !stats.has_changes() {
+        return "No changes".to_string();
+    }
+    let mut parts = Vec::new();
+    if stats.lines_added > 0 {
+        parts.push(format!("{} added", stats.lines_added));
+    }
+    if stats.lines_removed > 0 {
+        parts.push(format!("{} removed", stats.lines_removed));
+    }
+    if stats.lines_unchanged > 0 {
+        parts.push(format!("{} unchanged", stats.lines_unchanged));
+    }
+    parts.join(", ")
+}
+
+/// Compute a patch that can be applied to old content to produce new content
+pub fn compute_patch(old: &str, new: &str) -> Vec<PatchOp> {
+    let old_lines: Vec<&str> = old.lines().collect();
+    let new_lines: Vec<&str> = new.lines().collect();
+    let diff = lcs_diff(&old_lines, &new_lines);
+
+    let mut ops = Vec::new();
+    let mut old_idx = 0;
+
+    for chunk in &diff {
+        match chunk {
+            DiffChunk::Equal(_) => {
+                old_idx += 1;
+            }
+            DiffChunk::Added(line) => {
+                ops.push(PatchOp::Insert { after_line: old_idx, content: line.clone() });
+            }
+            DiffChunk::Removed(_) => {
+                ops.push(PatchOp::Delete { line: old_idx });
+                old_idx += 1;
+            }
+        }
+    }
+
+    ops
+}
+
+/// A single patch operation
+#[derive(Debug, Clone)]
+pub enum PatchOp {
+    Insert { after_line: usize, content: String },
+    Delete { line: usize },
+}
+
+impl PatchOp {
+    /// Describe this operation
+    pub fn describe(&self) -> String {
+        match self {
+            PatchOp::Insert { after_line, content } => {
+                format!("Insert after line {}: \"{}\"", after_line, content)
+            }
+            PatchOp::Delete { line } => {
+                format!("Delete line {}", line)
+            }
+        }
+    }
 }
 
 /// Compute diff using Longest Common Subsequence (Myers-like) algorithm.
@@ -728,5 +829,135 @@ mod tests {
         let chunks: Vec<DiffChunk> = vec![];
         let hunks = group_into_hunks(&chunks, 3);
         assert!(hunks.is_empty());
+    }
+
+    #[test]
+    fn test_snapshot_paragraph_count() {
+        let doc = Document::with_content("Para one.\n\nPara two.\n\nPara three.");
+        let snap = Snapshot::from_document(&doc, "Test");
+        assert_eq!(snap.paragraph_count(), 3);
+    }
+
+    #[test]
+    fn test_snapshot_paragraph_count_empty() {
+        let doc = Document::new();
+        let snap = Snapshot::from_document(&doc, "Empty");
+        assert_eq!(snap.paragraph_count(), 0);
+    }
+
+    #[test]
+    fn test_snapshot_sentence_count() {
+        let doc = Document::with_content("Hello. World! How are you?");
+        let snap = Snapshot::from_document(&doc, "Test");
+        assert_eq!(snap.sentence_count(), 3);
+    }
+
+    #[test]
+    fn test_snapshot_has_changed() {
+        let doc = Document::with_content("Original");
+        let snap = Snapshot::from_document(&doc, "v1");
+        assert!(!snap.has_changed("Original"));
+        assert!(snap.has_changed("Modified"));
+    }
+
+    #[test]
+    fn test_snapshot_label() {
+        let doc = Document::with_content("Hello world");
+        let snap = Snapshot::from_document(&doc, "Draft 1");
+        let label = snap.label();
+        assert!(label.contains("Draft 1"));
+        assert!(label.contains("2 words"));
+    }
+
+    #[test]
+    fn test_snapshot_similarity_identical() {
+        let doc = Document::with_content("Same content");
+        let snap = Snapshot::from_document(&doc, "v1");
+        assert!((snap.similarity("Same content") - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_snapshot_similarity_different() {
+        let doc = Document::with_content("Line one\nLine two\nLine three");
+        let snap = Snapshot::from_document(&doc, "v1");
+        let sim = snap.similarity("Line one\nDifferent\nLine three");
+        assert!(sim > 0.0);
+        assert!(sim < 1.0);
+    }
+
+    #[test]
+    fn test_snapshot_similarity_empty() {
+        let doc = Document::new();
+        let snap = Snapshot::from_document(&doc, "empty");
+        assert!((snap.similarity("") - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_diff_summary_no_changes() {
+        let chunks = vec![DiffChunk::Equal("same".to_string())];
+        assert_eq!(diff_summary(&chunks), "No changes");
+    }
+
+    #[test]
+    fn test_diff_summary_with_changes() {
+        let chunks = vec![
+            DiffChunk::Equal("same".to_string()),
+            DiffChunk::Added("new".to_string()),
+            DiffChunk::Removed("old".to_string()),
+        ];
+        let summary = diff_summary(&chunks);
+        assert!(summary.contains("1 added"));
+        assert!(summary.contains("1 removed"));
+        assert!(summary.contains("1 unchanged"));
+    }
+
+    #[test]
+    fn test_compute_patch() {
+        let old = "line1\nline2\nline3";
+        let new = "line1\nnew line\nline3";
+        let patch = compute_patch(old, new);
+        assert!(!patch.is_empty());
+    }
+
+    #[test]
+    fn test_compute_patch_insertion() {
+        let old = "line1\nline2";
+        let new = "line1\ninserted\nline2";
+        let patch = compute_patch(old, new);
+        let inserts: Vec<_> = patch.iter().filter(|op| matches!(op, PatchOp::Insert { .. })).collect();
+        assert!(!inserts.is_empty());
+    }
+
+    #[test]
+    fn test_compute_patch_deletion() {
+        let old = "line1\nto_delete\nline2";
+        let new = "line1\nline2";
+        let patch = compute_patch(old, new);
+        let deletes: Vec<_> = patch.iter().filter(|op| matches!(op, PatchOp::Delete { .. })).collect();
+        assert!(!deletes.is_empty());
+    }
+
+    #[test]
+    fn test_patch_op_describe_insert() {
+        let op = PatchOp::Insert { after_line: 5, content: "new line".to_string() };
+        let desc = op.describe();
+        assert!(desc.contains("Insert"));
+        assert!(desc.contains("5"));
+        assert!(desc.contains("new line"));
+    }
+
+    #[test]
+    fn test_patch_op_describe_delete() {
+        let op = PatchOp::Delete { line: 3 };
+        let desc = op.describe();
+        assert!(desc.contains("Delete"));
+        assert!(desc.contains("3"));
+    }
+
+    #[test]
+    fn test_compute_patch_no_changes() {
+        let text = "line1\nline2";
+        let patch = compute_patch(text, text);
+        assert!(patch.is_empty());
     }
 }

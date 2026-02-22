@@ -326,4 +326,130 @@ mod tests {
         assert_eq!(colors.len(), 1);
         assert_eq!(colors[0], "red");
     }
+
+    #[test]
+    fn test_bookmark_with_empty_note() {
+        let id = make_id();
+        let bm = Bookmark::with_note(id, "Test", "");
+        assert!(bm.note.is_none());
+    }
+
+    #[test]
+    fn test_bookmark_age_string() {
+        let bm = Bookmark::new(make_id(), "Test");
+        assert_eq!(bm.age_string(), "recent");
+    }
+
+    #[test]
+    fn test_set_note_empty_clears() {
+        let mut list = BookmarkList::new();
+        let id = make_id();
+        list.add(id, "Test");
+        list.set_note(&id, "A note");
+        assert!(list.get(&id).unwrap().note.is_some());
+        list.set_note(&id, "");
+        assert!(list.get(&id).unwrap().note.is_none());
+    }
+
+    #[test]
+    fn test_set_color_empty_clears() {
+        let mut list = BookmarkList::new();
+        let id = make_id();
+        list.add(id, "Test");
+        list.set_color(&id, "blue");
+        assert!(list.get(&id).unwrap().color.is_some());
+        list.set_color(&id, "");
+        assert!(list.get(&id).unwrap().color.is_none());
+    }
+
+    #[test]
+    fn test_with_notes_filter() {
+        let mut list = BookmarkList::new();
+        let id1 = make_id();
+        let id2 = make_id();
+        list.add(id1, "A");
+        list.add(id2, "B");
+        list.set_note(&id1, "Has note");
+
+        let with_notes = list.with_notes();
+        assert_eq!(with_notes.len(), 1);
+        assert_eq!(with_notes[0].name, "A");
+    }
+
+    #[test]
+    fn test_get_nonexistent() {
+        let list = BookmarkList::new();
+        assert!(list.get(&make_id()).is_none());
+    }
+
+    #[test]
+    fn test_remove_nonexistent() {
+        let mut list = BookmarkList::new();
+        let id = make_id();
+        list.add(id, "A");
+        list.remove(&make_id()); // Remove a different ID
+        assert_eq!(list.count(), 1);
+    }
+
+    #[test]
+    fn test_search_empty_query() {
+        let mut list = BookmarkList::new();
+        list.add(make_id(), "Test");
+        let results = list.search("");
+        assert_eq!(results.len(), 1); // Empty query matches all
+    }
+
+    #[test]
+    fn test_search_case_insensitive() {
+        let mut list = BookmarkList::new();
+        list.add(make_id(), "Chapter One");
+        let results = list.search("CHAPTER");
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_reorder_out_of_bounds() {
+        let mut list = BookmarkList::new();
+        let id = make_id();
+        list.add(id, "A");
+        list.reorder(0, 10); // Out of bounds
+        assert_eq!(list.count(), 1); // No change
+    }
+
+    #[test]
+    fn test_sorted_by_date() {
+        let mut list = BookmarkList::new();
+        list.add(make_id(), "First");
+        list.add(make_id(), "Second");
+        let sorted = list.sorted_by_date();
+        // Newest first
+        assert_eq!(sorted.len(), 2);
+    }
+
+    #[test]
+    fn test_used_colors_multiple() {
+        let mut list = BookmarkList::new();
+        let id1 = make_id();
+        let id2 = make_id();
+        let id3 = make_id();
+        list.add(id1, "A");
+        list.add(id2, "B");
+        list.add(id3, "C");
+        list.set_color(&id1, "red");
+        list.set_color(&id2, "blue");
+        list.set_color(&id3, "red");
+
+        let colors = list.used_colors();
+        assert_eq!(colors.len(), 2);
+        assert!(colors.contains(&"blue".to_string()));
+        assert!(colors.contains(&"red".to_string()));
+    }
+
+    #[test]
+    fn test_rename_nonexistent() {
+        let mut list = BookmarkList::new();
+        list.add(make_id(), "A");
+        list.rename(&make_id(), "New Name"); // Different ID
+        assert_eq!(list.bookmarks[0].name, "A"); // Unchanged
+    }
 }

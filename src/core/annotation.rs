@@ -156,6 +156,147 @@ pub fn default_categories() -> Vec<&'static str> {
     vec!["Note", "Todo", "Question", "Research", "Continuity", "Revision"]
 }
 
+/// Manages a collection of annotations for a document
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AnnotationSet {
+    pub annotations: Vec<Annotation>,
+}
+
+impl AnnotationSet {
+    pub fn new() -> Self {
+        Self { annotations: Vec::new() }
+    }
+
+    /// Add an annotation
+    pub fn add(&mut self, annotation: Annotation) {
+        self.annotations.push(annotation);
+    }
+
+    /// Remove an annotation by ID
+    pub fn remove(&mut self, id: &Uuid) {
+        self.annotations.retain(|a| &a.id != id);
+    }
+
+    /// Get an annotation by ID
+    pub fn get(&self, id: &Uuid) -> Option<&Annotation> {
+        self.annotations.iter().find(|a| &a.id == id)
+    }
+
+    /// Get a mutable annotation by ID
+    pub fn get_mut(&mut self, id: &Uuid) -> Option<&mut Annotation> {
+        self.annotations.iter_mut().find(|a| &a.id == id)
+    }
+
+    /// Get all open (unresolved) annotations
+    pub fn open(&self) -> Vec<&Annotation> {
+        self.annotations.iter().filter(|a| !a.resolved).collect()
+    }
+
+    /// Get all resolved annotations
+    pub fn resolved(&self) -> Vec<&Annotation> {
+        self.annotations.iter().filter(|a| a.resolved).collect()
+    }
+
+    /// Get annotations by category
+    pub fn by_category(&self, category: &str) -> Vec<&Annotation> {
+        self.annotations.iter()
+            .filter(|a| a.category.as_deref() == Some(category))
+            .collect()
+    }
+
+    /// Get annotations by color
+    pub fn by_color(&self, color: &AnnotationColor) -> Vec<&Annotation> {
+        self.annotations.iter()
+            .filter(|a| std::mem::discriminant(&a.color) == std::mem::discriminant(color))
+            .collect()
+    }
+
+    /// Get annotations overlapping a given range
+    pub fn overlapping(&self, start: usize, end: usize) -> Vec<&Annotation> {
+        self.annotations.iter().filter(|a| a.overlaps(start, end)).collect()
+    }
+
+    /// Get annotations at a specific position
+    pub fn at_position(&self, pos: usize) -> Vec<&Annotation> {
+        self.annotations.iter().filter(|a| a.contains_position(pos)).collect()
+    }
+
+    /// Search annotations by text (case-insensitive)
+    pub fn search(&self, query: &str) -> Vec<&Annotation> {
+        self.annotations.iter().filter(|a| a.text_contains(query)).collect()
+    }
+
+    /// Resolve all annotations
+    pub fn resolve_all(&mut self) {
+        for ann in &mut self.annotations {
+            if !ann.resolved {
+                ann.toggle_resolved();
+            }
+        }
+    }
+
+    /// Count of annotations
+    pub fn count(&self) -> usize {
+        self.annotations.len()
+    }
+
+    /// Count of open annotations
+    pub fn open_count(&self) -> usize {
+        self.annotations.iter().filter(|a| !a.resolved).count()
+    }
+
+    /// Count of resolved annotations
+    pub fn resolved_count(&self) -> usize {
+        self.annotations.iter().filter(|a| a.resolved).count()
+    }
+
+    /// Check if empty
+    pub fn is_empty(&self) -> bool {
+        self.annotations.is_empty()
+    }
+
+    /// Get all unique categories used
+    pub fn used_categories(&self) -> Vec<String> {
+        let mut cats: Vec<String> = self.annotations.iter()
+            .filter_map(|a| a.category.clone())
+            .collect();
+        cats.sort();
+        cats.dedup();
+        cats
+    }
+
+    /// Sorted by position (start offset)
+    pub fn sorted_by_position(&self) -> Vec<&Annotation> {
+        let mut sorted: Vec<&Annotation> = self.annotations.iter().collect();
+        sorted.sort_by_key(|a| a.start);
+        sorted
+    }
+
+    /// Sorted by creation date (newest first)
+    pub fn sorted_by_date(&self) -> Vec<&Annotation> {
+        let mut sorted: Vec<&Annotation> = self.annotations.iter().collect();
+        sorted.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        sorted
+    }
+
+    /// Shift all annotations after a position by an offset
+    pub fn shift_after(&mut self, position: usize, offset: i64) {
+        for ann in &mut self.annotations {
+            if ann.start >= position {
+                ann.shift(offset);
+            }
+        }
+    }
+
+    /// Summary of annotations
+    pub fn summary(&self) -> String {
+        format!(
+            "{} total ({} open, {} resolved)",
+            self.count(), self.open_count(), self.resolved_count()
+        )
+    }
+}
+
 impl AnnotationColor {
     pub fn to_hex(&self) -> &str {
         match self {
@@ -454,5 +595,212 @@ mod tests {
         assert!(cats.contains(&"Continuity"));
         assert!(cats.contains(&"Revision"));
         assert!(cats.contains(&"Research"));
+    }
+
+    // AnnotationSet tests
+
+    #[test]
+    fn test_annotation_set_new() {
+        let set = AnnotationSet::new();
+        assert!(set.is_empty());
+        assert_eq!(set.count(), 0);
+    }
+
+    #[test]
+    fn test_annotation_set_add_remove() {
+        let mut set = AnnotationSet::new();
+        let ann = Annotation::new(0, 10, "Note 1");
+        let id = ann.id;
+        set.add(ann);
+        assert_eq!(set.count(), 1);
+        assert!(!set.is_empty());
+
+        set.remove(&id);
+        assert_eq!(set.count(), 0);
+        assert!(set.is_empty());
+    }
+
+    #[test]
+    fn test_annotation_set_get() {
+        let mut set = AnnotationSet::new();
+        let ann = Annotation::new(5, 15, "Test");
+        let id = ann.id;
+        set.add(ann);
+
+        let found = set.get(&id).unwrap();
+        assert_eq!(found.text, "Test");
+    }
+
+    #[test]
+    fn test_annotation_set_get_mut() {
+        let mut set = AnnotationSet::new();
+        let ann = Annotation::new(5, 15, "Original");
+        let id = ann.id;
+        set.add(ann);
+
+        let found = set.get_mut(&id).unwrap();
+        found.edit_text("Modified");
+        assert_eq!(set.get(&id).unwrap().text, "Modified");
+    }
+
+    #[test]
+    fn test_annotation_set_open_resolved() {
+        let mut set = AnnotationSet::new();
+        let mut ann1 = Annotation::new(0, 10, "Open");
+        let mut ann2 = Annotation::new(10, 20, "Resolved");
+        ann2.toggle_resolved();
+        set.add(ann1);
+        set.add(ann2);
+
+        assert_eq!(set.open_count(), 1);
+        assert_eq!(set.resolved_count(), 1);
+        assert_eq!(set.open().len(), 1);
+        assert_eq!(set.resolved().len(), 1);
+    }
+
+    #[test]
+    fn test_annotation_set_by_category() {
+        let mut set = AnnotationSet::new();
+        let mut ann1 = Annotation::new(0, 10, "Note");
+        ann1.set_category("Todo");
+        let mut ann2 = Annotation::new(10, 20, "Question");
+        ann2.set_category("Research");
+        let ann3 = Annotation::new(20, 30, "No category");
+        set.add(ann1);
+        set.add(ann2);
+        set.add(ann3);
+
+        assert_eq!(set.by_category("Todo").len(), 1);
+        assert_eq!(set.by_category("Research").len(), 1);
+        assert_eq!(set.by_category("Missing").len(), 0);
+    }
+
+    #[test]
+    fn test_annotation_set_by_color() {
+        let mut set = AnnotationSet::new();
+        set.add(Annotation::with_color(0, 5, "A", AnnotationColor::Red));
+        set.add(Annotation::with_color(5, 10, "B", AnnotationColor::Red));
+        set.add(Annotation::with_color(10, 15, "C", AnnotationColor::Blue));
+
+        assert_eq!(set.by_color(&AnnotationColor::Red).len(), 2);
+        assert_eq!(set.by_color(&AnnotationColor::Blue).len(), 1);
+        assert_eq!(set.by_color(&AnnotationColor::Green).len(), 0);
+    }
+
+    #[test]
+    fn test_annotation_set_overlapping() {
+        let mut set = AnnotationSet::new();
+        set.add(Annotation::new(0, 10, "First"));
+        set.add(Annotation::new(5, 15, "Second"));
+        set.add(Annotation::new(20, 30, "Third"));
+
+        let overlapping = set.overlapping(8, 12);
+        assert_eq!(overlapping.len(), 2); // First and Second
+    }
+
+    #[test]
+    fn test_annotation_set_at_position() {
+        let mut set = AnnotationSet::new();
+        set.add(Annotation::new(0, 10, "First"));
+        set.add(Annotation::new(5, 15, "Second"));
+        set.add(Annotation::new(20, 30, "Third"));
+
+        let at_7 = set.at_position(7);
+        assert_eq!(at_7.len(), 2); // First and Second
+        let at_25 = set.at_position(25);
+        assert_eq!(at_25.len(), 1); // Third
+    }
+
+    #[test]
+    fn test_annotation_set_search() {
+        let mut set = AnnotationSet::new();
+        set.add(Annotation::new(0, 10, "Fix the bug"));
+        set.add(Annotation::new(10, 20, "Add feature"));
+        set.add(Annotation::new(20, 30, "Another bug fix"));
+
+        let results = set.search("bug");
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_annotation_set_resolve_all() {
+        let mut set = AnnotationSet::new();
+        set.add(Annotation::new(0, 10, "A"));
+        set.add(Annotation::new(10, 20, "B"));
+        assert_eq!(set.open_count(), 2);
+
+        set.resolve_all();
+        assert_eq!(set.open_count(), 0);
+        assert_eq!(set.resolved_count(), 2);
+    }
+
+    #[test]
+    fn test_annotation_set_used_categories() {
+        let mut set = AnnotationSet::new();
+        let mut a1 = Annotation::new(0, 5, "A");
+        a1.set_category("Todo");
+        let mut a2 = Annotation::new(5, 10, "B");
+        a2.set_category("Research");
+        let mut a3 = Annotation::new(10, 15, "C");
+        a3.set_category("Todo");
+        set.add(a1);
+        set.add(a2);
+        set.add(a3);
+
+        let cats = set.used_categories();
+        assert_eq!(cats.len(), 2); // "Research" and "Todo" (deduped, sorted)
+        assert_eq!(cats[0], "Research");
+        assert_eq!(cats[1], "Todo");
+    }
+
+    #[test]
+    fn test_annotation_set_sorted_by_position() {
+        let mut set = AnnotationSet::new();
+        set.add(Annotation::new(20, 30, "Third"));
+        set.add(Annotation::new(0, 10, "First"));
+        set.add(Annotation::new(10, 20, "Second"));
+
+        let sorted = set.sorted_by_position();
+        assert_eq!(sorted[0].text, "First");
+        assert_eq!(sorted[1].text, "Second");
+        assert_eq!(sorted[2].text, "Third");
+    }
+
+    #[test]
+    fn test_annotation_set_sorted_by_date() {
+        let mut set = AnnotationSet::new();
+        set.add(Annotation::new(0, 10, "First"));
+        set.add(Annotation::new(10, 20, "Second"));
+
+        let sorted = set.sorted_by_date();
+        // Newest first - both created very close, so just check we get both
+        assert_eq!(sorted.len(), 2);
+    }
+
+    #[test]
+    fn test_annotation_set_shift_after() {
+        let mut set = AnnotationSet::new();
+        set.add(Annotation::new(0, 10, "Before"));
+        set.add(Annotation::new(20, 30, "After"));
+
+        set.shift_after(15, 5);
+        let sorted = set.sorted_by_position();
+        assert_eq!(sorted[0].start, 0); // Not shifted (before position 15)
+        assert_eq!(sorted[1].start, 25); // Shifted by 5
+        assert_eq!(sorted[1].end, 35);
+    }
+
+    #[test]
+    fn test_annotation_set_summary() {
+        let mut set = AnnotationSet::new();
+        set.add(Annotation::new(0, 10, "A"));
+        let mut b = Annotation::new(10, 20, "B");
+        b.toggle_resolved();
+        set.add(b);
+
+        let summary = set.summary();
+        assert!(summary.contains("2 total"));
+        assert!(summary.contains("1 open"));
+        assert!(summary.contains("1 resolved"));
     }
 }
