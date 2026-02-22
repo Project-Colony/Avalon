@@ -3379,6 +3379,7 @@ impl ScrineverApp {
                 // Use the links module for proper link parsing and validation
                 let mut outgoing = Vec::new();
                 let mut incoming = Vec::new();
+                let mut broken = Vec::new();
                 let current_title = self.selected_item
                     .and_then(|id| project.binder.find_item(&id))
                     .map(|item| item.title.clone())
@@ -3389,12 +3390,32 @@ impl ScrineverApp {
                         // Use links module to extract and validate outgoing links
                         let validations = crate::core::links::validate_document_links(item, &project.binder);
                         for v in &validations {
-                            if let crate::core::links::LinkStatus::Valid(target_id) = &v.status {
-                                if let Some(target) = project.binder.find_item(target_id) {
-                                    outgoing.push(views::doc_links_panel::DocLink {
-                                        target_title: target.title.clone(),
-                                        target_id: *target_id,
+                            match &v.status {
+                                crate::core::links::LinkStatus::Valid(target_id) => {
+                                    if let Some(target) = project.binder.find_item(target_id) {
+                                        outgoing.push(views::doc_links_panel::DocLink {
+                                            target_title: target.title.clone(),
+                                            target_id: *target_id,
+                                            link_text: v.link.link_text.clone(),
+                                        });
+                                    }
+                                }
+                                crate::core::links::LinkStatus::Broken => {
+                                    let suggestions = crate::core::links::suggest_link_targets(
+                                        &v.link.link_text,
+                                        &project.binder,
+                                    );
+                                    broken.push(views::doc_links_panel::BrokenDocLink {
                                         link_text: v.link.link_text.clone(),
+                                        status: views::doc_links_panel::BrokenLinkStatus::Broken,
+                                        suggestions,
+                                    });
+                                }
+                                crate::core::links::LinkStatus::Ambiguous(ids) => {
+                                    broken.push(views::doc_links_panel::BrokenDocLink {
+                                        link_text: v.link.link_text.clone(),
+                                        status: views::doc_links_panel::BrokenLinkStatus::Ambiguous(ids.len()),
+                                        suggestions: Vec::new(),
                                     });
                                 }
                             }
@@ -3427,7 +3448,7 @@ impl ScrineverApp {
                     .map(|i| (i.id, i.title.clone()))
                     .collect();
 
-                Some(views::doc_links_panel::view(&outgoing, &incoming, &available))
+                Some(views::doc_links_panel::view(&outgoing, &incoming, &broken, &available))
             }
             BottomPanel::Backups => {
                 let backups = crate::core::backup::BackupManager::list_backups(
