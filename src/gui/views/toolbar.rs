@@ -1,45 +1,59 @@
-use iced::widget::{button, column, container, row, text, Space};
+use iced::widget::{button, container, mouse_area, row, scrollable, text, column, Space};
 use iced::{Element, Length, Padding};
 
 use crate::gui::app::{BottomPanel, Message, ToolbarMenu, ViewMode};
 use crate::gui::theme::Theme;
 
-/// Render the menu bar (category headers) + dropdown panel if a menu is open
-pub fn view(
-    current_view: &ViewMode,
-    show_inspector: bool,
-    fullscreen: bool,
-    bottom_panel: &BottomPanel,
-    active_menu: &Option<ToolbarMenu>,
-) -> Element<'static, Message> {
-    // Menu category buttons
+/// Render the menu bar (just the category header buttons)
+pub fn menu_bar(active_menu: &Option<ToolbarMenu>) -> Element<'static, Message> {
     let file_menu = menu_header("File", &ToolbarMenu::File, active_menu);
     let view_menu = menu_header("View", &ToolbarMenu::View, active_menu);
     let panels_menu = menu_header("Panels", &ToolbarMenu::Panels, active_menu);
     let tools_menu = menu_header("Tools", &ToolbarMenu::Tools, active_menu);
 
-    let menu_bar = container(
-        row![
-            file_menu,
-            view_menu,
-            panels_menu,
-            tools_menu,
-        ]
-        .spacing(2)
-        .padding(Padding::from([4, 8]))
+    container(
+        row![file_menu, view_menu, panels_menu, tools_menu]
+            .spacing(2)
+            .padding(Padding::from([4, 8]))
     )
-    .width(Length::Fill);
+    .width(Length::Fill)
+    .into()
+}
 
-    // Dropdown panel for the active menu
-    let dropdown: Element<'static, Message> = match active_menu {
+/// Render the floating dropdown overlay (to be stacked on top of main content).
+/// Returns None if no menu is open.
+pub fn dropdown_overlay(
+    current_view: &ViewMode,
+    show_inspector: bool,
+    fullscreen: bool,
+    bottom_panel: &BottomPanel,
+    active_menu: &Option<ToolbarMenu>,
+) -> Option<Element<'static, Message>> {
+    let dropdown_content: Element<'static, Message> = match active_menu {
         Some(ToolbarMenu::File) => file_dropdown(),
         Some(ToolbarMenu::View) => view_dropdown(current_view, show_inspector, fullscreen),
         Some(ToolbarMenu::Panels) => panels_dropdown(bottom_panel),
         Some(ToolbarMenu::Tools) => tools_dropdown(),
-        None => Space::with_height(0).into(),
+        None => return None,
     };
 
-    column![menu_bar, dropdown].into()
+    // Wrap in a column: the dropdown panel at the top, then a click-away area below
+    let overlay = column![
+        // The dropdown panel itself
+        dropdown_content,
+        // Transparent click-away area that closes the menu
+        mouse_area(
+            Space::new(Length::Fill, Length::Fill)
+        )
+        .on_press(Message::CloseToolbarMenu),
+    ];
+
+    Some(
+        container(overlay)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
+    )
 }
 
 /// A menu header button that toggles its dropdown
@@ -55,7 +69,7 @@ fn menu_header(label: &str, menu: &ToolbarMenu, active: &Option<ToolbarMenu>) ->
     .into()
 }
 
-/// File menu dropdown: New, Open, Save, Import, Export, Print, Compile
+/// File menu dropdown
 fn file_dropdown() -> Element<'static, Message> {
     dropdown_container(
         row![
@@ -76,7 +90,7 @@ fn file_dropdown() -> Element<'static, Message> {
     )
 }
 
-/// View menu dropdown: view modes, inspector, focus, compose
+/// View menu dropdown
 fn view_dropdown(current_view: &ViewMode, show_inspector: bool, fullscreen: bool) -> Element<'static, Message> {
     let fullscreen_label = if fullscreen { "Exit Focus" } else { "Focus Mode" };
 
@@ -95,40 +109,43 @@ fn view_dropdown(current_view: &ViewMode, show_inspector: bool, fullscreen: bool
     )
 }
 
-/// Panels menu dropdown: all bottom panel toggles
+/// Panels menu dropdown
 fn panels_dropdown(bottom_panel: &BottomPanel) -> Element<'static, Message> {
     dropdown_container(
-        row![
-            panel_btn("Search", BottomPanel::Search, bottom_panel),
-            panel_btn("Find", BottomPanel::FindReplace, bottom_panel),
-            panel_btn("Thesaurus", BottomPanel::Thesaurus, bottom_panel),
-            panel_btn("Spell", BottomPanel::SpellCheck, bottom_panel),
-            dropdown_sep(),
-            panel_btn("Session", BottomPanel::Session, bottom_panel),
-            panel_btn("Timer", BottomPanel::Timer, bottom_panel),
-            panel_btn("Goals", BottomPanel::WritingGoals, bottom_panel),
-            panel_btn("Targets", BottomPanel::Targets, bottom_panel),
-            panel_btn("Stats", BottomPanel::TextStats, bottom_panel),
-            dropdown_sep(),
-            panel_btn("Snapshots", BottomPanel::Snapshots, bottom_panel),
-            panel_btn("History", BottomPanel::History, bottom_panel),
-            panel_btn("Backups", BottomPanel::Backups, bottom_panel),
-            dropdown_sep(),
-            panel_btn("Notes", BottomPanel::ProjectNotes, bottom_panel),
-            panel_btn("Annot", BottomPanel::Annotations, bottom_panel),
-            panel_btn("Bookmarks", BottomPanel::Bookmarks, bottom_panel),
-            panel_btn("Collections", BottomPanel::Collections, bottom_panel),
-            panel_btn("Links", BottomPanel::DocLinks, bottom_panel),
-            dropdown_sep(),
-            panel_btn("Names", BottomPanel::NameGen, bottom_panel),
-            panel_btn("Templates", BottomPanel::Templates, bottom_panel),
-            panel_btn("Validation", BottomPanel::Validation, bottom_panel),
-        ]
-        .spacing(2)
+        scrollable(
+            row![
+                panel_btn("Search", BottomPanel::Search, bottom_panel),
+                panel_btn("Find", BottomPanel::FindReplace, bottom_panel),
+                panel_btn("Thesaurus", BottomPanel::Thesaurus, bottom_panel),
+                panel_btn("Spell", BottomPanel::SpellCheck, bottom_panel),
+                dropdown_sep(),
+                panel_btn("Session", BottomPanel::Session, bottom_panel),
+                panel_btn("Timer", BottomPanel::Timer, bottom_panel),
+                panel_btn("Goals", BottomPanel::WritingGoals, bottom_panel),
+                panel_btn("Targets", BottomPanel::Targets, bottom_panel),
+                panel_btn("Stats", BottomPanel::TextStats, bottom_panel),
+                dropdown_sep(),
+                panel_btn("Snapshots", BottomPanel::Snapshots, bottom_panel),
+                panel_btn("History", BottomPanel::History, bottom_panel),
+                panel_btn("Backups", BottomPanel::Backups, bottom_panel),
+                dropdown_sep(),
+                panel_btn("Notes", BottomPanel::ProjectNotes, bottom_panel),
+                panel_btn("Annot", BottomPanel::Annotations, bottom_panel),
+                panel_btn("Bookmarks", BottomPanel::Bookmarks, bottom_panel),
+                panel_btn("Collections", BottomPanel::Collections, bottom_panel),
+                panel_btn("Links", BottomPanel::DocLinks, bottom_panel),
+                dropdown_sep(),
+                panel_btn("Names", BottomPanel::NameGen, bottom_panel),
+                panel_btn("Templates", BottomPanel::Templates, bottom_panel),
+                panel_btn("Validation", BottomPanel::Validation, bottom_panel),
+            ]
+            .spacing(2)
+        )
+        .direction(scrollable::Direction::Horizontal(scrollable::Scrollbar::new()))
     )
 }
 
-/// Tools menu dropdown: settings, project stats
+/// Tools menu dropdown
 fn tools_dropdown() -> Element<'static, Message> {
     dropdown_container(
         row![
@@ -139,11 +156,25 @@ fn tools_dropdown() -> Element<'static, Message> {
     )
 }
 
-/// Wrap dropdown items in a styled container
-fn dropdown_container(content: iced::widget::Row<'static, Message>) -> Element<'static, Message> {
+/// Wrap dropdown items in a styled container with background
+fn dropdown_container(content: impl Into<Element<'static, Message>>) -> Element<'static, Message> {
     container(content)
         .padding(Padding::from([4, 12]))
         .width(Length::Fill)
+        .style(|_theme: &iced::Theme| container::Style {
+            background: Some(iced::Background::Color(Theme::BG_TOOLBAR)),
+            border: iced::Border {
+                color: Theme::BORDER_SUBTLE,
+                width: 0.0,
+                radius: 0.0.into(),
+            },
+            shadow: iced::Shadow {
+                color: iced::Color::from_rgba(0.0, 0.0, 0.0, 0.3),
+                offset: iced::Vector::new(0.0, 2.0),
+                blur_radius: 6.0,
+            },
+            ..Default::default()
+        })
         .into()
 }
 

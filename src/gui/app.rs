@@ -1,5 +1,5 @@
 use iced::keyboard;
-use iced::widget::{column, container, row, text, text_editor};
+use iced::widget::{column, container, row, stack, text, text_editor, Space};
 use iced::{Element, Length, Padding, Subscription, Task as IcedTask};
 use uuid::Uuid;
 use chrono;
@@ -489,6 +489,7 @@ pub enum Message {
 
     // Toolbar menus
     ToggleToolbarMenu(ToolbarMenu),
+    CloseToolbarMenu,
 
     // Misc
     Tick,
@@ -614,7 +615,7 @@ impl ScrineverApp {
 
     pub fn update(&mut self, message: Message) -> IcedTask<Message> {
         // Close toolbar menu on any action except menu toggle itself and ticks
-        if !matches!(message, Message::ToggleToolbarMenu(_) | Message::Tick | Message::EscapePressed) {
+        if !matches!(message, Message::ToggleToolbarMenu(_) | Message::CloseToolbarMenu | Message::Tick | Message::EscapePressed) {
             self.active_toolbar_menu = None;
         }
 
@@ -3226,6 +3227,10 @@ impl ScrineverApp {
                 }
             }
 
+            Message::CloseToolbarMenu => {
+                self.active_toolbar_menu = None;
+            }
+
             Message::EscapePressed => {
                 if self.active_toolbar_menu.is_some() {
                     self.active_toolbar_menu = None;
@@ -3353,8 +3358,11 @@ impl ScrineverApp {
             return views::editor_view::view_fullscreen(&self.editor, title);
         }
 
-        // Toolbar
-        let toolbar = views::toolbar::view(
+        // Menu bar
+        let toolbar = views::toolbar::menu_bar(&self.active_toolbar_menu);
+
+        // Floating dropdown overlay (if a menu is open)
+        let dropdown_overlay = views::toolbar::dropdown_overlay(
             &self.view_mode,
             self.show_inspector,
             self.fullscreen_editor,
@@ -3772,10 +3780,29 @@ impl ScrineverApp {
         }
         layout = layout.push(status_bar);
 
-        container(layout)
+        // If a dropdown menu is open, stack it as a floating overlay
+        if let Some(overlay) = dropdown_overlay {
+            // The overlay column: an empty spacer for the menu bar height,
+            // then the dropdown floating over the rest of the content
+            let floating = column![
+                // Spacer matching the menu bar height (~33px)
+                Space::with_height(33),
+                overlay,
+            ];
+
+            stack![
+                container(layout).width(Length::Fill).height(Length::Fill),
+                container(floating).width(Length::Fill).height(Length::Fill),
+            ]
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
+        } else {
+            container(layout)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .into()
+        }
     }
 
     /// Keyboard shortcuts and auto-save timer
