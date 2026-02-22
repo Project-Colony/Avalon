@@ -280,4 +280,178 @@ mod tests {
         ];
         assert_eq!(estimate_pages(&contents), 2);
     }
+
+    #[test]
+    fn test_compile_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_compile_section_break_separator() {
+        let mut opts = make_opts();
+        opts.separator = SeparatorType::SectionBreak;
+        let contents = vec![
+            make_content("A", "First.", false, 1),
+            make_content("B", "Second.", false, 1),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("* * *"));
+    }
+
+    #[test]
+    fn test_compile_custom_separator() {
+        let mut opts = make_opts();
+        opts.separator = SeparatorType::Custom("~~~".to_string());
+        let contents = vec![
+            make_content("A", "First.", false, 1),
+            make_content("B", "Second.", false, 1),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("~~~"));
+    }
+
+    #[test]
+    fn test_compile_page_break_separator() {
+        let mut opts = make_opts();
+        opts.separator = SeparatorType::PageBreak;
+        let contents = vec![
+            make_content("A", "First.", false, 1),
+            make_content("B", "Second.", false, 1),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("\u{2500}"));
+    }
+
+    #[test]
+    fn test_compile_no_separator() {
+        let mut opts = make_opts();
+        opts.separator = SeparatorType::None;
+        let contents = vec![
+            make_content("A", "First.", false, 1),
+            make_content("B", "Second.", false, 1),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("First."));
+        assert!(result.contains("Second."));
+    }
+
+    #[test]
+    fn test_compile_folder_depth_2() {
+        let contents = vec![
+            make_content("Subsection", "", true, 2),
+            make_content("Content", "Text here.", false, 2),
+        ];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("Subsection"));
+        assert!(result.contains("-".repeat(10).as_str())); // Underline with dashes
+    }
+
+    #[test]
+    fn test_compile_folder_depth_3() {
+        let contents = vec![
+            make_content("Deep Section", "", true, 3),
+            make_content("Content", "Deep text.", false, 3),
+        ];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("* Deep Section"));
+    }
+
+    #[test]
+    fn test_compile_page_break_between_folders() {
+        let mut opts = make_opts();
+        opts.page_break_between_folders = true;
+        let contents = vec![
+            make_content("Ch 1", "", true, 1),
+            make_content("Scene 1", "Text.", false, 2),
+            make_content("Ch 2", "", true, 1),
+            make_content("Scene 2", "More text.", false, 2),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("\u{2500}")); // Page break between folders
+    }
+
+    #[test]
+    fn test_strip_markdown_blockquote() {
+        let result = strip_markdown("> This is a quote");
+        assert!(result.contains("This is a quote"));
+        assert!(!result.contains(">"));
+    }
+
+    #[test]
+    fn test_strip_markdown_heading_levels() {
+        assert!(strip_markdown("## Sub Heading").trim() == "Sub Heading");
+        assert!(strip_markdown("### Third Level").trim() == "Third Level");
+    }
+
+    #[test]
+    fn test_strip_markdown_triple_emphasis() {
+        let result = strip_markdown("***bold italic***");
+        assert!(result.trim() == "bold italic");
+    }
+
+    #[test]
+    fn test_strip_markdown_no_formatting() {
+        let result = strip_markdown("Plain text without formatting.");
+        assert_eq!(result, "Plain text without formatting.");
+    }
+
+    #[test]
+    fn test_word_wrap_short_line() {
+        let text = "short";
+        let wrapped = word_wrap(text, 80);
+        assert_eq!(wrapped, "short");
+    }
+
+    #[test]
+    fn test_word_wrap_exact_width() {
+        let text = "hello world";
+        let wrapped = word_wrap(text, 11);
+        assert_eq!(wrapped, "hello world");
+    }
+
+    #[test]
+    fn test_estimate_pages_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(estimate_pages(&contents), 1); // Minimum 1 page
+    }
+
+    #[test]
+    fn test_word_count_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(word_count(&contents), 0);
+    }
+
+    #[test]
+    fn test_char_count_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(char_count(&contents), 0);
+    }
+
+    #[test]
+    fn test_compile_front_matter_no_author() {
+        let mut opts = make_opts();
+        opts.include_front_matter = true;
+        opts.author = String::new();
+        let contents = vec![
+            make_content("Scene", "Content.", false, 1),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("TEST BOOK"));
+        assert!(!result.contains("by "));
+    }
+
+    #[test]
+    fn test_compile_front_matter_empty_title() {
+        let mut opts = make_opts();
+        opts.include_front_matter = true;
+        opts.title = String::new();
+        let contents = vec![
+            make_content("Scene", "Content.", false, 1),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        // Empty title — front matter should be skipped
+        assert!(!result.contains("by "));
+    }
 }

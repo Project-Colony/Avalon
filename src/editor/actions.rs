@@ -296,6 +296,62 @@ impl EditorAction {
         self.is_editing()
     }
 
+    /// Whether this action requires a text selection to be meaningful
+    pub fn requires_selection(&self) -> bool {
+        matches!(
+            self,
+            EditorAction::WrapSelection { .. }
+                | EditorAction::ToUppercase
+                | EditorAction::ToLowercase
+                | EditorAction::ToTitleCase
+                | EditorAction::SortLines
+                | EditorAction::RemoveDuplicateLines
+        )
+    }
+
+    /// Menu path for nested menu organization (e.g., "Format > Case")
+    pub fn menu_path(&self) -> Vec<&str> {
+        match self {
+            EditorAction::ToggleBold
+            | EditorAction::ToggleItalic
+            | EditorAction::ToggleUnderline
+            | EditorAction::ToggleStrikethrough => vec!["Format", "Style"],
+
+            EditorAction::ToUppercase
+            | EditorAction::ToLowercase
+            | EditorAction::ToTitleCase => vec!["Format", "Case"],
+
+            EditorAction::InsertHeading(_) => vec!["Insert", "Heading"],
+            EditorAction::InsertListItem(_) => vec!["Insert", "List"],
+
+            EditorAction::MoveLineUp
+            | EditorAction::MoveLineDown
+            | EditorAction::DeleteLine
+            | EditorAction::DuplicateLine
+            | EditorAction::JoinLines => vec!["Edit", "Line"],
+
+            EditorAction::SortLines
+            | EditorAction::RemoveDuplicateLines => vec!["Edit", "Lines"],
+
+            EditorAction::Indent | EditorAction::Unindent => vec!["Edit", "Indentation"],
+
+            _ => vec![self.category()],
+        }
+    }
+
+    /// Get a combined batch description for a list of actions
+    pub fn batch_description(actions: &[EditorAction]) -> String {
+        if actions.is_empty() {
+            return "No actions".to_string();
+        }
+        if actions.len() == 1 {
+            return actions[0].description().to_string();
+        }
+        let editing: usize = actions.iter().filter(|a| a.is_editing()).count();
+        let nav: usize = actions.iter().filter(|a| a.is_movement()).count();
+        format!("{} actions ({} edits, {} navigation)", actions.len(), editing, nav)
+    }
+
     /// Category string for grouping in menus
     pub fn category(&self) -> &str {
         if self.is_movement() {
@@ -334,6 +390,20 @@ impl ListStyle {
             ListStyle::Checkbox => "Checkbox List",
         }
     }
+
+    /// All available list styles
+    pub fn all() -> Vec<Self> {
+        vec![ListStyle::Bullet, ListStyle::Numbered, ListStyle::Checkbox]
+    }
+
+    /// Continuation prefix for subsequent items (numbered lists increment)
+    pub fn continuation_prefix(&self, index: usize) -> String {
+        match self {
+            ListStyle::Bullet => "- ".to_string(),
+            ListStyle::Numbered => format!("{}. ", index + 1),
+            ListStyle::Checkbox => "- [ ] ".to_string(),
+        }
+    }
 }
 
 impl DateTimeFormat {
@@ -355,6 +425,26 @@ impl DateTimeFormat {
             DateTimeFormat::TimeOnly => "Time Only",
             DateTimeFormat::DateTime => "Date & Time",
             DateTimeFormat::Iso8601 => "ISO 8601",
+        }
+    }
+
+    /// All available date/time formats
+    pub fn all() -> Vec<Self> {
+        vec![
+            DateTimeFormat::DateOnly,
+            DateTimeFormat::TimeOnly,
+            DateTimeFormat::DateTime,
+            DateTimeFormat::Iso8601,
+        ]
+    }
+
+    /// Format string pattern (for display to users)
+    pub fn pattern(&self) -> &str {
+        match self {
+            DateTimeFormat::DateOnly => "YYYY-MM-DD",
+            DateTimeFormat::TimeOnly => "HH:MM",
+            DateTimeFormat::DateTime => "YYYY-MM-DD HH:MM",
+            DateTimeFormat::Iso8601 => "YYYY-MM-DDTHH:MM:SS+ZZZZ",
         }
     }
 }
@@ -558,5 +648,300 @@ mod tests {
         assert_eq!(DateTimeFormat::TimeOnly.label(), "Time Only");
         assert_eq!(DateTimeFormat::DateTime.label(), "Date & Time");
         assert_eq!(DateTimeFormat::Iso8601.label(), "ISO 8601");
+    }
+
+    #[test]
+    fn test_replace_is_editing() {
+        assert!(EditorAction::Replace { find: "a".into(), replace: "b".into() }.is_editing());
+        assert!(EditorAction::ReplaceAll { find: "a".into(), replace: "b".into() }.is_editing());
+    }
+
+    #[test]
+    fn test_replace_category() {
+        assert_eq!(EditorAction::Replace { find: "a".into(), replace: "b".into() }.category(), "Find & Replace");
+        assert_eq!(EditorAction::ReplaceAll { find: "a".into(), replace: "b".into() }.category(), "Find & Replace");
+    }
+
+    #[test]
+    fn test_wrap_selection_is_editing() {
+        assert!(EditorAction::WrapSelection { prefix: "[".into(), suffix: "]".into() }.is_editing());
+    }
+
+    #[test]
+    fn test_insert_link_is_insertion() {
+        assert!(EditorAction::InsertLink { text: "t".into(), url: "u".into() }.is_insertion());
+        assert!(EditorAction::InsertImage { alt: "a".into(), path: "p".into() }.is_insertion());
+        assert!(EditorAction::InsertComment("c".into()).is_insertion());
+    }
+
+    #[test]
+    fn test_smart_paste_is_insertion() {
+        assert!(EditorAction::SmartPaste("pasted text".into()).is_insertion());
+    }
+
+    #[test]
+    fn test_movement_is_not_editing() {
+        assert!(!EditorAction::MoveToDocStart.is_editing());
+        assert!(!EditorAction::MoveToDocEnd.is_editing());
+        assert!(!EditorAction::MoveWordForward.is_editing());
+        assert!(!EditorAction::MoveWordBackward.is_editing());
+    }
+
+    #[test]
+    fn test_sort_lines_is_editing() {
+        assert!(EditorAction::SortLines.is_editing());
+        assert!(EditorAction::RemoveDuplicateLines.is_editing());
+        assert!(EditorAction::TransposeChars.is_editing());
+        assert!(EditorAction::JoinLines.is_editing());
+    }
+
+    #[test]
+    fn test_indent_unindent_editing() {
+        assert!(EditorAction::Indent.is_editing());
+        assert!(EditorAction::Unindent.is_editing());
+    }
+
+    #[test]
+    fn test_insert_table_is_insertion() {
+        assert!(EditorAction::InsertTable { rows: 3, cols: 4 }.is_insertion());
+    }
+
+    #[test]
+    fn test_set_script_element_is_editing() {
+        assert!(EditorAction::SetScriptElement("Action".into()).is_editing());
+    }
+
+    #[test]
+    fn test_action_debug_format() {
+        let action = EditorAction::ToggleBold;
+        let debug = format!("{:?}", action);
+        assert!(debug.contains("ToggleBold"));
+    }
+
+    #[test]
+    fn test_action_clone() {
+        let action = EditorAction::Insert("hello".to_string());
+        let cloned = action.clone();
+        assert_eq!(cloned.description(), "Insert text");
+    }
+
+    #[test]
+    fn test_list_style_debug_clone() {
+        let bullet = ListStyle::Bullet;
+        let cloned = bullet.clone();
+        assert_eq!(cloned.prefix(), "- ");
+        let debug = format!("{:?}", bullet);
+        assert!(debug.contains("Bullet"));
+    }
+
+    #[test]
+    fn test_datetime_format_debug_clone() {
+        let fmt = DateTimeFormat::Iso8601;
+        let cloned = fmt.clone();
+        assert_eq!(cloned.label(), "ISO 8601");
+        let debug = format!("{:?}", fmt);
+        assert!(debug.contains("Iso8601"));
+    }
+
+    #[test]
+    fn test_all_shortcut_hints_non_panicking() {
+        let actions = vec![
+            EditorAction::ToggleBold,
+            EditorAction::ToggleItalic,
+            EditorAction::ToggleUnderline,
+            EditorAction::Undo,
+            EditorAction::Redo,
+            EditorAction::SelectAll,
+            EditorAction::Find("q".into()),
+            EditorAction::Replace { find: "a".into(), replace: "b".into() },
+            EditorAction::MoveToLineStart,
+            EditorAction::MoveToLineEnd,
+            EditorAction::MoveToDocStart,
+            EditorAction::MoveToDocEnd,
+            EditorAction::Indent,
+            EditorAction::Unindent,
+            EditorAction::DeleteLine,
+            EditorAction::DuplicateLine,
+            EditorAction::MoveLineUp,
+            EditorAction::MoveLineDown,
+            EditorAction::GoToLine(1),
+            EditorAction::ToggleComment,
+            EditorAction::InsertBlockQuote,
+            EditorAction::SortLines,
+            EditorAction::TransposeChars,
+        ];
+        for action in &actions {
+            let _ = action.shortcut_hint();
+        }
+    }
+
+    #[test]
+    fn test_category_completeness() {
+        let actions: Vec<EditorAction> = vec![
+            EditorAction::MoveToLineStart,
+            EditorAction::MoveToDocEnd,
+            EditorAction::GoToLine(1),
+            EditorAction::SelectAll,
+            EditorAction::SelectWord,
+            EditorAction::ToggleBold,
+            EditorAction::ToUppercase,
+            EditorAction::Insert("x".into()),
+            EditorAction::InsertHeading(1),
+            EditorAction::Undo,
+            EditorAction::Redo,
+            EditorAction::Find("x".into()),
+            EditorAction::Replace { find: "a".into(), replace: "b".into() },
+            EditorAction::DeleteLine,
+            EditorAction::SortLines,
+        ];
+        let categories: Vec<&str> = actions.iter().map(|a| a.category()).collect();
+        assert!(categories.contains(&"Navigation"));
+        assert!(categories.contains(&"Selection"));
+        assert!(categories.contains(&"Formatting"));
+        assert!(categories.contains(&"Insert"));
+        assert!(categories.contains(&"History"));
+        assert!(categories.contains(&"Find & Replace"));
+        assert!(categories.contains(&"Edit"));
+    }
+
+    #[test]
+    fn test_focus_mode_not_editing() {
+        assert!(!EditorAction::ToggleFocusMode.is_editing());
+        assert!(!EditorAction::ToggleFocusMode.is_movement());
+        assert!(!EditorAction::ToggleFocusMode.is_selection());
+        assert!(!EditorAction::ToggleFocusMode.is_formatting());
+        assert!(!EditorAction::ToggleFocusMode.is_insertion());
+    }
+
+    #[test]
+    fn test_insert_code_block_with_language() {
+        let action = EditorAction::InsertCodeBlock(Some("rust".into()));
+        assert!(action.is_insertion());
+        assert_eq!(action.description(), "Insert code block");
+    }
+
+    #[test]
+    fn test_insert_heading_levels() {
+        for level in 1..=6 {
+            let action = EditorAction::InsertHeading(level);
+            assert!(action.is_insertion());
+            assert!(action.is_editing());
+            assert_eq!(action.description(), "Insert heading");
+        }
+    }
+
+    #[test]
+    fn test_page_break_properties() {
+        let action = EditorAction::InsertPageBreak;
+        assert!(action.is_insertion());
+        assert!(action.is_editing());
+        assert!(action.is_undoable());
+        assert_eq!(action.category(), "Insert");
+    }
+
+    // ---- New tests for batch_description, requires_selection, menu_path, list/datetime helpers ----
+
+    #[test]
+    fn test_requires_selection() {
+        assert!(EditorAction::WrapSelection { prefix: "[".into(), suffix: "]".into() }.requires_selection());
+        assert!(EditorAction::ToUppercase.requires_selection());
+        assert!(EditorAction::ToLowercase.requires_selection());
+        assert!(EditorAction::ToTitleCase.requires_selection());
+        assert!(EditorAction::SortLines.requires_selection());
+        assert!(EditorAction::RemoveDuplicateLines.requires_selection());
+        assert!(!EditorAction::ToggleBold.requires_selection());
+        assert!(!EditorAction::Undo.requires_selection());
+        assert!(!EditorAction::DeleteLine.requires_selection());
+    }
+
+    #[test]
+    fn test_menu_path_formatting() {
+        let path = EditorAction::ToggleBold.menu_path();
+        assert_eq!(path, vec!["Format", "Style"]);
+    }
+
+    #[test]
+    fn test_menu_path_case() {
+        let path = EditorAction::ToUppercase.menu_path();
+        assert_eq!(path, vec!["Format", "Case"]);
+    }
+
+    #[test]
+    fn test_menu_path_headings() {
+        let path = EditorAction::InsertHeading(2).menu_path();
+        assert_eq!(path, vec!["Insert", "Heading"]);
+    }
+
+    #[test]
+    fn test_menu_path_line_edit() {
+        let path = EditorAction::MoveLineUp.menu_path();
+        assert_eq!(path, vec!["Edit", "Line"]);
+    }
+
+    #[test]
+    fn test_menu_path_indent() {
+        let path = EditorAction::Indent.menu_path();
+        assert_eq!(path, vec!["Edit", "Indentation"]);
+    }
+
+    #[test]
+    fn test_menu_path_fallback() {
+        let path = EditorAction::Undo.menu_path();
+        assert_eq!(path, vec!["History"]);
+    }
+
+    #[test]
+    fn test_batch_description_empty() {
+        let desc = EditorAction::batch_description(&[]);
+        assert_eq!(desc, "No actions");
+    }
+
+    #[test]
+    fn test_batch_description_single() {
+        let actions = vec![EditorAction::ToggleBold];
+        let desc = EditorAction::batch_description(&actions);
+        assert_eq!(desc, "Toggle bold");
+    }
+
+    #[test]
+    fn test_batch_description_multiple() {
+        let actions = vec![
+            EditorAction::ToggleBold,
+            EditorAction::MoveToDocStart,
+            EditorAction::ToUppercase,
+        ];
+        let desc = EditorAction::batch_description(&actions);
+        assert!(desc.contains("3 actions"));
+        assert!(desc.contains("2 edits"));
+        assert!(desc.contains("1 navigation"));
+    }
+
+    #[test]
+    fn test_list_style_all() {
+        let all = ListStyle::all();
+        assert_eq!(all.len(), 3);
+    }
+
+    #[test]
+    fn test_list_style_continuation_prefix() {
+        assert_eq!(ListStyle::Bullet.continuation_prefix(0), "- ");
+        assert_eq!(ListStyle::Bullet.continuation_prefix(5), "- ");
+        assert_eq!(ListStyle::Numbered.continuation_prefix(0), "1. ");
+        assert_eq!(ListStyle::Numbered.continuation_prefix(4), "5. ");
+        assert_eq!(ListStyle::Checkbox.continuation_prefix(0), "- [ ] ");
+    }
+
+    #[test]
+    fn test_datetime_format_all() {
+        let all = DateTimeFormat::all();
+        assert_eq!(all.len(), 4);
+    }
+
+    #[test]
+    fn test_datetime_format_pattern() {
+        assert_eq!(DateTimeFormat::DateOnly.pattern(), "YYYY-MM-DD");
+        assert_eq!(DateTimeFormat::TimeOnly.pattern(), "HH:MM");
+        assert!(DateTimeFormat::DateTime.pattern().contains("YYYY"));
+        assert!(DateTimeFormat::Iso8601.pattern().contains("T"));
     }
 }

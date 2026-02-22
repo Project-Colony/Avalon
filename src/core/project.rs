@@ -12,6 +12,7 @@ use super::document::Document;
 use super::history::WritingHistory;
 use super::snapshot::Snapshot;
 use super::metadata::ProjectSettings;
+use crate::export::compiler::CompileOptions;
 
 /// A Scrinever project — the top-level container for all writing data.
 /// Stored as a directory with structured JSON files inside.
@@ -35,6 +36,9 @@ pub struct Project {
     /// Bookmarks / favorites
     #[serde(default)]
     pub bookmarks: BookmarkList,
+    /// Compile presets (name -> options)
+    #[serde(default)]
+    pub compile_presets: Vec<(String, CompileOptions)>,
     #[serde(skip)]
     pub path: Option<PathBuf>,
 }
@@ -54,6 +58,7 @@ impl Project {
             collections: Vec::new(),
             writing_history: WritingHistory::new(),
             bookmarks: BookmarkList::new(),
+            compile_presets: Vec::new(),
             path: None,
         }
     }
@@ -87,6 +92,13 @@ impl Project {
         // Save snapshots
         let snaps_dir = project_dir.join("snapshots");
         fs::create_dir_all(&snaps_dir)?;
+        self.save_snapshots(&snaps_dir)?;
+
+        // Save compile presets (if any)
+        let presets_path = project_dir.join("compile_presets.json");
+        if let Ok(json) = serde_json::to_string_pretty(&self.compile_presets) {
+            let _ = fs::write(&presets_path, json);
+        }
 
         self.path = Some(project_dir);
         Ok(())
@@ -104,6 +116,22 @@ impl Project {
         let docs_dir = project_dir.join("docs");
         if docs_dir.exists() {
             project.load_documents(&docs_dir)?;
+        }
+
+        // Load snapshots
+        let snaps_dir = project_dir.join("snapshots");
+        if snaps_dir.exists() {
+            project.load_snapshots(&snaps_dir)?;
+        }
+
+        // Load compile presets
+        let presets_path = project_dir.join("compile_presets.json");
+        if presets_path.exists() {
+            if let Ok(json) = fs::read_to_string(&presets_path) {
+                if let Ok(presets) = serde_json::from_str(&json) {
+                    project.compile_presets = presets;
+                }
+            }
         }
 
         project.path = Some(project_dir.to_path_buf());
@@ -130,6 +158,31 @@ impl Project {
                 let json = fs::read_to_string(&doc_path)?;
                 let doc: Document = serde_json::from_str(&json)?;
                 item.document = Some(doc);
+            }
+        }
+        Ok(())
+    }
+
+    /// Save all snapshots to disk (one file per binder item that has snapshots)
+    fn save_snapshots(&self, snaps_dir: &Path) -> Result<()> {
+        for item in self.binder.all_items() {
+            if !item.snapshots.is_empty() {
+                let snap_path = snaps_dir.join(format!("{}.json", item.id));
+                let json = serde_json::to_string_pretty(&item.snapshots)?;
+                fs::write(snap_path, json)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Load all snapshots from disk
+    fn load_snapshots(&mut self, snaps_dir: &Path) -> Result<()> {
+        for item in self.binder.all_items_mut() {
+            let snap_path = snaps_dir.join(format!("{}.json", item.id));
+            if snap_path.exists() {
+                let json = fs::read_to_string(&snap_path)?;
+                let snapshots: Vec<Snapshot> = serde_json::from_str(&json)?;
+                item.snapshots = snapshots;
             }
         }
         Ok(())
@@ -616,6 +669,136 @@ impl Project {
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| "Unsaved".to_string())
     }
+
+    /// Get the number of compile presets
+    pub fn preset_count(&self) -> usize {
+        self.compile_presets.len()
+    }
+
+    /// Find a compile preset by name
+    pub fn find_preset(&self, name: &str) -> Option<&CompileOptions> {
+        self.compile_presets.iter()
+            .find(|(n, _)| n == name)
+            .map(|(_, opts)| opts)
+    }
+
+    /// Add or update a compile preset
+    pub fn set_preset(&mut self, name: &str, opts: CompileOptions) {
+        if let Some(existing) = self.compile_presets.iter_mut().find(|(n, _)| n == name) {
+            existing.1 = opts;
+        } else {
+            self.compile_presets.push((name.to_string(), opts));
+        }
+    }
+
+    /// Remove a compile preset by name
+    pub fn remove_preset(&mut self, name: &str) -> bool {
+        let before = self.compile_presets.len();
+        self.compile_presets.retain(|(n, _)| n != name);
+        self.compile_presets.len() < before
+    }
+
+    /// Get all available template names
+    pub fn available_templates() -> Vec<&'static str> {
+        vec![
+            "novel", "novel_with_parts", "short_story", "poetry",
+            "screenplay", "stage_play", "nonfiction", "essay",
+            "academic", "research_proposal", "thesis",
+            "recipes", "journal", "blog",
+            "comic_script", "radio_drama", "documentary",
+            "mla_paper", "chicago_essay",
+        ]
+    }
+
+    /// Get a comprehensive status summary
+    pub fn status_summary(&self) -> String {
+        let words = self.total_word_count();
+        let docs = self.document_count();
+        let folders = self.folder_count();
+        let pages = self.estimated_pages();
+        let collections = self.collection_count();
+        let presets = self.preset_count();
+        let has_notes = !self.project_notes.is_empty();
+
+        let mut parts = vec![
+            format!("{} words", words),
+            format!("{} pages", pages),
+            format!("{} documents", docs),
+            format!("{} folders", folders),
+        ];
+        if collections > 0 { parts.push(format!("{} collections", collections)); }
+        if presets > 0 { parts.push(format!("{} presets", presets)); }
+        if has_notes { parts.push("has project notes".to_string()); }
+
+        parts.join(", ")
+    }
+
+    /// Check if a template name is valid
+    pub fn is_valid_template(name: &str) -> bool {
+        Self::available_templates().contains(&name)
+    }
+
+    /// Compute content distribution: returns (folder_title, word_count) pairs for top-level items.
+    pub fn content_distribution(&self) -> Vec<(String, usize)> {
+        self.binder.draft.children.iter()
+            .map(|child| (child.title.clone(), child.total_word_count()))
+            .collect()
+    }
+
+    /// Analyze the project structure: (max_depth, avg_children, total_items).
+    pub fn structure_analysis(&self) -> (usize, f64, usize) {
+        let max_depth = self.binder.max_nesting_depth();
+        let total = self.binder.item_count();
+        let folders: Vec<&super::binder::BinderItem> = self.binder.all_items().into_iter()
+            .filter(|i| !i.children.is_empty())
+            .collect();
+        let avg_children = if folders.is_empty() {
+            0.0
+        } else {
+            folders.iter().map(|f| f.child_count() as f64).sum::<f64>() / folders.len() as f64
+        };
+        (max_depth, avg_children, total)
+    }
+
+    /// Writing velocity: average words per recorded history day.
+    pub fn writing_velocity(&self) -> f64 {
+        let entries = &self.writing_history.entries;
+        if entries.is_empty() {
+            return 0.0;
+        }
+        let total_words: i64 = entries.iter().map(|e| e.words_written).sum();
+        total_words as f64 / entries.len() as f64
+    }
+
+    /// Get the longest and shortest documents by word count.
+    pub fn word_count_extremes(&self) -> (Option<(String, usize)>, Option<(String, usize)>) {
+        let items: Vec<(&str, usize)> = self.binder.all_items().into_iter()
+            .filter(|i| i.kind == super::binder::BinderItemKind::Text)
+            .filter_map(|i| i.document.as_ref().map(|d| (i.title.as_str(), d.word_count())))
+            .filter(|(_, wc)| *wc > 0)
+            .collect();
+
+        let longest = items.iter()
+            .max_by_key(|(_, wc)| *wc)
+            .map(|(t, wc)| (t.to_string(), *wc));
+        let shortest = items.iter()
+            .min_by_key(|(_, wc)| *wc)
+            .map(|(t, wc)| (t.to_string(), *wc));
+        (longest, shortest)
+    }
+
+    /// Average document word count across all text items with content.
+    pub fn avg_document_word_count(&self) -> f64 {
+        let items: Vec<usize> = self.binder.all_items().into_iter()
+            .filter(|i| i.kind == super::binder::BinderItemKind::Text)
+            .filter_map(|i| i.document.as_ref().map(|d| d.word_count()))
+            .filter(|wc| *wc > 0)
+            .collect();
+        if items.is_empty() {
+            return 0.0;
+        }
+        items.iter().sum::<usize>() as f64 / items.len() as f64
+    }
 }
 
 #[cfg(test)]
@@ -799,5 +982,429 @@ mod tests {
         let parsed = parsed.unwrap();
         assert_eq!(parsed.title, "Serialization Test");
         assert_eq!(parsed.id, project.id);
+    }
+
+    #[test]
+    fn test_save_and_load_snapshots() {
+        use tempfile::tempdir;
+        use crate::core::binder::BinderItem;
+
+        let dir = tempdir().unwrap();
+        let mut project = Project::new("SnapshotTest");
+
+        // Add a document with content
+        let mut item = BinderItem::new_text("Chapter 1");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Hello world".to_string();
+        }
+        project.binder.draft.children.push(item);
+
+        // Create a snapshot
+        let item_id = project.binder.draft.children.last().unwrap().id;
+        let _ = project.create_snapshot(&item_id, "First Draft");
+
+        // Verify snapshot exists in memory
+        let item = project.binder.find_item(&item_id).unwrap();
+        assert_eq!(item.snapshots.len(), 1);
+        assert_eq!(item.snapshots[0].title, "First Draft");
+        assert_eq!(item.snapshots[0].content, "Hello world");
+
+        // Save project
+        project.save(dir.path()).unwrap();
+
+        // Load project
+        let project_dir = dir.path().join("SnapshotTest.scriv");
+        let loaded = Project::load(&project_dir).unwrap();
+
+        // Verify snapshot was persisted
+        let loaded_item = loaded.binder.find_item(&item_id).unwrap();
+        assert_eq!(loaded_item.snapshots.len(), 1);
+        assert_eq!(loaded_item.snapshots[0].title, "First Draft");
+        assert_eq!(loaded_item.snapshots[0].content, "Hello world");
+    }
+
+    #[test]
+    fn test_save_and_load_compile_presets() {
+        use tempfile::tempdir;
+        use crate::export::compiler::{CompileOptions, OutputFormat};
+
+        let dir = tempdir().unwrap();
+        let mut project = Project::new("PresetTest");
+
+        // Add compile presets
+        let mut opts = CompileOptions::default();
+        opts.title = "My Book".to_string();
+        opts.format = OutputFormat::Html;
+        project.compile_presets.push(("HTML Export".to_string(), opts));
+
+        let mut opts2 = CompileOptions::default();
+        opts2.format = OutputFormat::Latex;
+        opts2.font_size = 14.0;
+        project.compile_presets.push(("LaTeX Export".to_string(), opts2));
+
+        // Save project
+        project.save(dir.path()).unwrap();
+
+        // Load project
+        let project_dir = dir.path().join("PresetTest.scriv");
+        let loaded = Project::load(&project_dir).unwrap();
+
+        assert_eq!(loaded.compile_presets.len(), 2);
+        assert_eq!(loaded.compile_presets[0].0, "HTML Export");
+        assert_eq!(loaded.compile_presets[0].1.title, "My Book");
+        assert!(matches!(loaded.compile_presets[0].1.format, OutputFormat::Html));
+        assert_eq!(loaded.compile_presets[1].0, "LaTeX Export");
+        assert!((loaded.compile_presets[1].1.font_size - 14.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_save_and_load_annotations() {
+        use tempfile::tempdir;
+        use crate::core::binder::BinderItem;
+        use crate::core::annotation::Annotation;
+
+        let dir = tempdir().unwrap();
+        let mut project = Project::new("AnnotationTest");
+
+        // Add a document with annotations
+        let mut item = BinderItem::new_text("Chapter 1");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "The quick brown fox jumps over the lazy dog.".to_string();
+            doc.annotations.push(Annotation::new(4, 19, "Check this phrasing"));
+            doc.annotations.push(Annotation::new(35, 43, "Consider stronger word"));
+        }
+        project.binder.draft.children.push(item);
+        let item_id = project.binder.draft.children.last().unwrap().id;
+
+        // Save project
+        project.save(dir.path()).unwrap();
+
+        // Load project
+        let project_dir = dir.path().join("AnnotationTest.scriv");
+        let loaded = Project::load(&project_dir).unwrap();
+
+        let loaded_item = loaded.binder.find_item(&item_id).unwrap();
+        let doc = loaded_item.document.as_ref().unwrap();
+        assert_eq!(doc.annotations.len(), 2);
+        assert_eq!(doc.annotations[0].text, "Check this phrasing");
+        assert_eq!(doc.annotations[0].start, 4);
+        assert_eq!(doc.annotations[0].end, 19);
+        assert_eq!(doc.annotations[1].text, "Consider stronger word");
+    }
+
+    #[test]
+    fn test_save_and_load_multiple_snapshots() {
+        use tempfile::tempdir;
+        use crate::core::binder::BinderItem;
+
+        let dir = tempdir().unwrap();
+        let mut project = Project::new("MultiSnapTest");
+
+        let mut item = BinderItem::new_text("Scene 1");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Version 1".to_string();
+        }
+        project.binder.draft.children.push(item);
+        let item_id = project.binder.draft.children.last().unwrap().id;
+
+        // Create first snapshot
+        let _ = project.create_snapshot(&item_id, "Draft 1");
+
+        // Modify and create second snapshot
+        if let Some(doc) = project.get_document_mut(&item_id) {
+            doc.content = "Version 2 - improved".to_string();
+        }
+        let _ = project.create_snapshot(&item_id, "Draft 2");
+
+        // Save and reload
+        project.save(dir.path()).unwrap();
+        let project_dir = dir.path().join("MultiSnapTest.scriv");
+        let loaded = Project::load(&project_dir).unwrap();
+
+        let loaded_item = loaded.binder.find_item(&item_id).unwrap();
+        assert_eq!(loaded_item.snapshots.len(), 2);
+        assert_eq!(loaded_item.snapshots[0].title, "Draft 1");
+        assert_eq!(loaded_item.snapshots[0].content, "Version 1");
+        assert_eq!(loaded_item.snapshots[1].title, "Draft 2");
+        assert_eq!(loaded_item.snapshots[1].content, "Version 2 - improved");
+    }
+
+    // New: compile preset tests
+
+    #[test]
+    fn test_preset_count_empty() {
+        let project = Project::new("Test");
+        assert_eq!(project.preset_count(), 0);
+    }
+
+    #[test]
+    fn test_set_and_find_preset() {
+        let mut project = Project::new("Test");
+        let opts = CompileOptions::default();
+        project.set_preset("My Preset", opts);
+
+        assert_eq!(project.preset_count(), 1);
+        assert!(project.find_preset("My Preset").is_some());
+        assert!(project.find_preset("Not Found").is_none());
+    }
+
+    #[test]
+    fn test_set_preset_updates_existing() {
+        let mut project = Project::new("Test");
+        let mut opts1 = CompileOptions::default();
+        opts1.title = "Old".to_string();
+        project.set_preset("Preset", opts1);
+
+        let mut opts2 = CompileOptions::default();
+        opts2.title = "New".to_string();
+        project.set_preset("Preset", opts2);
+
+        assert_eq!(project.preset_count(), 1); // Still only one
+        assert_eq!(project.find_preset("Preset").unwrap().title, "New");
+    }
+
+    #[test]
+    fn test_remove_preset() {
+        let mut project = Project::new("Test");
+        project.set_preset("A", CompileOptions::default());
+        project.set_preset("B", CompileOptions::default());
+
+        assert!(project.remove_preset("A"));
+        assert_eq!(project.preset_count(), 1);
+        assert!(!project.remove_preset("A")); // Already removed
+    }
+
+    // New: template tests
+
+    #[test]
+    fn test_available_templates() {
+        let templates = Project::available_templates();
+        assert!(templates.len() >= 15);
+        assert!(templates.contains(&"novel"));
+        assert!(templates.contains(&"screenplay"));
+        assert!(templates.contains(&"thesis"));
+    }
+
+    #[test]
+    fn test_is_valid_template() {
+        assert!(Project::is_valid_template("novel"));
+        assert!(Project::is_valid_template("essay"));
+        assert!(!Project::is_valid_template("nonexistent"));
+    }
+
+    #[test]
+    fn test_all_templates_produce_valid_projects() {
+        for template in Project::available_templates() {
+            let project = Project::from_template(&format!("Test {}", template), template);
+            assert!(!project.binder.draft.title.is_empty(),
+                "Template '{}' produced empty draft title", template);
+            assert_eq!(project.title, format!("Test {}", template));
+        }
+    }
+
+    // New: status summary tests
+
+    #[test]
+    fn test_status_summary_empty() {
+        let project = Project::new("Test");
+        let summary = project.status_summary();
+        assert!(summary.contains("0 words"));
+        assert!(summary.contains("0 pages"));
+    }
+
+    #[test]
+    fn test_status_summary_with_extras() {
+        let mut project = Project::new("Test");
+        project.collections.push(Collection::new_manual("Fav"));
+        project.set_preset("Default", CompileOptions::default());
+        project.project_notes = "Some notes".to_string();
+
+        let summary = project.status_summary();
+        assert!(summary.contains("1 collections"));
+        assert!(summary.contains("1 presets"));
+        assert!(summary.contains("has project notes"));
+    }
+
+    // New: additional template structure tests
+
+    #[test]
+    fn test_from_template_stage_play() {
+        let project = Project::from_template("Test Play", "stage_play");
+        assert_eq!(project.binder.draft.title, "Play");
+        assert!(project.binder.draft.children.len() >= 3);
+    }
+
+    #[test]
+    fn test_from_template_research_proposal() {
+        let project = Project::from_template("Test", "research_proposal");
+        assert_eq!(project.binder.draft.title, "Proposal");
+    }
+
+    #[test]
+    fn test_from_template_recipes() {
+        let project = Project::from_template("Test", "recipes");
+        assert_eq!(project.binder.draft.title, "Recipe Book");
+    }
+
+    #[test]
+    fn test_from_template_comic_script() {
+        let project = Project::from_template("Test", "comic_script");
+        assert_eq!(project.binder.draft.title, "Comic");
+    }
+
+    #[test]
+    fn test_from_template_radio_drama() {
+        let project = Project::from_template("Test", "radio_drama");
+        assert_eq!(project.binder.draft.title, "Radio Drama");
+    }
+
+    #[test]
+    fn test_from_template_documentary() {
+        let project = Project::from_template("Test", "documentary");
+        assert_eq!(project.binder.draft.title, "Documentary");
+    }
+
+    #[test]
+    fn test_from_template_mla_paper() {
+        let project = Project::from_template("Test", "mla_paper");
+        assert_eq!(project.binder.draft.title, "Paper");
+    }
+
+    #[test]
+    fn test_from_template_chicago_essay() {
+        let project = Project::from_template("Test", "chicago_essay");
+        assert_eq!(project.binder.draft.title, "Essay");
+    }
+
+    // --- Project analytics tests ---
+
+    #[test]
+    fn test_content_distribution_empty() {
+        let project = Project::new("Test");
+        let dist = project.content_distribution();
+        assert!(dist.is_empty() || dist.iter().all(|(_, wc)| *wc == 0));
+    }
+
+    #[test]
+    fn test_content_distribution_with_items() {
+        use crate::core::binder::BinderItem;
+        let mut project = Project::new("Test");
+        let mut ch1 = BinderItem::new_text("Chapter 1");
+        if let Some(ref mut doc) = ch1.document {
+            doc.content = "one two three four five".to_string();
+        }
+        let mut ch2 = BinderItem::new_text("Chapter 2");
+        if let Some(ref mut doc) = ch2.document {
+            doc.content = "six seven".to_string();
+        }
+        project.binder.draft.add_child(ch1);
+        project.binder.draft.add_child(ch2);
+
+        let dist = project.content_distribution();
+        assert_eq!(dist.len(), 2);
+        assert_eq!(dist[0].0, "Chapter 1");
+        assert_eq!(dist[0].1, 5);
+        assert_eq!(dist[1].0, "Chapter 2");
+        assert_eq!(dist[1].1, 2);
+    }
+
+    #[test]
+    fn test_structure_analysis() {
+        let mut project = Project::from_template("Novel", "novel");
+        let (max_depth, _avg_children, total) = project.structure_analysis();
+        assert!(max_depth >= 1);
+        assert!(total >= 3);
+    }
+
+    #[test]
+    fn test_structure_analysis_empty() {
+        let project = Project::new("Empty");
+        let (max_depth, _avg, total) = project.structure_analysis();
+        assert_eq!(max_depth, 0);
+        assert!(total >= 3); // Draft, Research, Trash always present
+    }
+
+    #[test]
+    fn test_writing_velocity_empty() {
+        let project = Project::new("Test");
+        assert_eq!(project.writing_velocity(), 0.0);
+    }
+
+    #[test]
+    fn test_writing_velocity_with_entries() {
+        use crate::core::history::DailyEntry;
+        use chrono::NaiveDate;
+
+        let mut project = Project::new("Test");
+        project.writing_history.entries.push(DailyEntry {
+            date: NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            word_count_start: 0,
+            word_count_end: 1000,
+            words_written: 1000,
+            time_spent_seconds: 3600,
+        });
+        project.writing_history.entries.push(DailyEntry {
+            date: NaiveDate::from_ymd_opt(2025, 1, 2).unwrap(),
+            word_count_start: 1000,
+            word_count_end: 1500,
+            words_written: 500,
+            time_spent_seconds: 1800,
+        });
+
+        let velocity = project.writing_velocity();
+        assert!((velocity - 750.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_word_count_extremes_empty() {
+        let project = Project::new("Test");
+        let (longest, shortest) = project.word_count_extremes();
+        assert!(longest.is_none());
+        assert!(shortest.is_none());
+    }
+
+    #[test]
+    fn test_word_count_extremes_with_items() {
+        use crate::core::binder::BinderItem;
+        let mut project = Project::new("Test");
+        let mut short = BinderItem::new_text("Short");
+        if let Some(ref mut doc) = short.document {
+            doc.content = "one two".to_string();
+        }
+        let mut long = BinderItem::new_text("Long");
+        if let Some(ref mut doc) = long.document {
+            doc.content = "one two three four five six seven eight".to_string();
+        }
+        project.binder.draft.add_child(short);
+        project.binder.draft.add_child(long);
+
+        let (longest, shortest) = project.word_count_extremes();
+        assert_eq!(longest.unwrap().0, "Long");
+        assert_eq!(shortest.unwrap().0, "Short");
+    }
+
+    #[test]
+    fn test_avg_document_word_count_empty() {
+        let project = Project::new("Test");
+        assert_eq!(project.avg_document_word_count(), 0.0);
+    }
+
+    #[test]
+    fn test_avg_document_word_count() {
+        use crate::core::binder::BinderItem;
+        let mut project = Project::new("Test");
+        let mut a = BinderItem::new_text("A");
+        if let Some(ref mut doc) = a.document {
+            doc.content = "one two three four".to_string();
+        }
+        let mut b = BinderItem::new_text("B");
+        if let Some(ref mut doc) = b.document {
+            doc.content = "five six".to_string();
+        }
+        project.binder.draft.add_child(a);
+        project.binder.draft.add_child(b);
+
+        let avg = project.avg_document_word_count();
+        assert!((avg - 3.0).abs() < 0.01);
     }
 }

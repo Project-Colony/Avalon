@@ -1,4 +1,4 @@
-use iced::widget::{button, column, container, row, text, text_editor, Space};
+use iced::widget::{button, column, container, row, scrollable, text, text_editor, Space};
 use iced::{Element, Length, Padding};
 
 use crate::editor::EditorState;
@@ -12,11 +12,36 @@ pub fn view<'a>(
     script_mode: bool,
     script_element: Option<&str>,
 ) -> Element<'a, Message> {
+    // Document annotations/notes indicator
+    let notes_indicator = if editor_state.document.has_notes() {
+        "\u{1F4DD} "
+    } else {
+        ""
+    };
+
+    let annotation_text = if editor_state.document.annotation_count() > 0 {
+        let open = editor_state.document.open_annotation_count();
+        let total = editor_state.document.annotation_count();
+        format!(" | \u{1F4AC} {}/{}", open, total)
+    } else {
+        String::new()
+    };
+
+    let footnote_text = if editor_state.document.footnote_count() > 0 {
+        format!(" | Fn:{}", editor_state.document.footnote_count())
+    } else {
+        String::new()
+    };
+
     let header = container(
         row![
-            text(title.to_string())
+            text(format!("{}{}", notes_indicator, title))
                 .size(14)
                 .color(Theme::TEXT_SECONDARY),
+            Space::with_width(8),
+            text(format!("{}{}", annotation_text, footnote_text))
+                .size(10)
+                .color(Theme::TEXT_MUTED),
             Space::with_width(Length::Fill),
             if script_mode {
                 text(format!("[Script: {}]", script_element.unwrap_or("Action")))
@@ -54,29 +79,49 @@ pub fn view<'a>(
 
     // Formatting toolbar
     let format_bar = container(
-        row![
-            fmt_btn("B", Message::InsertBold),
-            fmt_btn("I", Message::InsertItalic),
-            fmt_btn("U", Message::InsertUnderline),
-            fmt_btn("S", Message::InsertStrikethrough),
-            Space::with_width(8),
-            fmt_btn("H1", Message::InsertHeading(1)),
-            fmt_btn("H2", Message::InsertHeading(2)),
-            fmt_btn("H3", Message::InsertHeading(3)),
-            Space::with_width(8),
-            fmt_btn(">", Message::InsertBlockQuote),
-            fmt_btn("Fn", Message::InsertFootnote),
-            fmt_btn("--", Message::InsertHRule),
-            Space::with_width(Length::Fill),
-            fmt_btn("UPPER", Message::TextToUppercase),
-            fmt_btn("lower", Message::TextToLowercase),
-            fmt_btn("Title", Message::TextToTitleCase),
-            Space::with_width(8),
-            fmt_btn("CpMD", Message::CopyAsMarkdown),
-            fmt_btn("CpHTML", Message::CopyAsHtml),
-            fmt_btn("CpTxt", Message::CopyAsPlainText),
-        ]
-        .spacing(2)
+        scrollable(
+            row![
+                fmt_btn("B", Message::InsertBold),
+                fmt_btn("I", Message::InsertItalic),
+                fmt_btn("U", Message::InsertUnderline),
+                fmt_btn("S", Message::InsertStrikethrough),
+                Space::with_width(6),
+                fmt_btn("H1", Message::InsertHeading(1)),
+                fmt_btn("H2", Message::InsertHeading(2)),
+                fmt_btn("H3", Message::InsertHeading(3)),
+                Space::with_width(6),
+                fmt_btn(">", Message::InsertBlockQuote),
+                fmt_btn("Fn", Message::InsertFootnote),
+                fmt_btn("--", Message::InsertHRule),
+                fmt_btn("```", Message::InsertCodeBlock(String::new())),
+                fmt_btn("PgBrk", Message::InsertPageBreak),
+                fmt_btn("<!--", Message::InsertComment),
+                Space::with_width(6),
+                fmt_btn("Link", Message::InsertLink),
+                fmt_btn("Img", Message::InsertImage),
+                Space::with_width(6),
+                fmt_btn("List", Message::InsertListItem("bullet".to_string())),
+                fmt_btn("1.", Message::InsertListItem("numbered".to_string())),
+                fmt_btn("[ ]", Message::InsertListItem("checkbox".to_string())),
+                fmt_btn("Table", Message::InsertTable(3, 3)),
+                fmt_btn("Date", Message::InsertDateTime("date".to_string())),
+                Space::with_width(6),
+                fmt_btn("Dup", Message::DuplicateLine),
+                fmt_btn("Del", Message::DeleteLine),
+                fmt_btn("Join", Message::JoinLines),
+                fmt_btn("Sort", Message::SortLines),
+                Space::with_width(Length::Fill),
+                fmt_btn("UPPER", Message::TextToUppercase),
+                fmt_btn("lower", Message::TextToLowercase),
+                fmt_btn("Title", Message::TextToTitleCase),
+                Space::with_width(6),
+                fmt_btn("CpMD", Message::CopyAsMarkdown),
+                fmt_btn("CpHTML", Message::CopyAsHtml),
+                fmt_btn("CpTxt", Message::CopyAsPlainText),
+            ]
+            .spacing(2)
+        )
+        .direction(scrollable::Direction::Horizontal(scrollable::Scrollbar::new()))
     )
     .padding(Padding::from([2, 16]));
 
@@ -86,17 +131,40 @@ pub fn view<'a>(
         .height(Length::Fill);
 
     let word_count = editor_state.document.word_count();
-    let char_count = editor_state.document.char_count();
     let page_est = word_count as f64 / 250.0;
+    let para_count = editor_state.document.paragraph_count();
+    let sentence_count = editor_state.document.sentence_count();
+    let reading_min = word_count as f64 / 250.0;
+    let reading_display = if reading_min < 1.0 {
+        "<1m".to_string()
+    } else if reading_min < 60.0 {
+        format!("{:.0}m", reading_min)
+    } else {
+        format!("{:.1}h", reading_min / 60.0)
+    };
+
+    let dirty_indicator = if editor_state.dirty { " \u{2022}" } else { "" };
+
+    // Unique word count for vocabulary richness
+    let unique_words = editor_state.document.unique_word_count();
+    let richness = if word_count > 0 {
+        format!(" | TTR:{:.0}%", unique_words as f64 / word_count as f64 * 100.0)
+    } else {
+        String::new()
+    };
 
     let stats_text = format!(
-        "Words: {}  |  Chars: {}  |  Pages: {:.1}",
-        word_count, char_count, page_est
+        "{}W  |  {}S  |  {}P  |  {:.1}pg  |  ~{} read{}{}",
+        word_count, sentence_count, para_count, page_est, reading_display, richness, dirty_indicator
     );
     let stats_bar = container(
-        text(stats_text)
-            .size(12)
-            .color(Theme::TEXT_MUTED),
+        row![
+            text(stats_text).size(11).color(Theme::TEXT_MUTED),
+            Space::with_width(Length::Fill),
+            text(format!("Ln {}, Col {}", editor_state.current_line(), editor_state.current_column()))
+                .size(10)
+                .color(Theme::TEXT_MUTED),
+        ]
     )
     .padding(Padding::from([4, 16]));
 

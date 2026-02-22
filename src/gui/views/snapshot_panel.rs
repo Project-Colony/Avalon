@@ -58,6 +58,14 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
         };
 
         let words = format!("{} words", snapshot.word_count);
+        // Calculate similarity to current content
+        let similarity = snapshot.similarity(current_content);
+        let sim_pct = (similarity * 100.0) as usize;
+        let sim_color = if sim_pct >= 90 { Theme::SUCCESS }
+            else if sim_pct >= 50 { Theme::WARNING }
+            else { Theme::ERROR };
+        let sim_text = format!("{}% sim", sim_pct);
+
         let is_selected = selected_snapshot == Some(i);
         let text_color = if is_selected {
             Theme::TEXT_ACCENT
@@ -92,6 +100,8 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
                 text(format!("({})", age)).size(9).color(Theme::TEXT_MUTED),
                 Space::with_width(8),
                 text(words).size(10).color(Theme::TEXT_MUTED),
+                Space::with_width(4),
+                text(sim_text).size(9).color(sim_color),
                 Space::with_width(8),
                 button(
                     text("\u{21BA} Restore").size(10).color(Theme::TEXT_ACCENT),
@@ -188,11 +198,22 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
                 format!("{}", net_change)
             };
 
+            // Compute word count difference
+            let current_words = current_content.split_whitespace().count();
+            let word_diff = current_words as i64 - snapshot.word_count as i64;
+            let word_diff_text = if word_diff > 0 {
+                format!("+{} words", word_diff)
+            } else if word_diff < 0 {
+                format!("{} words", word_diff)
+            } else {
+                "same word count".to_string()
+            };
+
             diff_col = diff_col.push(
                 row![
                     text(format!(
-                        "Summary: +{} added, -{} removed, {} unchanged ({} net)",
-                        added, removed, unchanged, net_text
+                        "Summary: +{} added, -{} removed, {} unchanged ({} net lines, {})",
+                        added, removed, unchanged, net_text, word_diff_text
                     ))
                     .size(10)
                     .color(Theme::TEXT_SECONDARY),

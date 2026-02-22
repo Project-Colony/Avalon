@@ -304,4 +304,70 @@ mod tests {
         };
         assert_eq!(project.extension(), "scx");
     }
+
+    #[test]
+    fn test_recent_project_directory_name() {
+        let project = RecentProject {
+            title: "Test".to_string(),
+            path: PathBuf::from("/home/user/projects/test.scx"),
+            last_opened: Utc::now(),
+        };
+        assert_eq!(project.directory_name(), "projects");
+    }
+
+    #[test]
+    fn test_recent_project_directory_name_root() {
+        let project = RecentProject {
+            title: "Test".to_string(),
+            path: PathBuf::from("/test.scx"),
+            last_opened: Utc::now(),
+        };
+        // Parent of /test.scx is /, which has no file_name
+        assert_eq!(project.directory_name(), "");
+    }
+
+    #[test]
+    fn test_recent_project_extension_none() {
+        let project = RecentProject {
+            title: "Test".to_string(),
+            path: PathBuf::from("/tmp/test"),
+            last_opened: Utc::now(),
+        };
+        assert_eq!(project.extension(), "");
+    }
+
+    #[test]
+    fn test_recently_active() {
+        let mut recent = RecentProjects::new();
+        recent.add("Today", PathBuf::from("/tmp/today.scx"));
+        let active = recent.recently_active(7);
+        assert_eq!(active.len(), 1);
+    }
+
+    #[test]
+    fn test_serialization_roundtrip() {
+        let mut recent = RecentProjects::new();
+        recent.add("Test", PathBuf::from("/tmp/test.scx"));
+        let json = serde_json::to_string(&recent).unwrap();
+        let parsed: RecentProjects = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.count(), 1);
+        assert_eq!(parsed.projects[0].title, "Test");
+    }
+
+    #[test]
+    fn test_remove_nonexistent() {
+        let mut recent = RecentProjects::new();
+        recent.add("A", PathBuf::from("/tmp/a.scx"));
+        recent.remove(&PathBuf::from("/tmp/nonexistent.scx"));
+        assert_eq!(recent.count(), 1);
+    }
+
+    #[test]
+    fn test_find_by_title_case_insensitive() {
+        let mut recent = RecentProjects::new();
+        recent.add("My Great Novel", PathBuf::from("/tmp/novel.scx"));
+        assert!(recent.find_by_title("my great novel").is_some());
+        assert!(recent.find_by_title("MY GREAT NOVEL").is_some());
+        assert!(recent.find_by_title("My Great Novel").is_some());
+    }
 }

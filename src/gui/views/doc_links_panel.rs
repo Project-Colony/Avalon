@@ -10,15 +10,29 @@ pub struct DocLink {
     pub target_title: String,
     pub target_id: Uuid,
     pub link_text: String,
+    pub display_text: Option<String>,
+}
+
+/// A broken or ambiguous link
+pub struct BrokenDocLink {
+    pub link_text: String,
+    pub status: BrokenLinkStatus,
+    pub suggestions: Vec<String>,
+}
+
+pub enum BrokenLinkStatus {
+    Broken,
+    Ambiguous(usize),
 }
 
 /// Render the document links panel (shows [[links]] in current doc)
 pub fn view(
     outgoing_links: &[DocLink],
     incoming_links: &[DocLink],
+    broken_links: &[BrokenDocLink],
     available_docs: &[(Uuid, String)],
 ) -> Element<'static, Message> {
-    let total_links = outgoing_links.len() + incoming_links.len();
+    let total_links = outgoing_links.len() + incoming_links.len() + broken_links.len();
     let header = row![
         text("DOCUMENT LINKS").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(4),
@@ -27,6 +41,14 @@ pub fn view(
         text(format!("{} total link{}", total_links, if total_links == 1 { "" } else { "s" }))
             .size(10)
             .color(Theme::TEXT_MUTED),
+        Space::with_width(8),
+        if broken_links.is_empty() {
+            text("\u{2713} healthy").size(10).color(Theme::SUCCESS)
+        } else {
+            text(format!("\u{26A0} {} issue{}", broken_links.len(),
+                if broken_links.len() == 1 { "" } else { "s" }))
+                .size(10).color(Theme::WARNING)
+        },
     ];
 
     // Outgoing links (from current document)
@@ -37,7 +59,7 @@ pub fn view(
             .color(outgoing_label_color),
     ].spacing(2);
 
-    if outgoing_links.is_empty() {
+    if outgoing_links.is_empty() && broken_links.is_empty() {
         outgoing_col = outgoing_col.push(
             text("No outgoing links. Use [[Title]] syntax to create links.")
                 .size(10)
@@ -47,8 +69,8 @@ pub fn view(
 
     for (i, link) in outgoing_links.iter().enumerate() {
         let id = link.target_id;
-        let display = if link.link_text != link.target_title && !link.link_text.is_empty() {
-            format!("\u{2192} {} (\"{}\")", link.target_title, link.link_text)
+        let display = if let Some(ref dt) = link.display_text {
+            format!("\u{2192} {} (shown as \"{}\")", link.target_title, dt)
         } else {
             format!("\u{2192} {}", link.target_title)
         };
@@ -63,6 +85,51 @@ pub fn view(
             ].align_y(iced::Alignment::Center)
         );
     }
+
+    // Broken/ambiguous links section
+    let broken_section: Element<'static, Message> = if !broken_links.is_empty() {
+        let mut broken_col = column![
+            text(format!("\u{26A0} Broken/Ambiguous ({})", broken_links.len()))
+                .size(11)
+                .color(Theme::WARNING),
+        ].spacing(2);
+
+        for blink in broken_links {
+            let status_text = match &blink.status {
+                BrokenLinkStatus::Broken => "broken".to_string(),
+                BrokenLinkStatus::Ambiguous(count) => format!("ambiguous ({} matches)", count),
+            };
+
+            let mut link_row = row![
+                text("\u{2717}").size(10).color(Theme::ERROR),
+                Space::with_width(4),
+                text(format!("[[{}]]", blink.link_text)).size(11).color(Theme::ERROR),
+                Space::with_width(4),
+                text(status_text).size(9).color(Theme::TEXT_MUTED),
+            ];
+
+            if !blink.suggestions.is_empty() {
+                link_row = link_row.push(Space::with_width(8));
+                link_row = link_row.push(
+                    text("Did you mean:").size(9).color(Theme::TEXT_MUTED)
+                );
+                for suggestion in &blink.suggestions {
+                    link_row = link_row.push(Space::with_width(4));
+                    link_row = link_row.push(
+                        text(format!("\"{}\"", suggestion))
+                            .size(9)
+                            .color(Theme::TEXT_ACCENT),
+                    );
+                }
+            }
+
+            broken_col = broken_col.push(link_row);
+        }
+
+        broken_col.into()
+    } else {
+        Space::with_height(0).into()
+    };
 
     // Incoming links (backlinks to current document)
     let incoming_label_color = if incoming_links.is_empty() { Theme::TEXT_MUTED } else { Theme::SUCCESS };
@@ -123,24 +190,6 @@ pub fn view(
         );
     }
 
-    // Link health summary
-    let orphan_indicator = if incoming_links.is_empty() && !outgoing_links.is_empty() {
-        "Orphan: no backlinks to this doc"
-    } else if incoming_links.is_empty() && outgoing_links.is_empty() {
-        "Isolated: no links at all"
-    } else {
-        ""
-    };
-
-    let health_row: Element<'static, Message> = if !orphan_indicator.is_empty() {
-        text(orphan_indicator)
-            .size(9)
-            .color(Theme::WARNING)
-            .into()
-    } else {
-        Space::with_height(0).into()
-    };
-
     let hint = row![
         text("Syntax: [[Document Title]] or [[Title|display text]]")
             .size(9)
@@ -155,12 +204,12 @@ pub fn view(
         header,
         Space::with_height(4),
         outgoing_col,
+        broken_section,
         Space::with_height(6),
         incoming_col,
         Space::with_height(6),
         scrollable(insert_col).height(Length::Fixed(60.0)),
         Space::with_height(2),
-        health_row,
         hint,
     ]
     .padding(Padding::from([8, 12]));

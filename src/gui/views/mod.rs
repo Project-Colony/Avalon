@@ -29,3 +29,6 @@ pub mod writing_goals_panel;
 pub mod doc_links_panel;
 pub mod backup_panel;
 pub mod spell_check_panel;
+pub mod timer_panel;
+pub mod validation_panel;
+pub mod templates_panel;

@@ -6,7 +6,12 @@ use crate::gui::theme::Theme;
 use crate::spelling::SpellSuggestion;
 
 /// Render the spell check results panel
-pub fn view(results: &[SpellSuggestion], spell_active: bool, dict_size: usize) -> Element<'static, Message> {
+pub fn view(
+    results: &[SpellSuggestion],
+    spell_active: bool,
+    dict_size: usize,
+    user_dict_words: &[String],
+) -> Element<'static, Message> {
     let status_icon = if spell_active { "\u{2705}" } else { "\u{26AA}" };
     let status_text = if spell_active { "Active" } else { "Inactive" };
 
@@ -20,6 +25,10 @@ pub fn view(results: &[SpellSuggestion], spell_active: bool, dict_size: usize) -
             .color(if spell_active { Theme::SUCCESS } else { Theme::TEXT_MUTED }),
         Space::with_width(8),
         text(format!("Dictionary: {} words", format_number(dict_size)))
+            .size(10)
+            .color(Theme::TEXT_MUTED),
+        Space::with_width(4),
+        text(format!("User: {} words", user_dict_words.len()))
             .size(10)
             .color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
@@ -74,6 +83,7 @@ pub fn view(results: &[SpellSuggestion], spell_active: bool, dict_size: usize) -
 
     for (idx, result) in results.iter().enumerate() {
         let word = result.word.clone();
+        let position = result.position;
         let index_text = format!("{}.", idx + 1);
 
         let mut result_row = row![
@@ -84,6 +94,10 @@ pub fn view(results: &[SpellSuggestion], spell_active: bool, dict_size: usize) -
             text(format!("\"{}\"", &result.word))
                 .size(12)
                 .color(iced::Color::from_rgb(0.9, 0.3, 0.3)),
+            Space::with_width(2),
+            text(format!("@{}", position))
+                .size(9)
+                .color(Theme::TEXT_MUTED),
             Space::with_width(4),
             text("\u{2192}").size(11).color(Theme::TEXT_MUTED),
             Space::with_width(4),
@@ -98,11 +112,16 @@ pub fn view(results: &[SpellSuggestion], spell_active: bool, dict_size: usize) -
             );
         } else {
             for suggestion in &result.suggestions {
+                let misspelled = word.clone();
                 result_row = result_row.push(
                     button(
                         text(suggestion.clone()).size(11).color(Theme::TEXT_ACCENT),
                     )
-                    .on_press(Message::InsertSynonym(suggestion.clone()))
+                    .on_press(Message::SpellCheckReplace(
+                        position,
+                        misspelled,
+                        suggestion.clone(),
+                    ))
                     .padding(Padding::from([1, 4])),
                 );
             }
@@ -120,8 +139,49 @@ pub fn view(results: &[SpellSuggestion], spell_active: bool, dict_size: usize) -
         result_list = result_list.push(result_row);
     }
 
+    // User dictionary section
+    let user_dict_section: Element<'static, Message> = if !user_dict_words.is_empty() {
+        let mut dict_row = row![
+            text("User dict:").size(9).color(Theme::TEXT_MUTED),
+            Space::with_width(4),
+        ]
+        .spacing(2);
+
+        for word in user_dict_words.iter().take(15) {
+            let w = word.clone();
+            dict_row = dict_row.push(
+                button(
+                    text(format!("{} \u{2715}", word)).size(9).color(Theme::TEXT_MUTED),
+                )
+                .on_press(Message::SpellCheckRemoveWord(w))
+                .padding(Padding::from([0, 3])),
+            );
+        }
+
+        if user_dict_words.len() > 15 {
+            dict_row = dict_row.push(
+                text(format!("... +{} more", user_dict_words.len() - 15))
+                    .size(9)
+                    .color(Theme::TEXT_MUTED),
+            );
+        }
+
+        dict_row = dict_row.push(Space::with_width(Length::Fill));
+        dict_row = dict_row.push(
+            button(
+                text("Clear all").size(9).color(Theme::ERROR),
+            )
+            .on_press(Message::SpellCheckClearDict)
+            .padding(Padding::from([0, 4])),
+        );
+
+        dict_row.into()
+    } else {
+        Space::with_height(0).into()
+    };
+
     let footer = row![
-        text("Click a suggestion to replace, or '+ Dict' to learn the word")
+        text("Click a suggestion to replace the word in the document")
             .size(9)
             .color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
@@ -135,8 +195,10 @@ pub fn view(results: &[SpellSuggestion], spell_active: bool, dict_size: usize) -
         Space::with_height(4),
         summary,
         Space::with_height(4),
-        scrollable(result_list).height(Length::Fixed(120.0)),
+        scrollable(result_list).height(Length::Fixed(100.0)),
         Space::with_height(4),
+        user_dict_section,
+        Space::with_height(2),
         footer,
     ]
     .padding(Padding::from([8, 12]));

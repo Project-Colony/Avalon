@@ -374,4 +374,84 @@ mod tests {
         ];
         assert_eq!(paragraph_count(&contents), 2);
     }
+
+    #[test]
+    fn test_parse_md_heading_levels() {
+        assert_eq!(parse_md_heading("### Level 3").unwrap().0, 3);
+        assert_eq!(parse_md_heading("#### Level 4").unwrap().0, 4);
+        assert!(parse_md_heading("#").is_none());
+    }
+
+    #[test]
+    fn test_parse_inline_runs_empty() {
+        let runs = parse_inline_runs("", 12.0);
+        assert!(!runs.is_empty());
+    }
+
+    #[test]
+    fn test_find_closing_double_not_found() {
+        let chars: Vec<char> = "hello world".chars().collect();
+        assert!(find_closing_double(&chars, 0, '*').is_none());
+    }
+
+    #[test]
+    fn test_find_closing_single_not_found() {
+        let chars: Vec<char> = "hello world".chars().collect();
+        assert!(find_closing_single(&chars, 0, '*').is_none());
+    }
+
+    #[test]
+    fn test_estimate_pages_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(estimate_pages(&contents), 1);
+    }
+
+    #[test]
+    fn test_word_count_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(word_count(&contents), 0);
+    }
+
+    #[test]
+    fn test_char_count_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(char_count(&contents), 0);
+    }
+
+    #[test]
+    fn test_paragraph_count_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(paragraph_count(&contents), 0);
+    }
+
+    #[test]
+    fn test_paragraph_count_no_double_newlines() {
+        let contents = vec![
+            make_content("A", "One single paragraph without breaks.", false, 0),
+        ];
+        assert_eq!(paragraph_count(&contents), 1);
+    }
+
+    #[test]
+    fn test_paragraph_count_multiple() {
+        let contents = vec![
+            make_content("A", "P1\n\nP2\n\nP3", false, 0),
+            make_content("B", "P4\n\nP5", false, 0),
+        ];
+        assert_eq!(paragraph_count(&contents), 5);
+    }
+
+    #[test]
+    fn test_estimate_pages_large() {
+        let contents = vec![
+            make_content("A", &"word ".repeat(1000), false, 0),
+        ];
+        assert_eq!(estimate_pages(&contents), 4);
+    }
+
+    #[test]
+    fn test_parse_inline_runs_mixed() {
+        let runs = parse_inline_runs("normal **bold** *italic* end", 12.0);
+        assert!(runs.len() >= 4);
+    }
 }

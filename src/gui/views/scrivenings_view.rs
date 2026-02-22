@@ -15,14 +15,38 @@ pub fn view<'a>(
         .map(|d| d.word_count())
         .sum();
 
+    let total_chars: usize = items.iter()
+        .filter_map(|i| i.document.as_ref())
+        .map(|d| d.char_count())
+        .sum();
+
+    let total_sentences: usize = items.iter()
+        .filter_map(|i| i.document.as_ref())
+        .map(|d| {
+            d.content.chars()
+                .filter(|c| *c == '.' || *c == '!' || *c == '?')
+                .count()
+        })
+        .sum();
+
+    // Reading time
+    let reading_min = total_words as f64 / 250.0;
+    let reading_display = if reading_min < 1.0 {
+        "<1 min".to_string()
+    } else if reading_min < 60.0 {
+        format!("~{:.0} min", reading_min)
+    } else {
+        format!("~{:.1}h", reading_min / 60.0)
+    };
+
     let header = container(
         row![
-            text(format!("Scrivenings: {}", parent_title))
+            text(format!("\u{1F4D6} Scrivenings: {}", parent_title))
                 .size(14)
                 .color(Theme::TEXT_SECONDARY),
             Space::with_width(Length::Fill),
-            text(format!("{} docs | {} words | {:.1} pages",
-                items.len(), total_words, total_words as f64 / 250.0))
+            text(format!("{} docs | {} words | {:.1} pg | {}",
+                items.len(), total_words, total_words as f64 / 250.0, reading_display))
                 .size(11)
                 .color(Theme::TEXT_MUTED),
         ]
@@ -35,11 +59,20 @@ pub fn view<'a>(
     if items.is_empty() {
         content_col = content_col.push(
             container(
-                text("Select a folder to view its documents in Scrivenings mode.")
-                    .size(14)
-                    .color(Theme::TEXT_MUTED),
+                column![
+                    Space::with_height(40),
+                    text("Select a folder to view its documents in Scrivenings mode.")
+                        .size(14)
+                        .color(Theme::TEXT_MUTED),
+                    Space::with_height(8),
+                    text("Scrivenings stitches multiple documents together for seamless reading.")
+                        .size(12)
+                        .color(Theme::TEXT_MUTED),
+                ]
+                .align_x(iced::Alignment::Center)
             )
             .padding(24)
+            .center_x(Length::Fill)
         );
     } else {
         let mut cumulative_words: usize = 0;
@@ -50,26 +83,48 @@ pub fn view<'a>(
                 .unwrap_or(0);
             cumulative_words += words;
 
-            // Document title header with section number and status
+            let chars = item.document.as_ref()
+                .map(|d| d.char_count())
+                .unwrap_or(0);
+
+            // Progress through the composite document
+            let progress_pct = if total_words > 0 {
+                (cumulative_words as f64 / total_words as f64 * 100.0) as usize
+            } else {
+                0
+            };
+
+            // Document title header with section number, status, and label
             let status_text = item.metadata.status.as_ref()
                 .map(|s| format!(" [{}]", s.name))
+                .unwrap_or_default();
+
+            let label_indicator = item.metadata.label.as_ref()
+                .map(|l| format!(" \u{25CF} {}", l.name))
                 .unwrap_or_default();
 
             let label_color = item.metadata.label.as_ref()
                 .map(|l| l.color.to_iced_color())
                 .unwrap_or(Theme::TEXT_ACCENT);
 
+            // Section marker
+            let section_marker = format!("\u{2503} {}.", i + 1);
+
             let doc_header = container(
                 row![
-                    text(format!("{}.", i + 1))
-                        .size(11)
-                        .color(Theme::TEXT_MUTED),
-                    Space::with_width(4),
+                    text(section_marker)
+                        .size(12)
+                        .color(Theme::TEXT_ACCENT),
+                    Space::with_width(6),
                     text(item.title.clone())
                         .size(13)
                         .color(label_color),
+                    Space::with_width(8),
+                    text(label_indicator)
+                        .size(10)
+                        .color(label_color),
                     Space::with_width(Length::Fill),
-                    text(format!("{} words{}", words, status_text))
+                    text(format!("{} w | {} ch{}", words, chars, status_text))
                         .size(10)
                         .color(Theme::TEXT_MUTED),
                 ]
@@ -83,13 +138,34 @@ pub fn view<'a>(
             // Synopsis (if any)
             if !item.synopsis.is_empty() {
                 let synopsis = container(
-                    text(format!("Synopsis: {}", item.synopsis))
-                        .size(10)
-                        .color(Theme::TEXT_MUTED),
+                    row![
+                        Space::with_width(28),
+                        text("\u{25B8}").size(10).color(Theme::TEXT_MUTED),
+                        Space::with_width(4),
+                        text(item.synopsis.clone())
+                            .size(10)
+                            .color(Theme::TEXT_MUTED),
+                    ]
                 )
                 .padding(Padding::from([0, 24]))
                 .width(Length::Fill);
                 content_col = content_col.push(synopsis);
+            }
+
+            // Snapshot indicator
+            if item.has_snapshots() {
+                let snap_text = container(
+                    row![
+                        Space::with_width(28),
+                        text(format!("\u{1F4F7} {} snapshot{}", item.snapshot_count(),
+                            if item.snapshot_count() == 1 { "" } else { "s" }))
+                            .size(9)
+                            .color(Theme::TEXT_MUTED),
+                    ]
+                )
+                .padding(Padding::from([0, 24]))
+                .width(Length::Fill);
+                content_col = content_col.push(snap_text);
             }
 
             // Document content
@@ -107,23 +183,37 @@ pub fn view<'a>(
 
             content_col = content_col.push(doc_text);
 
-            // Separator between documents
+            // Separator between documents with progress indicator
             if i < items.len() - 1 {
+                // Mini progress bar
+                let bar_width: usize = 20;
+                let filled = ((progress_pct as f64 / 100.0) * bar_width as f64) as usize;
+                let empty = bar_width.saturating_sub(filled);
+                let bar = format!(
+                    "{}{}",
+                    "\u{2501}".repeat(filled),
+                    "\u{2500}".repeat(empty)
+                );
+
                 let separator = container(
                     row![
-                        Space::with_width(Length::Fill),
-                        text("\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}")
-                            .size(10)
+                        Space::with_width(24),
+                        text(bar.clone())
+                            .size(8)
                             .color(Theme::BORDER),
                         Space::with_width(8),
-                        text(format!("{} cumulative", cumulative_words))
+                        text(format!("{}% | {} of {} words", progress_pct, cumulative_words, total_words))
                             .size(9)
                             .color(Theme::TEXT_MUTED),
                         Space::with_width(Length::Fill),
+                        text(format!("{} of {} docs", i + 1, items.len()))
+                            .size(9)
+                            .color(Theme::TEXT_MUTED),
+                        Space::with_width(24),
                     ]
                     .align_y(iced::Alignment::Center)
                 )
-                .padding(Padding::from([8, 24]))
+                .padding(Padding::from([8, 0]))
                 .width(Length::Fill);
 
                 content_col = content_col.push(separator);
@@ -131,15 +221,27 @@ pub fn view<'a>(
         }
     }
 
-    // Footer with reading time
-    let reading_min = total_words as f64 / 250.0;
+    // Enhanced footer with comprehensive stats
+    let avg_words = if !items.is_empty() {
+        total_words / items.len()
+    } else {
+        0
+    };
+
     let footer = container(
-        text(format!("Total: {} words | {:.1} pages | ~{:.0} min read",
-            total_words, total_words as f64 / 250.0, reading_min))
-            .size(12)
-            .color(Theme::TEXT_MUTED),
+        row![
+            text(format!("Total: {} words | {} chars | {} sentences | {:.1} pages | {} read",
+                total_words, total_chars, total_sentences,
+                total_words as f64 / 250.0, reading_display))
+                .size(10)
+                .color(Theme::TEXT_MUTED),
+            Space::with_width(Length::Fill),
+            text(format!("Avg: {} words/doc", avg_words))
+                .size(10)
+                .color(Theme::TEXT_MUTED),
+        ]
+        .padding(Padding::from([4, 16]))
     )
-    .padding(Padding::from([4, 16]))
     .width(Length::Fill);
 
     let layout = column![

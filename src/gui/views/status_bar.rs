@@ -23,6 +23,11 @@ pub fn view(
     is_dirty: bool,
     project_title: &str,
     session_active: bool,
+    cursor_line: usize,
+    cursor_col: usize,
+    timer_running: bool,
+    timer_remaining: &str,
+    writing_streak: usize,
 ) -> Element<'static, Message> {
     let dirty_indicator = if is_dirty { " \u{2022}" } else { "" };
     let dirty_color = if is_dirty { Theme::WARNING } else { Theme::TEXT_SECONDARY };
@@ -62,6 +67,21 @@ pub fn view(
     } else {
         Space::with_width(0).into()
     };
+
+    // Timer indicator
+    let timer_indicator: Element<'static, Message> = if timer_running {
+        row![
+            Space::with_width(4),
+            text("\u{23F1}").size(10),
+            Space::with_width(2),
+            text(timer_remaining.to_string()).size(9).color(Theme::TEXT_ACCENT),
+        ].into()
+    } else {
+        Space::with_width(0).into()
+    };
+
+    // Cursor position
+    let cursor_info = format!("Ln {}, Col {}", cursor_line, cursor_col);
 
     // Target progress (if set)
     let target_info: Element<'static, Message> = if let Some(target) = target_words {
@@ -113,9 +133,25 @@ pub fn view(
         if stats.document_count == 1 { "" } else { "s" }
     );
 
+    // Writing streak indicator
+    let streak_indicator: Element<'static, Message> = if writing_streak > 0 {
+        let streak_color = if writing_streak >= 7 { Theme::SUCCESS }
+        else if writing_streak >= 3 { Theme::WARNING }
+        else { Theme::TEXT_MUTED };
+        let streak_icon = if writing_streak >= 7 { "\u{1F525}" } else { "\u{26A1}" };
+        row![
+            Space::with_width(4),
+            text(format!("{} {}d", streak_icon, writing_streak)).size(9).color(streak_color),
+        ].into()
+    } else {
+        Space::with_width(0).into()
+    };
+
     let content = row![
         text(project_info).size(11).color(dirty_color),
         session_indicator,
+        timer_indicator,
+        streak_indicator,
         Space::with_width(Length::Fill),
         text(progress).size(10).color(Theme::TEXT_PRIMARY),
         target_info,
@@ -124,6 +160,8 @@ pub fn view(
         Space::with_width(8),
         text(docs_text).size(10).color(Theme::TEXT_MUTED),
         Space::with_width(8),
+        text(cursor_info).size(9).color(Theme::TEXT_MUTED),
+        Space::with_width(4),
         text("UTF-8").size(9).color(Theme::TEXT_MUTED),
     ]
     .padding(Padding::from([3, 12]));

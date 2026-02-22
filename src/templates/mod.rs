@@ -312,4 +312,100 @@ mod tests {
         ids.dedup();
         assert_eq!(ids.len(), original_len, "Template IDs must be unique");
     }
+
+    #[test]
+    fn test_find_template_blank() {
+        let blank = find_template("blank").unwrap();
+        assert_eq!(blank.category, TemplateCategory::Blank);
+    }
+
+    #[test]
+    fn test_find_template_screenplay() {
+        let screenplay = find_template("screenplay").unwrap();
+        assert_eq!(screenplay.category, TemplateCategory::Scriptwriting);
+        assert!(screenplay.description.contains("screenplay"));
+    }
+
+    #[test]
+    fn test_find_template_academic() {
+        let academic = find_template("academic").unwrap();
+        assert_eq!(academic.category, TemplateCategory::Academic);
+    }
+
+    #[test]
+    fn test_templates_by_category_academic() {
+        let academic = templates_by_category(&TemplateCategory::Academic);
+        assert!(academic.len() >= 3);
+        for t in &academic {
+            assert_eq!(t.category, TemplateCategory::Academic);
+        }
+    }
+
+    #[test]
+    fn test_templates_by_category_blank() {
+        let blank = templates_by_category(&TemplateCategory::Blank);
+        assert_eq!(blank.len(), 1);
+    }
+
+    #[test]
+    fn test_templates_by_category_misc() {
+        let misc = templates_by_category(&TemplateCategory::Miscellaneous);
+        assert!(misc.len() >= 2);
+    }
+
+    #[test]
+    fn test_template_category_display() {
+        assert_eq!(format!("{}", TemplateCategory::Fiction), "Fiction");
+        assert_eq!(format!("{}", TemplateCategory::NonFiction), "Non-Fiction");
+        assert_eq!(format!("{}", TemplateCategory::Scriptwriting), "Scriptwriting");
+        assert_eq!(format!("{}", TemplateCategory::Academic), "Academic");
+        assert_eq!(format!("{}", TemplateCategory::Miscellaneous), "Miscellaneous");
+        assert_eq!(format!("{}", TemplateCategory::Blank), "Blank");
+    }
+
+    #[test]
+    fn test_template_category_icon_not_empty() {
+        for cat in TemplateCategory::all() {
+            assert!(!cat.icon().is_empty());
+        }
+    }
+
+    #[test]
+    fn test_template_matches_query_case_insensitive() {
+        let t = find_template("novel").unwrap();
+        assert!(t.matches_query("NOVEL"));
+        assert!(t.matches_query("novel"));
+        assert!(t.matches_query("Novel"));
+    }
+
+    #[test]
+    fn test_template_matches_query_by_id() {
+        let t = find_template("novel_with_parts").unwrap();
+        assert!(t.matches_query("novel_with_parts"));
+    }
+
+    #[test]
+    fn test_template_matches_query_by_description() {
+        let t = find_template("short_story").unwrap();
+        assert!(t.matches_query("simple"));
+    }
+
+    #[test]
+    fn test_all_templates_have_valid_categories() {
+        let templates = built_in_templates();
+        let all_cats = TemplateCategory::all();
+        for t in &templates {
+            assert!(all_cats.contains(&t.category),
+                "Template '{}' has unrecognized category", t.name);
+        }
+    }
+
+    #[test]
+    fn test_template_serialization() {
+        let t = find_template("novel").unwrap();
+        let json = serde_json::to_string(&t).unwrap();
+        let parsed: Template = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.name, "Novel");
+        assert_eq!(parsed.template_id, "novel");
+    }
 }

@@ -406,4 +406,141 @@ mod tests {
         assert!(summary.contains("dialogue blocks"));
         assert!(summary.contains("pages"));
     }
+
+    #[test]
+    fn test_compile_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.is_empty() || result.trim().is_empty());
+    }
+
+    #[test]
+    fn test_compile_front_matter_no_author() {
+        let mut opts = make_opts();
+        opts.include_front_matter = true;
+        opts.author = String::new();
+        let contents = vec![make_content("Scene", "Text.", false, 1)];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("Title: Test Screenplay"));
+        assert!(!result.contains("Author:"));
+    }
+
+    #[test]
+    fn test_compile_multiple_acts() {
+        let contents = vec![
+            make_content("Act I", "", true, 0),
+            make_content("Scene 1", "Action.", false, 1),
+            make_content("Act II", "", true, 0),
+            make_content("Scene 2", "More action.", false, 1),
+        ];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("# ACT I"));
+        assert!(result.contains("# ACT II"));
+    }
+
+    #[test]
+    fn test_prose_to_fountain_scene_heading() {
+        let result = prose_to_fountain("INT. OFFICE - DAY\nSome action.");
+        assert!(result.contains("INT. OFFICE - DAY"));
+    }
+
+    #[test]
+    fn test_prose_to_fountain_transition() {
+        let result = prose_to_fountain("CUT TO:");
+        assert!(result.contains("CUT TO:"));
+    }
+
+    #[test]
+    fn test_prose_to_fountain_centered() {
+        let result = prose_to_fountain(">CENTERED TEXT<");
+        assert!(result.contains(">CENTERED TEXT<"));
+    }
+
+    #[test]
+    fn test_prose_to_fountain_parenthetical() {
+        let result = prose_to_fountain("(whispering)");
+        assert!(result.contains("(whispering)"));
+    }
+
+    #[test]
+    fn test_prose_to_fountain_note() {
+        let result = prose_to_fountain("[[This is a note]]");
+        assert!(result.contains("[[This is a note]]"));
+    }
+
+    #[test]
+    fn test_prose_to_fountain_page_break() {
+        let result = prose_to_fountain("===");
+        assert!(result.contains("==="));
+    }
+
+    #[test]
+    fn test_is_scene_heading_int_space() {
+        assert!(is_scene_heading("INT OFFICE - DAY"));
+    }
+
+    #[test]
+    fn test_is_scene_heading_ie() {
+        assert!(is_scene_heading("I/E CAR - MOVING"));
+        assert!(is_scene_heading("I/E. CAR"));
+    }
+
+    #[test]
+    fn test_is_character_cue_with_extension() {
+        assert!(is_character_cue("JOHN (V.O.)"));
+        assert!(is_character_cue("MARY (CONT'D)"));
+    }
+
+    #[test]
+    fn test_extract_characters_strips_extensions() {
+        let input = "INT. OFFICE\n\nJOHN (V.O.)\nSome dialogue.\n";
+        let chars = extract_characters(input);
+        assert!(chars.contains(&"JOHN".to_string()));
+    }
+
+    #[test]
+    fn test_extract_characters_empty() {
+        let chars = extract_characters("Just some action text, no characters.");
+        assert!(chars.is_empty());
+    }
+
+    #[test]
+    fn test_scene_count_forced() {
+        // A . prefix forces a scene heading
+        let input = ".FLASHBACK - NIGHT\nAction.\n";
+        assert_eq!(scene_count(input), 1);
+    }
+
+    #[test]
+    fn test_parse_fountain_empty() {
+        let sections = parse_fountain("");
+        assert!(sections.is_empty());
+    }
+
+    #[test]
+    fn test_parse_title_page_empty() {
+        let meta = parse_title_page("");
+        assert!(meta.is_empty());
+    }
+
+    #[test]
+    fn test_parse_title_page_no_colon() {
+        let meta = parse_title_page("No colon here\n\nContent");
+        assert!(meta.is_empty());
+    }
+
+    #[test]
+    fn test_dialogue_count_empty() {
+        assert_eq!(dialogue_count("No dialogue here."), 0);
+    }
+
+    #[test]
+    fn test_transition_count_empty() {
+        assert_eq!(transition_count("No transitions here."), 0);
+    }
+
+    #[test]
+    fn test_estimate_page_count_short() {
+        assert_eq!(estimate_page_count("Short script."), 1); // Min 1
+    }
 }

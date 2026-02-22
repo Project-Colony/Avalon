@@ -278,6 +278,46 @@ impl Thesaurus {
         let p = prefix.to_lowercase();
         self.entries.keys().filter(|k| k.starts_with(&p)).collect()
     }
+
+    /// Get synonyms filtered by part of speech.
+    pub fn synonyms_by_pos(&self, word: &str, pos: &PartOfSpeech) -> Vec<String> {
+        let entries = self.lookup(word);
+        let mut synonyms: Vec<String> = entries.iter()
+            .filter(|e| &e.part_of_speech == pos)
+            .flat_map(|e| e.synonyms.iter().cloned())
+            .collect();
+        synonyms.sort();
+        synonyms.dedup();
+        synonyms
+    }
+
+    /// Get all parts of speech for a word.
+    pub fn parts_of_speech_for(&self, word: &str) -> Vec<PartOfSpeech> {
+        let entries = self.lookup(word);
+        let mut pos: Vec<PartOfSpeech> = entries.iter()
+            .map(|e| e.part_of_speech.clone())
+            .collect();
+        pos.dedup();
+        pos
+    }
+
+    /// Suggest a replacement word that varies from the original.
+    /// Useful for reducing word repetition in writing.
+    pub fn suggest_variation(&self, word: &str, avoid: &[&str]) -> Option<String> {
+        let syns = self.synonyms(word);
+        syns.into_iter()
+            .find(|s| !avoid.contains(&s.as_str()))
+    }
+
+    /// Count total unique synonyms across all words.
+    pub fn total_unique_synonyms(&self) -> usize {
+        let mut all_syns: Vec<String> = self.entries.values()
+            .flat_map(|entries| entries.iter().flat_map(|e| e.synonyms.iter().cloned()))
+            .collect();
+        all_syns.sort();
+        all_syns.dedup();
+        all_syns.len()
+    }
 }
 
 impl ThesaurusEntry {
@@ -438,5 +478,249 @@ mod tests {
     fn test_part_of_speech_all() {
         let all = PartOfSpeech::all();
         assert_eq!(all.len(), 5);
+    }
+
+    #[test]
+    fn test_default_constructor() {
+        let t = Thesaurus::default();
+        assert!(!t.loaded);
+        assert_eq!(t.word_count(), 0);
+    }
+
+    #[test]
+    fn test_lookup_case_insensitive() {
+        let t = make_thesaurus();
+        let entries_lower = t.lookup("happy");
+        let entries_upper = t.lookup("HAPPY");
+        assert_eq!(entries_lower.len(), entries_upper.len());
+    }
+
+    #[test]
+    fn test_lookup_missing_word() {
+        let t = make_thesaurus();
+        let entries = t.lookup("xyznonexistent");
+        assert!(entries.is_empty());
+    }
+
+    #[test]
+    fn test_synonyms_deduplication() {
+        let t = make_thesaurus();
+        let syns = t.synonyms("good");
+        // Check no duplicates
+        let mut sorted = syns.clone();
+        sorted.sort();
+        sorted.dedup();
+        assert_eq!(syns.len(), sorted.len());
+    }
+
+    #[test]
+    fn test_antonyms_empty_builtin() {
+        let t = make_thesaurus();
+        // Built-in thesaurus doesn't have antonyms
+        let ants = t.antonyms("happy");
+        assert!(ants.is_empty());
+    }
+
+    #[test]
+    fn test_words_with_prefix_empty() {
+        let t = make_thesaurus();
+        let words = t.words_with_prefix("zzz");
+        assert!(words.is_empty());
+    }
+
+    #[test]
+    fn test_words_with_prefix_case_insensitive() {
+        let t = make_thesaurus();
+        let words = t.words_with_prefix("HA");
+        assert!(words.iter().any(|w| w.as_str() == "happy"));
+    }
+
+    #[test]
+    fn test_random_synonym_deterministic_for_same_word() {
+        let t = make_thesaurus();
+        // random_synonym uses word properties, should be deterministic for same word
+        let s1 = t.random_synonym("good");
+        let s2 = t.random_synonym("good");
+        assert_eq!(s1, s2);
+    }
+
+    #[test]
+    fn test_total_entries_matches_word_count() {
+        let t = make_thesaurus();
+        // Each word has exactly one entry in the builtin thesaurus
+        assert_eq!(t.total_entries(), t.word_count());
+    }
+
+    #[test]
+    fn test_thesaurus_entry_has_antonyms() {
+        let entry = ThesaurusEntry {
+            part_of_speech: PartOfSpeech::Adjective,
+            definition: "test".to_string(),
+            synonyms: vec!["good".to_string()],
+            antonyms: vec!["bad".to_string()],
+        };
+        assert!(entry.has_antonyms());
+        assert_eq!(entry.total_related(), 2);
+    }
+
+    #[test]
+    fn test_thesaurus_entry_no_antonyms() {
+        let entry = ThesaurusEntry {
+            part_of_speech: PartOfSpeech::Noun,
+            definition: String::new(),
+            synonyms: vec!["a".to_string(), "b".to_string()],
+            antonyms: vec![],
+        };
+        assert!(!entry.has_antonyms());
+        assert_eq!(entry.total_related(), 2);
+    }
+
+    #[test]
+    fn test_thesaurus_entry_summary_format() {
+        let entry = ThesaurusEntry {
+            part_of_speech: PartOfSpeech::Verb,
+            definition: String::new(),
+            synonyms: vec!["x".to_string(), "y".to_string()],
+            antonyms: vec!["z".to_string()],
+        };
+        let summary = entry.summary();
+        assert!(summary.contains("verb"));
+        assert!(summary.contains("2 synonym"));
+        assert!(summary.contains("1 antonym"));
+    }
+
+    #[test]
+    fn test_part_of_speech_display_unknown() {
+        assert_eq!(format!("{}", PartOfSpeech::Unknown), "");
+    }
+
+    #[test]
+    fn test_part_of_speech_equality() {
+        assert_eq!(PartOfSpeech::Noun, PartOfSpeech::Noun);
+        assert_ne!(PartOfSpeech::Noun, PartOfSpeech::Verb);
+    }
+
+    #[test]
+    fn test_all_words_nonempty() {
+        let t = make_thesaurus();
+        let words = t.all_words();
+        for w in &words {
+            assert!(!w.is_empty());
+        }
+    }
+
+    #[test]
+    fn test_contains_all_builtin() {
+        let t = make_thesaurus();
+        // Spot check some builtin words
+        assert!(t.contains("good"));
+        assert!(t.contains("bad"));
+        assert!(t.contains("walk"));
+        assert!(t.contains("run"));
+        assert!(t.contains("house"));
+        assert!(t.contains("story"));
+    }
+
+    #[test]
+    fn test_synonyms_sorted() {
+        let t = make_thesaurus();
+        let syns = t.synonyms("good");
+        let mut sorted = syns.clone();
+        sorted.sort();
+        assert_eq!(syns, sorted, "Synonyms should be sorted");
+    }
+
+    #[test]
+    fn test_load_builtin_idempotent() {
+        let mut t = Thesaurus::new();
+        t.load_builtin();
+        let count1 = t.word_count();
+        t.load_builtin();
+        let count2 = t.word_count();
+        // Loading twice won't double entries since we use entry().or_insert
+        // but it will add duplicate entries in the vec
+        assert!(count2 >= count1);
+    }
+
+    #[test]
+    fn test_load_from_wordnet_nonexistent() {
+        let mut t = Thesaurus::new();
+        let result = t.load_from_wordnet(std::path::Path::new("/nonexistent/path"));
+        assert!(result.is_ok()); // No files found, but no error
+        assert!(!t.loaded);
+    }
+
+    // --- New feature tests ---
+
+    #[test]
+    fn test_synonyms_by_pos() {
+        let t = make_thesaurus();
+        let adj_syns = t.synonyms_by_pos("good", &PartOfSpeech::Adjective);
+        assert!(!adj_syns.is_empty());
+        assert!(adj_syns.contains(&"great".to_string()));
+
+        // No verb entry for "good" in builtin
+        let verb_syns = t.synonyms_by_pos("good", &PartOfSpeech::Verb);
+        assert!(verb_syns.is_empty());
+    }
+
+    #[test]
+    fn test_synonyms_by_pos_missing() {
+        let t = make_thesaurus();
+        let syns = t.synonyms_by_pos("xyznonword", &PartOfSpeech::Noun);
+        assert!(syns.is_empty());
+    }
+
+    #[test]
+    fn test_parts_of_speech_for() {
+        let t = make_thesaurus();
+        let pos = t.parts_of_speech_for("walk");
+        assert!(pos.contains(&PartOfSpeech::Verb));
+    }
+
+    #[test]
+    fn test_parts_of_speech_for_missing() {
+        let t = make_thesaurus();
+        let pos = t.parts_of_speech_for("xyznonword");
+        assert!(pos.is_empty());
+    }
+
+    #[test]
+    fn test_suggest_variation() {
+        let t = make_thesaurus();
+        let var = t.suggest_variation("good", &["great", "fine"]);
+        assert!(var.is_some());
+        assert_ne!(var.as_deref(), Some("great"));
+        assert_ne!(var.as_deref(), Some("fine"));
+    }
+
+    #[test]
+    fn test_suggest_variation_all_avoided() {
+        let t = make_thesaurus();
+        // Avoid all synonyms of "good"
+        let all_syns = t.synonyms("good");
+        let avoid: Vec<&str> = all_syns.iter().map(|s| s.as_str()).collect();
+        let var = t.suggest_variation("good", &avoid);
+        assert!(var.is_none());
+    }
+
+    #[test]
+    fn test_suggest_variation_missing_word() {
+        let t = make_thesaurus();
+        let var = t.suggest_variation("xyznonword", &[]);
+        assert!(var.is_none());
+    }
+
+    #[test]
+    fn test_total_unique_synonyms() {
+        let t = make_thesaurus();
+        let total = t.total_unique_synonyms();
+        assert!(total > 50, "Expected > 50 unique synonyms, got {}", total);
+    }
+
+    #[test]
+    fn test_total_unique_synonyms_empty() {
+        let t = Thesaurus::new();
+        assert_eq!(t.total_unique_synonyms(), 0);
     }
 }

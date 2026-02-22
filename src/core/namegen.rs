@@ -725,6 +725,100 @@ mod tests {
     }
 
     #[test]
+    fn test_arabic_female() {
+        let name = NameGenerator::culture_name("arabic", "female");
+        assert!(name.contains(' '));
+    }
+
+    #[test]
+    fn test_spanish_female_double_surname() {
+        let name = NameGenerator::culture_name("spanish", "female");
+        let parts: Vec<&str> = name.split_whitespace().collect();
+        assert_eq!(parts.len(), 3);
+    }
+
+    #[test]
+    fn test_indian_male() {
+        let name = NameGenerator::culture_name("indian", "male");
+        assert!(name.contains(' '));
+    }
+
+    #[test]
+    fn test_chinese_names_have_two_parts() {
+        let m = NameGenerator::culture_name("chinese", "male");
+        let f = NameGenerator::culture_name("chinese", "female");
+        assert_eq!(m.split_whitespace().count(), 2);
+        assert_eq!(f.split_whitespace().count(), 2);
+    }
+
+    #[test]
+    fn test_scifi_name_structure() {
+        let name = NameGenerator::scifi_name();
+        // Scifi names are prefix + suffix, no space
+        assert!(name.len() >= 3);
+    }
+
+    #[test]
+    fn test_fantasy_name_structure() {
+        let name = NameGenerator::fantasy_name();
+        // Fantasy names are prefix + suffix, single word
+        assert!(name.len() >= 4);
+    }
+
+    #[test]
+    fn test_place_name_structure() {
+        let name = NameGenerator::place_name();
+        // Place names are prefix + suffix, single compound
+        assert!(!name.is_empty());
+    }
+
+    #[test]
+    fn test_medieval_name_parts() {
+        let name = NameGenerator::medieval_name();
+        let parts: Vec<&str> = name.split_whitespace().collect();
+        // Medieval names: "Name the Brave" or "Name of Ashford" = 3+ parts
+        assert!(parts.len() >= 2);
+    }
+
+    #[test]
+    fn test_title_name_contains_honorific() {
+        let name = NameGenerator::title_name();
+        let parts: Vec<&str> = name.split_whitespace().collect();
+        assert_eq!(parts.len(), 2);
+        // First part should be an honorific
+        let honorifics = NameGenerator::HONORIFICS;
+        assert!(honorifics.contains(&parts[0]), "First part should be an honorific: {}", parts[0]);
+    }
+
+    #[test]
+    fn test_nickname_parts() {
+        let name = NameGenerator::nickname();
+        let parts: Vec<&str> = name.split_whitespace().collect();
+        assert_eq!(parts.len(), 2);
+    }
+
+    #[test]
+    fn test_company_name_parts() {
+        let name = NameGenerator::company_name();
+        let parts: Vec<&str> = name.split_whitespace().collect();
+        assert_eq!(parts.len(), 2);
+    }
+
+    #[test]
+    fn test_vehicle_name_three_parts() {
+        let name = NameGenerator::vehicle_name();
+        let parts: Vec<&str> = name.split_whitespace().collect();
+        assert_eq!(parts.len(), 3); // "The" + adj + noun
+    }
+
+    #[test]
+    fn test_tavern_name_three_parts() {
+        let name = NameGenerator::tavern_name();
+        let parts: Vec<&str> = name.split_whitespace().collect();
+        assert_eq!(parts.len(), 3); // "The" + adj + noun
+    }
+
+    #[test]
     fn test_name_arrays_not_empty() {
         assert!(!NameGenerator::FIRST_NAMES_M.is_empty());
         assert!(!NameGenerator::FIRST_NAMES_F.is_empty());

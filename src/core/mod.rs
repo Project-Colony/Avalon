@@ -13,4 +13,12 @@ pub mod bookmark;
 pub mod recent;
 pub mod script;
 pub mod backup;
+pub mod watcher;
+pub mod indexer;
+pub mod targets;
+pub mod autosave;
+pub mod links;
+pub mod validation;
+pub mod timer;
+pub mod doc_templates;
 

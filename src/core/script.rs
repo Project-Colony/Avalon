@@ -346,4 +346,174 @@ mod tests {
         assert!(result.contains('\u{2014}') || result.contains("--")); // em dash or original
         assert!(result.contains('\u{2026}') || result.contains("...")); // ellipsis or original
     }
+
+    #[test]
+    fn test_auto_correction_apply_em_dash() {
+        let ac = AutoCorrection {
+            em_dashes: true,
+            smart_quotes: false,
+            ellipsis: false,
+            capitalize_sentences: false,
+            superscript_ordinals: false,
+        };
+        let result = ac.apply("He said -- and left");
+        assert!(result.contains('\u{2014}'));
+        assert!(!result.contains("--"));
+    }
+
+    #[test]
+    fn test_auto_correction_apply_ellipsis() {
+        let ac = AutoCorrection {
+            em_dashes: false,
+            smart_quotes: false,
+            ellipsis: true,
+            capitalize_sentences: false,
+            superscript_ordinals: false,
+        };
+        let result = ac.apply("Wait for it...");
+        assert!(result.contains('\u{2026}'));
+        assert!(!result.contains("..."));
+    }
+
+    #[test]
+    fn test_auto_correction_apply_smart_quotes() {
+        let ac = AutoCorrection {
+            em_dashes: false,
+            smart_quotes: true,
+            ellipsis: false,
+            capitalize_sentences: false,
+            superscript_ordinals: false,
+        };
+        let result = ac.apply("He said \"hello\" today");
+        assert!(result.contains('\u{201C}')); // left double quote
+        assert!(result.contains('\u{201D}')); // right double quote
+        assert!(!result.contains('"'));
+    }
+
+    #[test]
+    fn test_auto_correction_apply_apostrophe() {
+        let ac = AutoCorrection {
+            em_dashes: false,
+            smart_quotes: true,
+            ellipsis: false,
+            capitalize_sentences: false,
+            superscript_ordinals: false,
+        };
+        let result = ac.apply("It's a test");
+        assert!(result.contains('\u{2019}')); // right single quote (apostrophe)
+    }
+
+    #[test]
+    fn test_auto_correction_apply_opening_single_quote() {
+        let ac = AutoCorrection {
+            em_dashes: false,
+            smart_quotes: true,
+            ellipsis: false,
+            capitalize_sentences: false,
+            superscript_ordinals: false,
+        };
+        let result = ac.apply("'Hello' he said");
+        assert!(result.contains('\u{2018}')); // left single quote
+    }
+
+    #[test]
+    fn test_auto_correction_nothing_enabled() {
+        let ac = AutoCorrection {
+            em_dashes: false,
+            smart_quotes: false,
+            ellipsis: false,
+            capitalize_sentences: false,
+            superscript_ordinals: false,
+        };
+        let input = "Hello -- world... \"test\"";
+        assert_eq!(ac.apply(input), input);
+    }
+
+    #[test]
+    fn test_auto_correction_active_list() {
+        let ac = AutoCorrection {
+            em_dashes: true,
+            smart_quotes: false,
+            ellipsis: true,
+            capitalize_sentences: false,
+            superscript_ordinals: false,
+        };
+        let active = ac.active_list();
+        assert_eq!(active.len(), 2);
+        assert!(active.contains(&"Em Dashes"));
+        assert!(active.contains(&"Ellipsis"));
+    }
+
+    #[test]
+    fn test_revision_level_all() {
+        let all = RevisionLevel::all();
+        assert_eq!(all.len(), 5);
+    }
+
+    #[test]
+    fn test_revision_level_number() {
+        assert_eq!(RevisionLevel::First.number(), 1);
+        assert_eq!(RevisionLevel::Second.number(), 2);
+        assert_eq!(RevisionLevel::Third.number(), 3);
+        assert_eq!(RevisionLevel::Fourth.number(), 4);
+        assert_eq!(RevisionLevel::Fifth.number(), 5);
+    }
+
+    #[test]
+    fn test_revision_level_color_hex() {
+        for level in RevisionLevel::all() {
+            let hex = level.color_hex();
+            assert!(hex.starts_with('#'));
+            assert_eq!(hex.len(), 7);
+        }
+    }
+
+    #[test]
+    fn test_revision_level_next_wraps() {
+        let mut level = RevisionLevel::First;
+        for _ in 0..5 {
+            level = level.next();
+        }
+        assert_eq!(level, RevisionLevel::First); // Should wrap back to First
+    }
+
+    #[test]
+    fn test_revision_level_equality() {
+        assert_eq!(RevisionLevel::First, RevisionLevel::First);
+        assert_ne!(RevisionLevel::First, RevisionLevel::Second);
+    }
+
+    #[test]
+    fn test_script_element_equality() {
+        assert_eq!(ScriptElement::Action, ScriptElement::Action);
+        assert_ne!(ScriptElement::Action, ScriptElement::Dialogue);
+    }
+
+    #[test]
+    fn test_script_element_all_have_labels() {
+        for el in ScriptElement::all() {
+            assert!(!el.label().is_empty());
+        }
+    }
+
+    #[test]
+    fn test_script_element_parenthetical_indent() {
+        assert_eq!(ScriptElement::Parenthetical.indent_level(), 1);
+    }
+
+    #[test]
+    fn test_script_element_note_not_uppercase() {
+        assert!(!ScriptElement::Note.is_uppercase());
+        assert!(!ScriptElement::Shot.is_uppercase());
+    }
+
+    #[test]
+    fn test_next_element_transition() {
+        assert!(matches!(ScriptElement::Transition.next_element_on_enter(), ScriptElement::Action));
+    }
+
+    #[test]
+    fn test_next_element_parenthetical() {
+        assert!(matches!(ScriptElement::Parenthetical.next_element_on_enter(), ScriptElement::Dialogue));
+    }
 }

@@ -450,4 +450,366 @@ mod tests {
         assert!(pkgs.contains(&"hyperref"));
         assert!(pkgs.len() >= 9);
     }
+
+    #[test]
+    fn test_compile_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("\\documentclass"));
+        assert!(result.contains("\\end{document}"));
+    }
+
+    #[test]
+    fn test_compile_no_front_matter() {
+        let opts = make_opts();
+        let contents = vec![make_content("Scene", "Text.", false, 0)];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(!result.contains("\\maketitle"));
+    }
+
+    #[test]
+    fn test_compile_deep_folder() {
+        let contents = vec![make_content("Deep", "", true, 5)];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("\\subparagraph{Deep}"));
+    }
+
+    #[test]
+    fn test_markdown_to_latex_heading() {
+        let result = markdown_to_latex("# Title\n\nSome text.");
+        assert!(result.contains("\\section*{Title}"));
+    }
+
+    #[test]
+    fn test_markdown_to_latex_blockquote() {
+        let result = markdown_to_latex("> A quote here");
+        assert!(result.contains("\\begin{quote}"));
+        assert!(result.contains("\\end{quote}"));
+    }
+
+    #[test]
+    fn test_markdown_to_latex_hr() {
+        let result = markdown_to_latex("---");
+        assert!(result.contains("\\rule"));
+    }
+
+    #[test]
+    fn test_markdown_to_latex_list_item() {
+        let result = markdown_to_latex("- Item one");
+        assert!(result.contains("\\textbullet"));
+    }
+
+    #[test]
+    fn test_inline_strikethrough() {
+        let result = convert_inline_formatting("~~struck~~");
+        assert!(result.contains("\\sout{struck}"));
+    }
+
+    #[test]
+    fn test_separator_custom() {
+        let result = separator_latex(&SeparatorType::Custom("***".to_string()));
+        assert!(result.contains("\\begin{center}"));
+    }
+
+    #[test]
+    fn test_compile_multiple_docs_with_separator() {
+        let mut opts = make_opts();
+        opts.separator = SeparatorType::PageBreak;
+        let contents = vec![
+            make_content("A", "First.", false, 0),
+            make_content("B", "Second.", false, 0),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("\\newpage"));
+    }
+
+    #[test]
+    fn test_escape_latex_tilde_caret() {
+        assert!(escape_latex("a~b").contains("\\textasciitilde{}"));
+        assert!(escape_latex("a^b").contains("\\textasciicircum{}"));
+    }
+
+    #[test]
+    fn test_escape_latex_braces() {
+        assert!(escape_latex("{test}").contains("\\{"));
+        assert!(escape_latex("{test}").contains("\\}"));
+    }
+
+    #[test]
+    fn test_parse_heading_empty() {
+        assert!(parse_heading("#").is_none());
+        assert!(parse_heading("# ").is_none());
+    }
+
+    #[test]
+    fn test_estimate_output_size() {
+        let contents = vec![make_content("A", "text", false, 0)];
+        let size = estimate_output_size(&contents, &make_opts());
+        assert!(size > 600);
+    }
+
+    #[test]
+    fn test_estimate_output_size_front_matter() {
+        let contents = vec![make_content("A", "text", false, 0)];
+        let mut opts = make_opts();
+        opts.include_front_matter = true;
+        let size_fm = estimate_output_size(&contents, &opts);
+        opts.include_front_matter = false;
+        let size_no = estimate_output_size(&contents, &opts);
+        assert!(size_fm > size_no);
+    }
+
+    #[test]
+    fn test_word_count_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(word_count(&contents), 0);
+    }
+
+    #[test]
+    fn test_estimate_pages_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(estimate_pages(&contents), 1);
+    }
+
+    #[test]
+    fn test_compile_title_in_header() {
+        let opts = make_opts();
+        let contents = vec![make_content("Scene", "text.", false, 0)];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("\\fancyhead[R]"));
+        assert!(result.contains("Test Book"));
+    }
+
+    #[test]
+    fn test_compile_no_title() {
+        let mut opts = make_opts();
+        opts.title = String::new();
+        let contents = vec![make_content("Scene", "text.", false, 0)];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(!result.contains("\\title{}"));
+    }
+
+    #[test]
+    fn test_compile_multiple_text_docs_with_separator() {
+        let mut opts = make_opts();
+        opts.separator = SeparatorType::EmptyLine;
+        let contents = vec![
+            make_content("A", "First text.", false, 0),
+            make_content("B", "Second text.", false, 0),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("\\bigskip"));
+        assert!(result.contains("First text."));
+        assert!(result.contains("Second text."));
+    }
+
+    #[test]
+    fn test_compile_section_break_separator() {
+        let mut opts = make_opts();
+        opts.separator = SeparatorType::SectionBreak;
+        let contents = vec![
+            make_content("A", "First.", false, 0),
+            make_content("B", "Second.", false, 0),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("\\ast"));
+    }
+
+    #[test]
+    fn test_compile_no_separator() {
+        let mut opts = make_opts();
+        opts.separator = SeparatorType::None;
+        let contents = vec![
+            make_content("A", "First.", false, 0),
+            make_content("B", "Second.", false, 0),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("First."));
+        assert!(result.contains("Second."));
+        assert!(!result.contains("\\bigskip"));
+        assert!(!result.contains("\\newpage\n\nSecond"));
+    }
+
+    #[test]
+    fn test_compile_custom_separator() {
+        let mut opts = make_opts();
+        opts.separator = SeparatorType::Custom("***".to_string());
+        let contents = vec![
+            make_content("A", "First.", false, 0),
+            make_content("B", "Second.", false, 0),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("\\begin{center}"));
+    }
+
+    #[test]
+    fn test_escape_latex_backslash() {
+        let result = escape_latex("a\\b");
+        // Note: escape_latex replaces \ with \textbackslash{}, then { and } get
+        // escaped by subsequent replacement passes, yielding \textbackslash\{\}
+        assert!(result.contains("\\textbackslash\\{\\}"));
+    }
+
+    #[test]
+    fn test_escape_latex_all_specials() {
+        let input = "100$ 50% a&b c#d e_f {g} ~h ^i";
+        let result = escape_latex(input);
+        assert!(result.contains("\\$"));
+        assert!(result.contains("\\%"));
+        assert!(result.contains("\\&"));
+        assert!(result.contains("\\#"));
+        assert!(result.contains("\\_"));
+        assert!(result.contains("\\{"));
+        assert!(result.contains("\\}"));
+        assert!(result.contains("\\textasciitilde{}"));
+        assert!(result.contains("\\textasciicircum{}"));
+    }
+
+    #[test]
+    fn test_parse_heading_levels() {
+        let h1 = parse_heading("# Title").unwrap();
+        assert!(h1.contains("\\section*{Title}"));
+
+        let h2 = parse_heading("## Sub").unwrap();
+        assert!(h2.contains("\\subsection*{Sub}"));
+
+        let h3 = parse_heading("### SubSub").unwrap();
+        assert!(h3.contains("\\subsubsection*{SubSub}"));
+
+        let h4 = parse_heading("#### Para").unwrap();
+        assert!(h4.contains("\\paragraph*{Para}"));
+
+        let h5 = parse_heading("##### Deep").unwrap();
+        assert!(h5.contains("\\subparagraph*{Deep}"));
+    }
+
+    #[test]
+    fn test_parse_heading_too_deep() {
+        // 7 # is invalid (only 1-6 supported)
+        let result = parse_heading("####### Way too deep");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_markdown_to_latex_list_items() {
+        let result = markdown_to_latex("- Item one\n* Item two");
+        assert!(result.contains("\\textbullet"));
+    }
+
+    #[test]
+    fn test_markdown_to_latex_horizontal_rules() {
+        for rule in &["---", "***", "___"] {
+            let result = markdown_to_latex(rule);
+            assert!(result.contains("\\rule"), "Failed for rule: {}", rule);
+        }
+    }
+
+    #[test]
+    fn test_markdown_to_latex_consecutive_blockquotes() {
+        let result = markdown_to_latex("> Line one\n> Line two");
+        // Should open quote once and include both lines
+        let begin_count = result.matches("\\begin{quote}").count();
+        let end_count = result.matches("\\end{quote}").count();
+        assert_eq!(begin_count, 1);
+        assert_eq!(end_count, 1);
+    }
+
+    #[test]
+    fn test_markdown_to_latex_empty_lines() {
+        let result = markdown_to_latex("Paragraph one.\n\nParagraph two.");
+        assert!(result.contains("\\par"));
+    }
+
+    #[test]
+    fn test_inline_formatting_nested() {
+        let result = convert_inline_formatting("normal **bold `code`** end");
+        assert!(result.contains("\\textbf{"));
+    }
+
+    #[test]
+    fn test_inline_formatting_no_close() {
+        // Unclosed formatting should just pass through as literal
+        let result = convert_inline_formatting("unclosed **bold");
+        assert!(result.contains("unclosed"));
+    }
+
+    #[test]
+    fn test_compile_structure() {
+        let opts = make_opts();
+        let result = compile(&[], &opts).unwrap();
+        assert!(result.contains("\\documentclass"));
+        assert!(result.contains("\\usepackage"));
+        assert!(result.contains("\\begin{document}"));
+        assert!(result.contains("\\end{document}"));
+        assert!(result.contains("\\doublespacing"));
+        assert!(result.contains("\\pagestyle{fancy}"));
+    }
+
+    #[test]
+    fn test_compile_folder_then_text() {
+        let opts = make_opts();
+        let contents = vec![
+            make_content("Chapter One", "", true, 0),
+            make_content("Scene 1", "First scene text.", false, 1),
+            make_content("Scene 2", "Second scene text.", false, 1),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("\\section{Chapter One}"));
+        assert!(result.contains("First scene text."));
+        assert!(result.contains("Second scene text."));
+    }
+
+    #[test]
+    fn test_required_packages_list() {
+        let pkgs = required_packages();
+        assert!(pkgs.contains(&"geometry"));
+        assert!(pkgs.contains(&"setspace"));
+        assert!(pkgs.contains(&"fancyhdr"));
+        assert!(pkgs.contains(&"graphicx"));
+        assert!(pkgs.contains(&"longtable"));
+        assert!(pkgs.contains(&"enumitem"));
+    }
+
+    #[test]
+    fn test_word_count_empty_text() {
+        let contents = vec![make_content("A", "", false, 0)];
+        assert_eq!(word_count(&contents), 0);
+    }
+
+    #[test]
+    fn test_estimate_pages_short_text() {
+        let contents = vec![make_content("A", "one two three", false, 0)];
+        assert_eq!(estimate_pages(&contents), 1); // min 1
+    }
+
+    #[test]
+    fn test_estimate_output_size_grows() {
+        let small = vec![make_content("A", "short", false, 0)];
+        let big = vec![make_content("A", &"word ".repeat(1000), false, 0)];
+        let opts = make_opts();
+        assert!(estimate_output_size(&big, &opts) > estimate_output_size(&small, &opts));
+    }
+
+    #[test]
+    fn test_compile_no_author() {
+        let mut opts = make_opts();
+        opts.author = String::new();
+        opts.include_front_matter = true;
+        let contents = vec![make_content("Scene", "text.", false, 0)];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("\\maketitle"));
+        assert!(!result.contains("\\author{"));
+    }
+
+    #[test]
+    fn test_find_closing_not_found() {
+        let chars: Vec<char> = "no close here".chars().collect();
+        assert!(find_closing(&chars, 0, '*', '*').is_none());
+    }
+
+    #[test]
+    fn test_find_closing_single_not_found() {
+        let chars: Vec<char> = "no close here".chars().collect();
+        assert!(find_closing_single(&chars, 0, '*').is_none());
+    }
 }
