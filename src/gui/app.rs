@@ -452,6 +452,8 @@ pub enum Message {
     InsertComment,
     InsertDateTime(String),
     SmartPaste(String),
+    InsertLink,
+    InsertImage,
 
     // Document templates
     NewDocFromTemplate(String),
@@ -2838,6 +2840,30 @@ impl ScrineverApp {
                 self.editor.mark_dirty();
             }
 
+            Message::InsertLink => {
+                let link_text = "[link text](url)";
+                self.editor.content.perform(
+                    iced::widget::text_editor::Action::Edit(
+                        iced::widget::text_editor::Edit::Paste(
+                            std::sync::Arc::new(link_text.to_string())
+                        )
+                    )
+                );
+                self.editor.mark_dirty();
+            }
+
+            Message::InsertImage => {
+                let image_text = "![alt text](image_path)";
+                self.editor.content.perform(
+                    iced::widget::text_editor::Action::Edit(
+                        iced::widget::text_editor::Edit::Paste(
+                            std::sync::Arc::new(image_text.to_string())
+                        )
+                    )
+                );
+                self.editor.mark_dirty();
+            }
+
             // ========== Document templates ==========
             Message::NewDocFromTemplate(template_id) => {
                 if let Some(ref mut project) = self.project {
@@ -3602,6 +3628,9 @@ impl ScrineverApp {
                     }
                     keyboard::Key::Named(keyboard::key::Named::F5) => {
                         Some(Message::ToggleCompositionMode)
+                    }
+                    keyboard::Key::Named(keyboard::key::Named::F7) => {
+                        Some(Message::RunSpellCheck)
                     }
                     _ => None,
                 }
