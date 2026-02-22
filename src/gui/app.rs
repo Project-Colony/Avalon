@@ -411,6 +411,9 @@ pub enum Message {
     // Spell check
     RunSpellCheck,
     SpellCheckAddWord(String),
+    SpellCheckReplace(usize, String, String),
+    SpellCheckRemoveWord(String),
+    SpellCheckClearDict,
     ToggleSpellChecker,
 
     // Custom metadata fields
@@ -474,6 +477,7 @@ impl ScrineverApp {
     pub fn new() -> (Self, IcedTask<Message>) {
         let mut spell_checker = SpellChecker::new();
         spell_checker.try_init();
+        spell_checker.load_user_dictionary();
 
         let app = Self {
             project: None,
@@ -2461,7 +2465,51 @@ impl ScrineverApp {
             Message::SpellCheckAddWord(word) => {
                 self.spell_checker.add_to_dictionary(&word);
                 self.spell_check_results.retain(|r| r.word.to_lowercase() != word.to_lowercase());
+                let _ = self.spell_checker.save_user_dictionary();
                 self.notification = Some(format!("Added \"{}\" to dictionary", word));
+            }
+
+            Message::SpellCheckReplace(position, misspelled, replacement) => {
+                self.sync_editor_to_project();
+                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item_mut(&item_id) {
+                        if let Some(ref mut doc) = item.document {
+                            // Find the misspelled word at or near the given position and replace it
+                            if let Some(start) = doc.content[position..].find(&misspelled) {
+                                let actual_pos = position + start;
+                                let end_pos = actual_pos + misspelled.len();
+                                doc.content = format!(
+                                    "{}{}{}",
+                                    &doc.content[..actual_pos],
+                                    replacement,
+                                    &doc.content[end_pos..]
+                                );
+                                // Reload editor with updated content
+                                self.editor.load_document(doc);
+                                self.notification = Some(format!(
+                                    "Replaced \"{}\" with \"{}\"",
+                                    misspelled, replacement
+                                ));
+                                // Remove this entry from results
+                                self.spell_check_results.retain(|r| {
+                                    !(r.word == misspelled && r.position == position)
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            Message::SpellCheckRemoveWord(word) => {
+                self.spell_checker.remove_from_dictionary(&word);
+                let _ = self.spell_checker.save_user_dictionary();
+                self.notification = Some(format!("Removed \"{}\" from user dictionary", word));
+            }
+
+            Message::SpellCheckClearDict => {
+                self.spell_checker.clear_user_dictionary();
+                let _ = self.spell_checker.save_user_dictionary();
+                self.notification = Some("User dictionary cleared".to_string());
             }
 
             Message::ToggleSpellChecker => {
@@ -3392,6 +3440,7 @@ impl ScrineverApp {
                     &self.spell_check_results,
                     self.spell_checker.active,
                     self.spell_checker.dictionary_size(),
+                    self.spell_checker.user_words(),
                 ))
             }
             BottomPanel::Timer => {

@@ -220,6 +220,39 @@ impl SpellChecker {
     }
 }
 
+impl SpellChecker {
+    /// Save the user dictionary to disk
+    pub fn save_user_dictionary(&self) -> Result<(), String> {
+        if self.user_dictionary.is_empty() {
+            return Ok(());
+        }
+        let home = dirs::home_dir().ok_or("No home directory")?;
+        let dict_dir = home.join(".avalon");
+        std::fs::create_dir_all(&dict_dir).map_err(|e| e.to_string())?;
+        let dict_path = dict_dir.join("user_dictionary.txt");
+        let content = self.user_dictionary.join("\n");
+        std::fs::write(&dict_path, content).map_err(|e| e.to_string())
+    }
+
+    /// Load the user dictionary from disk
+    pub fn load_user_dictionary(&mut self) {
+        let home = match dirs::home_dir() {
+            Some(h) => h,
+            None => return,
+        };
+        let dict_path = home.join(".avalon").join("user_dictionary.txt");
+        if let Ok(content) = std::fs::read_to_string(&dict_path) {
+            for word in content.lines() {
+                let trimmed = word.trim().to_lowercase();
+                if !trimmed.is_empty() && !self.user_dictionary.contains(&trimmed) {
+                    self.user_dictionary.push(trimmed.clone());
+                    self.dictionary.insert(trimmed);
+                }
+            }
+        }
+    }
+}
+
 impl Default for SpellChecker {
     fn default() -> Self {
         Self::new()
