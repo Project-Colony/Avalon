@@ -357,4 +357,69 @@ mod tests {
         assert_eq!(validation.info_count(), 1);
         assert!(!validation.is_clean());
     }
+
+    #[test]
+    fn test_validate_large_document() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Huge Chapter");
+        if let Some(ref mut doc) = item.document {
+            // Create a large document (> 100k words)
+            doc.content = "word ".repeat(120_000);
+        }
+        binder.draft.children.push(item);
+
+        let result = validate_project(&binder);
+        assert!(result.issues.iter().any(|i| i.kind == IssueKind::LargeDocument));
+    }
+
+    #[test]
+    fn test_validate_valid_link() {
+        let mut binder = Binder::default_structure();
+        let target = BinderItem::new_text("Target");
+        let mut source = BinderItem::new_text("Source");
+        if let Some(ref mut doc) = source.document {
+            doc.content = "Link to [[Target]].".to_string();
+        }
+        binder.draft.children.push(source);
+        binder.draft.children.push(target);
+
+        let result = validate_project(&binder);
+        assert!(!result.issues.iter().any(|i| i.kind == IssueKind::BrokenLink));
+    }
+
+    #[test]
+    fn test_validate_multiple_issues() {
+        let mut binder = Binder::default_structure();
+
+        // Empty document
+        binder.draft.children.push(BinderItem::new_text("Empty"));
+
+        // Untitled
+        binder.draft.children.push(BinderItem::new_text(""));
+
+        // Broken link
+        let mut linked = BinderItem::new_text("Linked");
+        if let Some(ref mut doc) = linked.document {
+            doc.content = "See [[Nonexistent]].".to_string();
+        }
+        binder.draft.children.push(linked);
+
+        let result = validate_project(&binder);
+        assert!(result.issues.len() >= 3);
+        assert!(result.issues.iter().any(|i| i.kind == IssueKind::EmptyDocument));
+        assert!(result.issues.iter().any(|i| i.kind == IssueKind::UntitledItem));
+        assert!(result.issues.iter().any(|i| i.kind == IssueKind::BrokenLink));
+    }
+
+    #[test]
+    fn test_orphan_issue_kind() {
+        let issue = ValidationIssue {
+            severity: Severity::Info,
+            kind: IssueKind::Orphan,
+            item_id: None,
+            message: "orphan document".to_string(),
+        };
+        assert_eq!(issue.kind, IssueKind::Orphan);
+        assert_eq!(issue.severity, Severity::Info);
+    }
 }

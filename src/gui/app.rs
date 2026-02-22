@@ -170,6 +170,9 @@ pub struct ScrineverApp {
 
     // === Validation results ===
     pub validation_result: Option<crate::core::validation::ProjectValidation>,
+
+    // === Word count milestone tracking ===
+    pub last_milestone: usize,
 }
 
 /// Messages for the application
@@ -542,6 +545,7 @@ impl ScrineverApp {
             spell_check_results: Vec::new(),
             writing_timer: crate::core::timer::WritingTimer::new(),
             validation_result: None,
+            last_milestone: 0,
         };
 
         (app, IcedTask::none())
@@ -595,6 +599,7 @@ impl ScrineverApp {
                 self.editor = EditorState::new();
                 self.project_notes_text.clear();
                 self.generated_names.clear();
+                self.last_milestone = 0;
                 if let Some(ref p) = self.project {
                     self.compile_options.title = p.title.clone();
                 }
@@ -670,6 +675,13 @@ impl ScrineverApp {
                     self.project_notes_text = p.project_notes.clone();
                     self.compile_presets = p.compile_presets.clone();
                     self.generated_names.clear();
+                    // Initialize word count milestone to current project word count
+                    let total_words = p.binder.total_word_count();
+                    let milestones = [1000, 5000, 10000, 25000, 50000, 75000, 100000, 150000, 200000];
+                    self.last_milestone = milestones.iter().rev()
+                        .find(|&&m| total_words >= m)
+                        .copied()
+                        .unwrap_or(0);
                     self.project = Some(p);
                     self.selected_item = None;
                     self.editor = EditorState::new();
@@ -3046,6 +3058,25 @@ impl ScrineverApp {
                                 if let Some(ref path) = project.path {
                                     let _ = crate::core::backup::BackupManager::create_backup(path);
                                 }
+                            }
+                        }
+                    }
+                }
+
+                // Word count milestone detection (every 5 seconds)
+                if self.auto_save_counter % 5 == 0 {
+                    if let Some(ref project) = self.project {
+                        let total_words = project.binder.total_word_count();
+                        let milestones = [1000, 5000, 10000, 25000, 50000, 75000, 100000, 150000, 200000];
+                        for &m in &milestones {
+                            if total_words >= m && self.last_milestone < m {
+                                self.last_milestone = m;
+                                let label = if m >= 1000 { format!("{}k", m / 1000) } else { m.to_string() };
+                                self.notification = Some(format!(
+                                    "\u{1F389} Milestone: {} words! Keep writing!",
+                                    label
+                                ));
+                                break;
                             }
                         }
                     }
