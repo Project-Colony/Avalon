@@ -298,6 +298,10 @@ pub enum Message {
     AddAnnotation,
     DeleteAnnotation(Uuid),
     ToggleAnnotationResolved(Uuid),
+    EditAnnotation(Uuid, String),
+    SetAnnotationColor(Uuid, String),
+    SetAnnotationCategory(Uuid, String),
+    CycleAnnotationColor,
 
     // Project targets
     SettingsSetDeadline(String),
@@ -1561,10 +1565,12 @@ impl ScrineverApp {
                     if !self.annotation_text.is_empty() {
                         if let Some(item) = project.binder.find_item_mut(&item_id) {
                             if let Some(ref mut doc) = item.document {
-                                let cursor_pos = self.editor.cursor;
+                                // Use selection range if available, otherwise use cursor position
+                                let (start, end) = self.editor.selection_range()
+                                    .unwrap_or((self.editor.cursor, self.editor.cursor));
                                 let ann = crate::core::annotation::Annotation::new(
-                                    cursor_pos,
-                                    cursor_pos,
+                                    start,
+                                    end,
                                     &self.annotation_text,
                                 );
                                 doc.annotations.push(ann);
@@ -1598,6 +1604,56 @@ impl ScrineverApp {
                     }
                 }
                 self.notification = Some("Annotation toggled".to_string());
+            }
+
+            Message::EditAnnotation(ann_id, new_text) => {
+                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item_mut(&item_id) {
+                        if let Some(ref mut doc) = item.document {
+                            if let Some(ann) = doc.annotations.iter_mut().find(|a| a.id == ann_id) {
+                                if !new_text.is_empty() {
+                                    ann.edit_text(&new_text);
+                                    self.notification = Some("Annotation updated".to_string());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Message::SetAnnotationColor(ann_id, color_name) => {
+                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item_mut(&item_id) {
+                        if let Some(ref mut doc) = item.document {
+                            if let Some(ann) = doc.annotations.iter_mut().find(|a| a.id == ann_id) {
+                                ann.color = match color_name.as_str() {
+                                    "Blue" => crate::core::annotation::AnnotationColor::Blue,
+                                    "Green" => crate::core::annotation::AnnotationColor::Green,
+                                    "Red" => crate::core::annotation::AnnotationColor::Red,
+                                    "Purple" => crate::core::annotation::AnnotationColor::Purple,
+                                    _ => crate::core::annotation::AnnotationColor::Yellow,
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+
+            Message::SetAnnotationCategory(ann_id, category) => {
+                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item_mut(&item_id) {
+                        if let Some(ref mut doc) = item.document {
+                            if let Some(ann) = doc.annotations.iter_mut().find(|a| a.id == ann_id) {
+                                ann.set_category(&category);
+                            }
+                        }
+                    }
+                }
+            }
+
+            Message::CycleAnnotationColor => {
+                // Cycle the color that will be used for the next annotation
+                // This is a UI convenience - stored as a temporary state
             }
 
             // ========== Project targets ==========

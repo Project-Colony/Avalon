@@ -2,7 +2,7 @@ use iced::widget::{button, column, container, row, scrollable, text, text_input,
 use iced::{Element, Length, Padding};
 use uuid::Uuid;
 
-use crate::core::annotation::Annotation;
+use crate::core::annotation::{Annotation, AnnotationColor};
 use crate::gui::app::Message;
 use crate::gui::theme::Theme;
 
@@ -59,7 +59,7 @@ pub fn view(
                 column![
                     text("No annotations yet.").size(12).color(Theme::TEXT_MUTED),
                     Space::with_height(4),
-                    text("Add comments, notes, and reminders to your document text.")
+                    text("Select text in the editor, then add a comment with color and category.")
                         .size(10)
                         .color(Theme::TEXT_MUTED),
                 ]
@@ -85,7 +85,7 @@ pub fn view(
     }
 
     let hint = row![
-        text("Select text in editor, then add annotation to mark it")
+        text("Select text, then add annotation | Click color dot to change color")
             .size(9)
             .color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
@@ -114,6 +114,15 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
     let ann_id = ann.id;
     let color = ann.color.to_iced_color();
     let is_resolved = ann.resolved;
+    let next_color_label = ann.color.next().label().to_string();
+    let ann_text_str = ann.text.clone();
+    let ann_start = ann.start;
+    let ann_end = ann.end;
+    let ann_author = ann.author.clone();
+    let ann_category = ann.category.clone();
+    let edit_history_len = ann.edit_history.len();
+    let color_label_str = ann.color.label().to_string();
+    let age = ann.age_string();
 
     let text_color = if is_resolved {
         Theme::TEXT_MUTED
@@ -121,19 +130,51 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
         Theme::TEXT_PRIMARY
     };
 
-    // Status indicator
+    // Status indicator - clickable to cycle color
     let status_icon = if is_resolved { "\u{2713}" } else { "\u{25CF}" };
 
-    // Category tag
-    let category_tag: Element<'static, Message> = if let Some(ref cat) = ann.category {
-        text(format!("[{}]", cat)).size(9).color(Theme::TEXT_ACCENT).into()
+    // Color dot button - click to cycle to next color
+    let color_btn: Element<'static, Message> = if !is_resolved {
+        button(
+            text(format!("{} ", status_icon)).size(12).color(color),
+        )
+        .on_press(Message::SetAnnotationColor(ann_id, next_color_label))
+        .padding(Padding::from([0, 2]))
+        .into()
+    } else {
+        text(format!("{} ", status_icon)).size(12).color(color).into()
+    };
+
+    // Category tag with dropdown-like buttons
+    let category_display: Element<'static, Message> = if let Some(cat) = ann_category {
+        // Show current category as clickable button to clear it
+        button(
+            text(format!("[{}]", cat)).size(9).color(Theme::TEXT_ACCENT),
+        )
+        .on_press(Message::SetAnnotationCategory(ann_id, String::new()))
+        .padding(Padding::from([0, 2]))
+        .into()
+    } else if !is_resolved {
+        // Show category assignment buttons
+        let mut cat_row = row![].spacing(2);
+        for cat in &["Note", "Todo", "Question", "Research", "Continuity", "Revision"] {
+            let cat_str = cat.to_string();
+            cat_row = cat_row.push(
+                button(
+                    text(*cat).size(8).color(Theme::TEXT_MUTED),
+                )
+                .on_press(Message::SetAnnotationCategory(ann_id, cat_str))
+                .padding(Padding::from([0, 3])),
+            );
+        }
+        cat_row.into()
     } else {
         Space::with_width(0).into()
     };
 
     // Edit count
-    let edit_count: Element<'static, Message> = if !ann.edit_history.is_empty() {
-        text(format!("edited {}x", ann.edit_history.len()))
+    let edit_count: Element<'static, Message> = if edit_history_len > 0 {
+        text(format!("edited {}x", edit_history_len))
             .size(8)
             .color(Theme::TEXT_MUTED)
             .into()
@@ -141,28 +182,34 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
         Space::with_width(0).into()
     };
 
-    // Age display
-    let age = ann.age_string();
-
     // Author display
-    let author_display: Element<'static, Message> = if !ann.author.is_empty() {
-        text(format!("by {}", ann.author)).size(8).color(Theme::TEXT_MUTED).into()
+    let author_display: Element<'static, Message> = if !ann_author.is_empty() {
+        text(format!("by {}", ann_author)).size(8).color(Theme::TEXT_MUTED).into()
     } else {
         Space::with_width(0).into()
     };
 
+    // Annotation text display
+    let ann_text_el: Element<'static, Message> =
+        text(ann_text_str).size(12).color(text_color).into();
+
+    // Color label
+    let color_label_el = text(color_label_str)
+        .size(8)
+        .color(color);
+
     container(
         column![
             row![
-                text(format!("{} ", status_icon)).size(12).color(color),
-                text(ann.text.clone()).size(12).color(text_color),
+                color_btn,
+                ann_text_el,
                 Space::with_width(4),
-                category_tag,
+                color_label_el,
                 Space::with_width(Length::Fill),
                 text(age).size(9).color(Theme::TEXT_MUTED),
             ],
             row![
-                text(format!("span {}-{}", ann.start, ann.end))
+                text(format!("span {}-{}", ann_start, ann_end))
                     .size(9)
                     .color(Theme::TEXT_MUTED),
                 Space::with_width(4),
@@ -184,6 +231,7 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
                 .on_press(Message::DeleteAnnotation(ann_id))
                 .padding(Padding::from([1, 4])),
             ],
+            category_display,
         ]
         .spacing(2)
     )
