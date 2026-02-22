@@ -135,6 +135,54 @@ pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
     ]
     .align_y(iced::Alignment::Center);
 
+    // Grade level estimation (from Flesch reading ease)
+    // Approximate grade: (100 - score) / 6.67, clamped
+    let est_grade = ((100.0 - analysis.readability_score) / 6.67).max(0.0).min(20.0);
+    let est_audience = if est_grade <= 6.0 { "Children / General Public" }
+    else if est_grade <= 9.0 { "Young Adults" }
+    else if est_grade <= 13.0 { "General Adults" }
+    else if est_grade <= 17.0 { "College-educated" }
+    else { "Academic / Professional" };
+    let grade_color = if est_grade <= 8.0 { Theme::SUCCESS }
+    else if est_grade <= 12.0 { Theme::WARNING }
+    else { Theme::ERROR };
+
+    let grade_row = row![
+        text("Est. Grade:").size(11).color(Theme::TEXT_MUTED),
+        Space::with_width(4),
+        text(format!("{:.1}", est_grade)).size(12).color(grade_color),
+        Space::with_width(4),
+        text(format!("({})", est_audience)).size(11).color(Theme::TEXT_SECONDARY),
+    ]
+    .align_y(iced::Alignment::Center);
+
+    // Writing density metrics
+    let words_per_paragraph = if analysis.paragraph_count > 0 {
+        analysis.word_count as f64 / analysis.paragraph_count as f64
+    } else {
+        0.0
+    };
+    let chars_per_word = if analysis.word_count > 0 {
+        analysis.char_no_spaces as f64 / analysis.word_count as f64
+    } else {
+        0.0
+    };
+
+    let density_row = row![
+        text("Density:").size(11).color(Theme::TEXT_MUTED),
+        Space::with_width(4),
+        text(format!("{:.1} words/paragraph", words_per_paragraph)).size(10).color(Theme::TEXT_SECONDARY),
+        Space::with_width(8),
+        text(format!("{:.1} chars/word", chars_per_word)).size(10).color(Theme::TEXT_SECONDARY),
+        Space::with_width(8),
+        text(format!("{:.1} sentences/paragraph",
+            if analysis.paragraph_count > 0 {
+                analysis.sentence_count as f64 / analysis.paragraph_count as f64
+            } else { 0.0 }
+        )).size(10).color(Theme::TEXT_SECONDARY),
+    ]
+    .align_y(iced::Alignment::Center);
+
     let content = column![
         header,
         Space::with_height(4),
@@ -144,7 +192,11 @@ pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
         Space::with_height(4),
         readability,
         Space::with_height(4),
+        grade_row,
+        Space::with_height(4),
         vocab_row,
+        Space::with_height(4),
+        density_row,
         Space::with_height(4),
         complexity_row,
         Space::with_height(4),

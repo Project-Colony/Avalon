@@ -32,7 +32,7 @@ pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>) -> Element<'stat
             text("Status").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(2)),
             text("Label").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(2)),
             text("Words").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
-            text("Target").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
+            text("Target (%)").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(2)),
             text("Pgs").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
             text("Compile").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
         ]
@@ -208,7 +208,7 @@ fn collect_outline_rows(
         text(status).size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(2)),
         text(label).size(11).color(label_color).width(Length::FillPortion(2)),
         text(format!("{}", word_count)).size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
-        text(target_text).size(11).color(Theme::TEXT_MUTED).width(Length::FillPortion(1)),
+        text(format!("{} ({})", target_text, progress_text)).size(11).color(progress_color).width(Length::FillPortion(2)),
         text(pages_text).size(11).color(Theme::TEXT_MUTED).width(Length::FillPortion(1)),
         text(compile_text).size(11).color(compile_color).width(Length::FillPortion(1)),
     ]
