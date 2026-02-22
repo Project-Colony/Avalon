@@ -349,4 +349,68 @@ mod tests {
         let pages = estimate_pages(&contents, &make_opts());
         assert_eq!(pages, 1);
     }
+
+    #[test]
+    fn test_strip_markdown_star_list_items() {
+        // Single * is removed by italic stripping
+        assert_eq!(strip_markdown("* item two"), " item two");
+    }
+
+    #[test]
+    fn test_strip_markdown_dash_list_preserved() {
+        // Dash list markers are not stripped (they're not markdown formatting)
+        assert_eq!(strip_markdown("- item one"), "- item one");
+    }
+
+    #[test]
+    fn test_strip_markdown_preserves_text() {
+        assert_eq!(strip_markdown("No formatting here"), "No formatting here");
+    }
+
+    #[test]
+    fn test_char_count_with_folders() {
+        let contents = vec![
+            make_content("Folder", "", true, 0),
+            make_content("Doc", "hello", false, 1),
+        ];
+        // Folder text is empty, only doc has chars
+        assert_eq!(char_count(&contents), 5);
+    }
+
+    #[test]
+    fn test_estimate_pages_with_front_matter() {
+        let contents = vec![
+            make_content("Ch", "", true, 0),
+            make_content("Scene", &"Content.\n".repeat(50), false, 1),
+        ];
+        let mut opts = make_opts();
+        opts.include_front_matter = true;
+        let with_fm = estimate_pages(&contents, &opts);
+        opts.include_front_matter = false;
+        let without_fm = estimate_pages(&contents, &opts);
+        // Front matter adds at least one page
+        assert!(with_fm >= without_fm);
+    }
+
+    #[test]
+    fn test_estimate_pages_with_different_font_size() {
+        let contents = vec![
+            make_content("A", &"word ".repeat(500), false, 0),
+        ];
+        let mut opts = make_opts();
+        opts.font_size = 12.0;
+        let small_font = estimate_pages(&contents, &opts);
+        opts.font_size = 24.0;
+        let large_font = estimate_pages(&contents, &opts);
+        // Larger font = more pages (or at least equal)
+        assert!(large_font >= small_font);
+    }
+
+    #[test]
+    fn test_word_count_with_punctuation() {
+        let contents = vec![
+            make_content("A", "Hello, world! How's it going?", false, 0),
+        ];
+        assert_eq!(word_count(&contents), 5);
+    }
 }

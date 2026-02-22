@@ -224,6 +224,132 @@ pub enum IssueKind {
     Orphan,
 }
 
+impl Severity {
+    /// Human-readable label
+    pub fn label(&self) -> &str {
+        match self {
+            Severity::Error => "Error",
+            Severity::Warning => "Warning",
+            Severity::Info => "Info",
+        }
+    }
+
+    /// Icon character for UI
+    pub fn icon(&self) -> &str {
+        match self {
+            Severity::Error => "E",
+            Severity::Warning => "W",
+            Severity::Info => "I",
+        }
+    }
+
+    /// Sort weight (errors first)
+    pub fn weight(&self) -> usize {
+        match self {
+            Severity::Error => 0,
+            Severity::Warning => 1,
+            Severity::Info => 2,
+        }
+    }
+}
+
+impl IssueKind {
+    /// Human-readable label
+    pub fn label(&self) -> &str {
+        match self {
+            IssueKind::DuplicateId => "Duplicate ID",
+            IssueKind::EmptyDocument => "Empty Document",
+            IssueKind::MissingDocument => "Missing Document",
+            IssueKind::UntitledItem => "Untitled Item",
+            IssueKind::EmptyFolder => "Empty Folder",
+            IssueKind::BrokenLink => "Broken Link",
+            IssueKind::LargeDocument => "Large Document",
+            IssueKind::Orphan => "Orphan",
+        }
+    }
+
+    /// Whether this kind is automatically fixable
+    pub fn is_auto_fixable(&self) -> bool {
+        matches!(self, IssueKind::EmptyDocument | IssueKind::UntitledItem | IssueKind::EmptyFolder)
+    }
+
+    /// Suggested fix description
+    pub fn fix_hint(&self) -> &str {
+        match self {
+            IssueKind::DuplicateId => "Regenerate the item's UUID",
+            IssueKind::EmptyDocument => "Add content or delete the document",
+            IssueKind::MissingDocument => "Recreate the document data",
+            IssueKind::UntitledItem => "Add a title to the item",
+            IssueKind::EmptyFolder => "Add items or remove the folder",
+            IssueKind::BrokenLink => "Fix or remove the broken link",
+            IssueKind::LargeDocument => "Split the document into smaller sections",
+            IssueKind::Orphan => "Link to this document or move to trash",
+        }
+    }
+}
+
+impl ValidationIssue {
+    /// Formatted display string with severity and message
+    pub fn display(&self) -> String {
+        format!("[{}] {}", self.severity.label(), self.message)
+    }
+
+    /// Whether this issue can be automatically fixed
+    pub fn is_auto_fixable(&self) -> bool {
+        self.kind.is_auto_fixable()
+    }
+}
+
+impl ProjectValidation {
+    /// Get issues sorted by severity (errors first)
+    pub fn sorted_issues(&self) -> Vec<&ValidationIssue> {
+        let mut sorted: Vec<&ValidationIssue> = self.issues.iter().collect();
+        sorted.sort_by_key(|i| i.severity.weight());
+        sorted
+    }
+
+    /// Get issues of a specific kind
+    pub fn issues_of_kind(&self, kind: &IssueKind) -> Vec<&ValidationIssue> {
+        self.issues.iter().filter(|i| &i.kind == kind).collect()
+    }
+
+    /// Get issues for a specific item
+    pub fn issues_for_item(&self, item_id: Uuid) -> Vec<&ValidationIssue> {
+        self.issues.iter().filter(|i| i.item_id == Some(item_id)).collect()
+    }
+
+    /// Whether there are auto-fixable issues
+    pub fn has_auto_fixable(&self) -> bool {
+        self.issues.iter().any(|i| i.is_auto_fixable())
+    }
+
+    /// Count of auto-fixable issues
+    pub fn auto_fixable_count(&self) -> usize {
+        self.issues.iter().filter(|i| i.is_auto_fixable()).count()
+    }
+
+    /// Health score (0-100, higher is better)
+    pub fn health_score(&self) -> f64 {
+        if self.total_items == 0 {
+            return 100.0;
+        }
+        let error_penalty = self.error_count() as f64 * 10.0;
+        let warning_penalty = self.warning_count() as f64 * 3.0;
+        let info_penalty = self.info_count() as f64 * 1.0;
+        let total_penalty = error_penalty + warning_penalty + info_penalty;
+        (100.0 - total_penalty).max(0.0).min(100.0)
+    }
+
+    /// Health grade
+    pub fn health_grade(&self) -> &str {
+        let score = self.health_score();
+        if score >= 95.0 { "Excellent" }
+        else if score >= 80.0 { "Good" }
+        else if score >= 60.0 { "Fair" }
+        else { "Needs Attention" }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -540,5 +666,227 @@ mod tests {
         assert_eq!(IssueKind::DuplicateId, IssueKind::DuplicateId);
         assert_ne!(IssueKind::DuplicateId, IssueKind::EmptyDocument);
         assert_ne!(IssueKind::BrokenLink, IssueKind::LargeDocument);
+    }
+
+    // New: Severity tests
+
+    #[test]
+    fn test_severity_labels() {
+        assert_eq!(Severity::Error.label(), "Error");
+        assert_eq!(Severity::Warning.label(), "Warning");
+        assert_eq!(Severity::Info.label(), "Info");
+    }
+
+    #[test]
+    fn test_severity_icons() {
+        assert_eq!(Severity::Error.icon(), "E");
+        assert_eq!(Severity::Warning.icon(), "W");
+        assert_eq!(Severity::Info.icon(), "I");
+    }
+
+    #[test]
+    fn test_severity_weight_ordering() {
+        assert!(Severity::Error.weight() < Severity::Warning.weight());
+        assert!(Severity::Warning.weight() < Severity::Info.weight());
+    }
+
+    // New: IssueKind tests
+
+    #[test]
+    fn test_issue_kind_labels() {
+        assert_eq!(IssueKind::DuplicateId.label(), "Duplicate ID");
+        assert_eq!(IssueKind::EmptyDocument.label(), "Empty Document");
+        assert_eq!(IssueKind::BrokenLink.label(), "Broken Link");
+        assert_eq!(IssueKind::LargeDocument.label(), "Large Document");
+        assert_eq!(IssueKind::Orphan.label(), "Orphan");
+    }
+
+    #[test]
+    fn test_issue_kind_auto_fixable() {
+        assert!(IssueKind::EmptyDocument.is_auto_fixable());
+        assert!(IssueKind::UntitledItem.is_auto_fixable());
+        assert!(IssueKind::EmptyFolder.is_auto_fixable());
+        assert!(!IssueKind::DuplicateId.is_auto_fixable());
+        assert!(!IssueKind::BrokenLink.is_auto_fixable());
+        assert!(!IssueKind::LargeDocument.is_auto_fixable());
+    }
+
+    #[test]
+    fn test_issue_kind_fix_hints() {
+        for kind in [IssueKind::DuplicateId, IssueKind::EmptyDocument,
+            IssueKind::MissingDocument, IssueKind::UntitledItem,
+            IssueKind::EmptyFolder, IssueKind::BrokenLink,
+            IssueKind::LargeDocument, IssueKind::Orphan] {
+            assert!(!kind.fix_hint().is_empty());
+        }
+    }
+
+    // New: ValidationIssue tests
+
+    #[test]
+    fn test_validation_issue_display() {
+        let issue = ValidationIssue {
+            severity: Severity::Error,
+            kind: IssueKind::DuplicateId,
+            item_id: None,
+            message: "Duplicate found".to_string(),
+        };
+        assert_eq!(issue.display(), "[Error] Duplicate found");
+    }
+
+    #[test]
+    fn test_validation_issue_auto_fixable() {
+        let fixable = ValidationIssue {
+            severity: Severity::Info,
+            kind: IssueKind::EmptyDocument,
+            item_id: None,
+            message: "empty".to_string(),
+        };
+        assert!(fixable.is_auto_fixable());
+
+        let not_fixable = ValidationIssue {
+            severity: Severity::Error,
+            kind: IssueKind::DuplicateId,
+            item_id: None,
+            message: "dupe".to_string(),
+        };
+        assert!(!not_fixable.is_auto_fixable());
+    }
+
+    // New: ProjectValidation method tests
+
+    #[test]
+    fn test_sorted_issues() {
+        let validation = ProjectValidation {
+            issues: vec![
+                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyFolder, item_id: None, message: "a".to_string() },
+                ValidationIssue { severity: Severity::Error, kind: IssueKind::DuplicateId, item_id: None, message: "b".to_string() },
+                ValidationIssue { severity: Severity::Warning, kind: IssueKind::BrokenLink, item_id: None, message: "c".to_string() },
+            ],
+            total_items: 5,
+            trash_items: 0,
+        };
+
+        let sorted = validation.sorted_issues();
+        assert_eq!(sorted[0].severity, Severity::Error);
+        assert_eq!(sorted[1].severity, Severity::Warning);
+        assert_eq!(sorted[2].severity, Severity::Info);
+    }
+
+    #[test]
+    fn test_issues_of_kind() {
+        let validation = ProjectValidation {
+            issues: vec![
+                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyDocument, item_id: None, message: "a".to_string() },
+                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyDocument, item_id: None, message: "b".to_string() },
+                ValidationIssue { severity: Severity::Warning, kind: IssueKind::BrokenLink, item_id: None, message: "c".to_string() },
+            ],
+            total_items: 5,
+            trash_items: 0,
+        };
+
+        assert_eq!(validation.issues_of_kind(&IssueKind::EmptyDocument).len(), 2);
+        assert_eq!(validation.issues_of_kind(&IssueKind::BrokenLink).len(), 1);
+        assert_eq!(validation.issues_of_kind(&IssueKind::DuplicateId).len(), 0);
+    }
+
+    #[test]
+    fn test_issues_for_item() {
+        let id = Uuid::new_v4();
+        let validation = ProjectValidation {
+            issues: vec![
+                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyDocument, item_id: Some(id), message: "a".to_string() },
+                ValidationIssue { severity: Severity::Warning, kind: IssueKind::UntitledItem, item_id: Some(id), message: "b".to_string() },
+                ValidationIssue { severity: Severity::Warning, kind: IssueKind::BrokenLink, item_id: None, message: "c".to_string() },
+            ],
+            total_items: 5,
+            trash_items: 0,
+        };
+
+        assert_eq!(validation.issues_for_item(id).len(), 2);
+        assert_eq!(validation.issues_for_item(Uuid::new_v4()).len(), 0);
+    }
+
+    #[test]
+    fn test_has_auto_fixable() {
+        let validation_with = ProjectValidation {
+            issues: vec![
+                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyDocument, item_id: None, message: "fix me".to_string() },
+            ],
+            total_items: 1,
+            trash_items: 0,
+        };
+        assert!(validation_with.has_auto_fixable());
+        assert_eq!(validation_with.auto_fixable_count(), 1);
+
+        let validation_without = ProjectValidation {
+            issues: vec![
+                ValidationIssue { severity: Severity::Error, kind: IssueKind::DuplicateId, item_id: None, message: "no fix".to_string() },
+            ],
+            total_items: 1,
+            trash_items: 0,
+        };
+        assert!(!validation_without.has_auto_fixable());
+        assert_eq!(validation_without.auto_fixable_count(), 0);
+    }
+
+    #[test]
+    fn test_health_score_perfect() {
+        let validation = ProjectValidation {
+            issues: vec![],
+            total_items: 10,
+            trash_items: 0,
+        };
+        assert_eq!(validation.health_score(), 100.0);
+        assert_eq!(validation.health_grade(), "Excellent");
+    }
+
+    #[test]
+    fn test_health_score_with_issues() {
+        let validation = ProjectValidation {
+            issues: vec![
+                ValidationIssue { severity: Severity::Error, kind: IssueKind::DuplicateId, item_id: None, message: "e".to_string() },
+                ValidationIssue { severity: Severity::Warning, kind: IssueKind::BrokenLink, item_id: None, message: "w".to_string() },
+            ],
+            total_items: 10,
+            trash_items: 0,
+        };
+        let score = validation.health_score();
+        assert!(score < 100.0);
+        assert!(score > 0.0);
+    }
+
+    #[test]
+    fn test_health_score_empty_project() {
+        let validation = ProjectValidation {
+            issues: vec![],
+            total_items: 0,
+            trash_items: 0,
+        };
+        assert_eq!(validation.health_score(), 100.0);
+    }
+
+    #[test]
+    fn test_health_grade_levels() {
+        // Excellent: 100 - 0 = 100
+        let excellent = ProjectValidation { issues: vec![], total_items: 1, trash_items: 0 };
+        assert_eq!(excellent.health_grade(), "Excellent");
+
+        // Good: 100 - (3*3 + 1*5) = 100 - 14 = 86
+        let good = ProjectValidation {
+            issues: vec![
+                ValidationIssue { severity: Severity::Warning, kind: IssueKind::BrokenLink, item_id: None, message: "w1".to_string() },
+                ValidationIssue { severity: Severity::Warning, kind: IssueKind::BrokenLink, item_id: None, message: "w2".to_string() },
+                ValidationIssue { severity: Severity::Warning, kind: IssueKind::BrokenLink, item_id: None, message: "w3".to_string() },
+                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyFolder, item_id: None, message: "i1".to_string() },
+                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyFolder, item_id: None, message: "i2".to_string() },
+                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyFolder, item_id: None, message: "i3".to_string() },
+                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyFolder, item_id: None, message: "i4".to_string() },
+                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyFolder, item_id: None, message: "i5".to_string() },
+            ],
+            total_items: 20,
+            trash_items: 0,
+        };
+        assert_eq!(good.health_grade(), "Good");
     }
 }

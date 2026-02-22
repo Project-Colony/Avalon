@@ -423,4 +423,75 @@ mod tests {
         let size = estimate_file_size(&contents, &make_opts());
         assert!(size > 10000);
     }
+
+    #[test]
+    fn test_escape_xml_empty_string() {
+        assert_eq!(escape_xml(""), "");
+    }
+
+    #[test]
+    fn test_escape_xml_already_safe() {
+        let text = "Hello World 123";
+        assert_eq!(escape_xml(text), text);
+    }
+
+    #[test]
+    fn test_word_count_whitespace_only() {
+        let contents = vec![make_content("A", "   \n\t  ", false, 0)];
+        assert_eq!(word_count(&contents), 0);
+    }
+
+    #[test]
+    fn test_word_count_with_folders() {
+        let contents = vec![
+            make_content("Folder", "", true, 0),
+            make_content("Scene", "one two three", false, 1),
+        ];
+        // Folders have no text, only Scene has words
+        assert_eq!(word_count(&contents), 3);
+    }
+
+    #[test]
+    fn test_estimate_chapter_count_deeply_nested() {
+        let contents = vec![
+            make_content("Part 1", "", true, 0),
+            make_content("Chapter 1", "", true, 1),
+            make_content("Scene 1", "text", false, 2),
+            make_content("Part 2", "", true, 0),
+            make_content("Chapter 2", "", true, 1),
+            make_content("Scene 2", "text", false, 2),
+        ];
+        let count = estimate_chapter_count(&contents);
+        assert!(count >= 2);
+    }
+
+    #[test]
+    fn test_estimate_file_size_scales_with_content() {
+        let small = vec![make_content("A", "short text", false, 0)];
+        let large = vec![make_content("A", &"long text ".repeat(1000), false, 0)];
+
+        let small_size = estimate_file_size(&small, &make_opts());
+        let large_size = estimate_file_size(&large, &make_opts());
+        assert!(large_size > small_size);
+    }
+
+    #[test]
+    fn test_estimate_file_size_multiple_chapters() {
+        let single = vec![
+            make_content("Ch", "", true, 0),
+            make_content("Scene", "text content", false, 1),
+        ];
+        let multi = vec![
+            make_content("Ch 1", "", true, 0),
+            make_content("Scene 1", "text", false, 1),
+            make_content("Ch 2", "", true, 0),
+            make_content("Scene 2", "text", false, 1),
+            make_content("Ch 3", "", true, 0),
+            make_content("Scene 3", "text", false, 1),
+        ];
+
+        let single_size = estimate_file_size(&single, &make_opts());
+        let multi_size = estimate_file_size(&multi, &make_opts());
+        assert!(multi_size > single_size);
+    }
 }
