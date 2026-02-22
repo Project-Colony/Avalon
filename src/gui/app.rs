@@ -1592,11 +1592,15 @@ impl ScrineverApp {
                                 // Use selection range if available, otherwise use cursor position
                                 let (start, end) = self.editor.selection_range()
                                     .unwrap_or((self.editor.cursor, self.editor.cursor));
-                                let ann = crate::core::annotation::Annotation::new(
+                                let mut ann = crate::core::annotation::Annotation::new(
                                     start,
                                     end,
                                     &self.annotation_text,
                                 );
+                                // Set author from compile settings if available
+                                if !self.compile_options.author.is_empty() {
+                                    ann = ann.with_author(&self.compile_options.author);
+                                }
                                 doc.annotations.push(ann);
                             }
                         }
@@ -1693,39 +1697,56 @@ impl ScrineverApp {
 
             // ========== Text transforms ==========
             Message::TextToUppercase => {
-                self.sync_editor_to_project();
-                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
-                    if let Some(item) = project.binder.find_item_mut(&item_id) {
-                        if let Some(ref mut doc) = item.document {
-                            doc.content = doc.content.to_uppercase();
-                            self.editor.load_document(doc);
-                            self.editor.mark_dirty();
+                let has_selection = self.editor.has_selection();
+                if has_selection {
+                    // Transform selection only
+                    self.editor.to_uppercase(true);
+                } else {
+                    // Transform whole document
+                    self.sync_editor_to_project();
+                    if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                        if let Some(item) = project.binder.find_item_mut(&item_id) {
+                            if let Some(ref mut doc) = item.document {
+                                doc.content = doc.content.to_uppercase();
+                                self.editor.load_document(doc);
+                                self.editor.mark_dirty();
+                            }
                         }
                     }
                 }
             }
 
             Message::TextToLowercase => {
-                self.sync_editor_to_project();
-                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
-                    if let Some(item) = project.binder.find_item_mut(&item_id) {
-                        if let Some(ref mut doc) = item.document {
-                            doc.content = doc.content.to_lowercase();
-                            self.editor.load_document(doc);
-                            self.editor.mark_dirty();
+                let has_selection = self.editor.has_selection();
+                if has_selection {
+                    self.editor.to_lowercase(true);
+                } else {
+                    self.sync_editor_to_project();
+                    if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                        if let Some(item) = project.binder.find_item_mut(&item_id) {
+                            if let Some(ref mut doc) = item.document {
+                                doc.content = doc.content.to_lowercase();
+                                self.editor.load_document(doc);
+                                self.editor.mark_dirty();
+                            }
                         }
                     }
                 }
             }
 
             Message::TextToTitleCase => {
-                self.sync_editor_to_project();
-                if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
-                    if let Some(item) = project.binder.find_item_mut(&item_id) {
-                        if let Some(ref mut doc) = item.document {
-                            doc.content = title_case(&doc.content);
-                            self.editor.load_document(doc);
-                            self.editor.mark_dirty();
+                let has_selection = self.editor.has_selection();
+                if has_selection {
+                    self.editor.to_title_case(true);
+                } else {
+                    self.sync_editor_to_project();
+                    if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                        if let Some(item) = project.binder.find_item_mut(&item_id) {
+                            if let Some(ref mut doc) = item.document {
+                                doc.content = title_case(&doc.content);
+                                self.editor.load_document(doc);
+                                self.editor.mark_dirty();
+                            }
                         }
                     }
                 }
@@ -3625,10 +3646,13 @@ impl ScrineverApp {
                             "," => Some(Message::ShowSettings),
                             "b" => Some(Message::InsertBold),
                             "u" => Some(Message::InsertUnderline),
+                            "k" => Some(Message::InsertLink),
                             "h" => Some(Message::ShowBottomPanel(BottomPanel::FindReplace)),
                             "d" => Some(Message::ShowBottomPanel(BottomPanel::Annotations)),
                             "g" => Some(Message::ShowBottomPanel(BottomPanel::WritingGoals)),
                             "t" => Some(Message::TransposeChars),
+                            "l" => Some(Message::ShowBottomPanel(BottomPanel::DocLinks)),
+                            "j" => Some(Message::ShowBottomPanel(BottomPanel::Timer)),
                             "/" => Some(Message::ToggleComment),
                             "1" => Some(Message::SwitchView(ViewMode::Editor)),
                             "2" => Some(Message::SwitchView(ViewMode::Corkboard)),

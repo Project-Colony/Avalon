@@ -713,6 +713,95 @@ impl EditorState {
         self.content = iced::widget::text_editor::Content::with_text(&new_content);
         self.dirty = true;
     }
+
+    /// Transform text to uppercase - selection only if selected, otherwise whole document
+    pub fn to_uppercase(&mut self, selection_only: bool) {
+        if selection_only {
+            if let Some((start, end)) = self.selection_range() {
+                self.push_undo();
+                let text = self.document.content.clone();
+                let upper = text[start..end].to_uppercase();
+                let new_content = format!("{}{}{}", &text[..start], upper, &text[end..]);
+                self.document.content = new_content.clone();
+                self.content = iced::widget::text_editor::Content::with_text(&new_content);
+                self.cursor = start + upper.len();
+                self.selection_start = None;
+                self.dirty = true;
+                return;
+            }
+        }
+        // Whole document
+        self.push_undo();
+        let new_content = self.document.content.to_uppercase();
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.dirty = true;
+    }
+
+    /// Transform text to lowercase - selection only if selected, otherwise whole document
+    pub fn to_lowercase(&mut self, selection_only: bool) {
+        if selection_only {
+            if let Some((start, end)) = self.selection_range() {
+                self.push_undo();
+                let text = self.document.content.clone();
+                let lower = text[start..end].to_lowercase();
+                let new_content = format!("{}{}{}", &text[..start], lower, &text[end..]);
+                self.document.content = new_content.clone();
+                self.content = iced::widget::text_editor::Content::with_text(&new_content);
+                self.cursor = start + lower.len();
+                self.selection_start = None;
+                self.dirty = true;
+                return;
+            }
+        }
+        self.push_undo();
+        let new_content = self.document.content.to_lowercase();
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.dirty = true;
+    }
+
+    /// Transform text to title case - selection only if selected, otherwise whole document
+    pub fn to_title_case(&mut self, selection_only: bool) {
+        fn title_case(s: &str) -> String {
+            let mut result = String::with_capacity(s.len());
+            let mut capitalize_next = true;
+            for ch in s.chars() {
+                if capitalize_next && ch.is_alphabetic() {
+                    for c in ch.to_uppercase() {
+                        result.push(c);
+                    }
+                    capitalize_next = false;
+                } else {
+                    result.push(ch);
+                    if ch == ' ' || ch == '\n' || ch == '\t' || ch == '-' {
+                        capitalize_next = true;
+                    }
+                }
+            }
+            result
+        }
+
+        if selection_only {
+            if let Some((start, end)) = self.selection_range() {
+                self.push_undo();
+                let text = self.document.content.clone();
+                let titled = title_case(&text[start..end]);
+                let new_content = format!("{}{}{}", &text[..start], titled, &text[end..]);
+                self.document.content = new_content.clone();
+                self.content = iced::widget::text_editor::Content::with_text(&new_content);
+                self.cursor = start + titled.len();
+                self.selection_start = None;
+                self.dirty = true;
+                return;
+            }
+        }
+        self.push_undo();
+        let new_content = title_case(&self.document.content);
+        self.document.content = new_content.clone();
+        self.content = iced::widget::text_editor::Content::with_text(&new_content);
+        self.dirty = true;
+    }
 }
 
 impl Default for EditorState {
