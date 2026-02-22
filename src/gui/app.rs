@@ -3647,6 +3647,10 @@ impl ScrineverApp {
                             "j" | "J" => Some(Message::JoinLines),
                             "l" | "L" => Some(Message::SortLines),
                             "u" | "U" => Some(Message::RemoveDuplicateLines),
+                            "b" | "B" => Some(Message::CreateBackup),
+                            "e" | "E" => Some(Message::CloseSplitEditor),
+                            "n" | "N" => Some(Message::ShowBottomPanel(BottomPanel::NameGen)),
+                            "h" | "H" => Some(Message::ShowBottomPanel(BottomPanel::History)),
                             _ => None,
                         }
                     }
@@ -3675,10 +3679,17 @@ impl ScrineverApp {
                             "l" => Some(Message::ShowBottomPanel(BottomPanel::DocLinks)),
                             "j" => Some(Message::ShowBottomPanel(BottomPanel::Timer)),
                             "/" => Some(Message::ToggleComment),
+                            "5" => Some(Message::ShowBottomPanel(BottomPanel::Snapshots)),
+                            "6" => Some(Message::ShowBottomPanel(BottomPanel::Session)),
+                            "7" => Some(Message::ShowBottomPanel(BottomPanel::TextStats)),
+                            "8" => Some(Message::ShowBottomPanel(BottomPanel::Backups)),
+                            "9" => Some(Message::ShowBottomPanel(BottomPanel::Targets)),
                             "1" => Some(Message::SwitchView(ViewMode::Editor)),
                             "2" => Some(Message::SwitchView(ViewMode::Corkboard)),
                             "3" => Some(Message::SwitchView(ViewMode::Outliner)),
                             "4" => Some(Message::SwitchView(ViewMode::Scrivenings)),
+                            "p" => Some(Message::ShowBottomPanel(BottomPanel::ProjectNotes)),
+                            "m" => Some(Message::ShowBottomPanel(BottomPanel::Bookmarks)),
                             _ => None,
                         }
                     }
@@ -3717,6 +3728,18 @@ impl ScrineverApp {
                     }
                     keyboard::Key::Named(keyboard::key::Named::F7) => {
                         Some(Message::RunSpellCheck)
+                    }
+                    keyboard::Key::Named(keyboard::key::Named::F3) => {
+                        Some(Message::DocFindNext)
+                    }
+                    keyboard::Key::Named(keyboard::key::Named::F6) => {
+                        Some(Message::ShowBottomPanel(BottomPanel::Search))
+                    }
+                    keyboard::Key::Named(keyboard::key::Named::F8) => {
+                        Some(Message::ShowValidation)
+                    }
+                    keyboard::Key::Named(keyboard::key::Named::F9) => {
+                        Some(Message::CreateSnapshot)
                     }
                     _ => None,
                 }
