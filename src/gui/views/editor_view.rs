@@ -110,7 +110,7 @@ pub fn view<'a>(
                 fmt_btn("Del", Message::DeleteLine),
                 fmt_btn("Join", Message::JoinLines),
                 fmt_btn("Sort", Message::SortLines),
-                Space::with_width(Length::Fill),
+                Space::with_width(12),
                 fmt_btn("UPPER", Message::TextToUppercase),
                 fmt_btn("lower", Message::TextToLowercase),
                 fmt_btn("Title", Message::TextToTitleCase),

@@ -66,7 +66,7 @@ pub fn view(
     let settings_btn = tool_button("Settings", Message::ShowSettings);
     let compile_btn = tool_button("Compile", Message::ShowCompileDialog);
 
-    let toolbar_content = row![
+    let scrollable_buttons = row![
         new_btn,
         open_btn,
         save_btn,
@@ -107,17 +107,20 @@ pub fn view(
         print_all_btn,
         import_opml_btn,
         export_opml_btn,
-        Space::with_width(Length::Fill),
+    ]
+    .spacing(2);
+
+    let toolbar_content = row![
+        scrollable(scrollable_buttons)
+            .direction(scrollable::Direction::Horizontal(scrollable::Scrollbar::new()))
+            .width(Length::Fill),
         settings_btn,
         compile_btn,
     ]
     .spacing(2)
     .padding(Padding::from([4, 8]));
 
-    container(
-        scrollable(toolbar_content)
-            .direction(scrollable::Direction::Horizontal(scrollable::Scrollbar::new()))
-    )
+    container(toolbar_content)
     .width(Length::Fill)
     .into()
 }
