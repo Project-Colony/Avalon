@@ -52,7 +52,7 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
     let header = row![
         text("FIND & REPLACE").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(4),
-        text("\u{1F50D}").size(10),
+        text("\u{f002}").size(10),
         Space::with_width(Length::Fill),
         text("Ctrl+F: find | Ctrl+H: replace | Esc: close")
             .size(9)
@@ -83,9 +83,9 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
                 data.match_count
             )
         };
-        ("\u{2713}", position_text, Theme::SUCCESS)
+        ("\u{f00c}", position_text, Theme::SUCCESS)
     } else if !data.find_text.is_empty() {
-        ("\u{2717}", "No matches found".to_string(), Theme::WARNING)
+        ("\u{f00d}", "No matches found".to_string(), Theme::WARNING)
     } else {
         ("\u{2026}", "Type to search...".to_string(), Theme::TEXT_MUTED)
     };
@@ -95,11 +95,11 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
         Space::with_width(4),
         text(match_icon).size(12).color(match_color),
         Space::with_width(4),
-        button(text("\u{2191} Prev").size(10).color(Theme::TEXT_ACCENT))
+        button(text("\u{f062} Prev").size(10).color(Theme::TEXT_ACCENT))
             .on_press(Message::DocFindPrev)
             .padding(Padding::from([4, 8])),
         Space::with_width(2),
-        button(text("Next \u{2193}").size(10).color(Theme::TEXT_ACCENT))
+        button(text("Next \u{f063}").size(10).color(Theme::TEXT_ACCENT))
             .on_press(Message::DocFindNext)
             .padding(Padding::from([4, 8])),
     ]

@@ -57,8 +57,10 @@ regex = "1"
 # Clipboard
 arboard = "3"
 
-[dev-dependencies]
+# Temp files (used by print module)
 tempfile = "3"
+
+[dev-dependencies]
 
 [profile.release]
 opt-level = 3

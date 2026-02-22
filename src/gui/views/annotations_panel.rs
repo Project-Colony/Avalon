@@ -23,7 +23,7 @@ pub fn view(
     let header = row![
         text("ANNOTATIONS").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(4),
-        text("\u{1F4DD}").size(10),
+        text("\u{f044}").size(10),
         Space::with_width(Length::Fill),
         text(format!("{} open", open_count))
             .size(10)
@@ -43,7 +43,7 @@ pub fn view(
             .width(Length::FillPortion(3)),
         Space::with_width(4),
         button(
-            text("\u{2795} Add").size(11).color(Theme::TEXT_ACCENT),
+            text("\u{f067} Add").size(11).color(Theme::TEXT_ACCENT),
         )
         .on_press(Message::AddAnnotation)
         .padding(Padding::from([4, 10])),
@@ -131,7 +131,7 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
     };
 
     // Status indicator - clickable to cycle color
-    let status_icon = if is_resolved { "\u{2713}" } else { "\u{25CF}" };
+    let status_icon = if is_resolved { "\u{f00c}" } else { "\u{f111}" };
 
     // Color dot button - click to cycle to next color
     let color_btn: Element<'static, Message> = if !is_resolved {
@@ -218,7 +218,7 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
                 edit_count,
                 Space::with_width(Length::Fill),
                 button(
-                    text(if is_resolved { "Reopen" } else { "\u{2713} Resolve" })
+                    text(if is_resolved { "Reopen" } else { "\u{f00c} Resolve" })
                         .size(9)
                         .color(if is_resolved { Theme::TEXT_MUTED } else { Theme::SUCCESS }),
                 )
@@ -226,7 +226,7 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
                 .padding(Padding::from([1, 4])),
                 Space::with_width(4),
                 button(
-                    text("\u{2715}").size(9).color(Theme::ERROR),
+                    text("\u{f00d}").size(9).color(Theme::ERROR),
                 )
                 .on_press(Message::DeleteAnnotation(ann_id))
                 .padding(Padding::from([1, 4])),

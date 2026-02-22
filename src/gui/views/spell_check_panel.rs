@@ -12,7 +12,7 @@ pub fn view(
     dict_size: usize,
     user_dict_words: &[String],
 ) -> Element<'static, Message> {
-    let status_icon = if spell_active { "\u{2705}" } else { "\u{26AA}" };
+    let status_icon = if spell_active { "\u{f058}" } else { "\u{f10c}" };
     let status_text = if spell_active { "Active" } else { "Inactive" };
 
     let header_row = row![
@@ -41,7 +41,7 @@ pub fn view(
         .padding(Padding::from([2, 8])),
         Space::with_width(4),
         button(
-            text("\u{21BB} Re-check").size(10).color(Theme::TEXT_ACCENT),
+            text("\u{f021} Re-check").size(10).color(Theme::TEXT_ACCENT),
         )
         .on_press(Message::RunSpellCheck)
         .padding(Padding::from([2, 8])),
@@ -50,7 +50,7 @@ pub fn view(
     // Summary line
     let summary = if results.is_empty() {
         if spell_active {
-            text("\u{2713} No spelling errors found")
+            text("\u{f00c} No spelling errors found")
                 .size(11)
                 .color(Theme::SUCCESS)
         } else {
@@ -62,7 +62,7 @@ pub fn view(
         let unique_words: Vec<&str> = results.iter().map(|r| r.word.as_str()).collect();
         let with_suggestions = results.iter().filter(|r| !r.suggestions.is_empty()).count();
         text(format!(
-            "\u{26A0} {} issue(s) found ({} with suggestions, {} unknown)",
+            "\u{f071} {} issue(s) found ({} with suggestions, {} unknown)",
             unique_words.len(),
             with_suggestions,
             unique_words.len() - with_suggestions
@@ -99,7 +99,7 @@ pub fn view(
                 .size(9)
                 .color(Theme::TEXT_MUTED),
             Space::with_width(4),
-            text("\u{2192}").size(11).color(Theme::TEXT_MUTED),
+            text("\u{f061}").size(11).color(Theme::TEXT_MUTED),
             Space::with_width(4),
         ]
         .spacing(4);
@@ -151,7 +151,7 @@ pub fn view(
             let w = word.clone();
             dict_row = dict_row.push(
                 button(
-                    text(format!("{} \u{2715}", word)).size(9).color(Theme::TEXT_MUTED),
+                    text(format!("{} \u{f00d}", word)).size(9).color(Theme::TEXT_MUTED),
                 )
                 .on_press(Message::SpellCheckRemoveWord(w))
                 .padding(Padding::from([0, 3])),

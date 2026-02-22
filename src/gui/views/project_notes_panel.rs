@@ -62,7 +62,7 @@ pub fn view(notes: &str) -> Element<'static, Message> {
         Space::with_width(Length::Fill),
         text(reading_display).size(9).color(Theme::TEXT_MUTED),
         Space::with_width(8),
-        text("\u{1F4BE} Auto-saved with project")
+        text("\u{f0c7} Auto-saved with project")
             .size(9)
             .color(Theme::TEXT_MUTED),
     ];

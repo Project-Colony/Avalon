@@ -165,8 +165,8 @@ fn progress_bar(pct: f64) -> String {
 fn streak_display(streak: usize) -> String {
     let max_display = 14;
     let show = streak.min(max_display);
-    let filled = "\u{25CF}".repeat(show); // filled circles
-    let empty = "\u{25CB}".repeat(max_display.saturating_sub(show)); // empty circles
+    let filled = "\u{f111}".repeat(show); // filled circles
+    let empty = "\u{f10c}".repeat(max_display.saturating_sub(show)); // empty circles
     if streak > max_display {
         format!("{}{} +{}", filled, empty, streak - max_display)
     } else {

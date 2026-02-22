@@ -14,7 +14,7 @@ pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>) -> Element<'stat
 
     let header_info = container(
         row![
-            text(format!("\u{1F4CB} Outliner: {} docs | {} words | {:.1} pages",
+            text(format!("\u{f0ea} Outliner: {} docs | {} words | {:.1} pages",
                 doc_count_header, total_words, total_words as f64 / 250.0))
                 .size(12)
                 .color(Theme::TEXT_SECONDARY),
@@ -120,7 +120,7 @@ fn collect_outline_rows(
     };
 
     let icon = match item.kind {
-        BinderItemKind::Folder => if item.expanded { "\u{25BE} " } else { "\u{25B8} " },
+        BinderItemKind::Folder => if item.expanded { "\u{f0d7} " } else { "\u{f0da} " },
         BinderItemKind::Text => "\u{2022} ",
         _ => "  ",
     };

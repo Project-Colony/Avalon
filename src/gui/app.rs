@@ -1,5 +1,5 @@
 use iced::keyboard;
-use iced::widget::{column, container, row, text, text_editor};
+use iced::widget::{column, container, row, stack, text, text_editor, Space};
 use iced::{Element, Length, Padding, Subscription, Task as IcedTask};
 use uuid::Uuid;
 use chrono;
@@ -53,6 +53,15 @@ pub enum BottomPanel {
     Templates,
 }
 
+/// Which toolbar dropdown menu is open
+#[derive(Debug, Clone, PartialEq)]
+pub enum ToolbarMenu {
+    File,
+    View,
+    Panels,
+    Tools,
+}
+
 /// Application state
 pub struct ScrineverApp {
     // === Project ===
@@ -65,6 +74,7 @@ pub struct ScrineverApp {
     pub show_inspector: bool,
     pub fullscreen_editor: bool,
     pub bottom_panel: BottomPanel,
+    pub active_toolbar_menu: Option<ToolbarMenu>,
 
     // === Dialogs ===
     pub show_compile_dialog: bool,
@@ -477,6 +487,10 @@ pub enum Message {
     // Project validation
     ShowValidation,
 
+    // Toolbar menus
+    ToggleToolbarMenu(ToolbarMenu),
+    CloseToolbarMenu,
+
     // Misc
     Tick,
     DismissNotification,
@@ -497,6 +511,7 @@ impl ScrineverApp {
             show_inspector: true,
             fullscreen_editor: false,
             bottom_panel: BottomPanel::None,
+            active_toolbar_menu: None,
             show_compile_dialog: false,
             show_settings_dialog: false,
             compile_options: CompileOptions::default(),
@@ -599,6 +614,11 @@ impl ScrineverApp {
     }
 
     pub fn update(&mut self, message: Message) -> IcedTask<Message> {
+        // Close toolbar menu on any action except menu toggle itself and ticks
+        if !matches!(message, Message::ToggleToolbarMenu(_) | Message::CloseToolbarMenu | Message::Tick | Message::EscapePressed) {
+            self.active_toolbar_menu = None;
+        }
+
         match message {
             // ========== Project operations ==========
             Message::NewProject => {
@@ -3089,7 +3109,7 @@ impl ScrineverApp {
                                 self.last_milestone = m;
                                 let label = if m >= 1000 { format!("{}k", m / 1000) } else { m.to_string() };
                                 self.notification = Some(format!(
-                                    "\u{1F389} Milestone: {} words! Keep writing!",
+                                    "\u{f005} Milestone: {} words! Keep writing!",
                                     label
                                 ));
                                 break;
@@ -3112,7 +3132,7 @@ impl ScrineverApp {
                         // Just crossed the goal threshold
                         if prev_words < goal && new_words >= goal {
                             self.notification = Some(format!(
-                                "\u{2713} Session goal of {} words reached! Keep going!",
+                                "\u{f00c} Session goal of {} words reached! Keep going!",
                                 self.session_goal
                             ));
                         }
@@ -3124,7 +3144,7 @@ impl ScrineverApp {
                         let daily_goal = self.daily_goal as i64;
                         if words_today >= daily_goal && (words_today - 10) < daily_goal {
                             self.notification = Some(format!(
-                                "\u{2713} Daily goal of {} words reached!",
+                                "\u{f00c} Daily goal of {} words reached!",
                                 self.daily_goal
                             ));
                         }
@@ -3140,7 +3160,7 @@ impl ScrineverApp {
                     // Pomodoro break reminder at 25 min
                     if self.session_stats.time_elapsed_seconds == 1500 && self.notification.is_none() {
                         self.notification = Some(
-                            "\u{2615} 25 minutes of writing! Consider a short break.".to_string()
+                            "\u{f0f4} 25 minutes of writing! Consider a short break.".to_string()
                         );
                     }
                 }
@@ -3153,7 +3173,7 @@ impl ScrineverApp {
                         self.writing_timer.stop(word_count);
                         let summary = self.writing_timer.summary();
                         self.notification = Some(format!(
-                            "\u{2713} Timer completed! {} | Great writing session!",
+                            "\u{f00c} Timer completed! {} | Great writing session!",
                             summary
                         ));
                     }
@@ -3199,8 +3219,22 @@ impl ScrineverApp {
                 self.notification_timer = 0;
             }
 
+            Message::ToggleToolbarMenu(menu) => {
+                if self.active_toolbar_menu.as_ref() == Some(&menu) {
+                    self.active_toolbar_menu = None;
+                } else {
+                    self.active_toolbar_menu = Some(menu);
+                }
+            }
+
+            Message::CloseToolbarMenu => {
+                self.active_toolbar_menu = None;
+            }
+
             Message::EscapePressed => {
-                if self.composition_mode {
+                if self.active_toolbar_menu.is_some() {
+                    self.active_toolbar_menu = None;
+                } else if self.composition_mode {
                     self.composition_mode = false;
                 } else if self.fullscreen_editor {
                     self.fullscreen_editor = false;
@@ -3324,12 +3358,16 @@ impl ScrineverApp {
             return views::editor_view::view_fullscreen(&self.editor, title);
         }
 
-        // Toolbar
-        let toolbar = views::toolbar::view(
+        // Menu bar
+        let toolbar = views::toolbar::menu_bar(&self.active_toolbar_menu);
+
+        // Floating dropdown overlay (if a menu is open)
+        let dropdown_overlay = views::toolbar::dropdown_overlay(
             &self.view_mode,
             self.show_inspector,
             self.fullscreen_editor,
             &self.bottom_panel,
+            &self.active_toolbar_menu,
         );
 
         // Binder sidebar
@@ -3742,10 +3780,29 @@ impl ScrineverApp {
         }
         layout = layout.push(status_bar);
 
-        container(layout)
+        // If a dropdown menu is open, stack it as a floating overlay
+        if let Some(overlay) = dropdown_overlay {
+            // The overlay column: an empty spacer for the menu bar height,
+            // then the dropdown floating over the rest of the content
+            let floating = column![
+                // Spacer matching the menu bar height (~33px)
+                Space::with_height(33),
+                overlay,
+            ];
+
+            stack![
+                container(layout).width(Length::Fill).height(Length::Fill),
+                container(floating).width(Length::Fill).height(Length::Fill),
+            ]
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
+        } else {
+            container(layout)
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .into()
+        }
     }
 
     /// Keyboard shortcuts and auto-save timer

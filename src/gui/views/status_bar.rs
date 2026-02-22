@@ -60,7 +60,7 @@ pub fn view(
     let session_indicator: Element<'static, Message> = if session_active {
         row![
             Space::with_width(4),
-            text("\u{23F1}").size(10),
+            text("\u{f017}").size(10),
             Space::with_width(2),
             text("REC").size(9).color(Theme::SUCCESS),
         ].into()
@@ -72,7 +72,7 @@ pub fn view(
     let timer_indicator: Element<'static, Message> = if timer_running {
         row![
             Space::with_width(4),
-            text("\u{23F1}").size(10),
+            text("\u{f017}").size(10),
             Space::with_width(2),
             text(timer_remaining.to_string()).size(9).color(Theme::TEXT_ACCENT),
         ].into()
@@ -138,7 +138,7 @@ pub fn view(
         let streak_color = if writing_streak >= 7 { Theme::SUCCESS }
         else if writing_streak >= 3 { Theme::WARNING }
         else { Theme::TEXT_MUTED };
-        let streak_icon = if writing_streak >= 7 { "\u{1F525}" } else { "\u{26A1}" };
+        let streak_icon = if writing_streak >= 7 { "\u{f06d}" } else { "\u{f0e7}" };
         row![
             Space::with_width(4),
             text(format!("{} {}d", streak_icon, writing_streak)).size(9).color(streak_color),

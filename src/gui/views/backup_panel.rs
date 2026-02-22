@@ -19,7 +19,7 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
             .color(Theme::TEXT_MUTED),
         Space::with_width(8),
         button(
-            text("\u{2795} Create Backup").size(11).color(Theme::TEXT_ACCENT),
+            text("\u{f067} Create Backup").size(11).color(Theme::TEXT_ACCENT),
         )
         .on_press(Message::CreateBackup)
         .padding(Padding::from([4, 10])),
@@ -91,7 +91,7 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
     }
 
     let note = row![
-        text("\u{1F4C1}").size(10),
+        text("\u{f07b}").size(10),
         Space::with_width(4),
         text("Stored in ~/Scrinever Backups/")
             .size(9)

@@ -19,7 +19,7 @@ pub fn view<'a>(
 
     let primary_header = container(
         row![
-            text("\u{270E}").size(12).color(Theme::TEXT_ACCENT),
+            text("\u{f040}").size(12).color(Theme::TEXT_ACCENT),
             Space::with_width(4),
             text(primary_title.to_string())
                 .size(13)
@@ -65,7 +65,7 @@ pub fn view<'a>(
 
     let secondary_header = container(
         row![
-            text("\u{1F4D6}").size(12),
+            text("\u{f02d}").size(12),
             Space::with_width(4),
             text(secondary_title.to_string())
                 .size(13)
@@ -74,7 +74,7 @@ pub fn view<'a>(
             text("Read-only").size(10).color(Theme::TEXT_MUTED),
             Space::with_width(8),
             button(
-                text("\u{2715} Close").size(10).color(Theme::TEXT_MUTED),
+                text("\u{f00d} Close").size(10).color(Theme::TEXT_MUTED),
             )
             .on_press(Message::CloseSplitEditor)
             .padding(Padding::from([2, 6])),

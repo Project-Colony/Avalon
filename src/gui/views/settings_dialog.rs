@@ -107,7 +107,7 @@ pub fn view(
         let color = lbl.color.to_iced_color();
         labels_col = labels_col.push(
             row![
-                text("\u{25CF}").size(12).color(color),
+                text("\u{f111}").size(12).color(color),
                 Space::with_width(4),
                 text(lbl.name.clone()).size(12).color(Theme::TEXT_PRIMARY),
                 Space::with_width(Length::Fill),

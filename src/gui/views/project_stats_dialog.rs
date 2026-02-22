@@ -56,7 +56,7 @@ pub fn view(data: &ProjectStatsData) -> Element<'static, Message> {
     };
 
     let classification = row![
-        text(format!("\u{1F4D6} {}", size_label))
+        text(format!("\u{f02d} {}", size_label))
             .size(13)
             .color(Theme::TEXT_ACCENT),
         Space::with_width(8),
