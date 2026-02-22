@@ -127,6 +127,34 @@ impl AutoSaveManager {
         self.skip_count = 0;
     }
 
+    /// Efficiency ratio: proportion of actual saves to total save attempts
+    /// Returns a value between 0.0 and 1.0
+    pub fn efficiency_ratio(&self) -> f64 {
+        let total = self.save_count + self.skip_count;
+        if total == 0 {
+            return 1.0; // No attempts yet — perfectly efficient
+        }
+        self.save_count as f64 / total as f64
+    }
+
+    /// Builder: set the debounce delay in milliseconds
+    pub fn with_debounce(mut self, ms: u64) -> Self {
+        self.debounce_ms = ms;
+        self
+    }
+
+    /// Builder: set the backup path
+    pub fn with_backup_path(mut self, path: PathBuf) -> Self {
+        self.backup_path = Some(path);
+        self
+    }
+
+    /// Builder: set the backup interval
+    pub fn with_backup_interval(mut self, every_n: u32) -> Self {
+        self.backup_every_n_saves = every_n;
+        self
+    }
+
     /// Get a status summary
     pub fn status(&self) -> AutoSaveStatus {
         AutoSaveStatus {
@@ -180,6 +208,52 @@ pub enum BackupStrategy {
     AfterWordCountChange(usize),
     /// No automatic backups
     Never,
+}
+
+impl BackupStrategy {
+    /// Display label for the backup strategy
+    pub fn label(&self) -> String {
+        match self {
+            BackupStrategy::EverySaves(n) => format!("Every {} saves", n),
+            BackupStrategy::AfterDuration(d) => {
+                let mins = d.as_secs() / 60;
+                if mins > 0 {
+                    format!("Every {} min", mins)
+                } else {
+                    format!("Every {} sec", d.as_secs())
+                }
+            }
+            BackupStrategy::AfterWordCountChange(n) => format!("Every {} words", n),
+            BackupStrategy::Never => "Never".to_string(),
+        }
+    }
+
+    /// Whether this strategy produces automatic backups
+    pub fn is_active(&self) -> bool {
+        !matches!(self, BackupStrategy::Never)
+    }
+}
+
+impl SaveKind {
+    /// Display label for the save kind
+    pub fn label(&self) -> &str {
+        match self {
+            SaveKind::AutoSave => "Auto Save",
+            SaveKind::Manual => "Manual Save",
+            SaveKind::PreCompile => "Pre-Compile Save",
+            SaveKind::PreClose => "Pre-Close Save",
+        }
+    }
+
+    /// Whether this is a user-initiated save action
+    pub fn is_user_initiated(&self) -> bool {
+        matches!(self, SaveKind::Manual)
+    }
+
+    /// Whether this save should be prioritized over auto-saves
+    pub fn is_priority(&self) -> bool {
+        !matches!(self, SaveKind::AutoSave)
+    }
 }
 
 /// Manages the save queue for async saving
@@ -261,6 +335,22 @@ impl SaveQueue {
     /// Check if there's a manual save pending (should be prioritized)
     pub fn has_manual_save(&self) -> bool {
         self.pending.iter().any(|op| op.kind == SaveKind::Manual)
+    }
+
+    /// Reorder the queue so that priority saves (manual, pre-close, pre-compile)
+    /// come before auto-saves
+    pub fn prioritize(&mut self) {
+        self.pending.sort_by_key(|op| match op.kind {
+            SaveKind::PreClose => 0,
+            SaveKind::Manual => 1,
+            SaveKind::PreCompile => 2,
+            SaveKind::AutoSave => 3,
+        });
+    }
+
+    /// Get all pending save kinds
+    pub fn pending_kinds(&self) -> Vec<&SaveKind> {
+        self.pending.iter().map(|op| &op.kind).collect()
     }
 }
 
@@ -543,5 +633,138 @@ mod tests {
     fn test_autosave_backup_default() {
         let manager = AutoSaveManager::new(30);
         assert_eq!(manager.backup_every_n_saves, 10);
+    }
+
+    #[test]
+    fn test_efficiency_ratio_no_attempts() {
+        let manager = AutoSaveManager::new(30);
+        assert!((manager.efficiency_ratio() - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_efficiency_ratio_all_saves() {
+        let mut manager = AutoSaveManager::new(30);
+        manager.mark_dirty();
+        manager.mark_saved();
+        manager.mark_dirty();
+        manager.mark_saved();
+        assert!((manager.efficiency_ratio() - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_efficiency_ratio_half_skips() {
+        let mut manager = AutoSaveManager::new(30);
+        manager.mark_dirty();
+        manager.mark_saved();
+        manager.record_skip();
+        // 1 save, 1 skip => 0.5
+        assert!((manager.efficiency_ratio() - 0.5).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_with_debounce_builder() {
+        let manager = AutoSaveManager::new(30).with_debounce(500);
+        assert_eq!(manager.debounce_ms, 500);
+    }
+
+    #[test]
+    fn test_with_backup_path_builder() {
+        let manager = AutoSaveManager::new(30)
+            .with_backup_path(PathBuf::from("/tmp/backups"));
+        assert_eq!(
+            manager.backup_path.unwrap().to_str().unwrap(),
+            "/tmp/backups"
+        );
+    }
+
+    #[test]
+    fn test_with_backup_interval_builder() {
+        let manager = AutoSaveManager::new(30).with_backup_interval(20);
+        assert_eq!(manager.backup_every_n_saves, 20);
+    }
+
+    #[test]
+    fn test_builder_chain() {
+        let manager = AutoSaveManager::new(60)
+            .with_debounce(250)
+            .with_backup_interval(5)
+            .with_backup_path(PathBuf::from("/backups"));
+        assert_eq!(manager.interval_seconds, 60);
+        assert_eq!(manager.debounce_ms, 250);
+        assert_eq!(manager.backup_every_n_saves, 5);
+        assert!(manager.backup_path.is_some());
+    }
+
+    #[test]
+    fn test_backup_strategy_label() {
+        assert_eq!(BackupStrategy::Never.label(), "Never");
+        assert_eq!(BackupStrategy::EverySaves(10).label(), "Every 10 saves");
+        assert!(BackupStrategy::AfterDuration(Duration::from_secs(300))
+            .label()
+            .contains("5 min"));
+        assert!(BackupStrategy::AfterDuration(Duration::from_secs(30))
+            .label()
+            .contains("30 sec"));
+        assert!(BackupStrategy::AfterWordCountChange(500)
+            .label()
+            .contains("500 words"));
+    }
+
+    #[test]
+    fn test_backup_strategy_is_active() {
+        assert!(!BackupStrategy::Never.is_active());
+        assert!(BackupStrategy::EverySaves(5).is_active());
+        assert!(BackupStrategy::AfterDuration(Duration::from_secs(60)).is_active());
+        assert!(BackupStrategy::AfterWordCountChange(100).is_active());
+    }
+
+    #[test]
+    fn test_save_kind_label() {
+        assert_eq!(SaveKind::AutoSave.label(), "Auto Save");
+        assert_eq!(SaveKind::Manual.label(), "Manual Save");
+        assert_eq!(SaveKind::PreCompile.label(), "Pre-Compile Save");
+        assert_eq!(SaveKind::PreClose.label(), "Pre-Close Save");
+    }
+
+    #[test]
+    fn test_save_kind_is_user_initiated() {
+        assert!(SaveKind::Manual.is_user_initiated());
+        assert!(!SaveKind::AutoSave.is_user_initiated());
+        assert!(!SaveKind::PreCompile.is_user_initiated());
+        assert!(!SaveKind::PreClose.is_user_initiated());
+    }
+
+    #[test]
+    fn test_save_kind_is_priority() {
+        assert!(!SaveKind::AutoSave.is_priority());
+        assert!(SaveKind::Manual.is_priority());
+        assert!(SaveKind::PreCompile.is_priority());
+        assert!(SaveKind::PreClose.is_priority());
+    }
+
+    #[test]
+    fn test_save_queue_prioritize() {
+        let mut queue = SaveQueue::new();
+        queue.enqueue(Path::new("/tmp/a"), SaveKind::AutoSave);
+        queue.enqueue(Path::new("/tmp/b"), SaveKind::Manual);
+        queue.enqueue(Path::new("/tmp/c"), SaveKind::PreClose);
+        queue.prioritize();
+        let first = queue.dequeue().unwrap();
+        assert_eq!(first.kind, SaveKind::PreClose);
+        let second = queue.dequeue().unwrap();
+        assert_eq!(second.kind, SaveKind::Manual);
+        let third = queue.dequeue().unwrap();
+        assert_eq!(third.kind, SaveKind::AutoSave);
+    }
+
+    #[test]
+    fn test_save_queue_pending_kinds() {
+        let mut queue = SaveQueue::new();
+        queue.enqueue(Path::new("/tmp/a"), SaveKind::AutoSave);
+        queue.enqueue(Path::new("/tmp/b"), SaveKind::Manual);
+        let kinds = queue.pending_kinds();
+        assert_eq!(kinds.len(), 2);
+        assert!(kinds.contains(&&SaveKind::AutoSave));
+        assert!(kinds.contains(&&SaveKind::Manual));
     }
 }

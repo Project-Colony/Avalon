@@ -220,6 +220,48 @@ impl DocumentTargets {
         self.targets.len()
     }
 
+    /// Get a textual summary of all targets
+    pub fn summary(&self, word_counts: &HashMap<Uuid, usize>) -> String {
+        let total = self.total_count();
+        if total == 0 {
+            return "No targets set".to_string();
+        }
+        let completed = self.completed_count(word_counts);
+        let overall = self.overall_progress(word_counts);
+        format!(
+            "{}/{} targets complete ({:.0}% overall)",
+            completed, total, overall
+        )
+    }
+
+    /// Get documents that have a deadline set
+    pub fn with_deadline_docs(&self) -> Vec<Uuid> {
+        self.targets
+            .iter()
+            .filter(|(_, t)| t.has_deadline())
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
+    /// Get document IDs whose targets are not yet complete
+    pub fn incomplete_targets(&self, word_counts: &HashMap<Uuid, usize>) -> Vec<Uuid> {
+        self.targets
+            .keys()
+            .filter(|id| {
+                let current = word_counts.get(id).copied().unwrap_or(0);
+                self.progress(id, current)
+                    .map(|p| !p.status.is_complete())
+                    .unwrap_or(true)
+            })
+            .copied()
+            .collect()
+    }
+
+    /// Get the total target word count across all documents
+    pub fn total_target_words(&self) -> usize {
+        self.targets.values().map(|t| t.word_count).sum()
+    }
+
     /// Get documents that are over their target limit
     pub fn over_limit_docs(&self, word_counts: &HashMap<Uuid, usize>) -> Vec<Uuid> {
         self.targets.keys()
@@ -347,7 +389,29 @@ impl DocumentTarget {
     }
 }
 
+impl TargetType {
+    /// Display label for the target type
+    pub fn label(&self) -> &str {
+        match self {
+            TargetType::Minimum => "Minimum",
+            TargetType::Maximum => "Maximum",
+            TargetType::Range { .. } => "Range",
+        }
+    }
+}
+
 impl TargetStatus {
+    /// Get all possible status variants
+    pub fn all() -> Vec<TargetStatus> {
+        vec![
+            TargetStatus::NotStarted,
+            TargetStatus::InProgress,
+            TargetStatus::AlmostDone,
+            TargetStatus::Complete,
+            TargetStatus::OverLimit,
+        ]
+    }
+
     /// Get a short emoji representation
     pub fn icon(&self) -> &str {
         match self {
@@ -391,6 +455,15 @@ impl TargetProgress {
     /// Check if deadline is overdue
     pub fn deadline_overdue(&self) -> bool {
         self.days_remaining.map_or(false, |d| d < 0)
+    }
+
+    /// Whether the target is on track (enough daily capacity to finish in time)
+    pub fn is_on_track(&self) -> bool {
+        match (self.status == TargetStatus::Complete, self.words_per_day_needed) {
+            (true, _) => true,
+            (_, Some(wpd)) => wpd <= 2000, // Reasonable daily target
+            (_, None) => self.days_remaining.is_none(), // No deadline = on track
+        }
     }
 }
 
@@ -788,5 +861,152 @@ mod tests {
         targets.set_target_full(id, DocumentTarget::range(100, 500));
         let t = targets.get_target(&id).unwrap();
         assert_eq!(t.type_label(), "Range");
+    }
+
+    #[test]
+    fn test_targets_summary_empty() {
+        let targets = DocumentTargets::new();
+        let wc = HashMap::new();
+        assert_eq!(targets.summary(&wc), "No targets set");
+    }
+
+    #[test]
+    fn test_targets_summary_with_data() {
+        let mut targets = DocumentTargets::new();
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        targets.set_target(id1, 100);
+        targets.set_target(id2, 200);
+
+        let mut wc = HashMap::new();
+        wc.insert(id1, 100); // complete
+        wc.insert(id2, 50);  // in progress
+
+        let summary = targets.summary(&wc);
+        assert!(summary.contains("1/2 targets complete"));
+    }
+
+    #[test]
+    fn test_with_deadline_docs() {
+        let mut targets = DocumentTargets::new();
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        targets.set_target_full(id1, DocumentTarget::minimum(100).with_deadline("2026-12-31"));
+        targets.set_target(id2, 200); // no deadline
+
+        let dl_docs = targets.with_deadline_docs();
+        assert_eq!(dl_docs.len(), 1);
+        assert_eq!(dl_docs[0], id1);
+    }
+
+    #[test]
+    fn test_incomplete_targets() {
+        let mut targets = DocumentTargets::new();
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        targets.set_target(id1, 100);
+        targets.set_target(id2, 200);
+
+        let mut wc = HashMap::new();
+        wc.insert(id1, 100); // complete
+        wc.insert(id2, 50);  // incomplete
+
+        let incomplete = targets.incomplete_targets(&wc);
+        assert_eq!(incomplete.len(), 1);
+        assert_eq!(incomplete[0], id2);
+    }
+
+    #[test]
+    fn test_total_target_words() {
+        let mut targets = DocumentTargets::new();
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        targets.set_target(id1, 1000);
+        targets.set_target(id2, 2000);
+        assert_eq!(targets.total_target_words(), 3000);
+    }
+
+    #[test]
+    fn test_total_target_words_empty() {
+        let targets = DocumentTargets::new();
+        assert_eq!(targets.total_target_words(), 0);
+    }
+
+    #[test]
+    fn test_target_type_label() {
+        assert_eq!(TargetType::Minimum.label(), "Minimum");
+        assert_eq!(TargetType::Maximum.label(), "Maximum");
+        assert_eq!(TargetType::Range { min: 10, max: 20 }.label(), "Range");
+    }
+
+    #[test]
+    fn test_target_status_all() {
+        let all = TargetStatus::all();
+        assert_eq!(all.len(), 5);
+        assert!(all.contains(&TargetStatus::NotStarted));
+        assert!(all.contains(&TargetStatus::InProgress));
+        assert!(all.contains(&TargetStatus::AlmostDone));
+        assert!(all.contains(&TargetStatus::Complete));
+        assert!(all.contains(&TargetStatus::OverLimit));
+    }
+
+    #[test]
+    fn test_is_on_track_complete() {
+        let progress = TargetProgress {
+            doc_id: Uuid::new_v4(),
+            current_words: 1000,
+            target_words: 1000,
+            percentage: 100.0,
+            status: TargetStatus::Complete,
+            words_remaining: 0,
+            days_remaining: None,
+            words_per_day_needed: None,
+        };
+        assert!(progress.is_on_track());
+    }
+
+    #[test]
+    fn test_is_on_track_reasonable_pace() {
+        let progress = TargetProgress {
+            doc_id: Uuid::new_v4(),
+            current_words: 500,
+            target_words: 1000,
+            percentage: 50.0,
+            status: TargetStatus::InProgress,
+            words_remaining: 500,
+            days_remaining: Some(10),
+            words_per_day_needed: Some(50),
+        };
+        assert!(progress.is_on_track());
+    }
+
+    #[test]
+    fn test_is_on_track_unreasonable_pace() {
+        let progress = TargetProgress {
+            doc_id: Uuid::new_v4(),
+            current_words: 100,
+            target_words: 10000,
+            percentage: 1.0,
+            status: TargetStatus::InProgress,
+            words_remaining: 9900,
+            days_remaining: Some(2),
+            words_per_day_needed: Some(4950),
+        };
+        assert!(!progress.is_on_track());
+    }
+
+    #[test]
+    fn test_is_on_track_no_deadline() {
+        let progress = TargetProgress {
+            doc_id: Uuid::new_v4(),
+            current_words: 500,
+            target_words: 1000,
+            percentage: 50.0,
+            status: TargetStatus::InProgress,
+            words_remaining: 500,
+            days_remaining: None,
+            words_per_day_needed: None,
+        };
+        assert!(progress.is_on_track());
     }
 }
