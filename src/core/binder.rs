@@ -1199,4 +1199,436 @@ mod tests {
         assert_eq!(folder.prev_sibling(&b_id), Some(a_id));
         assert_eq!(folder.prev_sibling(&a_id), None);
     }
+
+    #[test]
+    fn test_move_child_up_already_first() {
+        let mut binder = Binder::default_structure();
+        let a = BinderItem::new_text("A");
+        let a_id = a.id;
+        binder.draft.add_child(a);
+        binder.draft.add_child(BinderItem::new_text("B"));
+
+        // A is already first — move_up should return false
+        assert!(!binder.move_item_up(&a_id));
+        assert_eq!(binder.draft.children[0].id, a_id);
+    }
+
+    #[test]
+    fn test_move_child_down_already_last() {
+        let mut binder = Binder::default_structure();
+        binder.draft.add_child(BinderItem::new_text("A"));
+        let b = BinderItem::new_text("B");
+        let b_id = b.id;
+        binder.draft.add_child(b);
+
+        // B is already last — move_down should return false
+        assert!(!binder.move_item_down(&b_id));
+        assert_eq!(binder.draft.children[1].id, b_id);
+    }
+
+    #[test]
+    fn test_move_item_up_down_success() {
+        let mut binder = Binder::default_structure();
+        let a = BinderItem::new_text("A");
+        let b = BinderItem::new_text("B");
+        let a_id = a.id;
+        let b_id = b.id;
+        binder.draft.add_child(a);
+        binder.draft.add_child(b);
+
+        // Move B up
+        assert!(binder.move_item_up(&b_id));
+        assert_eq!(binder.draft.children[0].id, b_id);
+        assert_eq!(binder.draft.children[1].id, a_id);
+
+        // Move B back down
+        assert!(binder.move_item_down(&b_id));
+        assert_eq!(binder.draft.children[0].id, a_id);
+        assert_eq!(binder.draft.children[1].id, b_id);
+    }
+
+    #[test]
+    fn test_duplicate_item() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Original");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Some content.".to_string();
+        }
+        let orig_id = item.id;
+        binder.draft.add_child(item);
+
+        let dup_id = binder.duplicate_item(&orig_id).unwrap();
+        assert_ne!(dup_id, orig_id);
+        let dup = binder.find_item(&dup_id).unwrap();
+        assert!(dup.title.contains("(Copy)"));
+        assert_eq!(binder.draft.children.len(), 2);
+    }
+
+    #[test]
+    fn test_deep_clone_new_ids() {
+        let mut folder = BinderItem::new_folder("Parent");
+        let child = BinderItem::new_text("Child");
+        let child_id = child.id;
+        folder.add_child(child);
+
+        let cloned = folder.deep_clone();
+        assert_ne!(cloned.id, folder.id);
+        assert_ne!(cloned.children[0].id, child_id);
+        assert_eq!(cloned.title, folder.title);
+        assert_eq!(cloned.children[0].title, "Child");
+    }
+
+    #[test]
+    fn test_convert_to_folder() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("Scene");
+        let id = item.id;
+        binder.draft.add_child(item);
+
+        assert!(binder.convert_to_folder(&id));
+        let converted = binder.find_item(&id).unwrap();
+        assert_eq!(converted.kind, BinderItemKind::Folder);
+        assert!(converted.expanded);
+    }
+
+    #[test]
+    fn test_convert_to_folder_already_folder() {
+        let mut binder = Binder::default_structure();
+        let folder = BinderItem::new_folder("Chapter");
+        let id = folder.id;
+        binder.draft.add_child(folder);
+
+        // Already a folder — should return false
+        assert!(!binder.convert_to_folder(&id));
+    }
+
+    #[test]
+    fn test_convert_to_text_empty_folder() {
+        let mut binder = Binder::default_structure();
+        let folder = BinderItem::new_folder("Empty");
+        let id = folder.id;
+        binder.draft.add_child(folder);
+
+        assert!(binder.convert_to_text(&id));
+        let converted = binder.find_item(&id).unwrap();
+        assert_eq!(converted.kind, BinderItemKind::Text);
+        assert!(converted.document.is_some());
+    }
+
+    #[test]
+    fn test_convert_to_text_nonempty_folder() {
+        let mut binder = Binder::default_structure();
+        let mut folder = BinderItem::new_folder("Chapter");
+        folder.add_child(BinderItem::new_text("Scene 1"));
+        let id = folder.id;
+        binder.draft.add_child(folder);
+
+        // Folder with children — should return false
+        assert!(!binder.convert_to_text(&id));
+    }
+
+    #[test]
+    fn test_empty_trash() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("Trash me");
+        let id = item.id;
+        binder.draft.add_child(item);
+        binder.move_to_trash(&id);
+        assert!(!binder.trash_is_empty());
+
+        binder.empty_trash();
+        assert!(binder.trash_is_empty());
+        assert_eq!(binder.trash_count(), 0);
+    }
+
+    #[test]
+    fn test_move_to_trash_from_research() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("Ref doc");
+        let id = item.id;
+        binder.research.add_child(item);
+
+        assert!(binder.move_to_trash(&id));
+        assert!(binder.research.find(&id).is_none());
+        assert!(binder.trash.find(&id).is_some());
+    }
+
+    #[test]
+    fn test_move_to_trash_nonexistent() {
+        let mut binder = Binder::default_structure();
+        let fake_id = Uuid::new_v4();
+        assert!(!binder.move_to_trash(&fake_id));
+    }
+
+    #[test]
+    fn test_find_parent() {
+        let mut folder = BinderItem::new_folder("Root");
+        let child = BinderItem::new_text("Child");
+        let child_id = child.id;
+        folder.add_child(child);
+
+        let (parent, idx) = folder.find_parent(&child_id).unwrap();
+        assert_eq!(parent.title, "Root");
+        assert_eq!(idx, 0);
+    }
+
+    #[test]
+    fn test_find_parent_nested() {
+        let mut root = BinderItem::new_folder("Root");
+        let mut sub = BinderItem::new_folder("Sub");
+        let leaf = BinderItem::new_text("Leaf");
+        let leaf_id = leaf.id;
+        sub.add_child(leaf);
+        root.add_child(sub);
+
+        let (parent, idx) = root.find_parent(&leaf_id).unwrap();
+        assert_eq!(parent.title, "Sub");
+        assert_eq!(idx, 0);
+    }
+
+    #[test]
+    fn test_longest_document() {
+        let mut binder = Binder::default_structure();
+        let mut short = BinderItem::new_text("Short");
+        if let Some(ref mut doc) = short.document {
+            doc.content = "one two".to_string();
+        }
+        let mut long = BinderItem::new_text("Long");
+        if let Some(ref mut doc) = long.document {
+            doc.content = "one two three four five six seven".to_string();
+        }
+        binder.draft.add_child(short);
+        binder.draft.add_child(long);
+
+        let longest = binder.longest_document().unwrap();
+        assert_eq!(longest.title, "Long");
+    }
+
+    #[test]
+    fn test_merge_children_content() {
+        let mut folder = BinderItem::new_folder("Chapter");
+        let mut s1 = BinderItem::new_text("Scene 1");
+        if let Some(ref mut doc) = s1.document {
+            doc.content = "Hello".to_string();
+        }
+        let mut s2 = BinderItem::new_text("Scene 2");
+        if let Some(ref mut doc) = s2.document {
+            doc.content = "World".to_string();
+        }
+        folder.add_child(s1);
+        folder.add_child(s2);
+
+        let merged = folder.merge_children_content();
+        assert!(merged.contains("Hello"));
+        assert!(merged.contains("World"));
+        assert!(merged.contains("Scene 1"));
+        assert!(merged.contains("Scene 2"));
+    }
+
+    #[test]
+    fn test_total_word_count_nested() {
+        let mut folder = BinderItem::new_folder("Root");
+        let mut a = BinderItem::new_text("A");
+        if let Some(ref mut doc) = a.document {
+            doc.content = "one two three".to_string();
+        }
+        let mut sub = BinderItem::new_folder("Sub");
+        let mut b = BinderItem::new_text("B");
+        if let Some(ref mut doc) = b.document {
+            doc.content = "four five".to_string();
+        }
+        sub.add_child(b);
+        folder.add_child(a);
+        folder.add_child(sub);
+
+        assert_eq!(folder.total_word_count(), 5);
+    }
+
+    #[test]
+    fn test_all_text() {
+        let mut binder = Binder::default_structure();
+        let mut a = BinderItem::new_text("A");
+        if let Some(ref mut doc) = a.document {
+            doc.content = "First doc".to_string();
+        }
+        let mut b = BinderItem::new_text("B");
+        if let Some(ref mut doc) = b.document {
+            doc.content = "Second doc".to_string();
+        }
+        binder.draft.add_child(a);
+        binder.draft.add_child(b);
+
+        let text = binder.all_text();
+        assert!(text.contains("First doc"));
+        assert!(text.contains("Second doc"));
+    }
+
+    #[test]
+    fn test_insert_child_at_position() {
+        let mut folder = BinderItem::new_folder("Parent");
+        folder.add_child(BinderItem::new_text("A"));
+        folder.add_child(BinderItem::new_text("C"));
+
+        let b = BinderItem::new_text("B");
+        let b_id = b.id;
+        folder.insert_child(1, b);
+
+        assert_eq!(folder.children.len(), 3);
+        assert_eq!(folder.children[1].id, b_id);
+        assert_eq!(folder.children[1].title, "B");
+    }
+
+    #[test]
+    fn test_insert_child_out_of_bounds() {
+        let mut folder = BinderItem::new_folder("Parent");
+        folder.add_child(BinderItem::new_text("A"));
+
+        let b = BinderItem::new_text("B");
+        let b_id = b.id;
+        folder.insert_child(999, b); // Way out of bounds
+
+        // Should clamp to end
+        assert_eq!(folder.children.len(), 2);
+        assert_eq!(folder.children[1].id, b_id);
+    }
+
+    #[test]
+    fn test_binder_item_kind_icons() {
+        assert!(!BinderItemKind::Folder.icon().is_empty());
+        assert!(!BinderItemKind::Text.icon().is_empty());
+        assert!(!BinderItemKind::Image.icon().is_empty());
+        assert!(!BinderItemKind::Pdf.icon().is_empty());
+        assert!(!BinderItemKind::WebPage.icon().is_empty());
+    }
+
+    #[test]
+    fn test_binder_item_kind_labels() {
+        assert_eq!(BinderItemKind::Image.label(), "Image");
+        assert_eq!(BinderItemKind::Pdf.label(), "PDF");
+        assert_eq!(BinderItemKind::WebPage.label(), "Web Page");
+    }
+
+    #[test]
+    fn test_binder_item_kind_editability() {
+        assert!(BinderItemKind::Text.is_editable());
+        assert!(!BinderItemKind::Folder.is_editable());
+        assert!(!BinderItemKind::Image.is_editable());
+        assert!(!BinderItemKind::Pdf.is_editable());
+        assert!(!BinderItemKind::WebPage.is_editable());
+    }
+
+    #[test]
+    fn test_document_count() {
+        let mut binder = Binder::default_structure();
+        binder.draft.add_child(BinderItem::new_text("A"));
+        binder.draft.add_child(BinderItem::new_folder("F"));
+        binder.draft.add_child(BinderItem::new_text("B"));
+        binder.research.add_child(BinderItem::new_text("R"));
+
+        assert_eq!(binder.document_count(), 3);
+    }
+
+    #[test]
+    fn test_total_word_count_binder() {
+        let mut binder = Binder::default_structure();
+        let mut a = BinderItem::new_text("A");
+        if let Some(ref mut doc) = a.document {
+            doc.content = "one two three".to_string();
+        }
+        let mut b = BinderItem::new_text("B");
+        if let Some(ref mut doc) = b.document {
+            doc.content = "four five".to_string();
+        }
+        binder.draft.add_child(a);
+        binder.draft.add_child(b);
+
+        assert_eq!(binder.total_word_count(), 5);
+    }
+
+    #[test]
+    fn test_find_item_mut() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("Editable");
+        let id = item.id;
+        binder.draft.add_child(item);
+
+        let found = binder.find_item_mut(&id).unwrap();
+        found.title = "Modified".to_string();
+
+        assert_eq!(binder.find_item(&id).unwrap().title, "Modified");
+    }
+
+    #[test]
+    fn test_find_item_not_found() {
+        let binder = Binder::default_structure();
+        let fake_id = Uuid::new_v4();
+        assert!(binder.find_item(&fake_id).is_none());
+    }
+
+    #[test]
+    fn test_age_string_today() {
+        let item = BinderItem::new_text("New");
+        let age = item.age_string();
+        assert_eq!(age, "today");
+    }
+
+    #[test]
+    fn test_remove_child_not_found() {
+        let mut folder = BinderItem::new_folder("Parent");
+        folder.add_child(BinderItem::new_text("A"));
+
+        let fake_id = Uuid::new_v4();
+        assert!(folder.remove_child(&fake_id).is_none());
+        assert_eq!(folder.child_count(), 1);
+    }
+
+    #[test]
+    fn test_remove_nested_child() {
+        let mut root = BinderItem::new_folder("Root");
+        let mut sub = BinderItem::new_folder("Sub");
+        let leaf = BinderItem::new_text("Leaf");
+        let leaf_id = leaf.id;
+        sub.add_child(leaf);
+        root.add_child(sub);
+
+        let removed = root.remove_child(&leaf_id);
+        assert!(removed.is_some());
+        assert_eq!(removed.unwrap().title, "Leaf");
+        assert_eq!(root.children[0].child_count(), 0);
+    }
+
+    #[test]
+    fn test_split_item_no_separator() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Single");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "No separator here.".to_string();
+        }
+        let id = item.id;
+        binder.draft.add_child(item);
+
+        let new_ids = binder.split_item(&id, "\n---\n");
+        assert!(new_ids.is_empty()); // Only 1 section, not enough to split
+        // Original should still exist
+        assert!(binder.find_item(&id).is_some());
+    }
+
+    #[test]
+    fn test_merge_items_single() {
+        let mut binder = Binder::default_structure();
+        let a = BinderItem::new_text("Only One");
+        let a_id = a.id;
+        binder.draft.add_child(a);
+
+        // Merging a single item should return None
+        assert!(binder.merge_items(&[a_id], "\n\n").is_none());
+    }
+
+    #[test]
+    fn test_sibling_ids_not_found() {
+        let folder = BinderItem::new_folder("Parent");
+        let fake_id = Uuid::new_v4();
+        let siblings = folder.sibling_ids(&fake_id);
+        assert!(siblings.is_empty());
+    }
 }
