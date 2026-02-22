@@ -506,4 +506,160 @@ mod tests {
         let results = index.search("under");
         assert!(!results.is_empty());
     }
+
+    #[test]
+    fn test_unique_terms() {
+        let mut index = SearchIndex::new();
+        assert_eq!(index.unique_terms(), 0);
+
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Test", "hello world testing", "", "");
+        assert!(index.unique_terms() > 0);
+    }
+
+    #[test]
+    fn test_update_document_replaces_old() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+
+        index.update_document(doc_id, "Old Title", "old content special", "", "");
+        assert!(index.has_term("special"));
+
+        index.update_document(doc_id, "New Title", "new content different", "", "");
+        assert!(!index.has_term("special"));
+        assert!(index.has_term("different"));
+    }
+
+    #[test]
+    fn test_search_empty_query() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Test", "Hello world", "", "");
+
+        let results = index.search("");
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_search_stop_words_only() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Test", "Hello world", "", "");
+
+        let results = index.search("the is at");
+        assert!(results.is_empty()); // All stop words
+    }
+
+    #[test]
+    fn test_multiple_documents_search() {
+        let mut index = SearchIndex::new();
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        let id3 = Uuid::new_v4();
+
+        index.update_document(id1, "Dragon Quest", "The dragon slept in the cave.", "", "");
+        index.update_document(id2, "Chapter 2", "The knight found a dragon.", "", "");
+        index.update_document(id3, "Epilogue", "Peace returned to the land.", "", "");
+
+        let results = index.search("dragon");
+        assert!(results.len() >= 2);
+        // id3 should not appear
+        assert!(results.iter().all(|r| r.doc_id != id3));
+    }
+
+    #[test]
+    fn test_index_notes_field() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Scene", "content", "important research notes", "");
+
+        let results = index.search("research");
+        assert!(!results.is_empty());
+        assert!(results.iter().any(|r| r.field == IndexField::Notes));
+    }
+
+    #[test]
+    fn test_index_synopsis_field() {
+        let mut index = SearchIndex::new();
+        let doc_id = Uuid::new_v4();
+        index.update_document(doc_id, "Scene", "content", "", "Hero confronts villain");
+
+        let results = index.search("villain");
+        assert!(!results.is_empty());
+        assert!(results.iter().any(|r| r.field == IndexField::Synopsis));
+    }
+
+    #[test]
+    fn test_estimated_size_increases() {
+        let mut index = SearchIndex::new();
+        let size_empty = index.estimated_size_bytes();
+
+        for i in 0..10 {
+            let doc_id = Uuid::new_v4();
+            index.update_document(doc_id, &format!("Doc {}", i), "lots of unique words here today", "", "");
+        }
+
+        let size_filled = index.estimated_size_bytes();
+        assert!(size_filled > size_empty);
+    }
+
+    #[test]
+    fn test_tokenize_short_words_filtered() {
+        let tokens = tokenize("I a x do it");
+        // Single-char words should be filtered (min length 2)
+        assert!(!tokens.contains(&"i".to_string()));
+        assert!(!tokens.contains(&"a".to_string()));
+        assert!(!tokens.contains(&"x".to_string()));
+    }
+
+    #[test]
+    fn test_tokenize_case_insensitive() {
+        let tokens = tokenize("Hello WORLD Testing");
+        assert!(tokens.contains(&"hello".to_string()));
+        assert!(tokens.contains(&"world".to_string()));
+        assert!(tokens.contains(&"testing".to_string()));
+    }
+
+    #[test]
+    fn test_generate_snippet_long_text() {
+        let text = "A ".repeat(200) + "keyword " + &"B ".repeat(200);
+        let snippet = generate_snippet(&text, "keyword");
+        assert!(snippet.contains("keyword"));
+        assert!(snippet.len() < text.len()); // Should be truncated
+    }
+
+    #[test]
+    fn test_generate_snippet_no_match() {
+        let text = "This is some text without the search term.";
+        let snippet = generate_snippet(text, "xyznothere");
+        // Should return truncated beginning
+        assert!(!snippet.is_empty());
+    }
+
+    #[test]
+    fn test_index_field_equality() {
+        assert_eq!(IndexField::Title, IndexField::Title);
+        assert_ne!(IndexField::Title, IndexField::Content);
+    }
+
+    #[test]
+    fn test_documents_with_term_empty() {
+        let index = SearchIndex::new();
+        let docs = index.documents_with_term("anything");
+        assert!(docs.is_empty());
+    }
+
+    #[test]
+    fn test_remove_document_updates_counts() {
+        let mut index = SearchIndex::new();
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        index.update_document(id1, "A", "unique alpha content", "", "");
+        index.update_document(id2, "B", "unique beta content", "", "");
+
+        let terms_before = index.term_count;
+        index.remove_document(id1);
+        // Term count may decrease if terms were only in removed doc
+        assert!(index.term_count <= terms_before);
+    }
 }

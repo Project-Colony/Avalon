@@ -286,6 +286,123 @@ impl CompileContent {
     }
 }
 
+impl CompileContent {
+    /// Paragraph count for this content item
+    pub fn paragraph_count(&self) -> usize {
+        self.text.split("\n\n").filter(|p| !p.trim().is_empty()).count()
+    }
+
+    /// Sentence count (approximate)
+    pub fn sentence_count(&self) -> usize {
+        self.text.chars()
+            .filter(|c| matches!(c, '.' | '!' | '?'))
+            .count()
+            .max(if self.text.trim().is_empty() { 0 } else { 1 })
+    }
+
+    /// Summary of this content item
+    pub fn summary(&self) -> String {
+        let kind = if self.is_folder { "Folder" } else { "Document" };
+        format!("{}: \"{}\" ({} words, depth {})", kind, self.title, self.word_count(), self.depth)
+    }
+}
+
+impl CompileOptions {
+    /// Build options for a quick plain text export
+    pub fn quick_text(title: &str) -> Self {
+        Self {
+            format: OutputFormat::PlainText,
+            title: title.to_string(),
+            include_front_matter: false,
+            include_toc: false,
+            replace_placeholders: false,
+            compile_marked_only: false,
+            ..Default::default()
+        }
+    }
+
+    /// Build options for a manuscript-style export
+    pub fn manuscript(title: &str, author: &str) -> Self {
+        Self {
+            format: OutputFormat::Markdown,
+            title: title.to_string(),
+            author: author.to_string(),
+            include_front_matter: true,
+            separator: SeparatorType::PageBreak,
+            page_break_between_folders: true,
+            compile_marked_only: true,
+            include_toc: true,
+            replace_placeholders: true,
+            ..Default::default()
+        }
+    }
+
+    /// Check if the export configuration is valid
+    pub fn validate(&self) -> Vec<String> {
+        let mut issues = Vec::new();
+        if self.title.is_empty() && self.include_front_matter {
+            issues.push("Title is empty but front matter is enabled".to_string());
+        }
+        if self.font_size < 6.0 || self.font_size > 72.0 {
+            issues.push(format!("Font size {} is outside reasonable range (6-72)", self.font_size));
+        }
+        if self.font_family.is_empty() {
+            issues.push("Font family is empty".to_string());
+        }
+        issues
+    }
+
+    /// Get a summary of the export settings
+    pub fn settings_summary(&self) -> String {
+        let mut parts = vec![
+            format!("Format: {}", self.format.display_name()),
+            format!("Font: {} {}pt", self.font_family, self.font_size),
+        ];
+        if self.include_front_matter { parts.push("With front matter".to_string()); }
+        if self.include_toc { parts.push("With TOC".to_string()); }
+        if self.compile_marked_only { parts.push("Marked items only".to_string()); }
+        parts.join(", ")
+    }
+}
+
+impl OutputFormat {
+    /// Whether this format supports table of contents
+    pub fn supports_toc(&self) -> bool {
+        matches!(self, OutputFormat::Html | OutputFormat::Markdown | OutputFormat::Latex
+            | OutputFormat::Pdf | OutputFormat::Docx | OutputFormat::Epub)
+    }
+
+    /// Whether this format supports front matter
+    pub fn supports_front_matter(&self) -> bool {
+        !matches!(self, OutputFormat::Opml)
+    }
+
+    /// Category label for grouping in UI
+    pub fn category(&self) -> &str {
+        match self {
+            OutputFormat::PlainText | OutputFormat::Markdown => "Text",
+            OutputFormat::Html | OutputFormat::Latex => "Markup",
+            OutputFormat::Pdf | OutputFormat::Docx | OutputFormat::Epub => "Document",
+            OutputFormat::Rtf => "Legacy",
+            OutputFormat::Opml => "Outline",
+            OutputFormat::Fountain => "Screenplay",
+        }
+    }
+}
+
+impl SeparatorType {
+    /// Get the actual separator string to insert between documents
+    pub fn separator_string(&self) -> &str {
+        match self {
+            SeparatorType::EmptyLine => "\n\n",
+            SeparatorType::PageBreak => "\n\n---\n\n",
+            SeparatorType::SectionBreak => "\n\n***\n\n",
+            SeparatorType::Custom(s) => s.as_str(),
+            SeparatorType::None => "",
+        }
+    }
+}
+
 impl SeparatorType {
     /// Human-readable label
     pub fn label(&self) -> &str {
@@ -775,5 +892,241 @@ mod tests {
 
         let result = Compiler::compile(&binder, &opts);
         assert!(result.is_ok());
+    }
+
+    // New CompileContent tests
+
+    #[test]
+    fn test_compile_content_paragraph_count() {
+        let content = CompileContent {
+            title: "Test".to_string(),
+            text: "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.".to_string(),
+            depth: 0,
+            is_folder: false,
+        };
+        assert_eq!(content.paragraph_count(), 3);
+    }
+
+    #[test]
+    fn test_compile_content_sentence_count() {
+        let content = CompileContent {
+            title: "Test".to_string(),
+            text: "First sentence. Second sentence! Third sentence?".to_string(),
+            depth: 0,
+            is_folder: false,
+        };
+        assert_eq!(content.sentence_count(), 3);
+    }
+
+    #[test]
+    fn test_compile_content_summary() {
+        let content = CompileContent {
+            title: "Chapter 1".to_string(),
+            text: "Hello world".to_string(),
+            depth: 1,
+            is_folder: false,
+        };
+        let summary = content.summary();
+        assert!(summary.contains("Document"));
+        assert!(summary.contains("Chapter 1"));
+        assert!(summary.contains("2 words"));
+        assert!(summary.contains("depth 1"));
+    }
+
+    #[test]
+    fn test_compile_content_summary_folder() {
+        let content = CompileContent {
+            title: "Part One".to_string(),
+            text: String::new(),
+            depth: 0,
+            is_folder: true,
+        };
+        assert!(content.summary().contains("Folder"));
+    }
+
+    // CompileOptions builder tests
+
+    #[test]
+    fn test_quick_text_options() {
+        let opts = CompileOptions::quick_text("My Story");
+        assert_eq!(opts.format, OutputFormat::PlainText);
+        assert_eq!(opts.title, "My Story");
+        assert!(!opts.include_front_matter);
+        assert!(!opts.include_toc);
+        assert!(!opts.replace_placeholders);
+        assert!(!opts.compile_marked_only);
+    }
+
+    #[test]
+    fn test_manuscript_options() {
+        let opts = CompileOptions::manuscript("My Novel", "Author");
+        assert_eq!(opts.format, OutputFormat::Markdown);
+        assert_eq!(opts.title, "My Novel");
+        assert_eq!(opts.author, "Author");
+        assert!(opts.include_front_matter);
+        assert!(opts.include_toc);
+        assert!(opts.compile_marked_only);
+    }
+
+    #[test]
+    fn test_validate_options_valid() {
+        let mut opts = CompileOptions::default();
+        opts.title = "My Book".to_string();
+        let issues = opts.validate();
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn test_validate_options_empty_title_with_front_matter() {
+        let opts = CompileOptions::default(); // title is empty, front matter is true
+        let issues = opts.validate();
+        assert!(issues.iter().any(|i| i.contains("Title is empty")));
+    }
+
+    #[test]
+    fn test_validate_options_bad_font_size() {
+        let mut opts = CompileOptions::default();
+        opts.title = "Book".to_string();
+        opts.font_size = 200.0;
+        let issues = opts.validate();
+        assert!(issues.iter().any(|i| i.contains("Font size")));
+    }
+
+    #[test]
+    fn test_settings_summary() {
+        let opts = CompileOptions::manuscript("Book", "Author");
+        let summary = opts.settings_summary();
+        assert!(summary.contains("Markdown"));
+        assert!(summary.contains("With front matter"));
+        assert!(summary.contains("With TOC"));
+    }
+
+    // OutputFormat new method tests
+
+    #[test]
+    fn test_format_supports_toc() {
+        assert!(OutputFormat::Html.supports_toc());
+        assert!(OutputFormat::Markdown.supports_toc());
+        assert!(OutputFormat::Latex.supports_toc());
+        assert!(OutputFormat::Pdf.supports_toc());
+        assert!(!OutputFormat::PlainText.supports_toc());
+        assert!(!OutputFormat::Rtf.supports_toc());
+        assert!(!OutputFormat::Fountain.supports_toc());
+    }
+
+    #[test]
+    fn test_format_supports_front_matter() {
+        assert!(OutputFormat::Html.supports_front_matter());
+        assert!(OutputFormat::Markdown.supports_front_matter());
+        assert!(!OutputFormat::Opml.supports_front_matter());
+    }
+
+    #[test]
+    fn test_format_category() {
+        assert_eq!(OutputFormat::PlainText.category(), "Text");
+        assert_eq!(OutputFormat::Markdown.category(), "Text");
+        assert_eq!(OutputFormat::Html.category(), "Markup");
+        assert_eq!(OutputFormat::Pdf.category(), "Document");
+        assert_eq!(OutputFormat::Fountain.category(), "Screenplay");
+        assert_eq!(OutputFormat::Opml.category(), "Outline");
+        assert_eq!(OutputFormat::Rtf.category(), "Legacy");
+    }
+
+    // SeparatorType tests
+
+    #[test]
+    fn test_separator_string() {
+        assert_eq!(SeparatorType::EmptyLine.separator_string(), "\n\n");
+        assert!(SeparatorType::PageBreak.separator_string().contains("---"));
+        assert!(SeparatorType::SectionBreak.separator_string().contains("***"));
+        assert_eq!(SeparatorType::None.separator_string(), "");
+    }
+
+    #[test]
+    fn test_separator_custom_string() {
+        let sep = SeparatorType::Custom("~~~".to_string());
+        assert_eq!(sep.separator_string(), "~~~");
+    }
+
+    // Compile with different formats
+
+    #[test]
+    fn test_compile_fountain() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Scene");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "INT. OFFICE - DAY\n\nJOHN enters.".to_string();
+        }
+        item.include_in_compile = true;
+        binder.draft.add_child(item);
+
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::Fountain;
+        opts.include_toc = false;
+        opts.replace_placeholders = false;
+        opts.include_front_matter = false;
+
+        let result = Compiler::compile(&binder, &opts);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_compile_opml() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Note");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Some notes.".to_string();
+        }
+        item.include_in_compile = true;
+        binder.draft.add_child(item);
+
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::Opml;
+        opts.include_toc = false;
+        opts.replace_placeholders = false;
+        opts.compile_marked_only = false;
+
+        let result = Compiler::compile(&binder, &opts);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_compile_with_nested_folders() {
+        let mut binder = Binder::default_structure();
+
+        let mut folder = BinderItem::new_folder("Part One");
+        folder.include_in_compile = true;
+
+        let mut ch1 = BinderItem::new_text("Chapter 1");
+        if let Some(ref mut doc) = ch1.document {
+            doc.content = "Content of chapter 1.".to_string();
+        }
+        ch1.include_in_compile = true;
+
+        let mut ch2 = BinderItem::new_text("Chapter 2");
+        if let Some(ref mut doc) = ch2.document {
+            doc.content = "Content of chapter 2.".to_string();
+        }
+        ch2.include_in_compile = true;
+
+        folder.add_child(ch1);
+        folder.add_child(ch2);
+        binder.draft.add_child(folder);
+
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::PlainText;
+        opts.include_front_matter = false;
+        opts.include_toc = false;
+        opts.replace_placeholders = false;
+
+        let result = Compiler::compile(&binder, &opts).unwrap();
+        assert!(result.contains("chapter 1"));
+        assert!(result.contains("chapter 2"));
+    }
+
+    #[test]
+    fn test_output_format_equality() {
+        assert_eq!(OutputFormat::Pdf, OutputFormat::Pdf);
+        assert_ne!(OutputFormat::Pdf, OutputFormat::Html);
     }
 }

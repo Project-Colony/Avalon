@@ -388,4 +388,78 @@ mod tests {
         let path = path.unwrap();
         assert!(path.to_str().unwrap().contains("Scrinever Backups"));
     }
+
+    #[test]
+    fn test_display_size_boundary_kb() {
+        let entry = make_entry("test.backup.json", "20260101_120000", 1023);
+        assert!(entry.display_size().contains("B"));
+
+        let entry2 = make_entry("test.backup.json", "20260101_120000", 1024);
+        assert!(entry2.display_size().contains("KB"));
+    }
+
+    #[test]
+    fn test_display_size_boundary_mb() {
+        let entry = make_entry("test.backup.json", "20260101_120000", 1024 * 1024 - 1);
+        assert!(entry.display_size().contains("KB"));
+
+        let entry2 = make_entry("test.backup.json", "20260101_120000", 1024 * 1024);
+        assert!(entry2.display_size().contains("MB"));
+    }
+
+    #[test]
+    fn test_display_size_zero() {
+        let entry = make_entry("test.backup.json", "20260101_120000", 0);
+        assert_eq!(entry.display_size(), "0 B");
+    }
+
+    #[test]
+    fn test_format_bytes_matches_display_size() {
+        for size in [0u64, 500, 2048, 5 * 1024 * 1024] {
+            let entry = make_entry("t.backup.json", "20260101_120000", size);
+            assert_eq!(entry.display_size(), BackupEntry::format_bytes(size));
+        }
+    }
+
+    #[test]
+    fn test_parsed_timestamp_components() {
+        let entry = make_entry("test.backup.json", "20261231_235959", 100);
+        let ts = entry.parsed_timestamp().unwrap();
+        assert_eq!(ts.date().to_string(), "2026-12-31");
+    }
+
+    #[test]
+    fn test_display_timestamp_formats_correctly() {
+        let entry = make_entry("test.backup.json", "20260101_000000", 100);
+        assert_eq!(entry.display_timestamp(), "2026-01-01 00:00:00");
+    }
+
+    #[test]
+    fn test_project_name_simple() {
+        let entry = make_entry("Novel_20260101_120000.backup.json", "20260101_120000", 100);
+        assert_eq!(entry.project_name(), "Novel");
+    }
+
+    #[test]
+    fn test_project_name_with_underscores() {
+        let entry = make_entry("My_Novel_Project_20260101_120000.backup.json", "20260101_120000", 100);
+        let name = entry.project_name();
+        // Should extract the project name part
+        assert!(!name.is_empty());
+    }
+
+    #[test]
+    fn test_age_string_old_timestamp() {
+        // A timestamp from years ago
+        let entry = make_entry("test.backup.json", "20200101_120000", 100);
+        let age = entry.age_string();
+        assert!(age.contains("w ago")); // Should be many weeks ago
+    }
+
+    #[test]
+    fn test_list_backups_nonexistent_project() {
+        let result = BackupManager::list_backups("definitely_nonexistent_project_12345");
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_empty());
+    }
 }
