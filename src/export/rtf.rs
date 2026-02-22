@@ -343,4 +343,132 @@ mod tests {
         let size = estimate_output_size(&contents, &options);
         assert!(size > 300); // Base + some content
     }
+
+    #[test]
+    fn test_compile_with_front_matter_no_author() {
+        let mut options = make_options();
+        options.author = String::new();
+        let contents = vec![make_content("Ch1", "Text.", false)];
+        let result = compile(&contents, &options).unwrap();
+        assert!(result.contains("Test Book"));
+        assert!(!result.contains("\\i Author")); // No author italic block
+    }
+
+    #[test]
+    fn test_compile_multiple_docs_separator() {
+        let options = make_options();
+        let contents = vec![
+            make_content("Ch1", "First.", false),
+            make_content("Ch2", "Second.", false),
+        ];
+        let result = compile(&contents, &options).unwrap();
+        assert!(result.contains("First."));
+        assert!(result.contains("Second."));
+    }
+
+    #[test]
+    fn test_compile_page_break_separator() {
+        let mut options = make_options();
+        options.separator = SeparatorType::PageBreak;
+        let contents = vec![
+            make_content("Ch1", "First.", false),
+            make_content("Ch2", "Second.", false),
+        ];
+        let result = compile(&contents, &options).unwrap();
+        assert!(result.contains("\\page"));
+    }
+
+    #[test]
+    fn test_compile_section_break_separator() {
+        let mut options = make_options();
+        options.separator = SeparatorType::SectionBreak;
+        let contents = vec![
+            make_content("Ch1", "First.", false),
+            make_content("Ch2", "Second.", false),
+        ];
+        let result = compile(&contents, &options).unwrap();
+        assert!(result.contains("* * *"));
+    }
+
+    #[test]
+    fn test_compile_no_separator() {
+        let mut options = make_options();
+        options.separator = SeparatorType::None;
+        let contents = vec![
+            make_content("Ch1", "First.", false),
+            make_content("Ch2", "Second.", false),
+        ];
+        let result = compile(&contents, &options).unwrap();
+        assert!(result.contains("First."));
+        assert!(result.contains("Second."));
+    }
+
+    #[test]
+    fn test_compile_blockquote() {
+        let options = make_options();
+        let contents = vec![make_content("Ch1", "> A quote here.", false)];
+        let result = compile(&contents, &options).unwrap();
+        assert!(result.contains("A quote here."));
+        assert!(result.contains("\\li720")); // Indentation for blockquote
+    }
+
+    #[test]
+    fn test_compile_heading_in_content() {
+        let options = make_options();
+        let contents = vec![make_content("Ch1", "# Section Title", false)];
+        let result = compile(&contents, &options).unwrap();
+        assert!(result.contains("Section Title"));
+        assert!(result.contains("\\b ")); // Bold for heading
+    }
+
+    #[test]
+    fn test_convert_markdown_unclosed_bold() {
+        let result = convert_basic_markdown("**unclosed bold");
+        assert!(result.contains("\\b "));
+        assert!(result.contains("\\b0 ")); // Should auto-close
+    }
+
+    #[test]
+    fn test_convert_markdown_unclosed_italic() {
+        let result = convert_basic_markdown("*unclosed italic");
+        assert!(result.contains("\\i "));
+        assert!(result.contains("\\i0 ")); // Should auto-close
+    }
+
+    #[test]
+    fn test_rtf_escape_backslash() {
+        assert_eq!(rtf_escape("a\\b\\c"), "a\\\\b\\\\c");
+    }
+
+    #[test]
+    fn test_estimate_size_front_matter_difference() {
+        let contents = vec![make_content("Ch1", "text", false)];
+        let mut opts = make_options();
+        opts.include_front_matter = true;
+        let size_fm = estimate_output_size(&contents, &opts);
+        opts.include_front_matter = false;
+        let size_no = estimate_output_size(&contents, &opts);
+        assert!(size_fm > size_no);
+    }
+
+    #[test]
+    fn test_word_count_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(word_count(&contents), 0);
+    }
+
+    #[test]
+    fn test_char_count_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(char_count(&contents), 0);
+    }
+
+    #[test]
+    fn test_compile_empty_paragraphs() {
+        let options = make_options();
+        let contents = vec![make_content("Ch1", "First\n\n\n\nSecond", false)];
+        let result = compile(&contents, &options).unwrap();
+        assert!(result.contains("First"));
+        assert!(result.contains("Second"));
+    }
 }

@@ -356,4 +356,176 @@ mod tests {
         assert_eq!(headings[0].0, "Chapter 1");
         assert_eq!(headings[1].0, "Chapter 2");
     }
+
+    #[test]
+    fn test_compile_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("<!DOCTYPE html>"));
+        assert!(result.contains("</html>"));
+    }
+
+    #[test]
+    fn test_compile_front_matter_no_author() {
+        let mut opts = make_opts();
+        opts.include_front_matter = true;
+        opts.author = String::new();
+        let contents = vec![make_content("Scene", "Text.", false, 1)];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("<h1>Test Book</h1>"));
+        assert!(!result.contains("class=\"author\""));
+    }
+
+    #[test]
+    fn test_compile_front_matter_empty_title() {
+        let mut opts = make_opts();
+        opts.include_front_matter = true;
+        opts.title = String::new();
+        let contents = vec![make_content("Scene", "Text.", false, 1)];
+        let result = compile(&contents, &opts).unwrap();
+        // Empty title should skip front matter
+        assert!(!result.contains("<h1></h1>"));
+    }
+
+    #[test]
+    fn test_compile_multiple_docs_with_separator() {
+        let mut opts = make_opts();
+        opts.separator = SeparatorType::SectionBreak;
+        let contents = vec![
+            make_content("S1", "First.", false, 1),
+            make_content("S2", "Second.", false, 1),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("section-break"));
+        assert!(result.contains("First."));
+        assert!(result.contains("Second."));
+    }
+
+    #[test]
+    fn test_compile_page_break_separator() {
+        let mut opts = make_opts();
+        opts.separator = SeparatorType::PageBreak;
+        let contents = vec![
+            make_content("S1", "First.", false, 1),
+            make_content("S2", "Second.", false, 1),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("page-break"));
+    }
+
+    #[test]
+    fn test_compile_custom_separator() {
+        let mut opts = make_opts();
+        opts.separator = SeparatorType::Custom("~~~".to_string());
+        let contents = vec![
+            make_content("S1", "First.", false, 1),
+            make_content("S2", "Second.", false, 1),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("~~~"));
+    }
+
+    #[test]
+    fn test_compile_no_separator() {
+        let mut opts = make_opts();
+        opts.separator = SeparatorType::None;
+        let contents = vec![
+            make_content("S1", "First.", false, 1),
+            make_content("S2", "Second.", false, 1),
+        ];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("First."));
+        assert!(result.contains("Second."));
+    }
+
+    #[test]
+    fn test_heading_depth_capped_at_6() {
+        let contents = vec![make_content("Deep", "", true, 10)];
+        let result = compile(&contents, &make_opts()).unwrap();
+        assert!(result.contains("<h6"));
+    }
+
+    #[test]
+    fn test_slug_special_characters() {
+        assert_eq!(slug("Hello, World!"), "hello-world");
+        assert_eq!(slug("Chapter 1: The Beginning"), "chapter-1-the-beginning");
+        assert_eq!(slug("---"), "");
+    }
+
+    #[test]
+    fn test_escape_html_apostrophe() {
+        assert_eq!(escape_html("it's"), "it&#39;s");
+    }
+
+    #[test]
+    fn test_strip_html_nested_tags() {
+        assert_eq!(strip_html_tags("<div><p><b>nested</b></p></div>"), "nested");
+    }
+
+    #[test]
+    fn test_strip_html_no_tags() {
+        assert_eq!(strip_html_tags("plain text"), "plain text");
+    }
+
+    #[test]
+    fn test_word_count_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(word_count(&contents), 0);
+    }
+
+    #[test]
+    fn test_estimate_output_size_with_front_matter() {
+        let contents = vec![make_content("A", "text", false, 0)];
+        let mut opts = make_opts();
+        opts.include_front_matter = true;
+        let size_fm = estimate_output_size(&contents, &opts);
+        opts.include_front_matter = false;
+        let size_no = estimate_output_size(&contents, &opts);
+        assert!(size_fm > size_no);
+    }
+
+    #[test]
+    fn test_extract_headings_no_folders() {
+        let contents = vec![
+            make_content("Doc 1", "text", false, 0),
+            make_content("Doc 2", "text", false, 0),
+        ];
+        let headings = extract_headings(&contents);
+        assert!(headings.is_empty());
+    }
+
+    #[test]
+    fn test_generate_toc_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        let toc = generate_toc(&contents);
+        assert!(toc.contains("Table of Contents"));
+        assert!(toc.contains("</ul>"));
+    }
+
+    #[test]
+    fn test_compile_markdown_in_content() {
+        let contents = vec![make_content("S", "**bold** and *italic*", false, 0)];
+        let result = compile(&contents, &make_opts()).unwrap();
+        // pulldown_cmark should convert markdown to HTML
+        assert!(result.contains("<strong>bold</strong>"));
+        assert!(result.contains("<em>italic</em>"));
+    }
+
+    #[test]
+    fn test_compile_font_size_in_css() {
+        let mut opts = make_opts();
+        opts.font_size = 14.0;
+        let contents = vec![make_content("S", "Text.", false, 0)];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("14pt"));
+    }
+
+    #[test]
+    fn test_compile_font_family_in_css() {
+        let mut opts = make_opts();
+        opts.font_family = "Georgia".to_string();
+        let contents = vec![make_content("S", "Text.", false, 0)];
+        let result = compile(&contents, &opts).unwrap();
+        assert!(result.contains("Georgia"));
+    }
 }
