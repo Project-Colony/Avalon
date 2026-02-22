@@ -433,4 +433,99 @@ mod tests {
         // xyznonword is unlikely to be in any dictionary
         assert!(bad.contains(&"xyznonword".to_string()) || !checker.active);
     }
+
+    #[test]
+    fn test_add_duplicate_to_dictionary() {
+        let mut checker = make_checker();
+        checker.add_to_dictionary("testword");
+        checker.add_to_dictionary("TESTWORD"); // Same word, different case
+        assert_eq!(checker.user_dictionary_size(), 1);
+    }
+
+    #[test]
+    fn test_user_words() {
+        let mut checker = make_checker();
+        checker.add_to_dictionary("foo");
+        checker.add_to_dictionary("bar");
+        let words = checker.user_words();
+        assert_eq!(words.len(), 2);
+        assert!(words.contains(&"foo".to_string()));
+        assert!(words.contains(&"bar".to_string()));
+    }
+
+    #[test]
+    fn test_dictionary_size_after_init() {
+        let checker = make_checker();
+        assert!(checker.dictionary_size() > 0);
+    }
+
+    #[test]
+    fn test_similar_words() {
+        let checker = make_checker();
+        let similar = checker.similar_words("helo", 3);
+        assert!(!similar.is_empty() || !checker.active);
+        if !similar.is_empty() {
+            // Should have distance > 0
+            assert!(similar[0].1 > 0);
+        }
+    }
+
+    #[test]
+    fn test_similar_words_inactive() {
+        let checker = SpellChecker::new();
+        let similar = checker.similar_words("hello", 5);
+        assert!(similar.is_empty());
+    }
+
+    #[test]
+    fn test_suggestion_no_suggestions() {
+        let suggestion = SpellSuggestion {
+            word: "xyzxyz".to_string(),
+            suggestions: vec![],
+            position: 0,
+        };
+        assert!(!suggestion.has_suggestions());
+        assert!(suggestion.best_suggestion().is_none());
+        assert_eq!(suggestion.suggestion_count(), 0);
+        let summary = suggestion.summary();
+        assert!(summary.contains("no suggestions"));
+    }
+
+    #[test]
+    fn test_count_misspellings_all_correct() {
+        let checker = make_checker();
+        let count = count_misspellings(&checker, "the cat");
+        assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn test_spelling_accuracy_all_correct() {
+        let checker = make_checker();
+        let accuracy = spelling_accuracy(&checker, "the the the the");
+        assert!(accuracy >= 90.0);
+    }
+
+    #[test]
+    fn test_default_constructor() {
+        let checker = SpellChecker::default();
+        assert!(!checker.active);
+        assert_eq!(checker.dictionary_size(), 0);
+    }
+
+    #[test]
+    fn test_check_text_with_apostrophes() {
+        let checker = make_checker();
+        let results = checker.check_text("don't it's");
+        // These are common words — shouldn't be flagged (if dictionary includes them)
+        // Just check it doesn't crash
+        assert!(results.len() <= 2);
+    }
+
+    #[test]
+    fn test_remove_nonexistent_word() {
+        let mut checker = make_checker();
+        checker.remove_from_dictionary("never_added");
+        // Should be a no-op
+        assert_eq!(checker.user_dictionary_size(), 0);
+    }
 }

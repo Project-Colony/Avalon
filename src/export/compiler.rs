@@ -513,4 +513,267 @@ mod tests {
         let html = result.unwrap();
         assert!(html.contains("<") && html.contains(">"));
     }
+
+    #[test]
+    fn test_output_format_rtf_extension() {
+        assert_eq!(OutputFormat::Rtf.extension(), "rtf");
+        assert_eq!(OutputFormat::Opml.extension(), "opml");
+        assert_eq!(OutputFormat::Fountain.extension(), "fountain");
+    }
+
+    #[test]
+    fn test_output_format_all_display_names() {
+        for fmt in OutputFormat::all() {
+            let name = fmt.display_name();
+            assert!(!name.is_empty(), "Display name for {:?} is empty", fmt);
+        }
+    }
+
+    #[test]
+    fn test_output_format_all_extensions() {
+        for fmt in OutputFormat::all() {
+            let ext = fmt.extension();
+            assert!(!ext.is_empty());
+            assert!(!ext.contains('.'), "Extension should not contain dot");
+        }
+    }
+
+    #[test]
+    fn test_output_format_all_mime_types() {
+        for fmt in OutputFormat::all() {
+            let mime = fmt.mime_type();
+            assert!(mime.contains('/'), "MIME type should contain /: {}", mime);
+        }
+    }
+
+    #[test]
+    fn test_is_binary_text_formats() {
+        assert!(!OutputFormat::PlainText.is_binary());
+        assert!(!OutputFormat::Markdown.is_binary());
+        assert!(!OutputFormat::Html.is_binary());
+        assert!(!OutputFormat::Latex.is_binary());
+        assert!(!OutputFormat::Rtf.is_binary());
+        assert!(!OutputFormat::Opml.is_binary());
+        assert!(!OutputFormat::Fountain.is_binary());
+    }
+
+    #[test]
+    fn test_compile_content_word_count() {
+        let content = CompileContent {
+            title: "Title".to_string(),
+            text: "one two three four five".to_string(),
+            depth: 0,
+            is_folder: false,
+        };
+        assert_eq!(content.word_count(), 5);
+        assert_eq!(content.char_count(), "one two three four five".len());
+    }
+
+    #[test]
+    fn test_compile_content_folder_not_empty() {
+        let content = CompileContent {
+            title: "Folder".to_string(),
+            text: String::new(),
+            depth: 0,
+            is_folder: true,
+        };
+        // Folders with empty text are not considered "empty" because is_folder is true
+        assert!(!content.is_empty());
+    }
+
+    #[test]
+    fn test_separator_type_custom_label() {
+        let sep = SeparatorType::Custom("---".to_string());
+        assert_eq!(sep.label(), "Custom");
+    }
+
+    #[test]
+    fn test_separator_type_section_break_label() {
+        assert_eq!(SeparatorType::SectionBreak.label(), "Section Break (***)");
+    }
+
+    #[test]
+    fn test_compile_options_default_values() {
+        let opts = CompileOptions::default();
+        assert_eq!(opts.font_family, "Times New Roman");
+        assert!(opts.replace_placeholders);
+        assert!(!opts.include_toc);
+        assert!(opts.page_break_between_folders);
+    }
+
+    #[test]
+    fn test_compile_marked_only_filters() {
+        let mut binder = Binder::default_structure();
+
+        let mut item1 = BinderItem::new_text("Included");
+        if let Some(ref mut doc) = item1.document {
+            doc.content = "This is included.".to_string();
+        }
+        item1.include_in_compile = true;
+        binder.draft.add_child(item1);
+
+        let mut item2 = BinderItem::new_text("Excluded");
+        if let Some(ref mut doc) = item2.document {
+            doc.content = "This is excluded.".to_string();
+        }
+        item2.include_in_compile = false;
+        binder.draft.add_child(item2);
+
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::PlainText;
+        opts.compile_marked_only = true;
+        opts.include_front_matter = false;
+        opts.include_toc = false;
+        opts.replace_placeholders = false;
+
+        let result = Compiler::compile(&binder, &opts).unwrap();
+        assert!(result.contains("included"));
+        assert!(!result.contains("excluded"));
+    }
+
+    #[test]
+    fn test_compile_all_items_when_not_marked_only() {
+        let mut binder = Binder::default_structure();
+
+        let mut item1 = BinderItem::new_text("First");
+        if let Some(ref mut doc) = item1.document {
+            doc.content = "First content.".to_string();
+        }
+        item1.include_in_compile = true;
+        binder.draft.add_child(item1);
+
+        let mut item2 = BinderItem::new_text("Second");
+        if let Some(ref mut doc) = item2.document {
+            doc.content = "Second content.".to_string();
+        }
+        item2.include_in_compile = false;
+        binder.draft.add_child(item2);
+
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::PlainText;
+        opts.compile_marked_only = false;
+        opts.include_front_matter = false;
+        opts.include_toc = false;
+        opts.replace_placeholders = false;
+
+        let result = Compiler::compile(&binder, &opts).unwrap();
+        assert!(result.contains("First content"));
+        assert!(result.contains("Second content"));
+    }
+
+    #[test]
+    fn test_compile_empty_binder() {
+        let binder = Binder::default_structure();
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::PlainText;
+        opts.include_front_matter = false;
+        opts.include_toc = false;
+        opts.replace_placeholders = false;
+        opts.compile_marked_only = false;
+
+        let result = Compiler::compile(&binder, &opts);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_compile_latex() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Chapter");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "LaTeX content here.".to_string();
+        }
+        item.include_in_compile = true;
+        binder.draft.add_child(item);
+
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::Latex;
+        opts.include_front_matter = false;
+        opts.include_toc = false;
+        opts.replace_placeholders = false;
+
+        let result = Compiler::compile(&binder, &opts);
+        assert!(result.is_ok());
+        let tex = result.unwrap();
+        assert!(tex.contains("LaTeX content"));
+    }
+
+    #[test]
+    fn test_compile_rtf() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Chapter");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "RTF output.".to_string();
+        }
+        item.include_in_compile = true;
+        binder.draft.add_child(item);
+
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::Rtf;
+        opts.include_front_matter = false;
+        opts.include_toc = false;
+        opts.replace_placeholders = false;
+
+        let result = Compiler::compile(&binder, &opts);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_compile_binary_formats_message() {
+        let binder = Binder::default_structure();
+        let mut opts = CompileOptions::default();
+        opts.include_toc = false;
+        opts.replace_placeholders = false;
+        opts.compile_marked_only = false;
+
+        for fmt in [OutputFormat::Pdf, OutputFormat::Docx, OutputFormat::Epub] {
+            opts.format = fmt;
+            let result = Compiler::compile(&binder, &opts).unwrap();
+            assert!(result.contains("requires save_to_file"));
+        }
+    }
+
+    #[test]
+    fn test_compile_with_toc() {
+        let mut binder = Binder::default_structure();
+        let mut ch1 = BinderItem::new_folder("Chapter One");
+        ch1.include_in_compile = true;
+        let mut scene = BinderItem::new_text("Scene 1");
+        if let Some(ref mut doc) = scene.document {
+            doc.content = "Text of scene one.".to_string();
+        }
+        scene.include_in_compile = true;
+        ch1.add_child(scene);
+        binder.draft.add_child(ch1);
+
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::PlainText;
+        opts.include_front_matter = true;
+        opts.title = "My Book".to_string();
+        opts.include_toc = true;
+        opts.replace_placeholders = false;
+
+        let result = Compiler::compile(&binder, &opts);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_compile_with_placeholders() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Chapter");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Word count: <$wc>".to_string();
+        }
+        item.include_in_compile = true;
+        binder.draft.add_child(item);
+
+        let mut opts = CompileOptions::default();
+        opts.format = OutputFormat::PlainText;
+        opts.include_front_matter = false;
+        opts.include_toc = false;
+        opts.replace_placeholders = true;
+        opts.title = "Test".to_string();
+
+        let result = Compiler::compile(&binder, &opts);
+        assert!(result.is_ok());
+    }
 }
