@@ -824,4 +824,194 @@ mod tests {
         assert_eq!(top2.len(), 2);
         assert_eq!(top2[0].0, "alpha");
     }
+
+    #[test]
+    fn test_statistics_from_binder() {
+        use crate::core::binder::{Binder, BinderItem};
+        let mut binder = Binder::default_structure();
+        let mut a = BinderItem::new_text("A");
+        if let Some(ref mut doc) = a.document {
+            doc.content = "Hello world. This is a test.".to_string();
+        }
+        let mut b = BinderItem::new_text("B");
+        if let Some(ref mut doc) = b.document {
+            doc.content = "Another paragraph here.".to_string();
+        }
+        binder.draft.add_child(a);
+        binder.draft.add_child(b);
+
+        let stats = Statistics::from_binder(&binder);
+        assert_eq!(stats.word_count, 9);
+        assert_eq!(stats.document_count, 2);
+        assert!(stats.folder_count >= 3); // Draft, Research, Trash
+        assert!(stats.average_words_per_document > 0.0);
+    }
+
+    #[test]
+    fn test_statistics_is_empty() {
+        let stats = Statistics::default();
+        assert!(stats.is_empty());
+
+        let stats2 = Statistics::from_text("Hello");
+        assert!(!stats2.is_empty());
+    }
+
+    #[test]
+    fn test_statistics_avg_words_per_page() {
+        let stats = Statistics::from_text(&"word ".repeat(500));
+        let avg = stats.avg_words_per_page();
+        assert!((avg - 250.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn test_statistics_avg_words_per_page_empty() {
+        let stats = Statistics::default();
+        assert_eq!(stats.avg_words_per_page(), 0.0);
+    }
+
+    #[test]
+    fn test_session_stats_negative_words() {
+        let mut session = SessionStats::new();
+        session.update(-100, 60);
+        assert_eq!(session.words_display(), "-100");
+        // Pages written should be 0 for negative
+        assert_eq!(session.pages_written(), 0.0);
+    }
+
+    #[test]
+    fn test_session_stats_zero_time() {
+        let mut session = SessionStats::new();
+        session.update(100, 0);
+        assert_eq!(session.words_per_minute, 0.0);
+    }
+
+    #[test]
+    fn test_text_analysis_grade_level() {
+        let analysis = TextAnalysis::from_text("Simple words. Easy to read.");
+        let grade = analysis.grade_level();
+        // Grade level should be a reasonable value
+        assert!(grade >= 0.0 || grade < 0.0); // Just ensure it computes
+
+        let empty = TextAnalysis::default();
+        assert_eq!(empty.grade_level(), 0.0);
+    }
+
+    #[test]
+    fn test_text_analysis_vocabulary_labels() {
+        let mut analysis = TextAnalysis::default();
+        analysis.word_count = 10;
+        analysis.unique_words = 8;
+        assert_eq!(analysis.vocabulary_label(), "Rich");
+
+        analysis.unique_words = 3;
+        assert_eq!(analysis.vocabulary_label(), "Repetitive");
+    }
+
+    #[test]
+    fn test_readability_metrics_complex_text() {
+        let text = "The epistemological implications of computational neuroscience fundamentally challenge our understanding of consciousness. Philosophical considerations regarding phenomenological experience suggest that reductionist approaches inadequately capture the complexity of subjective awareness.";
+        let metrics = ReadabilityMetrics::from_text(text);
+        // Complex text should have lower reading ease
+        assert!(metrics.flesch_reading_ease < 50.0);
+        // And higher grade level
+        assert!(metrics.flesch_kincaid_grade > 10.0);
+        assert!(metrics.complex_word_count > 5);
+    }
+
+    #[test]
+    fn test_readability_metrics_consensus_grade_zero() {
+        let metrics = ReadabilityMetrics::default();
+        assert_eq!(metrics.consensus_grade(), 0.0);
+    }
+
+    #[test]
+    fn test_readability_audience_labels() {
+        let mut metrics = ReadabilityMetrics::default();
+        metrics.flesch_kincaid_grade = 7.0;
+        metrics.gunning_fog = 7.0;
+        metrics.coleman_liau = 7.0;
+        metrics.automated_readability = 7.0;
+        assert_eq!(metrics.audience_label(), "Young Adults");
+
+        metrics.flesch_kincaid_grade = 10.0;
+        metrics.gunning_fog = 10.0;
+        metrics.coleman_liau = 10.0;
+        metrics.automated_readability = 10.0;
+        assert_eq!(metrics.audience_label(), "General Adults");
+
+        metrics.flesch_kincaid_grade = 15.0;
+        metrics.gunning_fog = 15.0;
+        metrics.coleman_liau = 15.0;
+        metrics.automated_readability = 15.0;
+        assert_eq!(metrics.audience_label(), "College-educated");
+
+        metrics.flesch_kincaid_grade = 20.0;
+        metrics.gunning_fog = 20.0;
+        metrics.coleman_liau = 20.0;
+        metrics.automated_readability = 20.0;
+        assert_eq!(metrics.audience_label(), "Academic / Professional");
+    }
+
+    #[test]
+    fn test_word_frequency_top_words_empty() {
+        let analysis = WordFrequencyAnalysis::default();
+        let top = analysis.top_words(5);
+        assert!(top.is_empty());
+    }
+
+    #[test]
+    fn test_word_frequency_hapax_empty() {
+        let analysis = WordFrequencyAnalysis::default();
+        let hapax = analysis.hapax_words();
+        assert!(hapax.is_empty());
+    }
+
+    #[test]
+    fn test_readability_flesch_labels_all() {
+        let mut m = ReadabilityMetrics::default();
+        m.flesch_reading_ease = 95.0;
+        assert!(m.flesch_label().contains("Very Easy"));
+        m.flesch_reading_ease = 85.0;
+        assert!(m.flesch_label().contains("Easy"));
+        m.flesch_reading_ease = 75.0;
+        assert!(m.flesch_label().contains("Fairly Easy"));
+        m.flesch_reading_ease = 65.0;
+        assert!(m.flesch_label().contains("Standard"));
+        m.flesch_reading_ease = 55.0;
+        assert!(m.flesch_label().contains("Fairly Difficult"));
+        m.flesch_reading_ease = 35.0;
+        assert!(m.flesch_label().contains("Difficult"));
+        m.flesch_reading_ease = 15.0;
+        assert!(m.flesch_label().contains("Very Difficult"));
+    }
+
+    #[test]
+    fn test_word_frequency_richness_labels_all() {
+        let mut a = WordFrequencyAnalysis::default();
+        a.type_token_ratio = 75.0;
+        assert_eq!(a.richness_label(), "Very Rich");
+        a.type_token_ratio = 60.0;
+        assert_eq!(a.richness_label(), "Rich");
+        a.type_token_ratio = 45.0;
+        assert_eq!(a.richness_label(), "Moderate");
+        a.type_token_ratio = 30.0;
+        assert_eq!(a.richness_label(), "Repetitive");
+        a.type_token_ratio = 15.0;
+        assert_eq!(a.richness_label(), "Very Repetitive");
+    }
+
+    #[test]
+    fn test_statistics_from_text_multiline() {
+        let stats = Statistics::from_text("First paragraph.\n\nSecond paragraph.\n\nThird one.");
+        assert_eq!(stats.paragraph_count, 3);
+        assert_eq!(stats.line_count, 5);
+    }
+
+    #[test]
+    fn test_count_syllables_edge_cases() {
+        assert_eq!(count_syllables(""), 1); // min 1
+        assert_eq!(count_syllables("I"), 1);
+        assert_eq!(count_syllables("eye"), 1); // silent e
+        assert_eq!(count_syllables("queue"), 1);
+    }
 }

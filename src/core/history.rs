@@ -386,4 +386,193 @@ mod tests {
         assert!(summary.contains("500 words"));
         assert!(summary.contains("1 days"));
     }
+
+    #[test]
+    fn test_wrote_today() {
+        let mut history = WritingHistory::new();
+        assert!(!history.wrote_today());
+
+        // Record something for today
+        history.record(100, 60);
+        // Initially words_written is 0 for the first record (start == end)
+        assert!(!history.wrote_today());
+
+        // Record a word count increase
+        history.record(200, 60);
+        assert!(history.wrote_today());
+    }
+
+    #[test]
+    fn test_today_entry() {
+        let mut history = WritingHistory::new();
+        assert!(history.today().is_none());
+
+        history.record(100, 60);
+        assert!(history.today().is_some());
+    }
+
+    #[test]
+    fn test_average_wpm_short_session() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 30));
+        // Less than 60 seconds should return 0
+        assert_eq!(history.average_wpm(), 0.0);
+    }
+
+    #[test]
+    fn test_average_wpm() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 300, 600)); // 30 wpm
+        let wpm = history.average_wpm();
+        assert!((wpm - 30.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_words_this_week() {
+        let mut history = WritingHistory::new();
+        for i in 1..=7 {
+            history.entries.push(make_entry(
+                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
+        }
+        assert_eq!(history.words_this_week(), 700);
+    }
+
+    #[test]
+    fn test_words_this_month() {
+        let mut history = WritingHistory::new();
+        for i in 1..=10 {
+            history.entries.push(make_entry(
+                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 50, 60));
+        }
+        assert_eq!(history.words_this_month(), 500);
+    }
+
+    #[test]
+    fn test_most_productive_weekday() {
+        let mut history = WritingHistory::new();
+        // Monday
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
+        // Tuesday
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 500, 120));
+        // Wednesday
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 200, 90));
+
+        let day = history.most_productive_weekday().unwrap();
+        assert_eq!(day, chrono::Weekday::Tue);
+    }
+
+    #[test]
+    fn test_most_productive_weekday_empty() {
+        let history = WritingHistory::new();
+        assert!(history.most_productive_weekday().is_none());
+    }
+
+    #[test]
+    fn test_average_session_minutes() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 1800)); // 30 min
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 3600)); // 60 min
+
+        let avg = history.average_session_minutes();
+        assert!((avg - 45.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_average_session_minutes_empty() {
+        let history = WritingHistory::new();
+        assert_eq!(history.average_session_minutes(), 0.0);
+    }
+
+    #[test]
+    fn test_average_session_minutes_skip_zero_time() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 600));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 0, 0)); // No time
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 200, 600));
+
+        let avg = history.average_session_minutes();
+        // Only 2 active sessions: (600 + 600) / 60 / 2 = 10
+        assert!((avg - 10.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_daily_entry_wpm_zero_time() {
+        let entry = make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 300, 30);
+        assert_eq!(entry.wpm(), 0.0); // Less than 60 seconds
+    }
+
+    #[test]
+    fn test_daily_entry_time_display_short() {
+        let entry = make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 300);
+        assert_eq!(entry.time_display(), "5m");
+    }
+
+    #[test]
+    fn test_total_time_display_minutes_only() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 1800));
+        assert_eq!(history.total_time_display(), "30m");
+    }
+
+    #[test]
+    fn test_activity_ratio_empty() {
+        let history = WritingHistory::new();
+        assert_eq!(history.activity_ratio(), 0.0);
+    }
+
+    #[test]
+    fn test_activity_ratio_all_active() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 60));
+        assert!((history.activity_ratio() - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_total_time_seconds() {
+        let mut history = WritingHistory::new();
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 3600));
+        history.entries.push(make_entry(
+            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 1800));
+        assert_eq!(history.total_time_seconds(), 5400);
+    }
+
+    #[test]
+    fn test_average_words_per_day_empty() {
+        let history = WritingHistory::new();
+        assert_eq!(history.average_words_per_day(), 0.0);
+    }
+
+    #[test]
+    fn test_best_day_empty() {
+        let history = WritingHistory::new();
+        assert!(history.best_day().is_none());
+    }
+
+    #[test]
+    fn test_streak_all_positive() {
+        let mut history = WritingHistory::new();
+        for i in 1..=5 {
+            history.entries.push(make_entry(
+                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
+        }
+        assert_eq!(history.current_streak(), 5);
+        assert_eq!(history.longest_streak(), 5);
+    }
 }
