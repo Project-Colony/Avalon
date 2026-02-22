@@ -9,6 +9,21 @@ use crate::gui::theme::Theme;
 
 /// Render the outliner view — a hierarchical table with section numbering
 pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>) -> Element<'static, Message> {
+    let total_words = draft.total_word_count();
+    let doc_count_header = count_text_items(draft);
+
+    let header_info = container(
+        row![
+            text(format!("\u{1F4CB} Outliner: {} docs | {} words | {:.1} pages",
+                doc_count_header, total_words, total_words as f64 / 250.0))
+                .size(12)
+                .color(Theme::TEXT_SECONDARY),
+            Space::with_width(Length::Fill),
+        ]
+        .padding(Padding::from([4, 16]))
+    )
+    .width(Length::Fill);
+
     let header_row = container(
         row![
             text("#").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
@@ -34,21 +49,35 @@ pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>) -> Element<'stat
         rows = rows.push(elem);
     }
 
-    // Summary footer
-    let total_words = draft.total_word_count();
+    // Summary footer with target completion stats
     let doc_count = count_text_items(draft);
+    let targeted_count = targets.len();
+    let completed_targets = targets.iter()
+        .filter(|(id, target)| {
+            if let Some(item) = draft.find(id) {
+                item.total_word_count() >= **target && **target > 0
+            } else {
+                false
+            }
+        })
+        .count();
+
+    let compile_count = count_compile_items(draft);
+
     let footer = container(
         row![
-            Space::with_width(Length::FillPortion(1)),
-            text(format!("{} documents, {} words total, ~{:.1} pages",
-                doc_count, total_words, total_words as f64 / 250.0))
-                .size(11)
+            text(format!("{} docs | {} words | {:.1} pg | {}/{} targets met | {}/{} compile",
+                doc_count, total_words, total_words as f64 / 250.0,
+                completed_targets, targeted_count,
+                compile_count, doc_count))
+                .size(10)
                 .color(Theme::TEXT_MUTED),
         ]
     )
     .padding(Padding::from([6, 16]));
 
     let content = column![
+        header_info,
         header_row,
         scrollable(rows).height(Length::Fill),
         footer,
@@ -63,6 +92,12 @@ pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>) -> Element<'stat
 fn count_text_items(item: &BinderItem) -> usize {
     let own = if item.kind == BinderItemKind::Text { 1 } else { 0 };
     let children: usize = item.children.iter().map(count_text_items).sum();
+    own + children
+}
+
+fn count_compile_items(item: &BinderItem) -> usize {
+    let own = if item.kind == BinderItemKind::Text && item.include_in_compile { 1 } else { 0 };
+    let children: usize = item.children.iter().map(count_compile_items).sum();
     own + children
 }
 

@@ -445,4 +445,133 @@ mod tests {
         let display = timer.elapsed_display();
         assert!(display.starts_with("00:0")); // Should be < 1 sec
     }
+
+    #[test]
+    fn test_timer_custom_preset() {
+        let mut timer = WritingTimer::new();
+        timer.set_preset(TimerPreset::Custom(300));
+        assert_eq!(timer.preset, TimerPreset::Custom(300));
+        assert_eq!(timer.duration_secs, 300);
+    }
+
+    #[test]
+    fn test_timer_custom_short_label() {
+        let preset = TimerPreset::Custom(30);
+        assert!(preset.label().contains("30 sec"));
+    }
+
+    #[test]
+    fn test_timer_progress_capped_at_one() {
+        let mut timer = WritingTimer::new();
+        timer.set_preset(TimerPreset::Custom(0));
+        timer.start(0);
+        // 0 second timer — should immediately be complete
+        assert!(timer.progress() <= 1.0);
+    }
+
+    #[test]
+    fn test_timer_remaining_zero_when_idle() {
+        let timer = WritingTimer::new();
+        assert_eq!(timer.remaining(), Duration::ZERO);
+    }
+
+    #[test]
+    fn test_timer_elapsed_idle() {
+        let timer = WritingTimer::new();
+        assert_eq!(timer.elapsed(), Duration::ZERO);
+    }
+
+    #[test]
+    fn test_timer_elapsed_completed() {
+        let mut timer = WritingTimer::new();
+        timer.set_preset(TimerPreset::Custom(60));
+        timer.start(0);
+        // Manually set state to Completed
+        timer.state = TimerState::Completed;
+        assert_eq!(timer.elapsed(), Duration::from_secs(60));
+    }
+
+    #[test]
+    fn test_timer_multiple_sessions() {
+        let mut timer = WritingTimer::new();
+        timer.start(0);
+        timer.stop(100);
+        timer.start(100);
+        timer.stop(200);
+        timer.start(200);
+        timer.stop(350);
+
+        assert_eq!(timer.sessions().len(), 3);
+        assert_eq!(timer.total_words(), 350);
+    }
+
+    #[test]
+    fn test_timer_avg_wpm_no_sessions() {
+        let timer = WritingTimer::new();
+        assert_eq!(timer.avg_wpm(), 0.0);
+    }
+
+    #[test]
+    fn test_timer_summary_with_sessions() {
+        let mut timer = WritingTimer::new();
+        timer.set_preset(TimerPreset::Custom(0));
+        timer.start(0);
+        timer.tick(); // Complete immediately
+        timer.stop(100);
+
+        let summary = timer.summary();
+        assert!(summary.contains("1 session"));
+        assert!(summary.contains("100 words"));
+    }
+
+    #[test]
+    fn test_timer_pause_while_idle() {
+        let mut timer = WritingTimer::new();
+        timer.pause(); // Should be a no-op
+        assert_eq!(timer.state(), &TimerState::Idle);
+    }
+
+    #[test]
+    fn test_timer_resume_while_idle() {
+        let mut timer = WritingTimer::new();
+        timer.resume(); // Should be a no-op
+        assert_eq!(timer.state(), &TimerState::Idle);
+    }
+
+    #[test]
+    fn test_timer_tick_while_idle() {
+        let mut timer = WritingTimer::new();
+        assert!(!timer.tick()); // Should return false
+    }
+
+    #[test]
+    fn test_timer_total_time() {
+        let mut timer = WritingTimer::new();
+        timer.start(0);
+        sleep(Duration::from_millis(50));
+        timer.stop(10);
+        timer.start(10);
+        sleep(Duration::from_millis(50));
+        timer.stop(20);
+
+        let total = timer.total_time();
+        assert!(total.as_millis() >= 80); // At least some time
+    }
+
+    #[test]
+    fn test_timer_is_complete_false() {
+        let timer = WritingTimer::new();
+        assert!(!timer.is_complete());
+    }
+
+    #[test]
+    fn test_session_wpm_zero_duration() {
+        let session = TimerSession {
+            duration: Duration::ZERO,
+            words_written: 100,
+            preset: TimerPreset::Sprint,
+            completed: true,
+        };
+        assert_eq!(session.words_per_minute(), 0.0);
+    }
 }
