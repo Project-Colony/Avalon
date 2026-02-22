@@ -21,6 +21,7 @@ pub struct SearchMatch {
 }
 
 /// Options for searching
+#[derive(Debug, Clone)]
 pub struct SearchOptions {
     pub query: String,
     pub case_sensitive: bool,
@@ -532,6 +533,201 @@ impl MatchContext {
     /// Total lines in context (before + match + after)
     pub fn total_lines(&self) -> usize {
         self.before.len() + 1 + self.after.len()
+    }
+}
+
+/// Compute the Levenshtein (edit) distance between two strings
+pub fn levenshtein_distance(a: &str, b: &str) -> usize {
+    let a_chars: Vec<char> = a.chars().collect();
+    let b_chars: Vec<char> = b.chars().collect();
+    let n = a_chars.len();
+    let m = b_chars.len();
+
+    if n == 0 { return m; }
+    if m == 0 { return n; }
+
+    let mut prev = vec![0usize; m + 1];
+    let mut curr = vec![0usize; m + 1];
+
+    for j in 0..=m {
+        prev[j] = j;
+    }
+
+    for i in 1..=n {
+        curr[0] = i;
+        for j in 1..=m {
+            let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1)
+                .min(curr[j - 1] + 1)
+                .min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+
+    prev[m]
+}
+
+/// A fuzzy search result with similarity score
+#[derive(Debug, Clone)]
+pub struct FuzzyMatch {
+    pub item_id: Uuid,
+    pub item_title: String,
+    pub matched_field: String,
+    pub matched_text: String,
+    pub distance: usize,
+    pub score: f64, // 0.0 to 1.0, higher = better match
+}
+
+/// Perform a fuzzy search across the binder. Returns items whose titles
+/// or content words are within `max_distance` edits of the query.
+pub fn fuzzy_search(binder: &Binder, query: &str, max_distance: usize) -> Vec<FuzzyMatch> {
+    let query_lower = query.to_lowercase();
+    let mut matches = Vec::new();
+
+    for item in binder.all_items() {
+        // Check title
+        let title_lower = item.title.to_lowercase();
+        let dist = levenshtein_distance(&query_lower, &title_lower);
+        let max_len = query_lower.len().max(title_lower.len());
+        if dist <= max_distance && max_len > 0 {
+            matches.push(FuzzyMatch {
+                item_id: item.id,
+                item_title: item.title.clone(),
+                matched_field: "title".to_string(),
+                matched_text: item.title.clone(),
+                distance: dist,
+                score: 1.0 - (dist as f64 / max_len as f64),
+            });
+        }
+
+        // Check content words
+        if let Some(ref doc) = item.document {
+            for word in doc.content.split_whitespace() {
+                let word_lower = word.to_lowercase();
+                // Only check words of similar length to avoid pointless comparisons
+                if word_lower.len().abs_diff(query_lower.len()) > max_distance {
+                    continue;
+                }
+                let dist = levenshtein_distance(&query_lower, &word_lower);
+                if dist <= max_distance && dist > 0 {
+                    // Only add if exact match wasn't already found
+                    let max_len = query_lower.len().max(word_lower.len());
+                    matches.push(FuzzyMatch {
+                        item_id: item.id,
+                        item_title: item.title.clone(),
+                        matched_field: "content".to_string(),
+                        matched_text: word.to_string(),
+                        distance: dist,
+                        score: 1.0 - (dist as f64 / max_len as f64),
+                    });
+                    break; // Only one match per item per word
+                }
+            }
+        }
+    }
+
+    matches.sort_by(|a, b| a.distance.cmp(&b.distance)
+        .then_with(|| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal)));
+    matches
+}
+
+/// A saved search (bookmark)
+#[derive(Debug, Clone)]
+pub struct SavedSearch {
+    pub id: Uuid,
+    pub name: String,
+    pub options: SearchOptions,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl SavedSearch {
+    pub fn new(name: &str, options: SearchOptions) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            name: name.to_string(),
+            options,
+            created_at: chrono::Utc::now(),
+        }
+    }
+
+    pub fn label(&self) -> String {
+        format!("{}: {}", self.name, self.options.summary())
+    }
+}
+
+/// Manages saved searches and search history
+#[derive(Debug, Default)]
+pub struct SearchManager {
+    pub saved_searches: Vec<SavedSearch>,
+    pub history: Vec<String>,
+    pub max_history: usize,
+}
+
+impl SearchManager {
+    pub fn new() -> Self {
+        Self {
+            saved_searches: Vec::new(),
+            history: Vec::new(),
+            max_history: 50,
+        }
+    }
+
+    /// Save a search
+    pub fn save_search(&mut self, name: &str, options: SearchOptions) -> Uuid {
+        let search = SavedSearch::new(name, options);
+        let id = search.id;
+        self.saved_searches.push(search);
+        id
+    }
+
+    /// Remove a saved search
+    pub fn remove_saved(&mut self, id: &Uuid) -> bool {
+        let len_before = self.saved_searches.len();
+        self.saved_searches.retain(|s| &s.id != id);
+        self.saved_searches.len() < len_before
+    }
+
+    /// Get a saved search by ID
+    pub fn get_saved(&self, id: &Uuid) -> Option<&SavedSearch> {
+        self.saved_searches.iter().find(|s| &s.id == id)
+    }
+
+    /// Record a query in history (most recent first, deduplicates)
+    pub fn record_query(&mut self, query: &str) {
+        self.history.retain(|q| q != query);
+        self.history.insert(0, query.to_string());
+        if self.history.len() > self.max_history {
+            self.history.truncate(self.max_history);
+        }
+    }
+
+    /// Get history entries matching a prefix (for autocomplete)
+    pub fn suggest(&self, prefix: &str) -> Vec<&str> {
+        let lower = prefix.to_lowercase();
+        self.history.iter()
+            .filter(|q| q.to_lowercase().starts_with(&lower))
+            .map(|q| q.as_str())
+            .collect()
+    }
+
+    /// Clear search history
+    pub fn clear_history(&mut self) {
+        self.history.clear();
+    }
+
+    /// Saved search count
+    pub fn saved_count(&self) -> usize {
+        self.saved_searches.len()
+    }
+
+    /// Search history count
+    pub fn history_count(&self) -> usize {
+        self.history.len()
+    }
+
+    /// Get all saved search names
+    pub fn saved_names(&self) -> Vec<&str> {
+        self.saved_searches.iter().map(|s| s.name.as_str()).collect()
     }
 }
 
@@ -1379,5 +1575,235 @@ mod tests {
         let opts = SearchOptions::regex_search(r"\b\w{4}\b");
         let count = count_matches("The cats like some fish", &opts);
         assert!(count >= 2); // cats, like, some, fish
+    }
+
+    // ---- Levenshtein distance tests ----
+
+    #[test]
+    fn test_levenshtein_identical() {
+        assert_eq!(levenshtein_distance("hello", "hello"), 0);
+    }
+
+    #[test]
+    fn test_levenshtein_empty() {
+        assert_eq!(levenshtein_distance("", ""), 0);
+        assert_eq!(levenshtein_distance("abc", ""), 3);
+        assert_eq!(levenshtein_distance("", "abc"), 3);
+    }
+
+    #[test]
+    fn test_levenshtein_substitution() {
+        assert_eq!(levenshtein_distance("cat", "car"), 1);
+        assert_eq!(levenshtein_distance("cat", "cut"), 1);
+    }
+
+    #[test]
+    fn test_levenshtein_insertion() {
+        assert_eq!(levenshtein_distance("cat", "cats"), 1);
+    }
+
+    #[test]
+    fn test_levenshtein_deletion() {
+        assert_eq!(levenshtein_distance("cats", "cat"), 1);
+    }
+
+    #[test]
+    fn test_levenshtein_multiple_edits() {
+        assert_eq!(levenshtein_distance("kitten", "sitting"), 3);
+    }
+
+    #[test]
+    fn test_levenshtein_completely_different() {
+        assert_eq!(levenshtein_distance("abc", "xyz"), 3);
+    }
+
+    // ---- Fuzzy search tests ----
+
+    #[test]
+    fn test_fuzzy_search_exact_match() {
+        let binder = make_binder_with_content(vec![
+            ("Chapter One", "The hero arrived."),
+        ]);
+        let results = fuzzy_search(&binder, "Chapter One", 0);
+        assert!(!results.is_empty());
+        assert_eq!(results[0].distance, 0);
+        assert!((results[0].score - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_fuzzy_search_close_match() {
+        let binder = make_binder_with_content(vec![
+            ("Chapter One", "The hero arrived."),
+            ("Chapter Two", "The villain escaped."),
+        ]);
+        // "Chaptor" is 1 edit from "Chapter" in the title
+        let results = fuzzy_search(&binder, "Chaptor One", 2);
+        assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn test_fuzzy_search_no_match() {
+        let binder = make_binder_with_content(vec![
+            ("Chapter One", "The hero arrived."),
+        ]);
+        let results = fuzzy_search(&binder, "XYZXYZXYZ", 1);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_fuzzy_search_content_word() {
+        let binder = make_binder_with_content(vec![
+            ("Doc", "The adventurer explored the cave."),
+        ]);
+        // "adventrer" is 1 edit from "adventurer"
+        let results = fuzzy_search(&binder, "adventrer", 2);
+        let content_matches: Vec<_> = results.iter()
+            .filter(|m| m.matched_field == "content")
+            .collect();
+        assert!(!content_matches.is_empty());
+    }
+
+    #[test]
+    fn test_fuzzy_search_sorted_by_distance() {
+        let binder = make_binder_with_content(vec![
+            ("Cat", ""),
+            ("Car", ""),
+            ("Bat", ""),
+        ]);
+        let results = fuzzy_search(&binder, "Cat", 2);
+        assert!(results.len() >= 2);
+        // Should be sorted by distance (exact match first)
+        assert!(results[0].distance <= results[results.len() - 1].distance);
+    }
+
+    // ---- SavedSearch tests ----
+
+    #[test]
+    fn test_saved_search_new() {
+        let opts = SearchOptions::simple("hero");
+        let saved = SavedSearch::new("Find hero", opts);
+        assert_eq!(saved.name, "Find hero");
+        assert_eq!(saved.options.query, "hero");
+    }
+
+    #[test]
+    fn test_saved_search_label() {
+        let opts = SearchOptions::simple("quest");
+        let saved = SavedSearch::new("My search", opts);
+        let label = saved.label();
+        assert!(label.contains("My search"));
+        assert!(label.contains("quest"));
+    }
+
+    // ---- SearchManager tests ----
+
+    #[test]
+    fn test_search_manager_new() {
+        let mgr = SearchManager::new();
+        assert_eq!(mgr.saved_count(), 0);
+        assert_eq!(mgr.history_count(), 0);
+    }
+
+    #[test]
+    fn test_search_manager_save_and_get() {
+        let mut mgr = SearchManager::new();
+        let opts = SearchOptions::simple("test");
+        let id = mgr.save_search("Test search", opts);
+        assert_eq!(mgr.saved_count(), 1);
+
+        let saved = mgr.get_saved(&id).unwrap();
+        assert_eq!(saved.name, "Test search");
+    }
+
+    #[test]
+    fn test_search_manager_remove_saved() {
+        let mut mgr = SearchManager::new();
+        let id = mgr.save_search("Temp", SearchOptions::simple("temp"));
+        assert_eq!(mgr.saved_count(), 1);
+        assert!(mgr.remove_saved(&id));
+        assert_eq!(mgr.saved_count(), 0);
+    }
+
+    #[test]
+    fn test_search_manager_remove_nonexistent() {
+        let mut mgr = SearchManager::new();
+        assert!(!mgr.remove_saved(&Uuid::new_v4()));
+    }
+
+    #[test]
+    fn test_search_manager_history() {
+        let mut mgr = SearchManager::new();
+        mgr.record_query("hero");
+        mgr.record_query("villain");
+        mgr.record_query("quest");
+        assert_eq!(mgr.history_count(), 3);
+        // Most recent first
+        assert_eq!(mgr.history[0], "quest");
+        assert_eq!(mgr.history[1], "villain");
+        assert_eq!(mgr.history[2], "hero");
+    }
+
+    #[test]
+    fn test_search_manager_history_dedup() {
+        let mut mgr = SearchManager::new();
+        mgr.record_query("hero");
+        mgr.record_query("villain");
+        mgr.record_query("hero"); // duplicate
+        assert_eq!(mgr.history_count(), 2);
+        assert_eq!(mgr.history[0], "hero"); // Most recent
+        assert_eq!(mgr.history[1], "villain");
+    }
+
+    #[test]
+    fn test_search_manager_history_max() {
+        let mut mgr = SearchManager::new();
+        mgr.max_history = 3;
+        mgr.record_query("a");
+        mgr.record_query("b");
+        mgr.record_query("c");
+        mgr.record_query("d");
+        assert_eq!(mgr.history_count(), 3);
+        assert_eq!(mgr.history[0], "d");
+    }
+
+    #[test]
+    fn test_search_manager_suggest() {
+        let mut mgr = SearchManager::new();
+        mgr.record_query("chapter one");
+        mgr.record_query("chapter two");
+        mgr.record_query("character");
+        mgr.record_query("villain");
+
+        let suggestions = mgr.suggest("chap");
+        assert_eq!(suggestions.len(), 2);
+        assert!(suggestions.contains(&"chapter one"));
+        assert!(suggestions.contains(&"chapter two"));
+    }
+
+    #[test]
+    fn test_search_manager_suggest_case_insensitive() {
+        let mut mgr = SearchManager::new();
+        mgr.record_query("Hero Quest");
+        let suggestions = mgr.suggest("hero");
+        assert_eq!(suggestions.len(), 1);
+    }
+
+    #[test]
+    fn test_search_manager_clear_history() {
+        let mut mgr = SearchManager::new();
+        mgr.record_query("test");
+        mgr.clear_history();
+        assert_eq!(mgr.history_count(), 0);
+    }
+
+    #[test]
+    fn test_search_manager_saved_names() {
+        let mut mgr = SearchManager::new();
+        mgr.save_search("Search A", SearchOptions::simple("a"));
+        mgr.save_search("Search B", SearchOptions::simple("b"));
+        let names = mgr.saved_names();
+        assert_eq!(names.len(), 2);
+        assert!(names.contains(&"Search A"));
+        assert!(names.contains(&"Search B"));
     }
 }
