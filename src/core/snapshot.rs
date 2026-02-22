@@ -565,4 +565,168 @@ mod tests {
         let has_changes = diff.iter().any(|c| !matches!(c, DiffChunk::Equal(_)));
         assert!(has_changes);
     }
+
+    #[test]
+    fn test_snapshot_age_string() {
+        let doc = Document::with_content("Content");
+        let snap = Snapshot::from_document(&doc, "Just now");
+        let age = snap.age_string();
+        // Just created — should be "1m ago" (minimum)
+        assert!(age.contains("m ago"));
+    }
+
+    #[test]
+    fn test_snapshot_empty_content() {
+        let doc = Document::new();
+        let snap = Snapshot::from_document(&doc, "Empty");
+        assert_eq!(snap.word_count, 0);
+        assert_eq!(snap.char_count(), 0);
+        assert_eq!(snap.line_count(), 0);
+    }
+
+    #[test]
+    fn test_diff_stats_words_positive() {
+        let chunks = vec![
+            DiffChunk::Added("new word here".to_string()),
+        ];
+        let stats = DiffStats::from_chunks(&chunks);
+        assert_eq!(stats.words_added, 3);
+        let summary = stats.summary();
+        assert!(summary.contains("+3 words"));
+    }
+
+    #[test]
+    fn test_diff_stats_words_negative() {
+        let chunks = vec![
+            DiffChunk::Removed("deleted these words now".to_string()),
+        ];
+        let stats = DiffStats::from_chunks(&chunks);
+        assert_eq!(stats.words_added, -4);
+        let summary = stats.summary();
+        assert!(summary.contains("-4 words"));
+    }
+
+    #[test]
+    fn test_diff_stats_no_word_change() {
+        let chunks = vec![
+            DiffChunk::Equal("same line".to_string()),
+        ];
+        let stats = DiffStats::from_chunks(&chunks);
+        assert_eq!(stats.words_added, 0);
+        let summary = stats.summary();
+        assert!(summary.contains("no word change"));
+    }
+
+    #[test]
+    fn test_diff_stats_total_lines() {
+        let chunks = vec![
+            DiffChunk::Equal("a".to_string()),
+            DiffChunk::Added("b".to_string()),
+            DiffChunk::Removed("c".to_string()),
+            DiffChunk::Equal("d".to_string()),
+        ];
+        let stats = DiffStats::from_chunks(&chunks);
+        assert_eq!(stats.total_lines(), 4);
+        assert_eq!(stats.total_changes(), 2);
+    }
+
+    #[test]
+    fn test_diff_stats_change_percentage() {
+        let chunks = vec![
+            DiffChunk::Equal("a".to_string()),
+            DiffChunk::Added("b".to_string()),
+        ];
+        let stats = DiffStats::from_chunks(&chunks);
+        assert!((stats.change_percentage() - 50.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_diff_stats_change_percentage_empty() {
+        let chunks: Vec<DiffChunk> = vec![];
+        let stats = DiffStats::from_chunks(&chunks);
+        assert_eq!(stats.change_percentage(), 0.0);
+    }
+
+    #[test]
+    fn test_unified_diff_no_changes() {
+        let chunks = vec![
+            DiffChunk::Equal("same".to_string()),
+        ];
+        let unified = format_unified_diff(&chunks, "a", "b");
+        assert!(unified.contains("--- a"));
+        assert!(unified.contains("+++ b"));
+        // No @@ hunk headers since no changes
+        assert!(!unified.contains("@@"));
+    }
+
+    #[test]
+    fn test_inline_diff_completely_different() {
+        let chunks = inline_diff("hello world", "foo bar");
+        let added = chunks.iter().filter(|c| matches!(c, InlineDiffChunk::Added(_))).count();
+        let removed = chunks.iter().filter(|c| matches!(c, InlineDiffChunk::Removed(_))).count();
+        assert!(added >= 1);
+        assert!(removed >= 1);
+    }
+
+    #[test]
+    fn test_inline_diff_empty_old() {
+        let chunks = inline_diff("", "new content");
+        let added = chunks.iter().filter(|c| matches!(c, InlineDiffChunk::Added(_))).count();
+        assert_eq!(added, 2);
+    }
+
+    #[test]
+    fn test_inline_diff_empty_new() {
+        let chunks = inline_diff("old content", "");
+        let removed = chunks.iter().filter(|c| matches!(c, InlineDiffChunk::Removed(_))).count();
+        assert_eq!(removed, 2);
+    }
+
+    #[test]
+    fn test_inline_diff_chunk_equality() {
+        let a = InlineDiffChunk::Equal("hello".to_string());
+        let b = InlineDiffChunk::Equal("hello".to_string());
+        assert_eq!(a, b);
+
+        let c = InlineDiffChunk::Added("world".to_string());
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn test_diff_with_multiline() {
+        let doc = Document::with_content("Line 1\nLine 2\nLine 3\nLine 4\nLine 5");
+        let snap = Snapshot::from_document(&doc, "v1");
+        let new_content = "Line 1\nModified 2\nLine 3\nNew Line\nLine 5";
+        let chunks = snap.diff_with(new_content);
+        assert!(!chunks.is_empty());
+
+        let stats = snap.diff_stats_with(new_content);
+        assert!(stats.has_changes());
+        assert_eq!(stats.lines_unchanged, 3); // Line 1, Line 3, Line 5
+    }
+
+    #[test]
+    fn test_diff_snapshots_identical() {
+        let doc = Document::with_content("Same content");
+        let snap1 = Snapshot::from_document(&doc, "v1");
+        let snap2 = Snapshot::from_document(&doc, "v2");
+
+        let diff = diff_snapshots(&snap1, &snap2);
+        assert!(diff.iter().all(|c| matches!(c, DiffChunk::Equal(_))));
+    }
+
+    #[test]
+    fn test_lcs_diff_both_empty() {
+        let old: Vec<&str> = vec![];
+        let new: Vec<&str> = vec![];
+        let diff = lcs_diff(&old, &new);
+        assert!(diff.is_empty());
+    }
+
+    #[test]
+    fn test_group_into_hunks_empty() {
+        let chunks: Vec<DiffChunk> = vec![];
+        let hunks = group_into_hunks(&chunks, 3);
+        assert!(hunks.is_empty());
+    }
 }
