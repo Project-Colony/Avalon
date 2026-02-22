@@ -154,10 +154,20 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
         Space::with_height(0).into()
     };
 
+    // Snapshot count indicator
+    let snapshot_info: Element<'static, Message> = if !item.snapshots.is_empty() {
+        text(format!("\u{1F4F7}{}", item.snapshots.len()))
+            .size(9).color(Theme::TEXT_MUTED).into()
+    } else {
+        Space::with_width(0).into()
+    };
+
     // Footer with status and word count
     let footer = container(
         row![
             text(word_count).size(10).color(Theme::TEXT_MUTED),
+            Space::with_width(4),
+            snapshot_info,
             Space::with_width(Length::Fill),
             text(status_text).size(10).color(status_color),
         ]

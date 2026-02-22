@@ -106,7 +106,6 @@ pub fn view<'a>(
         .height(Length::Fill);
 
     let word_count = editor_state.document.word_count();
-    let char_count = editor_state.document.char_count();
     let page_est = word_count as f64 / 250.0;
     let para_count = editor_state.document.paragraph_count();
     let sentence_count = editor_state.document.sentence_count();

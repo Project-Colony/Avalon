@@ -93,6 +93,7 @@ pub struct ScrineverApp {
 
     // === Notification ===
     pub notification: Option<String>,
+    pub notification_timer: u32,
 
     // === Auto-save ===
     pub auto_save_counter: u32,
@@ -508,6 +509,7 @@ impl ScrineverApp {
             notes_text: String::new(),
             item_targets: std::collections::HashMap::new(),
             notification: None,
+            notification_timer: 0,
             auto_save_counter: 0,
             session_active: false,
             session_stats: SessionStats::new(),
@@ -3165,10 +3167,22 @@ impl ScrineverApp {
                         }
                     }
                 }
+
+                // Auto-dismiss notification after 8 seconds
+                if self.notification.is_some() {
+                    self.notification_timer = self.notification_timer.saturating_add(1);
+                    if self.notification_timer >= 8 {
+                        self.notification = None;
+                        self.notification_timer = 0;
+                    }
+                } else {
+                    self.notification_timer = 0;
+                }
             }
 
             Message::DismissNotification => {
                 self.notification = None;
+                self.notification_timer = 0;
             }
 
             Message::EscapePressed => {
