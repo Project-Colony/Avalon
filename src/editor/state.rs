@@ -729,6 +729,7 @@ impl EditorState {
                 self.dirty = true;
                 return;
             }
+            return; // no selection, do nothing when selection_only
         }
         // Whole document
         self.push_undo();
@@ -753,6 +754,7 @@ impl EditorState {
                 self.dirty = true;
                 return;
             }
+            return; // no selection, do nothing when selection_only
         }
         self.push_undo();
         let new_content = self.document.content.to_lowercase();
@@ -795,6 +797,7 @@ impl EditorState {
                 self.dirty = true;
                 return;
             }
+            return; // no selection, do nothing when selection_only
         }
         self.push_undo();
         let new_content = title_case(&self.document.content);
@@ -986,5 +989,61 @@ mod tests {
         assert!(editor.can_undo());
         editor.undo();
         assert_eq!(editor.document.content, "first\nsecond");
+    }
+
+    #[test]
+    fn test_to_uppercase_whole_doc() {
+        let mut editor = editor_with("hello world");
+        editor.to_uppercase(false);
+        assert_eq!(editor.document.content, "HELLO WORLD");
+    }
+
+    #[test]
+    fn test_to_uppercase_selection() {
+        let mut editor = editor_with("hello world");
+        editor.selection_start = Some(0);
+        editor.cursor = 5;
+        editor.to_uppercase(true);
+        assert_eq!(editor.document.content, "HELLO world");
+    }
+
+    #[test]
+    fn test_to_lowercase_whole_doc() {
+        let mut editor = editor_with("HELLO WORLD");
+        editor.to_lowercase(false);
+        assert_eq!(editor.document.content, "hello world");
+    }
+
+    #[test]
+    fn test_to_lowercase_selection() {
+        let mut editor = editor_with("HELLO WORLD");
+        editor.selection_start = Some(6);
+        editor.cursor = 11;
+        editor.to_lowercase(true);
+        assert_eq!(editor.document.content, "HELLO world");
+    }
+
+    #[test]
+    fn test_to_title_case_whole_doc() {
+        let mut editor = editor_with("hello world foo");
+        editor.to_title_case(false);
+        assert_eq!(editor.document.content, "Hello World Foo");
+    }
+
+    #[test]
+    fn test_to_title_case_selection() {
+        let mut editor = editor_with("hello world foo");
+        editor.selection_start = Some(6);
+        editor.cursor = 11;
+        editor.to_title_case(true);
+        assert_eq!(editor.document.content, "hello World foo");
+    }
+
+    #[test]
+    fn test_to_uppercase_no_selection_with_flag() {
+        let mut editor = editor_with("test text");
+        // selection_only=true but no selection → no change
+        editor.to_uppercase(true);
+        assert_eq!(editor.document.content, "test text");
     }
 }

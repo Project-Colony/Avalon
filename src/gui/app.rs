@@ -3482,6 +3482,7 @@ impl ScrineverApp {
                                             target_title: target.title.clone(),
                                             target_id: *target_id,
                                             link_text: v.link.link_text.clone(),
+                                            display_text: v.link.display_text.clone(),
                                         });
                                     }
                                 }
@@ -3518,6 +3519,7 @@ impl ScrineverApp {
                                         target_title: other_item.title.clone(),
                                         target_id: other_item.id,
                                         link_text: format!("[[{}]]", current_title),
+                                        display_text: link.display_text.clone(),
                                     });
                                     break; // one entry per source document
                                 }

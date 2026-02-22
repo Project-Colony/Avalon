@@ -10,6 +10,7 @@ pub struct DocLink {
     pub target_title: String,
     pub target_id: Uuid,
     pub link_text: String,
+    pub display_text: Option<String>,
 }
 
 /// A broken or ambiguous link
@@ -68,8 +69,8 @@ pub fn view(
 
     for (i, link) in outgoing_links.iter().enumerate() {
         let id = link.target_id;
-        let display = if link.link_text != link.target_title && !link.link_text.is_empty() {
-            format!("\u{2192} {} (\"{}\")", link.target_title, link.link_text)
+        let display = if let Some(ref dt) = link.display_text {
+            format!("\u{2192} {} (shown as \"{}\")", link.target_title, dt)
         } else {
             format!("\u{2192} {}", link.target_title)
         };
