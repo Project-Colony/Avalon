@@ -344,4 +344,83 @@ mod tests {
         ];
         assert_eq!(word_count(&contents), 4);
     }
+
+    #[test]
+    fn test_word_count_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(word_count(&contents), 0);
+    }
+
+    #[test]
+    fn test_escape_xml_all_entities() {
+        let result = escape_xml("a & b < c > d \" e ' f");
+        assert!(result.contains("&amp;"));
+        assert!(result.contains("&lt;"));
+        assert!(result.contains("&gt;"));
+        assert!(result.contains("&quot;"));
+        assert!(result.contains("&apos;"));
+    }
+
+    #[test]
+    fn test_escape_xml_no_special() {
+        assert_eq!(escape_xml("plain text"), "plain text");
+    }
+
+    #[test]
+    fn test_estimate_chapter_count_folders_only() {
+        let contents = vec![
+            make_content("Ch 1", "", true, 0),
+            make_content("Ch 2", "", true, 0),
+        ];
+        // Folders only, no content flushed = min 1
+        assert_eq!(estimate_chapter_count(&contents), 1);
+    }
+
+    #[test]
+    fn test_estimate_chapter_count_single_text() {
+        let contents = vec![
+            make_content("Scene", "text", false, 0),
+        ];
+        assert_eq!(estimate_chapter_count(&contents), 1);
+    }
+
+    #[test]
+    fn test_estimate_chapter_count_mixed() {
+        let contents = vec![
+            make_content("Ch 1", "", true, 0),
+            make_content("Scene 1", "text", false, 1),
+            make_content("Scene 2", "more text", false, 1),
+            make_content("Ch 2", "", true, 0),
+            make_content("Scene 3", "text", false, 1),
+        ];
+        // Ch1 content flushed when Ch2 starts = 1, then Scene 3 remains = 2
+        assert_eq!(estimate_chapter_count(&contents), 2);
+    }
+
+    #[test]
+    fn test_estimate_file_size_with_front_matter() {
+        let contents = vec![make_content("A", "text", false, 0)];
+        let mut opts = make_opts();
+        opts.include_front_matter = true;
+        let size_fm = estimate_file_size(&contents, &opts);
+        opts.include_front_matter = false;
+        let size_no = estimate_file_size(&contents, &opts);
+        assert!(size_fm > size_no);
+    }
+
+    #[test]
+    fn test_estimate_file_size_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        let size = estimate_file_size(&contents, &make_opts());
+        assert!(size >= 3000); // Base overhead
+    }
+
+    #[test]
+    fn test_estimate_file_size_large_content() {
+        let contents = vec![
+            make_content("A", &"word ".repeat(10000), false, 0),
+        ];
+        let size = estimate_file_size(&contents, &make_opts());
+        assert!(size > 10000);
+    }
 }

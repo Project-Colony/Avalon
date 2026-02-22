@@ -422,4 +422,123 @@ mod tests {
         assert_eq!(issue.kind, IssueKind::Orphan);
         assert_eq!(issue.severity, Severity::Info);
     }
+
+    #[test]
+    fn test_validate_root_folder_not_flagged() {
+        let binder = Binder::default_structure();
+        let result = validate_project(&binder);
+        assert!(!result.issues.iter().any(|i| {
+            i.kind == IssueKind::EmptyFolder && i.message.contains("Draft")
+        }));
+    }
+
+    #[test]
+    fn test_validate_folder_with_children_not_flagged() {
+        let mut binder = Binder::default_structure();
+        let mut folder = BinderItem::new_folder("Chapter 1");
+        let mut item = BinderItem::new_text("Scene 1");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Content.".to_string();
+        }
+        folder.children.push(item);
+        binder.draft.children.push(folder);
+
+        let result = validate_project(&binder);
+        assert!(!result.issues.iter().any(|i| {
+            i.kind == IssueKind::EmptyFolder && i.message.contains("Chapter 1")
+        }));
+    }
+
+    #[test]
+    fn test_display_single_error() {
+        let validation = ProjectValidation {
+            issues: vec![
+                ValidationIssue {
+                    severity: Severity::Error,
+                    kind: IssueKind::DuplicateId,
+                    item_id: None,
+                    message: "test".to_string(),
+                },
+            ],
+            total_items: 1,
+            trash_items: 0,
+        };
+        let display = validation.display();
+        assert!(display.contains("1 error"));
+        assert!(!display.contains("errors"));
+    }
+
+    #[test]
+    fn test_display_plural() {
+        let validation = ProjectValidation {
+            issues: vec![
+                ValidationIssue {
+                    severity: Severity::Warning,
+                    kind: IssueKind::EmptyDocument,
+                    item_id: None,
+                    message: "a".to_string(),
+                },
+                ValidationIssue {
+                    severity: Severity::Warning,
+                    kind: IssueKind::UntitledItem,
+                    item_id: None,
+                    message: "b".to_string(),
+                },
+            ],
+            total_items: 5,
+            trash_items: 0,
+        };
+        let display = validation.display();
+        assert!(display.contains("2 warnings"));
+    }
+
+    #[test]
+    fn test_is_clean_info_only() {
+        let validation = ProjectValidation {
+            issues: vec![
+                ValidationIssue {
+                    severity: Severity::Info,
+                    kind: IssueKind::EmptyDocument,
+                    item_id: None,
+                    message: "info".to_string(),
+                },
+            ],
+            total_items: 1,
+            trash_items: 0,
+        };
+        assert!(validation.is_clean());
+    }
+
+    #[test]
+    fn test_total_items_count() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("A");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Content.".to_string();
+        }
+        binder.draft.children.push(item);
+
+        let result = validate_project(&binder);
+        assert!(result.total_items >= 4);
+    }
+
+    #[test]
+    fn test_trash_items_count() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Trashed");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Content.".to_string();
+        }
+        binder.trash.children.push(item);
+
+        let result = validate_project(&binder);
+        assert!(result.trash_items >= 1);
+    }
+
+    #[test]
+    fn test_issue_kind_equality() {
+        assert_eq!(IssueKind::DuplicateId, IssueKind::DuplicateId);
+        assert_ne!(IssueKind::DuplicateId, IssueKind::EmptyDocument);
+        assert_ne!(IssueKind::BrokenLink, IssueKind::LargeDocument);
+    }
 }

@@ -285,4 +285,68 @@ mod tests {
         let pages = estimate_pages(&contents, &make_opts());
         assert!(pages >= 1);
     }
+
+    #[test]
+    fn test_estimate_pages_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        let pages = estimate_pages(&contents, &make_opts());
+        assert_eq!(pages, 1); // Minimum 1
+    }
+
+    #[test]
+    fn test_word_count_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(word_count(&contents), 0);
+    }
+
+    #[test]
+    fn test_char_count_empty() {
+        let contents: Vec<CompileContent> = vec![];
+        assert_eq!(char_count(&contents), 0);
+    }
+
+    #[test]
+    fn test_strip_markdown_multiple_hashes() {
+        assert_eq!(strip_markdown("### Third Level"), "Third Level");
+    }
+
+    #[test]
+    fn test_strip_markdown_combined() {
+        let result = strip_markdown("**bold** and *italic*");
+        assert_eq!(result, "bold and italic");
+    }
+
+    #[test]
+    fn test_strip_markdown_empty() {
+        assert_eq!(strip_markdown(""), "");
+    }
+
+    #[test]
+    fn test_word_count_multiple() {
+        let contents = vec![
+            make_content("A", "one two", false, 0),
+            make_content("B", "three four five", false, 0),
+            make_content("C", "", false, 0),
+        ];
+        assert_eq!(word_count(&contents), 5);
+    }
+
+    #[test]
+    fn test_estimate_pages_large() {
+        let contents = vec![
+            make_content("A", &"A line of text.\n".repeat(1000), false, 0),
+        ];
+        let pages = estimate_pages(&contents, &make_opts());
+        assert!(pages >= 2);
+    }
+
+    #[test]
+    fn test_estimate_pages_folders_only() {
+        let contents = vec![
+            make_content("Ch1", "", true, 0),
+            make_content("Ch2", "", true, 0),
+        ];
+        let pages = estimate_pages(&contents, &make_opts());
+        assert_eq!(pages, 1);
+    }
 }

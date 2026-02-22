@@ -254,4 +254,96 @@ mod tests {
         // ProjectRemoved sets metadata_changed flag
         assert!(tracker.project_metadata_changed);
     }
+
+    #[test]
+    fn test_external_change_tracker_multiple_events() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events = vec![
+            WatchEvent::FileModified(PathBuf::from("/project/docs/a.json")),
+            WatchEvent::FileCreated(PathBuf::from("/project/docs/b.json")),
+            WatchEvent::FileRemoved(PathBuf::from("/project/old.txt")),
+            WatchEvent::FileModified(PathBuf::from("/project/project.json")),
+        ];
+        tracker.process_events(&events);
+        assert!(tracker.has_changes());
+        assert_eq!(tracker.modified_paths.len(), 4);
+        assert!(tracker.project_metadata_changed);
+        assert_eq!(tracker.documents_changed.len(), 2); // a.json and b.json
+    }
+
+    #[test]
+    fn test_external_change_tracker_non_json_file() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events = vec![
+            WatchEvent::FileModified(PathBuf::from("/project/readme.md")),
+        ];
+        tracker.process_events(&events);
+        assert!(tracker.has_changes());
+        assert!(!tracker.project_metadata_changed);
+        assert!(tracker.documents_changed.is_empty());
+    }
+
+    #[test]
+    fn test_external_change_tracker_clear_resets_all() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events = vec![
+            WatchEvent::FileModified(PathBuf::from("/project/project.json")),
+            WatchEvent::FileModified(PathBuf::from("/project/docs/a.json")),
+        ];
+        tracker.process_events(&events);
+        assert!(tracker.has_changes());
+        assert!(tracker.project_metadata_changed);
+        assert!(!tracker.documents_changed.is_empty());
+
+        tracker.clear();
+        assert!(!tracker.has_changes());
+        assert!(!tracker.project_metadata_changed);
+        assert!(tracker.documents_changed.is_empty());
+    }
+
+    #[test]
+    fn test_external_change_tracker_process_replaces() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events1 = vec![
+            WatchEvent::FileModified(PathBuf::from("/project/file1.txt")),
+        ];
+        tracker.process_events(&events1);
+        assert_eq!(tracker.modified_paths.len(), 1);
+
+        let events2 = vec![
+            WatchEvent::FileModified(PathBuf::from("/project/file2.txt")),
+        ];
+        tracker.process_events(&events2);
+        // process_events clears previous state first
+        assert_eq!(tracker.modified_paths.len(), 1);
+        assert_eq!(tracker.modified_paths[0], PathBuf::from("/project/file2.txt"));
+    }
+
+    #[test]
+    fn test_external_change_tracker_empty_events() {
+        let mut tracker = ExternalChangeTracker::new();
+        tracker.process_events(&[]);
+        assert!(!tracker.has_changes());
+    }
+
+    #[test]
+    fn test_external_change_tracker_json_not_in_docs() {
+        let mut tracker = ExternalChangeTracker::new();
+        let events = vec![
+            WatchEvent::FileModified(PathBuf::from("/project/config/settings.json")),
+        ];
+        tracker.process_events(&events);
+        assert!(tracker.has_changes());
+        // JSON file outside docs/ should not be in documents_changed
+        assert!(tracker.documents_changed.is_empty());
+    }
+
+    #[test]
+    fn test_default_tracker() {
+        let tracker = ExternalChangeTracker::default();
+        assert!(!tracker.has_changes());
+        assert!(tracker.modified_paths.is_empty());
+        assert!(tracker.documents_changed.is_empty());
+        assert!(!tracker.project_metadata_changed);
+    }
 }

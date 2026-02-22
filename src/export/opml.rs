@@ -341,4 +341,137 @@ mod tests {
         let invalid = "<opml><head></head></opml>";
         assert!(validate_opml(invalid).is_err());
     }
+
+    #[test]
+    fn test_validate_opml_missing_root() {
+        let invalid = "<head></head><body></body>";
+        assert!(validate_opml(invalid).is_err());
+    }
+
+    #[test]
+    fn test_import_opml_empty() {
+        let opml = r#"<?xml version="1.0"?>
+<opml version="2.0">
+  <head><title>Empty</title></head>
+  <body>
+  </body>
+</opml>"#;
+        let items = import_opml(opml).unwrap();
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn test_import_opml_flat() {
+        let opml = r#"<?xml version="1.0"?>
+<opml version="2.0">
+  <head><title>Flat</title></head>
+  <body>
+    <outline text="Item 1"/>
+    <outline text="Item 2"/>
+    <outline text="Item 3"/>
+  </body>
+</opml>"#;
+        let items = import_opml(opml).unwrap();
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0].title, "Item 1");
+    }
+
+    #[test]
+    fn test_import_opml_with_notes() {
+        let opml = r#"<?xml version="1.0"?>
+<opml version="2.0">
+  <head><title>Test</title></head>
+  <body>
+    <outline text="Scene" _note="The content here"/>
+  </body>
+</opml>"#;
+        let items = import_opml(opml).unwrap();
+        assert_eq!(items.len(), 1);
+        assert!(!items[0].synopsis.is_empty());
+    }
+
+    #[test]
+    fn test_export_opml_empty_binder() {
+        let binder = Binder::default_structure();
+        let opml = export_opml(&binder, "Empty Book").unwrap();
+        assert!(opml.contains("Empty Book"));
+        assert!(opml.contains("<opml"));
+        assert!(opml.contains("</opml>"));
+    }
+
+    #[test]
+    fn test_export_opml_with_synopsis() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Scene 1");
+        item.synopsis = "A brief synopsis".to_string();
+        binder.draft.add_child(item);
+
+        let opml = export_opml(&binder, "Test").unwrap();
+        assert!(opml.contains("A brief synopsis"));
+    }
+
+    #[test]
+    fn test_count_items_single() {
+        let item = BinderItem::new_text("Alone");
+        assert_eq!(count_items(&item), 1);
+    }
+
+    #[test]
+    fn test_count_items_nested() {
+        let mut root = BinderItem::new_folder("Root");
+        let mut sub = BinderItem::new_folder("Sub");
+        sub.add_child(BinderItem::new_text("Leaf"));
+        root.add_child(sub);
+        root.add_child(BinderItem::new_text("Other"));
+        assert_eq!(count_items(&root), 4);
+    }
+
+    #[test]
+    fn test_max_depth_leaf() {
+        let item = BinderItem::new_text("Leaf");
+        assert_eq!(max_depth(&item), 0);
+    }
+
+    #[test]
+    fn test_max_depth_deep() {
+        let mut root = BinderItem::new_folder("Root");
+        let mut l1 = BinderItem::new_folder("L1");
+        let mut l2 = BinderItem::new_folder("L2");
+        l2.add_child(BinderItem::new_text("L3"));
+        l1.add_child(l2);
+        root.add_child(l1);
+        assert_eq!(max_depth(&root), 3);
+    }
+
+    #[test]
+    fn test_flat_titles_single() {
+        let item = BinderItem::new_text("Solo");
+        let titles = flat_titles(&item, 0);
+        assert_eq!(titles.len(), 1);
+        assert_eq!(titles[0], (0, "Solo".to_string()));
+    }
+
+    #[test]
+    fn test_flat_titles_depth() {
+        let mut root = BinderItem::new_folder("Root");
+        root.add_child(BinderItem::new_text("A"));
+        let titles = flat_titles(&root, 0);
+        assert_eq!(titles.len(), 2);
+        assert_eq!(titles[0].0, 0);
+        assert_eq!(titles[1].0, 1);
+    }
+
+    #[test]
+    fn test_escape_unescape_roundtrip() {
+        let original = "A & B < C > D \"E\"";
+        let escaped = escape_xml(original);
+        let unescaped = unescape_xml(&escaped);
+        assert_eq!(unescaped, original);
+    }
+
+    #[test]
+    fn test_extract_attr_no_match() {
+        let line = r#"<outline text="Hello"/>"#;
+        assert!(extract_attr(line, "missing").is_none());
+    }
 }
