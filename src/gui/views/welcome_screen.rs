@@ -115,8 +115,12 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
         text("Ctrl+I Inspector | Ctrl+Z Undo | Ctrl+Y Redo | Ctrl+, Settings").size(11).color(Theme::TEXT_MUTED),
         text("Ctrl+1-4 Switch View | F11 Focus Mode | F5 Composition Mode").size(11).color(Theme::TEXT_MUTED),
         text("Ctrl+B Bold | Ctrl+U Underline | Ctrl+H Find/Replace | Esc Close Panel").size(11).color(Theme::TEXT_MUTED),
-        text("Ctrl+Shift+F Composition | Ctrl+Shift+T Script Mode | Ctrl+Shift+G Goals").size(11).color(Theme::TEXT_MUTED),
-        text("Ctrl+5 Snapshots | Ctrl+D Bookmark | Ctrl+G Go to Line | Tab Next Panel").size(11).color(Theme::TEXT_MUTED),
+        text("Ctrl+K Link | Ctrl+L DocLinks | Ctrl+J Timer | Ctrl+T Transpose").size(11).color(Theme::TEXT_MUTED),
+        text("Ctrl+Shift+F Composition | Ctrl+Shift+T Script | Ctrl+Shift+G Goals").size(11).color(Theme::TEXT_MUTED),
+        text("Ctrl+Shift+B Backup | Ctrl+Shift+N Name Gen | Ctrl+Shift+H History").size(11).color(Theme::TEXT_MUTED),
+        text("Ctrl+5 Snapshots | Ctrl+M Bookmarks | Ctrl+P Project Notes | F7 Spellcheck").size(11).color(Theme::TEXT_MUTED),
+        text("F3 Find Next | F6 Search | F8 Validation | F9 Take Snapshot").size(11).color(Theme::TEXT_MUTED),
+        text("Alt+U Uppercase | Alt+L Lowercase | Alt+[ Indent | Alt+] Unindent").size(11).color(Theme::TEXT_MUTED),
     ]
     .spacing(2);
 
@@ -130,6 +134,14 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
         "Use labels and statuses to track progress on individual documents.",
         "The Scrivenings view stitches multiple documents together for seamless reading.",
         "Project Notes are a quick scratchpad saved with your project.",
+        "Writing streaks are tracked automatically — aim for 7+ days for the fire icon!",
+        "The Writing Timer (Ctrl+J) has Pomodoro, Sprint, and custom presets.",
+        "Use [[Title|display text]] to create links with custom display text.",
+        "Ctrl+Shift+S shows comprehensive project statistics with readability scores.",
+        "The Text Stats panel (Ctrl+7) analyzes vocabulary richness and overused words.",
+        "Use the Name Generator (Ctrl+Shift+N) for character and place names.",
+        "Auto-backup creates safety copies every time your project is saved.",
+        "F8 runs project validation to find broken links, empty docs, and orphans.",
     ];
     let tip_index = {
         use chrono::Datelike;

@@ -213,3 +213,134 @@ pub fn word_count(contents: &[CompileContent]) -> usize {
 pub fn char_count(contents: &[CompileContent]) -> usize {
     contents.iter().map(|c| c.text.len()).sum()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_options() -> CompileOptions {
+        CompileOptions {
+            title: "Test Book".to_string(),
+            author: "Author".to_string(),
+            include_front_matter: true,
+            ..Default::default()
+        }
+    }
+
+    fn make_content(title: &str, text: &str, is_folder: bool) -> CompileContent {
+        CompileContent {
+            title: title.to_string(),
+            text: text.to_string(),
+            is_folder,
+            depth: 0,
+        }
+    }
+
+    #[test]
+    fn test_rtf_escape_basic() {
+        assert_eq!(rtf_escape("hello"), "hello");
+        assert_eq!(rtf_escape("a\\b"), "a\\\\b");
+        assert_eq!(rtf_escape("a{b}"), "a\\{b\\}");
+    }
+
+    #[test]
+    fn test_rtf_escape_unicode() {
+        let result = rtf_escape("caf\u{00E9}");
+        assert!(result.contains("\\u233?"));
+    }
+
+    #[test]
+    fn test_compile_empty() {
+        let options = make_options();
+        let result = compile(&[], &options).unwrap();
+        assert!(result.starts_with("{\\rtf1"));
+        assert!(result.ends_with("}\n"));
+    }
+
+    #[test]
+    fn test_compile_with_content() {
+        let options = make_options();
+        let contents = vec![
+            make_content("Chapter 1", "Hello world.", false),
+        ];
+        let result = compile(&contents, &options).unwrap();
+        assert!(result.contains("Hello world."));
+        assert!(result.contains("Test Book"));
+        assert!(result.contains("Author"));
+    }
+
+    #[test]
+    fn test_compile_no_front_matter() {
+        let mut options = make_options();
+        options.include_front_matter = false;
+        let contents = vec![
+            make_content("Ch1", "Text here.", false),
+        ];
+        let result = compile(&contents, &options).unwrap();
+        assert!(!result.contains("Test Book")); // No title page
+        assert!(result.contains("Text here."));
+    }
+
+    #[test]
+    fn test_compile_folder_heading() {
+        let options = make_options();
+        let contents = vec![
+            make_content("Act One", "", true),
+            make_content("Scene 1", "First scene.", false),
+        ];
+        let result = compile(&contents, &options).unwrap();
+        assert!(result.contains("Act One"));
+        assert!(result.contains("First scene."));
+    }
+
+    #[test]
+    fn test_convert_markdown_bold() {
+        let result = convert_basic_markdown("Hello **bold** text");
+        assert!(result.contains("\\b "));
+        assert!(result.contains("\\b0 "));
+    }
+
+    #[test]
+    fn test_convert_markdown_italic() {
+        let result = convert_basic_markdown("Hello *italic* text");
+        assert!(result.contains("\\i "));
+        assert!(result.contains("\\i0 "));
+    }
+
+    #[test]
+    fn test_separator_types() {
+        assert!(separator_rtf(&SeparatorType::EmptyLine).contains("\\par"));
+        assert!(separator_rtf(&SeparatorType::PageBreak).contains("\\page"));
+        assert!(separator_rtf(&SeparatorType::SectionBreak).contains("* * *"));
+        assert!(separator_rtf(&SeparatorType::None).is_empty());
+        assert!(separator_rtf(&SeparatorType::Custom("---".to_string())).contains("---"));
+    }
+
+    #[test]
+    fn test_word_count() {
+        let contents = vec![
+            make_content("Ch1", "one two three", false),
+            make_content("Ch2", "four five", false),
+        ];
+        assert_eq!(word_count(&contents), 5);
+    }
+
+    #[test]
+    fn test_char_count_fn() {
+        let contents = vec![
+            make_content("Ch1", "abc", false),
+            make_content("Ch2", "de", false),
+        ];
+        assert_eq!(char_count(&contents), 5);
+    }
+
+    #[test]
+    fn test_estimate_output_size() {
+        let contents = vec![
+            make_content("Ch1", "Some text here.", false),
+        ];
+        let options = make_options();
+        let size = estimate_output_size(&contents, &options);
+        assert!(size > 300); // Base + some content
+    }
+}
