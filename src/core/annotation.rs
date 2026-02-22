@@ -137,6 +137,34 @@ impl Annotation {
         pos >= self.start && pos < self.end
     }
 
+    /// Builder: set category
+    pub fn with_category(mut self, category: &str) -> Self {
+        self.category = if category.is_empty() { None } else { Some(category.to_string()) };
+        self
+    }
+
+    /// Check if this annotation is in a given category
+    pub fn is_in_category(&self, category: &str) -> bool {
+        self.category.as_deref() == Some(category)
+    }
+
+    /// Check if this annotation is older than the given number of days
+    pub fn is_older_than_days(&self, days: i64) -> bool {
+        let age = Utc::now().signed_duration_since(self.created_at);
+        age.num_days() > days
+    }
+
+    /// Get a compact display label
+    pub fn label(&self) -> String {
+        let status = if self.resolved { "resolved" } else { "open" };
+        let truncated = if self.text.len() > 30 {
+            format!("{}...", &self.text[..30])
+        } else {
+            self.text.clone()
+        };
+        format!("[{}|{}] {}", status, self.color.label(), truncated)
+    }
+
     /// Shift the annotation range by an offset (for text insertions/deletions before it)
     pub fn shift(&mut self, offset: i64) {
         if offset >= 0 {
@@ -294,6 +322,49 @@ impl AnnotationSet {
             "{} total ({} open, {} resolved)",
             self.count(), self.open_count(), self.resolved_count()
         )
+    }
+
+    /// Get annotations by author
+    pub fn by_author(&self, author: &str) -> Vec<&Annotation> {
+        let lower = author.to_lowercase();
+        self.annotations.iter()
+            .filter(|a| a.author.to_lowercase() == lower)
+            .collect()
+    }
+
+    /// Get all unique authors
+    pub fn unique_authors(&self) -> Vec<String> {
+        let mut authors: Vec<String> = self.annotations.iter()
+            .filter(|a| !a.author.is_empty())
+            .map(|a| a.author.clone())
+            .collect();
+        authors.sort();
+        authors.dedup();
+        authors
+    }
+
+    /// Get the most-edited annotation
+    pub fn most_edited(&self) -> Option<&Annotation> {
+        self.annotations.iter().max_by_key(|a| a.edit_count())
+    }
+
+    /// Get annotations older than a given number of days
+    pub fn older_than_days(&self, days: i64) -> Vec<&Annotation> {
+        self.annotations.iter()
+            .filter(|a| a.is_older_than_days(days))
+            .collect()
+    }
+
+    /// Get stale open annotations (open and older than N days)
+    pub fn stale_open(&self, days: i64) -> Vec<&Annotation> {
+        self.annotations.iter()
+            .filter(|a| !a.resolved && a.is_older_than_days(days))
+            .collect()
+    }
+
+    /// Export all annotation texts as a list of strings
+    pub fn export_texts(&self) -> Vec<String> {
+        self.annotations.iter().map(|a| a.text.clone()).collect()
     }
 }
 
@@ -802,5 +873,141 @@ mod tests {
         assert!(summary.contains("2 total"));
         assert!(summary.contains("1 open"));
         assert!(summary.contains("1 resolved"));
+    }
+
+    // ---- New annotation tests ----
+
+    #[test]
+    fn test_with_category_builder() {
+        let ann = Annotation::new(0, 10, "Test").with_category("Todo");
+        assert_eq!(ann.category, Some("Todo".to_string()));
+    }
+
+    #[test]
+    fn test_with_category_empty() {
+        let ann = Annotation::new(0, 10, "Test").with_category("");
+        assert!(ann.category.is_none());
+    }
+
+    #[test]
+    fn test_is_in_category() {
+        let ann = Annotation::new(0, 10, "Test").with_category("Research");
+        assert!(ann.is_in_category("Research"));
+        assert!(!ann.is_in_category("Todo"));
+    }
+
+    #[test]
+    fn test_is_older_than_days() {
+        let ann = Annotation::new(0, 10, "Test");
+        // Just created, not older than 1 day
+        assert!(!ann.is_older_than_days(1));
+    }
+
+    #[test]
+    fn test_label() {
+        let ann = Annotation::new(0, 10, "Fix typo");
+        let label = ann.label();
+        assert!(label.contains("open"));
+        assert!(label.contains("Yellow"));
+        assert!(label.contains("Fix typo"));
+    }
+
+    #[test]
+    fn test_label_resolved() {
+        let mut ann = Annotation::new(0, 10, "Done");
+        ann.toggle_resolved();
+        let label = ann.label();
+        assert!(label.contains("resolved"));
+    }
+
+    #[test]
+    fn test_label_truncated() {
+        let long_text = "A".repeat(50);
+        let ann = Annotation::new(0, 10, &long_text);
+        let label = ann.label();
+        assert!(label.contains("..."));
+    }
+
+    #[test]
+    fn test_by_author() {
+        let mut set = AnnotationSet::new();
+        set.add(Annotation::new(0, 5, "A").with_author("Alice"));
+        set.add(Annotation::new(5, 10, "B").with_author("Bob"));
+        set.add(Annotation::new(10, 15, "C").with_author("Alice"));
+
+        assert_eq!(set.by_author("Alice").len(), 2);
+        assert_eq!(set.by_author("Bob").len(), 1);
+        assert_eq!(set.by_author("Charlie").len(), 0);
+    }
+
+    #[test]
+    fn test_by_author_case_insensitive() {
+        let mut set = AnnotationSet::new();
+        set.add(Annotation::new(0, 5, "A").with_author("Alice"));
+        assert_eq!(set.by_author("alice").len(), 1);
+        assert_eq!(set.by_author("ALICE").len(), 1);
+    }
+
+    #[test]
+    fn test_unique_authors() {
+        let mut set = AnnotationSet::new();
+        set.add(Annotation::new(0, 5, "A").with_author("Alice"));
+        set.add(Annotation::new(5, 10, "B").with_author("Bob"));
+        set.add(Annotation::new(10, 15, "C").with_author("Alice"));
+        set.add(Annotation::new(15, 20, "D")); // No author
+
+        let authors = set.unique_authors();
+        assert_eq!(authors.len(), 2);
+        assert!(authors.contains(&"Alice".to_string()));
+        assert!(authors.contains(&"Bob".to_string()));
+    }
+
+    #[test]
+    fn test_most_edited() {
+        let mut set = AnnotationSet::new();
+        let mut a1 = Annotation::new(0, 5, "A");
+        a1.edit_text("A2");
+        let mut a2 = Annotation::new(5, 10, "B");
+        a2.edit_text("B2");
+        a2.edit_text("B3");
+        a2.edit_text("B4");
+        set.add(a1);
+        set.add(a2);
+
+        let most = set.most_edited().unwrap();
+        assert_eq!(most.text, "B4");
+        assert_eq!(most.edit_count(), 3);
+    }
+
+    #[test]
+    fn test_most_edited_empty() {
+        let set = AnnotationSet::new();
+        assert!(set.most_edited().is_none());
+    }
+
+    #[test]
+    fn test_stale_open() {
+        let mut set = AnnotationSet::new();
+        set.add(Annotation::new(0, 5, "A"));
+        set.add(Annotation::new(5, 10, "B"));
+        // Just created, not stale
+        assert_eq!(set.stale_open(7).len(), 0);
+    }
+
+    #[test]
+    fn test_export_texts() {
+        let mut set = AnnotationSet::new();
+        set.add(Annotation::new(0, 5, "First note"));
+        set.add(Annotation::new(5, 10, "Second note"));
+        let texts = set.export_texts();
+        assert_eq!(texts.len(), 2);
+        assert_eq!(texts[0], "First note");
+        assert_eq!(texts[1], "Second note");
+    }
+
+    #[test]
+    fn test_export_texts_empty() {
+        let set = AnnotationSet::new();
+        assert!(set.export_texts().is_empty());
     }
 }
