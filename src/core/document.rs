@@ -346,6 +346,94 @@ impl Document {
         self.word_count() as f64 / para as f64
     }
 
+    /// Get bigrams (two-word phrases) and their frequencies
+    pub fn bigrams(&self) -> Vec<(String, usize)> {
+        let words: Vec<String> = self.content.split_whitespace()
+            .map(|w| w.chars()
+                .filter(|c| c.is_alphanumeric() || *c == '\'')
+                .collect::<String>()
+                .to_lowercase())
+            .filter(|w| !w.is_empty())
+            .collect();
+
+        let mut freq = std::collections::HashMap::new();
+        for pair in words.windows(2) {
+            let bigram = format!("{} {}", pair[0], pair[1]);
+            *freq.entry(bigram).or_insert(0usize) += 1;
+        }
+
+        let mut pairs: Vec<(String, usize)> = freq.into_iter().collect();
+        pairs.sort_by(|a, b| b.1.cmp(&a.1));
+        pairs
+    }
+
+    /// Get the N most frequent bigrams
+    pub fn top_bigrams(&self, n: usize) -> Vec<(String, usize)> {
+        let mut bg = self.bigrams();
+        bg.truncate(n);
+        bg
+    }
+
+    /// Analyze sentence length variety (standard deviation of sentence lengths)
+    pub fn sentence_length_variety(&self) -> f64 {
+        let sentences: Vec<&str> = self.content
+            .split(|c: char| c == '.' || c == '!' || c == '?')
+            .filter(|s| !s.trim().is_empty())
+            .collect();
+
+        if sentences.len() <= 1 {
+            return 0.0;
+        }
+
+        let lengths: Vec<f64> = sentences.iter()
+            .map(|s| s.split_whitespace().count() as f64)
+            .collect();
+
+        let mean = lengths.iter().sum::<f64>() / lengths.len() as f64;
+        let variance = lengths.iter()
+            .map(|l| (l - mean).powi(2))
+            .sum::<f64>() / lengths.len() as f64;
+
+        variance.sqrt()
+    }
+
+    /// Count lines of dialogue (lines starting with quotes or containing dialogue markers)
+    pub fn dialogue_line_count(&self) -> usize {
+        self.content.lines()
+            .filter(|line| {
+                let trimmed = line.trim();
+                trimmed.starts_with('"')
+                    || trimmed.starts_with('\u{201C}') // left double quote
+                    || trimmed.starts_with('\u{2018}') // left single quote
+            })
+            .count()
+    }
+
+    /// Estimate dialogue percentage
+    pub fn dialogue_percentage(&self) -> f64 {
+        let total_lines = self.content.lines().filter(|l| !l.trim().is_empty()).count();
+        if total_lines == 0 {
+            return 0.0;
+        }
+        self.dialogue_line_count() as f64 / total_lines as f64 * 100.0
+    }
+
+    /// Count the number of paragraphs starting with the same word
+    pub fn repeated_paragraph_starts(&self) -> Vec<(String, usize)> {
+        let mut starts = std::collections::HashMap::new();
+        for para in self.content.split("\n\n") {
+            if let Some(first_word) = para.trim().split_whitespace().next() {
+                let clean = first_word.to_lowercase();
+                *starts.entry(clean).or_insert(0usize) += 1;
+            }
+        }
+        let mut repeated: Vec<(String, usize)> = starts.into_iter()
+            .filter(|(_, count)| *count > 1)
+            .collect();
+        repeated.sort_by(|a, b| b.1.cmp(&a.1));
+        repeated
+    }
+
     /// Find all positions of a substring (case-insensitive)
     pub fn find_positions(&self, query: &str) -> Vec<usize> {
         if query.is_empty() {
@@ -958,5 +1046,107 @@ mod tests {
         let doc = Document::with_content("a b c d");
         assert_eq!(doc.char_count_no_spaces(), 4);
         assert_eq!(doc.char_count(), 7);
+    }
+
+    #[test]
+    fn test_bigrams_basic() {
+        let doc = Document::with_content("the cat sat on the mat");
+        let bg = doc.bigrams();
+        assert!(!bg.is_empty());
+        // "the cat" appears once, "the mat" appears once
+        assert!(bg.iter().any(|(b, _)| b == "the cat"));
+    }
+
+    #[test]
+    fn test_bigrams_empty() {
+        let doc = Document::new();
+        assert!(doc.bigrams().is_empty());
+    }
+
+    #[test]
+    fn test_bigrams_single_word() {
+        let doc = Document::with_content("alone");
+        assert!(doc.bigrams().is_empty());
+    }
+
+    #[test]
+    fn test_top_bigrams() {
+        let doc = Document::with_content("one two one two one two three four");
+        let top = doc.top_bigrams(2);
+        assert!(top.len() <= 2);
+        assert_eq!(top[0].0, "one two"); // most frequent
+        assert_eq!(top[0].1, 3);
+    }
+
+    #[test]
+    fn test_sentence_length_variety_uniform() {
+        let doc = Document::with_content("One two three. One two three. One two three.");
+        let variety = doc.sentence_length_variety();
+        assert!(variety < 0.1, "Uniform sentences should have near-zero variety");
+    }
+
+    #[test]
+    fn test_sentence_length_variety_varied() {
+        let doc = Document::with_content("Short. A very long sentence with many many words in it goes here.");
+        let variety = doc.sentence_length_variety();
+        assert!(variety > 1.0, "Varied sentences should have higher variety score");
+    }
+
+    #[test]
+    fn test_sentence_length_variety_empty() {
+        let doc = Document::new();
+        assert_eq!(doc.sentence_length_variety(), 0.0);
+    }
+
+    #[test]
+    fn test_sentence_length_variety_single() {
+        let doc = Document::with_content("Just one sentence.");
+        assert_eq!(doc.sentence_length_variety(), 0.0);
+    }
+
+    #[test]
+    fn test_dialogue_line_count() {
+        let doc = Document::with_content("\"Hello,\" she said.\nHe looked up.\n\"What is it?\"\nSilence.");
+        assert_eq!(doc.dialogue_line_count(), 2);
+    }
+
+    #[test]
+    fn test_dialogue_line_count_empty() {
+        let doc = Document::new();
+        assert_eq!(doc.dialogue_line_count(), 0);
+    }
+
+    #[test]
+    fn test_dialogue_percentage() {
+        let doc = Document::with_content("\"Hello.\"\nAction line.\n\"Goodbye.\"\nAnother action.");
+        let pct = doc.dialogue_percentage();
+        assert!((pct - 50.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_dialogue_percentage_empty() {
+        let doc = Document::new();
+        assert_eq!(doc.dialogue_percentage(), 0.0);
+    }
+
+    #[test]
+    fn test_repeated_paragraph_starts() {
+        let doc = Document::with_content("The dog ran.\n\nThe cat sat.\n\nA bird flew.\n\nThe fish swam.");
+        let repeated = doc.repeated_paragraph_starts();
+        assert!(repeated.iter().any(|(w, c)| w == "the" && *c == 3));
+    }
+
+    #[test]
+    fn test_repeated_paragraph_starts_none() {
+        let doc = Document::with_content("First paragraph.\n\nSecond one.\n\nAnother here.");
+        let repeated = doc.repeated_paragraph_starts();
+        assert!(repeated.is_empty());
+    }
+
+    #[test]
+    fn test_repeated_paragraph_starts_empty() {
+        let doc = Document::new();
+        let repeated = doc.repeated_paragraph_starts();
+        assert!(repeated.is_empty());
     }
 }

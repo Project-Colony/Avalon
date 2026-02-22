@@ -172,6 +172,52 @@ impl Statistics {
     pub fn is_empty(&self) -> bool {
         self.word_count == 0 && self.document_count == 0
     }
+
+    /// Estimated completion percentage toward a word target
+    pub fn completion_toward_target(&self, target: usize) -> f64 {
+        if target == 0 {
+            return 0.0;
+        }
+        (self.word_count as f64 / target as f64 * 100.0).min(100.0)
+    }
+
+    /// Words remaining to reach a target
+    pub fn words_remaining(&self, target: usize) -> usize {
+        target.saturating_sub(self.word_count)
+    }
+
+    /// Estimated days to completion at a given daily word rate
+    pub fn days_to_completion(&self, target: usize, words_per_day: usize) -> Option<usize> {
+        if words_per_day == 0 {
+            return None;
+        }
+        let remaining = self.words_remaining(target);
+        if remaining == 0 {
+            return Some(0);
+        }
+        Some((remaining + words_per_day - 1) / words_per_day) // ceiling division
+    }
+
+    /// Average words per document
+    pub fn avg_words_per_doc(&self) -> f64 {
+        if self.document_count == 0 {
+            return 0.0;
+        }
+        self.word_count as f64 / self.document_count as f64
+    }
+
+    /// Project size classification
+    pub fn size_label(&self) -> &str {
+        match self.word_count {
+            0..=999 => "Flash Fiction / Note",
+            1000..=7499 => "Short Story",
+            7500..=17499 => "Novelette",
+            17500..=39999 => "Novella",
+            40000..=79999 => "Novel",
+            80000..=119999 => "Full Novel",
+            _ => "Epic / Tome",
+        }
+    }
 }
 
 /// Detailed text analysis for the text statistics panel
@@ -1013,5 +1059,98 @@ mod tests {
         assert_eq!(count_syllables("I"), 1);
         assert_eq!(count_syllables("eye"), 1); // silent e
         assert_eq!(count_syllables("queue"), 1);
+    }
+
+    #[test]
+    fn test_completion_toward_target() {
+        let mut stats = Statistics::default();
+        stats.word_count = 25000;
+        assert!((stats.completion_toward_target(50000) - 50.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_completion_toward_target_zero() {
+        let stats = Statistics::default();
+        assert_eq!(stats.completion_toward_target(0), 0.0);
+    }
+
+    #[test]
+    fn test_completion_toward_target_exceeded() {
+        let mut stats = Statistics::default();
+        stats.word_count = 60000;
+        assert_eq!(stats.completion_toward_target(50000), 100.0);
+    }
+
+    #[test]
+    fn test_words_remaining() {
+        let mut stats = Statistics::default();
+        stats.word_count = 30000;
+        assert_eq!(stats.words_remaining(50000), 20000);
+    }
+
+    #[test]
+    fn test_words_remaining_exceeded() {
+        let mut stats = Statistics::default();
+        stats.word_count = 60000;
+        assert_eq!(stats.words_remaining(50000), 0);
+    }
+
+    #[test]
+    fn test_days_to_completion() {
+        let mut stats = Statistics::default();
+        stats.word_count = 30000;
+        assert_eq!(stats.days_to_completion(50000, 1000), Some(20));
+    }
+
+    #[test]
+    fn test_days_to_completion_zero_rate() {
+        let stats = Statistics::default();
+        assert_eq!(stats.days_to_completion(50000, 0), None);
+    }
+
+    #[test]
+    fn test_days_to_completion_already_done() {
+        let mut stats = Statistics::default();
+        stats.word_count = 60000;
+        assert_eq!(stats.days_to_completion(50000, 1000), Some(0));
+    }
+
+    #[test]
+    fn test_avg_words_per_doc() {
+        let mut stats = Statistics::default();
+        stats.word_count = 10000;
+        stats.document_count = 5;
+        assert_eq!(stats.avg_words_per_doc(), 2000.0);
+    }
+
+    #[test]
+    fn test_avg_words_per_doc_no_docs() {
+        let stats = Statistics::default();
+        assert_eq!(stats.avg_words_per_doc(), 0.0);
+    }
+
+    #[test]
+    fn test_size_label() {
+        let mut stats = Statistics::default();
+        stats.word_count = 0;
+        assert_eq!(stats.size_label(), "Flash Fiction / Note");
+
+        stats.word_count = 5000;
+        assert_eq!(stats.size_label(), "Short Story");
+
+        stats.word_count = 10000;
+        assert_eq!(stats.size_label(), "Novelette");
+
+        stats.word_count = 25000;
+        assert_eq!(stats.size_label(), "Novella");
+
+        stats.word_count = 60000;
+        assert_eq!(stats.size_label(), "Novel");
+
+        stats.word_count = 100000;
+        assert_eq!(stats.size_label(), "Full Novel");
+
+        stats.word_count = 200000;
+        assert_eq!(stats.size_label(), "Epic / Tome");
     }
 }
