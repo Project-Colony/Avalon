@@ -36,16 +36,16 @@ pub fn view(
     let header = row![
         text("DOCUMENT LINKS").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(4),
-        text("\u{1F517}").size(10),
+        text("\u{f0c1}").size(10),
         Space::with_width(Length::Fill),
         text(format!("{} total link{}", total_links, if total_links == 1 { "" } else { "s" }))
             .size(10)
             .color(Theme::TEXT_MUTED),
         Space::with_width(8),
         if broken_links.is_empty() {
-            text("\u{2713} healthy").size(10).color(Theme::SUCCESS)
+            text("\u{f00c} healthy").size(10).color(Theme::SUCCESS)
         } else {
-            text(format!("\u{26A0} {} issue{}", broken_links.len(),
+            text(format!("\u{f071} {} issue{}", broken_links.len(),
                 if broken_links.len() == 1 { "" } else { "s" }))
                 .size(10).color(Theme::WARNING)
         },
@@ -54,7 +54,7 @@ pub fn view(
     // Outgoing links (from current document)
     let outgoing_label_color = if outgoing_links.is_empty() { Theme::TEXT_MUTED } else { Theme::TEXT_ACCENT };
     let mut outgoing_col = column![
-        text(format!("\u{2192} Outgoing ({})", outgoing_links.len()))
+        text(format!("\u{f061} Outgoing ({})", outgoing_links.len()))
             .size(11)
             .color(outgoing_label_color),
     ].spacing(2);
@@ -70,9 +70,9 @@ pub fn view(
     for (i, link) in outgoing_links.iter().enumerate() {
         let id = link.target_id;
         let display = if let Some(ref dt) = link.display_text {
-            format!("\u{2192} {} (shown as \"{}\")", link.target_title, dt)
+            format!("\u{f061} {} (shown as \"{}\")", link.target_title, dt)
         } else {
-            format!("\u{2192} {}", link.target_title)
+            format!("\u{f061} {}", link.target_title)
         };
         outgoing_col = outgoing_col.push(
             row![
@@ -89,7 +89,7 @@ pub fn view(
     // Broken/ambiguous links section
     let broken_section: Element<'static, Message> = if !broken_links.is_empty() {
         let mut broken_col = column![
-            text(format!("\u{26A0} Broken/Ambiguous ({})", broken_links.len()))
+            text(format!("\u{f071} Broken/Ambiguous ({})", broken_links.len()))
                 .size(11)
                 .color(Theme::WARNING),
         ].spacing(2);
@@ -101,7 +101,7 @@ pub fn view(
             };
 
             let mut link_row = row![
-                text("\u{2717}").size(10).color(Theme::ERROR),
+                text("\u{f00d}").size(10).color(Theme::ERROR),
                 Space::with_width(4),
                 text(format!("[[{}]]", blink.link_text)).size(11).color(Theme::ERROR),
                 Space::with_width(4),
@@ -134,7 +134,7 @@ pub fn view(
     // Incoming links (backlinks to current document)
     let incoming_label_color = if incoming_links.is_empty() { Theme::TEXT_MUTED } else { Theme::SUCCESS };
     let mut incoming_col = column![
-        text(format!("\u{2190} Backlinks ({})", incoming_links.len()))
+        text(format!("\u{f060} Backlinks ({})", incoming_links.len()))
             .size(11)
             .color(incoming_label_color),
     ].spacing(2);
@@ -153,7 +153,7 @@ pub fn view(
             row![
                 text(format!("{}.", i + 1)).size(9).color(Theme::TEXT_MUTED).width(Length::Fixed(16.0)),
                 button(
-                    text(format!("\u{2190} {}", link.target_title)).size(11).color(Theme::TEXT_SECONDARY),
+                    text(format!("\u{f060} {}", link.target_title)).size(11).color(Theme::TEXT_SECONDARY),
                 )
                 .on_press(Message::SelectBinderItem(id))
                 .padding(Padding::from([2, 4])),
@@ -178,7 +178,7 @@ pub fn view(
         let target_id = *id;
         // Check if already linked
         let already_linked = outgoing_links.iter().any(|l| l.target_id == target_id);
-        let icon = if already_linked { "\u{2713} " } else { "  " };
+        let icon = if already_linked { "\u{f00c} " } else { "  " };
         let color = if already_linked { Theme::TEXT_MUTED } else { Theme::TEXT_SECONDARY };
 
         insert_col = insert_col.push(
@@ -195,7 +195,7 @@ pub fn view(
             .size(9)
             .color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
-        text(format!("{}\u{2192} {}\u{2190}", outgoing_links.len(), incoming_links.len()))
+        text(format!("{}\u{f061} {}\u{f060}", outgoing_links.len(), incoming_links.len()))
             .size(9)
             .color(Theme::TEXT_MUTED),
     ];

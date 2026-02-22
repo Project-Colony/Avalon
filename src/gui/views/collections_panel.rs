@@ -88,22 +88,22 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
         };
 
         let (kind_icon, kind_detail) = match &coll.kind {
-            CollectionKind::Manual => ("\u{2630}", "Manual".to_string()),
+            CollectionKind::Manual => ("\u{f0c9}", "Manual".to_string()),
             CollectionKind::Search { query, .. } => {
                 if query.is_empty() {
-                    ("\u{2606}", "Smart".to_string())
+                    ("\u{f006}", "Smart".to_string())
                 } else {
                     let truncated = if query.len() > 20 {
                         format!("{}...", &query[..20])
                     } else {
                         query.clone()
                     };
-                    ("\u{2605}", format!("Smart: \"{}\"", truncated))
+                    ("\u{f005}", format!("Smart: \"{}\"", truncated))
                 }
             }
         };
 
-        let selected_marker = if is_selected { "\u{25B6} " } else { "  " };
+        let selected_marker = if is_selected { "\u{f0da} " } else { "  " };
         let index_text = format!("{}{}.", selected_marker, idx + 1);
 
         let coll_id = coll.id;
@@ -125,7 +125,7 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
                 .color(Theme::TEXT_MUTED),
             Space::with_width(4),
             button(
-                text("\u{2715}").size(10).color(Theme::ERROR),
+                text("\u{f00d}").size(10).color(Theme::ERROR),
             )
             .on_press(Message::DeleteCollection(coll_id))
             .padding(Padding::from([1, 4])),

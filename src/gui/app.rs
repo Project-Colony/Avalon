@@ -3089,7 +3089,7 @@ impl ScrineverApp {
                                 self.last_milestone = m;
                                 let label = if m >= 1000 { format!("{}k", m / 1000) } else { m.to_string() };
                                 self.notification = Some(format!(
-                                    "\u{1F389} Milestone: {} words! Keep writing!",
+                                    "\u{f005} Milestone: {} words! Keep writing!",
                                     label
                                 ));
                                 break;
@@ -3112,7 +3112,7 @@ impl ScrineverApp {
                         // Just crossed the goal threshold
                         if prev_words < goal && new_words >= goal {
                             self.notification = Some(format!(
-                                "\u{2713} Session goal of {} words reached! Keep going!",
+                                "\u{f00c} Session goal of {} words reached! Keep going!",
                                 self.session_goal
                             ));
                         }
@@ -3124,7 +3124,7 @@ impl ScrineverApp {
                         let daily_goal = self.daily_goal as i64;
                         if words_today >= daily_goal && (words_today - 10) < daily_goal {
                             self.notification = Some(format!(
-                                "\u{2713} Daily goal of {} words reached!",
+                                "\u{f00c} Daily goal of {} words reached!",
                                 self.daily_goal
                             ));
                         }
@@ -3140,7 +3140,7 @@ impl ScrineverApp {
                     // Pomodoro break reminder at 25 min
                     if self.session_stats.time_elapsed_seconds == 1500 && self.notification.is_none() {
                         self.notification = Some(
-                            "\u{2615} 25 minutes of writing! Consider a short break.".to_string()
+                            "\u{f0f4} 25 minutes of writing! Consider a short break.".to_string()
                         );
                     }
                 }
@@ -3153,7 +3153,7 @@ impl ScrineverApp {
                         self.writing_timer.stop(word_count);
                         let summary = self.writing_timer.summary();
                         self.notification = Some(format!(
-                            "\u{2713} Timer completed! {} | Great writing session!",
+                            "\u{f00c} Timer completed! {} | Great writing session!",
                             summary
                         ));
                     }

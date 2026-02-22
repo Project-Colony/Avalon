@@ -128,7 +128,7 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
     // Deadline info
     let deadline_info: Element<'static, Message> = if !data.deadline.is_empty() {
         let deadline_row = row![
-            text("\u{1F4C5} Deadline:").size(11).color(Theme::TEXT_MUTED),
+            text("\u{f073} Deadline:").size(11).color(Theme::TEXT_MUTED),
             Space::with_width(4),
             text(data.deadline.clone()).size(11).color(Theme::TEXT_PRIMARY),
         ];
@@ -165,7 +165,7 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
                 .into()
             }
             (Some(days), _) if days <= 0 => {
-                text("\u{26A0} Deadline has passed!").size(11).color(Theme::ERROR).into()
+                text("\u{f071} Deadline has passed!").size(11).color(Theme::ERROR).into()
             }
             _ => Space::with_height(0).into(),
         };

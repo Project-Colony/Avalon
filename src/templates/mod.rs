@@ -57,15 +57,15 @@ impl TemplateCategory {
         }
     }
 
-    /// Get an icon for the category
+    /// Get a Nerd Font icon for the category
     pub fn icon(&self) -> &str {
         match self {
-            TemplateCategory::Fiction => "\u{1F4D6}",
-            TemplateCategory::NonFiction => "\u{1F4DA}",
-            TemplateCategory::Scriptwriting => "\u{1F3AC}",
-            TemplateCategory::Academic => "\u{1F393}",
-            TemplateCategory::Miscellaneous => "\u{1F4CB}",
-            TemplateCategory::Blank => "\u{1F4C4}",
+            TemplateCategory::Fiction => "\u{f02d}",      // nf-fa-book
+            TemplateCategory::NonFiction => "\u{f1ea}",   // nf-fa-newspaper_o
+            TemplateCategory::Scriptwriting => "\u{f008}", // nf-fa-film
+            TemplateCategory::Academic => "\u{f19d}",     // nf-fa-graduation_cap
+            TemplateCategory::Miscellaneous => "\u{f0ea}",// nf-fa-clipboard
+            TemplateCategory::Blank => "\u{f15c}",        // nf-fa-file_text
         }
     }
 }

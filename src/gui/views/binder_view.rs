@@ -107,7 +107,7 @@ fn render_section(
     let mut col = column![];
 
     // Section header with item counts
-    let icon = if item.expanded { "\u{25BE} " } else { "\u{25B8} " };
+    let icon = if item.expanded { "\u{f0d7} " } else { "\u{f0da} " };
     let doc_count = count_docs(item);
     let folder_count = count_folders(item);
     let total_words = item.total_word_count();
@@ -177,16 +177,16 @@ fn render_item(
 
     let icon = match item.kind {
         BinderItemKind::Folder => {
-            if item.expanded { "\u{1F4C2} " } else { "\u{1F4C1} " }
+            if item.expanded { "\u{f07c} " } else { "\u{f07b} " }
         }
-        BinderItemKind::Text => "\u{1F4C4} ",
-        BinderItemKind::Image => "\u{1F5BC} ",
-        BinderItemKind::Pdf => "\u{1F4D1} ",
-        BinderItemKind::WebPage => "\u{1F310} ",
+        BinderItemKind::Text => "\u{f15c} ",
+        BinderItemKind::Image => "\u{f1c5} ",
+        BinderItemKind::Pdf => "\u{f1c1} ",
+        BinderItemKind::WebPage => "\u{f0ac} ",
     };
 
     // Compile indicator
-    let compile_icon = if item.include_in_compile { "" } else { "\u{2298}" }; // circled minus for excluded
+    let compile_icon = if item.include_in_compile { "" } else { "\u{f05e}" }; // circled minus for excluded
 
     // Show word count for documents
     let word_info = if item.kind == BinderItemKind::Text {

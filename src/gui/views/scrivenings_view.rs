@@ -41,7 +41,7 @@ pub fn view<'a>(
 
     let header = container(
         row![
-            text(format!("\u{1F4D6} Scrivenings: {}", parent_title))
+            text(format!("\u{f02d} Scrivenings: {}", parent_title))
                 .size(14)
                 .color(Theme::TEXT_SECONDARY),
             Space::with_width(Length::Fill),
@@ -100,7 +100,7 @@ pub fn view<'a>(
                 .unwrap_or_default();
 
             let label_indicator = item.metadata.label.as_ref()
-                .map(|l| format!(" \u{25CF} {}", l.name))
+                .map(|l| format!(" \u{f111} {}", l.name))
                 .unwrap_or_default();
 
             let label_color = item.metadata.label.as_ref()
@@ -140,7 +140,7 @@ pub fn view<'a>(
                 let synopsis = container(
                     row![
                         Space::with_width(28),
-                        text("\u{25B8}").size(10).color(Theme::TEXT_MUTED),
+                        text("\u{f0da}").size(10).color(Theme::TEXT_MUTED),
                         Space::with_width(4),
                         text(item.synopsis.clone())
                             .size(10)
@@ -157,7 +157,7 @@ pub fn view<'a>(
                 let snap_text = container(
                     row![
                         Space::with_width(28),
-                        text(format!("\u{1F4F7} {} snapshot{}", item.snapshot_count(),
+                        text(format!("\u{f030} {} snapshot{}", item.snapshot_count(),
                             if item.snapshot_count() == 1 { "" } else { "s" }))
                             .size(9)
                             .color(Theme::TEXT_MUTED),

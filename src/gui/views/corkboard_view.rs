@@ -19,7 +19,7 @@ pub fn view(items: &[&BinderItem], parent_title: &str) -> Element<'static, Messa
 
     let header = container(
         row![
-            text(format!("\u{1F4CB} Corkboard: {}", parent_title))
+            text(format!("\u{f0ea} Corkboard: {}", parent_title))
                 .size(14)
                 .color(Theme::TEXT_SECONDARY),
             Space::with_width(Length::Fill),
@@ -137,9 +137,9 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
 
     // Include in compile indicator
     let compile_icon = if item.include_in_compile {
-        "\u{2713}"  // checkmark
+        "\u{f00c}"  // checkmark
     } else {
-        "\u{2717}"  // cross
+        "\u{f00d}"  // cross
     };
     let compile_color = if item.include_in_compile {
         Theme::SUCCESS
@@ -182,7 +182,7 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
         let color = lbl.color.to_iced_color();
         container(
             row![
-                text("\u{25CF}").size(10).color(color),
+                text("\u{f111}").size(10).color(color),
                 Space::with_width(4),
                 text(lbl.name.clone()).size(9).color(color),
             ]
@@ -207,7 +207,7 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
         };
         container(
             row![
-                text("\u{1F3F7}").size(8),
+                text("\u{f02b}").size(8),
                 Space::with_width(2),
                 text(format!("{}{}", kw_text, suffix)).size(9).color(Theme::TEXT_MUTED),
             ]
@@ -225,10 +225,10 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
 
     let mut indicator_parts: Vec<String> = Vec::new();
     if !item.snapshots.is_empty() {
-        indicator_parts.push(format!("\u{1F4F7}{}", item.snapshots.len()));
+        indicator_parts.push(format!("\u{f030}{}", item.snapshots.len()));
     }
     if has_notes {
-        indicator_parts.push("\u{1F4DD}".to_string());
+        indicator_parts.push("\u{f044}".to_string());
     }
 
     let extra_indicators: Element<'static, Message> = if !indicator_parts.is_empty() {

@@ -3,7 +3,7 @@ use iced::{Background, Border, Color, Element, Length, Padding};
 
 use crate::core::recent::RecentProjects;
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{Icons, Theme};
 use crate::templates::{built_in_templates, TemplateCategory};
 
 // ── Style helpers ────────────────────────────────────────────────────
@@ -96,7 +96,7 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
             row![
                 button(
                     row![
-                        text("+").size(18).color(Theme::TEXT_ACCENT),
+                        text(Icons::PLUS).size(16).color(Theme::TEXT_ACCENT),
                         Space::with_width(8),
                         text("New Project").size(15).color(Theme::TEXT_PRIMARY),
                     ]
@@ -107,7 +107,7 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
                 Space::with_width(12),
                 button(
                     row![
-                        text("\u{1F4C2}").size(14),
+                        text(Icons::FOLDER_OPEN).size(14).color(Theme::TEXT_ACCENT),
                         Space::with_width(8),
                         text("Open Project").size(15).color(Theme::TEXT_PRIMARY),
                     ]
@@ -332,6 +332,8 @@ fn build_footer() -> Element<'static, Message> {
 
     container(
         row![
+            text(Icons::LIGHTBULB).size(11).color(Theme::TEXT_ACCENT),
+            Space::with_width(4),
             text("Tip:").size(11).color(Theme::TEXT_ACCENT),
             Space::with_width(6),
             text(tips[tip_index])

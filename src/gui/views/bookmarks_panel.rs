@@ -12,7 +12,7 @@ pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
     let header = row![
         text("BOOKMARKS").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(8),
-        text("\u{2605}").size(12).color(Theme::WARNING),
+        text("\u{f005}").size(12).color(Theme::WARNING),
         Space::with_width(Length::Fill),
         text(format!("{} bookmark{}", count, if count == 1 { "" } else { "s" }))
             .size(10)
@@ -27,7 +27,7 @@ pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
                 column![
                     text("No bookmarks yet.").size(12).color(Theme::TEXT_MUTED),
                     Space::with_height(4),
-                    text("Use the \u{2605} star icon in the inspector to bookmark documents for quick access.")
+                    text("Use the \u{f005} star icon in the inspector to bookmark documents for quick access.")
                         .size(10)
                         .color(Theme::TEXT_MUTED),
                 ]
@@ -58,7 +58,7 @@ pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
 
         let bm_row = row![
             text(index_str).size(10).color(Theme::TEXT_MUTED).width(Length::Fixed(20.0)),
-            text("\u{2605}").size(10).color(Theme::WARNING),
+            text("\u{f005}").size(10).color(Theme::WARNING),
             Space::with_width(4),
             color_indicator,
             button(
@@ -76,7 +76,7 @@ pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
                 .color(Theme::TEXT_MUTED),
             Space::with_width(4),
             button(
-                text("\u{2715}").size(10).color(Theme::ERROR),
+                text("\u{f00d}").size(10).color(Theme::ERROR),
             )
             .on_press(Message::ToggleBookmark(item_id))
             .padding(Padding::from([1, 4])),

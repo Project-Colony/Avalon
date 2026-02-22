@@ -17,9 +17,9 @@ pub struct SessionData {
 /// Render the writing session panel (bottom panel)
 pub fn view(data: &SessionData) -> Element<'static, Message> {
     let status_indicator = if data.is_active {
-        "\u{23F1} REC"
+        "\u{f017} REC"
     } else {
-        "\u{23F8} PAUSED"
+        "\u{f04c} PAUSED"
     };
     let status_color = if data.is_active { Theme::SUCCESS } else { Theme::TEXT_MUTED };
 
@@ -48,20 +48,20 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
     // Start/Stop button
     let toggle_btn = if data.is_active {
         button(
-            text("\u{23F8}  Pause  ").size(13).color(Theme::WARNING),
+            text("\u{f04c}  Pause  ").size(13).color(Theme::WARNING),
         )
         .on_press(Message::SessionToggle)
         .padding(Padding::from([6, 16]))
     } else {
         button(
-            text("\u{25B6}  Start  ").size(13).color(Theme::SUCCESS),
+            text("\u{f04b}  Start  ").size(13).color(Theme::SUCCESS),
         )
         .on_press(Message::SessionToggle)
         .padding(Padding::from([6, 16]))
     };
 
     let reset_btn = button(
-        text("\u{21BB} Reset").size(12).color(Theme::TEXT_MUTED),
+        text("\u{f021} Reset").size(12).color(Theme::TEXT_MUTED),
     )
     .on_press(Message::SessionReset)
     .padding(Padding::from([4, 12]));
@@ -140,7 +140,7 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
             pct
         );
 
-        let completion_icon = if pct >= 100.0 { "\u{2713} " } else { "" };
+        let completion_icon = if pct >= 100.0 { "\u{f00c} " } else { "" };
 
         column![
             text(format!("{}{}", completion_icon, bar)).size(11).color(progress_color),
@@ -169,7 +169,7 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
     // Productivity tip based on elapsed time
     let tip: Element<'static, Message> = if data.is_active && data.elapsed_seconds >= 1500 {
         // 25 minutes (Pomodoro)
-        text("\u{2615} Consider a short break! You've been writing for 25+ minutes.")
+        text("\u{f0f4} Consider a short break! You've been writing for 25+ minutes.")
             .size(10)
             .color(Theme::WARNING)
             .into()

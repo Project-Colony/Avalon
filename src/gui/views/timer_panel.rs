@@ -12,7 +12,7 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
             .size(11)
             .color(Theme::TEXT_SECONDARY),
         Space::with_width(4),
-        text("\u{23F1}").size(10),
+        text("\u{f017}").size(10),
         Space::with_width(Length::Fill),
         text(format!("{} session{} completed",
             timer.completed_count(),
@@ -38,7 +38,7 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
                 .color(Theme::WARNING)
         }
         TimerState::Completed => {
-            text("\u{2713} 00:00")
+            text("\u{f00c} 00:00")
                 .size(28)
                 .color(Theme::SUCCESS)
         }
@@ -51,10 +51,10 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
 
     // Status indicator
     let status = match timer.state() {
-        TimerState::Running => text("\u{25CF} Running").size(10).color(Theme::SUCCESS),
-        TimerState::Paused(_) => text("\u{25A0} Paused").size(10).color(Theme::WARNING),
-        TimerState::Completed => text("\u{2713} Completed!").size(10).color(Theme::SUCCESS),
-        TimerState::Idle => text("\u{25CB} Ready").size(10).color(Theme::TEXT_MUTED),
+        TimerState::Running => text("\u{f111} Running").size(10).color(Theme::SUCCESS),
+        TimerState::Paused(_) => text("\u{f04c} Paused").size(10).color(Theme::WARNING),
+        TimerState::Completed => text("\u{f00c} Completed!").size(10).color(Theme::SUCCESS),
+        TimerState::Idle => text("\u{f10c} Ready").size(10).color(Theme::TEXT_MUTED),
     };
 
     // Progress bar
@@ -85,7 +85,7 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
         TimerState::Idle => {
             row![
                 button(
-                    text("\u{25B6} Start").size(13).color(Theme::SUCCESS),
+                    text("\u{f04b} Start").size(13).color(Theme::SUCCESS),
                 )
                 .on_press(Message::TimerStart)
                 .padding(Padding::from([6, 16])),
@@ -95,13 +95,13 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
         TimerState::Running => {
             row![
                 button(
-                    text("\u{25A0} Pause").size(13).color(Theme::WARNING),
+                    text("\u{f04c} Pause").size(13).color(Theme::WARNING),
                 )
                 .on_press(Message::TimerPause)
                 .padding(Padding::from([6, 16])),
                 Space::with_width(8),
                 button(
-                    text("\u{25FC} Stop").size(12).color(Theme::TEXT_MUTED),
+                    text("\u{f04d} Stop").size(12).color(Theme::TEXT_MUTED),
                 )
                 .on_press(Message::TimerStop)
                 .padding(Padding::from([4, 12])),
@@ -111,13 +111,13 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
         TimerState::Paused(_) => {
             row![
                 button(
-                    text("\u{25B6} Resume").size(13).color(Theme::SUCCESS),
+                    text("\u{f04b} Resume").size(13).color(Theme::SUCCESS),
                 )
                 .on_press(Message::TimerResume)
                 .padding(Padding::from([6, 16])),
                 Space::with_width(8),
                 button(
-                    text("\u{25FC} Stop").size(12).color(Theme::TEXT_MUTED),
+                    text("\u{f04d} Stop").size(12).color(Theme::TEXT_MUTED),
                 )
                 .on_press(Message::TimerStop)
                 .padding(Padding::from([4, 12])),
@@ -127,7 +127,7 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
         TimerState::Completed => {
             row![
                 button(
-                    text("\u{21BB} Reset").size(13).color(Theme::TEXT_SECONDARY),
+                    text("\u{f021} Reset").size(13).color(Theme::TEXT_SECONDARY),
                 )
                 .on_press(Message::TimerReset)
                 .padding(Padding::from([6, 16])),
@@ -185,7 +185,7 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
         for (i, session) in timer.sessions().iter().rev().take(5).enumerate() {
             let duration_mins = session.duration.as_secs() as f64 / 60.0;
             let wpm = session.words_per_minute();
-            let status_icon = if session.completed { "\u{2713}" } else { "\u{2715}" };
+            let status_icon = if session.completed { "\u{f00c}" } else { "\u{f00d}" };
             let status_color = if session.completed { Theme::SUCCESS } else { Theme::TEXT_MUTED };
 
             history_col = history_col.push(

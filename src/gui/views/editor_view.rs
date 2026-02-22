@@ -14,7 +14,7 @@ pub fn view<'a>(
 ) -> Element<'a, Message> {
     // Document annotations/notes indicator
     let notes_indicator = if editor_state.document.has_notes() {
-        "\u{1F4DD} "
+        "\u{f044} "
     } else {
         ""
     };
@@ -22,7 +22,7 @@ pub fn view<'a>(
     let annotation_text = if editor_state.document.annotation_count() > 0 {
         let open = editor_state.document.open_annotation_count();
         let total = editor_state.document.annotation_count();
-        format!(" | \u{1F4AC} {}/{}", open, total)
+        format!(" | \u{f075} {}/{}", open, total)
     } else {
         String::new()
     };

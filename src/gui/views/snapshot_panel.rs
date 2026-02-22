@@ -19,7 +19,7 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
             .color(Theme::TEXT_MUTED),
         Space::with_width(8),
         button(
-            text("\u{1F4F7} Take Snapshot").size(12).color(Theme::TEXT_ACCENT),
+            text("\u{f030} Take Snapshot").size(12).color(Theme::TEXT_ACCENT),
         )
         .on_press(Message::CreateSnapshot)
         .padding(Padding::from([4, 12])),
@@ -73,7 +73,7 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
             Theme::TEXT_PRIMARY
         };
 
-        let selected_marker = if is_selected { "\u{25B6} " } else { "  " };
+        let selected_marker = if is_selected { "\u{f0da} " } else { "  " };
         let index_text = format!("{}{}.", selected_marker, i + 1);
         let is_latest = i == snapshots.len() - 1;
 
@@ -104,13 +104,13 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
                 text(sim_text).size(9).color(sim_color),
                 Space::with_width(8),
                 button(
-                    text("\u{21BA} Restore").size(10).color(Theme::TEXT_ACCENT),
+                    text("\u{f0e2} Restore").size(10).color(Theme::TEXT_ACCENT),
                 )
                 .on_press(Message::RestoreSnapshot(i))
                 .padding(Padding::from([2, 6])),
                 Space::with_width(4),
                 button(
-                    text("\u{2194} Diff").size(10).color(Theme::WARNING),
+                    text("\u{f07e} Diff").size(10).color(Theme::WARNING),
                 )
                 .on_press(Message::CompareSnapshot(i))
                 .padding(Padding::from([2, 6])),
