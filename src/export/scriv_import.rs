@@ -200,20 +200,31 @@ fn parse_binder_items(xml: &str) -> Result<Vec<ScrivNode>> {
 /// Find the position of the matching `</TagName>` close tag starting from
 /// `start`, accounting for nested elements with the same tag name.
 fn find_matching_close(xml: &str, start: usize, tag_name: &str) -> Option<usize> {
-    let open_tag = format!("<{} ", tag_name);
+    let open_with_space = format!("<{} ", tag_name);
+    let open_with_close = format!("<{}>", tag_name);
     let close_tag = format!("</{}>", tag_name);
     let mut depth = 1usize;
     let mut pos = start;
 
     while pos < xml.len() {
-        // Find the next occurrence of either an open or close tag.
-        let next_open = xml[pos..].find(&open_tag).map(|p| pos + p);
+        // Find the next occurrence of an open tag (either `<Tag ...>` or
+        // `<Tag>`).
+        let next_open_space = xml[pos..].find(&open_with_space).map(|p| pos + p);
+        let next_open_close = xml[pos..].find(&open_with_close).map(|p| pos + p);
+        let next_open = match (next_open_space, next_open_close) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
+
         let next_close = xml[pos..].find(&close_tag).map(|p| pos + p);
 
         match (next_open, next_close) {
             (Some(o), Some(c)) if o < c => {
                 depth += 1;
-                pos = o + open_tag.len();
+                // Advance past the opening tag.
+                pos = o + 1;
             }
             (_, Some(c)) => {
                 depth -= 1;
