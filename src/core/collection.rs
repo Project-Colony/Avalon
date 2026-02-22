@@ -325,4 +325,196 @@ mod tests {
         };
         assert_eq!(search.label(), "Smart");
     }
+
+    #[test]
+    fn test_search_query() {
+        let manual = Collection::new_manual("Manual");
+        assert!(manual.search_query().is_none());
+
+        let search = Collection::new_search("Results", "dragon");
+        assert_eq!(search.search_query(), Some("dragon"));
+    }
+
+    #[test]
+    fn test_search_options() {
+        let search = Collection::new_search("Results", "query");
+        let (q, cs, ww) = search.search_options().unwrap();
+        assert_eq!(q, "query");
+        assert!(!cs);
+        assert!(!ww);
+
+        let manual = Collection::new_manual("Manual");
+        assert!(manual.search_options().is_none());
+    }
+
+    #[test]
+    fn test_is_smart() {
+        let manual = Collection::new_manual("Manual");
+        assert!(!manual.is_smart());
+
+        let search = Collection::new_search("Smart", "test");
+        assert!(search.is_smart());
+    }
+
+    #[test]
+    fn test_items_slice() {
+        let mut coll = Collection::new_manual("Test");
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        coll.add_item(id1);
+        coll.add_item(id2);
+
+        let items = coll.items();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0], id1);
+        assert_eq!(items[1], id2);
+    }
+
+    #[test]
+    fn test_add_items_bulk() {
+        let mut coll = Collection::new_manual("Test");
+        let ids: Vec<Uuid> = (0..5).map(|_| Uuid::new_v4()).collect();
+        coll.add_items(&ids);
+        assert_eq!(coll.count(), 5);
+    }
+
+    #[test]
+    fn test_add_items_bulk_no_duplicates() {
+        let mut coll = Collection::new_manual("Test");
+        let id = Uuid::new_v4();
+        coll.add_item(id);
+        coll.add_items(&[id, id, id]);
+        assert_eq!(coll.count(), 1);
+    }
+
+    #[test]
+    fn test_get() {
+        let mut coll = Collection::new_manual("Test");
+        let id = Uuid::new_v4();
+        coll.add_item(id);
+
+        assert_eq!(coll.get(0), Some(&id));
+        assert_eq!(coll.get(1), None);
+    }
+
+    #[test]
+    fn test_summary() {
+        let mut coll = Collection::new_manual("My Collection");
+        coll.add_item(Uuid::new_v4());
+        coll.add_item(Uuid::new_v4());
+
+        let summary = coll.summary();
+        assert!(summary.contains("My Collection"));
+        assert!(summary.contains("Manual"));
+        assert!(summary.contains("2 items"));
+    }
+
+    #[test]
+    fn test_summary_smart() {
+        let coll = Collection::new_search("Dragon Scenes", "dragon");
+        let summary = coll.summary();
+        assert!(summary.contains("Smart"));
+        assert!(summary.contains("0 items"));
+    }
+
+    #[test]
+    fn test_rename() {
+        let mut coll = Collection::new_manual("Old Name");
+        coll.rename("New Name");
+        assert_eq!(coll.name, "New Name");
+    }
+
+    #[test]
+    fn test_move_item_valid() {
+        let mut coll = Collection::new_manual("Test");
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        let id3 = Uuid::new_v4();
+        coll.add_item(id1);
+        coll.add_item(id2);
+        coll.add_item(id3);
+
+        coll.move_item(0, 2); // Move first to last
+        assert_eq!(coll.item_at_position(0), Some(&id2));
+        assert_eq!(coll.item_at_position(2), Some(&id1));
+    }
+
+    #[test]
+    fn test_move_item_out_of_bounds() {
+        let mut coll = Collection::new_manual("Test");
+        let id = Uuid::new_v4();
+        coll.add_item(id);
+
+        // Should be a no-op when indices are out of bounds
+        coll.move_item(0, 5);
+        assert_eq!(coll.count(), 1);
+        assert_eq!(coll.item_at_position(0), Some(&id));
+    }
+
+    #[test]
+    fn test_swap_out_of_bounds() {
+        let mut coll = Collection::new_manual("Test");
+        let id = Uuid::new_v4();
+        coll.add_item(id);
+
+        // Should be a no-op
+        coll.swap(0, 5);
+        assert_eq!(coll.item_at_position(0), Some(&id));
+    }
+
+    #[test]
+    fn test_sort_by() {
+        let mut coll = Collection::new_manual("Test");
+        let id1 = Uuid::new_v4();
+        let id2 = Uuid::new_v4();
+        let id3 = Uuid::new_v4();
+        coll.add_item(id1);
+        coll.add_item(id2);
+        coll.add_item(id3);
+
+        // Sort by UUID string representation
+        coll.sort_by(|a, b| a.to_string().cmp(&b.to_string()));
+        // Just verify it doesn't crash and preserves count
+        assert_eq!(coll.count(), 3);
+    }
+
+    #[test]
+    fn test_kind_label() {
+        let coll = Collection::new_manual("Test");
+        assert_eq!(coll.kind_label(), "Manual");
+
+        let coll2 = Collection::new_search("Test", "query");
+        assert_eq!(coll2.kind_label(), "Smart");
+    }
+
+    #[test]
+    fn test_collection_kind_icons() {
+        let manual = CollectionKind::Manual;
+        assert!(!manual.icon().is_empty());
+
+        let search = CollectionKind::Search {
+            query: "test".to_string(),
+            case_sensitive: false,
+            whole_word: false,
+        };
+        assert!(!search.icon().is_empty());
+    }
+
+    #[test]
+    fn test_remove_nonexistent_item() {
+        let mut coll = Collection::new_manual("Test");
+        let id = Uuid::new_v4();
+        coll.add_item(id);
+
+        let fake = Uuid::new_v4();
+        coll.remove_item(&fake); // Should be no-op
+        assert_eq!(coll.count(), 1);
+    }
+
+    #[test]
+    fn test_position_of_not_found() {
+        let coll = Collection::new_manual("Test");
+        let fake = Uuid::new_v4();
+        assert!(coll.position_of(&fake).is_none());
+    }
 }

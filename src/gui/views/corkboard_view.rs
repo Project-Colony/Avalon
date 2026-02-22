@@ -8,13 +8,23 @@ use crate::gui::theme::Theme;
 /// Render the corkboard view — index cards on a cork background
 pub fn view(items: &[&BinderItem], parent_title: &str) -> Element<'static, Message> {
     let item_count = items.len();
+    let total_words: usize = items.iter()
+        .filter_map(|i| i.document.as_ref())
+        .map(|d| d.word_count())
+        .sum();
+
+    let compile_count = items.iter()
+        .filter(|i| i.include_in_compile)
+        .count();
+
     let header = container(
         row![
-            text(format!("Corkboard: {}", parent_title))
+            text(format!("\u{1F4CB} Corkboard: {}", parent_title))
                 .size(14)
                 .color(Theme::TEXT_SECONDARY),
             Space::with_width(Length::Fill),
-            text(format!("{} cards", item_count))
+            text(format!("{} cards | {} words | {}/{} compile",
+                item_count, total_words, compile_count, item_count))
                 .size(11)
                 .color(Theme::TEXT_MUTED),
         ]
@@ -22,12 +32,20 @@ pub fn view(items: &[&BinderItem], parent_title: &str) -> Element<'static, Messa
     .padding(Padding::from([8, 16]));
 
     if items.is_empty() {
-        let empty_msg = text("Select a folder to see its cards, or switch to Editor view.")
-            .size(13)
-            .color(Theme::TEXT_MUTED);
+        let empty_msg = column![
+            Space::with_height(40),
+            text("Select a folder to see its cards, or switch to Editor view.")
+                .size(13)
+                .color(Theme::TEXT_MUTED),
+            Space::with_height(8),
+            text("Each document appears as an index card with its synopsis.")
+                .size(11)
+                .color(Theme::TEXT_MUTED),
+        ]
+        .align_x(iced::Alignment::Center);
 
         return container(
-            column![header, Space::with_height(40), container(empty_msg).padding(20)]
+            column![header, container(empty_msg).padding(20).center_x(Length::Fill)]
         )
         .width(Length::Fill)
         .height(Length::Fill)
@@ -49,6 +67,28 @@ pub fn view(items: &[&BinderItem], parent_title: &str) -> Element<'static, Messa
         grid = grid.push(r);
     }
 
+    // Footer with aggregate stats
+    let with_synopsis = items.iter().filter(|i| !i.synopsis.is_empty()).count();
+    let with_status = items.iter().filter(|i| i.metadata.status.is_some()).count();
+    let with_label = items.iter().filter(|i| i.metadata.label.is_some()).count();
+
+    let footer = container(
+        row![
+            text(format!("{}/{} synopsis | {}/{} status | {}/{} labels",
+                with_synopsis, item_count,
+                with_status, item_count,
+                with_label, item_count))
+                .size(9)
+                .color(Theme::TEXT_MUTED),
+            Space::with_width(Length::Fill),
+            text(format!("{:.1} pages", total_words as f64 / 250.0))
+                .size(9)
+                .color(Theme::TEXT_MUTED),
+        ]
+        .padding(Padding::from([4, 16]))
+    )
+    .width(Length::Fill);
+
     let content = column![
         header,
         scrollable(
@@ -57,6 +97,7 @@ pub fn view(items: &[&BinderItem], parent_title: &str) -> Element<'static, Messa
                 .width(Length::Fill)
         )
         .height(Length::Fill),
+        footer,
     ];
 
     container(content)
@@ -71,8 +112,14 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
     let id = item.id;
 
     let word_count = item.document.as_ref()
-        .map(|d| format!("{} words", d.word_count()))
-        .unwrap_or_default();
+        .map(|d| d.word_count())
+        .unwrap_or(0);
+
+    let word_display = if word_count == 0 {
+        "empty".to_string()
+    } else {
+        format!("{} w", word_count)
+    };
 
     let status_text = item.metadata.status.as_ref()
         .map(|s| s.name.clone())
@@ -89,10 +136,15 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
     };
 
     // Include in compile indicator
-    let compile_indicator = if item.include_in_compile {
-        text("C").size(9).color(Theme::SUCCESS)
+    let compile_icon = if item.include_in_compile {
+        "\u{2713}"  // checkmark
     } else {
-        text("C").size(9).color(Theme::TEXT_MUTED)
+        "\u{2717}"  // cross
+    };
+    let compile_color = if item.include_in_compile {
+        Theme::SUCCESS
+    } else {
+        Theme::TEXT_MUTED
     };
 
     // Card title bar with label color stripe
@@ -106,7 +158,7 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
         row![
             text(title).size(13).color(title_color),
             Space::with_width(Length::Fill),
-            compile_indicator,
+            text(compile_icon).size(10).color(compile_color),
         ]
         .align_y(iced::Alignment::Center)
     )
@@ -125,11 +177,15 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
         .width(Length::Fill)
         .height(Length::Fixed(70.0));
 
-    // Label color indicator
+    // Label color indicator with name
     let label_indicator: Element<'static, Message> = if let Some(ref lbl) = item.metadata.label {
         let color = lbl.color.to_iced_color();
         container(
-            text(format!(" {} ", lbl.name)).size(9).color(color)
+            row![
+                text("\u{25CF}").size(10).color(color),
+                Space::with_width(4),
+                text(lbl.name.clone()).size(9).color(color),
+            ]
         )
         .padding(Padding::from([2, 8]))
         .into()
@@ -149,14 +205,34 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
         } else {
             String::new()
         };
-        text(format!("{}{}", kw_text, suffix)).size(9).color(Theme::TEXT_MUTED).into()
+        container(
+            row![
+                text("\u{1F3F7}").size(8),
+                Space::with_width(2),
+                text(format!("{}{}", kw_text, suffix)).size(9).color(Theme::TEXT_MUTED),
+            ]
+        )
+        .padding(Padding::from([0, 8]))
+        .into()
     } else {
         Space::with_height(0).into()
     };
 
-    // Snapshot count indicator
-    let snapshot_info: Element<'static, Message> = if !item.snapshots.is_empty() {
-        text(format!("\u{1F4F7}{}", item.snapshots.len()))
+    // Snapshot and notes indicators
+    let has_notes = item.document.as_ref()
+        .map(|d| !d.notes.trim().is_empty())
+        .unwrap_or(false);
+
+    let mut indicator_parts: Vec<String> = Vec::new();
+    if !item.snapshots.is_empty() {
+        indicator_parts.push(format!("\u{1F4F7}{}", item.snapshots.len()));
+    }
+    if has_notes {
+        indicator_parts.push("\u{1F4DD}".to_string());
+    }
+
+    let extra_indicators: Element<'static, Message> = if !indicator_parts.is_empty() {
+        text(indicator_parts.join(" "))
             .size(9).color(Theme::TEXT_MUTED).into()
     } else {
         Space::with_width(0).into()
@@ -165,9 +241,9 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
     // Footer with status and word count
     let footer = container(
         row![
-            text(word_count).size(10).color(Theme::TEXT_MUTED),
+            text(word_display).size(10).color(Theme::TEXT_MUTED),
             Space::with_width(4),
-            snapshot_info,
+            extra_indicators,
             Space::with_width(Length::Fill),
             text(status_text).size(10).color(status_color),
         ]

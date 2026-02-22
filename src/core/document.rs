@@ -690,4 +690,273 @@ mod tests {
         assert!(file.is_file());
         assert!(!file.is_web());
     }
+
+    #[test]
+    fn test_count_syllables() {
+        assert_eq!(Document::count_syllables("the"), 1);
+        assert_eq!(Document::count_syllables("cat"), 1);
+        assert_eq!(Document::count_syllables("beautiful"), 3);
+        assert_eq!(Document::count_syllables("a"), 1); // short word
+        assert_eq!(Document::count_syllables("I"), 1);
+    }
+
+    #[test]
+    fn test_avg_word_length() {
+        let doc = Document::with_content("cat dog");
+        let avg = doc.avg_word_length();
+        assert!((avg - 3.0).abs() < 0.01);
+
+        let empty = Document::new();
+        assert_eq!(empty.avg_word_length(), 0.0);
+    }
+
+    #[test]
+    fn test_avg_sentence_length() {
+        let doc = Document::with_content("One two three. Four five.");
+        // 5 words, 2 sentences = 2.5 avg
+        let avg = doc.avg_sentence_length();
+        assert!((avg - 2.5).abs() < 0.01);
+
+        let empty = Document::new();
+        assert_eq!(empty.avg_sentence_length(), 0.0);
+    }
+
+    #[test]
+    fn test_avg_paragraph_length() {
+        let doc = Document::with_content("One two.\n\nThree four five six.");
+        // 6 words, 2 paragraphs = 3.0
+        let avg = doc.avg_paragraph_length();
+        assert!((avg - 3.0).abs() < 0.01);
+
+        let empty = Document::new();
+        assert_eq!(empty.avg_paragraph_length(), 0.0);
+    }
+
+    #[test]
+    fn test_vocabulary_richness_empty() {
+        let doc = Document::new();
+        assert_eq!(doc.vocabulary_richness(), 0.0);
+    }
+
+    #[test]
+    fn test_vocabulary_richness_all_unique() {
+        let doc = Document::with_content("one two three four five");
+        assert!((doc.vocabulary_richness() - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_unique_words() {
+        let doc = Document::with_content("The cat sat on the mat.");
+        let words = doc.unique_words();
+        assert!(words.contains(&"the".to_string()));
+        assert!(words.contains(&"cat".to_string()));
+        assert!(words.contains(&"mat".to_string()));
+        // Should be sorted and deduped
+        let mut sorted = words.clone();
+        sorted.sort();
+        assert_eq!(words, sorted);
+    }
+
+    #[test]
+    fn test_count_word() {
+        let doc = Document::with_content("The cat sat on The mat the");
+        assert_eq!(doc.count_word("the"), 3);
+        assert_eq!(doc.count_word("cat"), 1);
+        assert_eq!(doc.count_word("missing"), 0);
+    }
+
+    #[test]
+    fn test_excerpt_around() {
+        let doc = Document::with_content("Hello beautiful world");
+        // Middle excerpt
+        let ex = doc.excerpt_around(10, 5);
+        assert!(ex.contains("..."));
+
+        // Start excerpt
+        let ex_start = doc.excerpt_around(0, 5);
+        assert!(ex_start.starts_with("Hello"));
+
+        // Full text (when radius covers everything)
+        let ex_full = doc.excerpt_around(10, 100);
+        assert_eq!(ex_full, "Hello beautiful world");
+    }
+
+    #[test]
+    fn test_reading_time_minutes() {
+        let doc = Document::with_content(&"word ".repeat(500));
+        assert!((doc.reading_time_minutes() - 2.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_speaking_time_minutes() {
+        let doc = Document::with_content(&"word ".repeat(300));
+        assert!((doc.speaking_time_minutes() - 2.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_page_count() {
+        let doc = Document::with_content(&"word ".repeat(500));
+        assert!((doc.page_count() - 2.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_line_count() {
+        let doc = Document::with_content("line 1\nline 2\nline 3");
+        assert_eq!(doc.line_count(), 3);
+
+        let empty = Document::new();
+        assert_eq!(empty.line_count(), 0);
+    }
+
+    #[test]
+    fn test_annotation_counts() {
+        let doc = Document::new();
+        assert_eq!(doc.annotation_count(), 0);
+        assert_eq!(doc.open_annotation_count(), 0);
+    }
+
+    #[test]
+    fn test_footnote_count() {
+        let mut doc = Document::new();
+        assert_eq!(doc.footnote_count(), 0);
+        doc.footnotes.push(Footnote::new(1, "A note"));
+        doc.footnotes.push(Footnote::endnote(2, "An endnote"));
+        assert_eq!(doc.footnote_count(), 2);
+    }
+
+    #[test]
+    fn test_has_formatting() {
+        let doc = Document::new();
+        assert!(!doc.has_formatting());
+    }
+
+    #[test]
+    fn test_has_notes() {
+        let mut doc = Document::new();
+        assert!(!doc.has_notes());
+        doc.notes = "Some research notes".to_string();
+        assert!(doc.has_notes());
+    }
+
+    #[test]
+    fn test_has_notes_whitespace() {
+        let mut doc = Document::new();
+        doc.notes = "   ".to_string();
+        assert!(!doc.has_notes());
+    }
+
+    #[test]
+    fn test_find_positions_empty_query() {
+        let doc = Document::with_content("Hello world");
+        let positions = doc.find_positions("");
+        assert!(positions.is_empty());
+    }
+
+    #[test]
+    fn test_find_positions_case_insensitive() {
+        let doc = Document::with_content("The THE the");
+        let positions = doc.find_positions("the");
+        assert_eq!(positions.len(), 3);
+    }
+
+    #[test]
+    fn test_insert_text_at_end() {
+        let mut doc = Document::with_content("Hello");
+        doc.insert_text(100, " world"); // beyond length, should clamp
+        assert_eq!(doc.content, "Hello world");
+    }
+
+    #[test]
+    fn test_delete_range_clamp() {
+        let mut doc = Document::with_content("Hello");
+        doc.delete_range(3, 100); // end beyond length, should clamp
+        assert_eq!(doc.content, "Hel");
+    }
+
+    #[test]
+    fn test_delete_range_invalid() {
+        let mut doc = Document::with_content("Hello");
+        doc.delete_range(5, 3); // start > end, no-op
+        assert_eq!(doc.content, "Hello");
+    }
+
+    #[test]
+    fn test_default_document() {
+        let doc = Document::default();
+        assert!(doc.is_empty());
+        assert_eq!(doc.word_count(), 0);
+    }
+
+    #[test]
+    fn test_span_style_constructors() {
+        let bold = SpanStyle::bold();
+        assert!(bold.bold);
+        assert!(!bold.italic);
+        assert!(bold.has_formatting());
+
+        let italic = SpanStyle::italic();
+        assert!(italic.italic);
+        assert!(!italic.bold);
+
+        let bi = SpanStyle::bold_italic();
+        assert!(bi.bold);
+        assert!(bi.italic);
+
+        let default = SpanStyle::default();
+        assert!(!default.has_formatting());
+    }
+
+    #[test]
+    fn test_text_span_empty() {
+        let span = TextSpan::new(5, 5, SpanStyle::default());
+        assert!(span.is_empty());
+        assert_eq!(span.len(), 0);
+    }
+
+    #[test]
+    fn test_text_span_no_overlap() {
+        let a = TextSpan::new(0, 5, SpanStyle::bold());
+        let b = TextSpan::new(5, 10, SpanStyle::italic());
+        assert!(!a.overlaps(&b));
+    }
+
+    #[test]
+    fn test_most_frequent_words_more_than_available() {
+        let doc = Document::with_content("hello world");
+        let top = doc.most_frequent_words(10);
+        assert_eq!(top.len(), 2);
+    }
+
+    #[test]
+    fn test_preview_short() {
+        let doc = Document::with_content("Short");
+        let preview = doc.preview(100);
+        assert_eq!(preview, "Short"); // No truncation needed
+    }
+
+    #[test]
+    fn test_readability_empty() {
+        let doc = Document::new();
+        assert_eq!(doc.readability_grade(), 0.0);
+        assert_eq!(doc.reading_ease(), 0.0);
+    }
+
+    #[test]
+    fn test_sentence_count_no_punctuation() {
+        let doc = Document::with_content("No ending punctuation here");
+        assert_eq!(doc.sentence_count(), 1); // at least 1 for non-empty
+    }
+
+    #[test]
+    fn test_paragraph_count_empty() {
+        let doc = Document::new();
+        assert_eq!(doc.paragraph_count(), 0);
+    }
+
+    #[test]
+    fn test_char_count_no_spaces() {
+        let doc = Document::with_content("a b c d");
+        assert_eq!(doc.char_count_no_spaces(), 4);
+        assert_eq!(doc.char_count(), 7);
+    }
 }
