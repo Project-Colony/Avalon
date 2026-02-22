@@ -12,11 +12,36 @@ pub fn view<'a>(
     script_mode: bool,
     script_element: Option<&str>,
 ) -> Element<'a, Message> {
+    // Document annotations/notes indicator
+    let notes_indicator = if editor_state.document.has_notes() {
+        "\u{1F4DD} "
+    } else {
+        ""
+    };
+
+    let annotation_text = if editor_state.document.annotation_count() > 0 {
+        let open = editor_state.document.open_annotation_count();
+        let total = editor_state.document.annotation_count();
+        format!(" | \u{1F4AC} {}/{}", open, total)
+    } else {
+        String::new()
+    };
+
+    let footnote_text = if editor_state.document.footnote_count() > 0 {
+        format!(" | Fn:{}", editor_state.document.footnote_count())
+    } else {
+        String::new()
+    };
+
     let header = container(
         row![
-            text(title.to_string())
+            text(format!("{}{}", notes_indicator, title))
                 .size(14)
                 .color(Theme::TEXT_SECONDARY),
+            Space::with_width(8),
+            text(format!("{}{}", annotation_text, footnote_text))
+                .size(10)
+                .color(Theme::TEXT_MUTED),
             Space::with_width(Length::Fill),
             if script_mode {
                 text(format!("[Script: {}]", script_element.unwrap_or("Action")))
@@ -120,9 +145,17 @@ pub fn view<'a>(
 
     let dirty_indicator = if editor_state.dirty { " \u{2022}" } else { "" };
 
+    // Unique word count for vocabulary richness
+    let unique_words = editor_state.document.unique_word_count();
+    let richness = if word_count > 0 {
+        format!(" | TTR:{:.0}%", unique_words as f64 / word_count as f64 * 100.0)
+    } else {
+        String::new()
+    };
+
     let stats_text = format!(
-        "{}W  |  {}S  |  {}P  |  {:.1}pg  |  ~{} read{}",
-        word_count, sentence_count, para_count, page_est, reading_display, dirty_indicator
+        "{}W  |  {}S  |  {}P  |  {:.1}pg  |  ~{} read{}{}",
+        word_count, sentence_count, para_count, page_est, reading_display, richness, dirty_indicator
     );
     let stats_bar = container(
         row![

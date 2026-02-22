@@ -826,4 +826,196 @@ mod tests {
         schema.remove_field("POV");
         assert_eq!(schema.fields.len(), 2);
     }
+
+    #[test]
+    fn test_custom_field_value_display() {
+        assert_eq!(CustomFieldValue::Text("hello".into()).display(), "hello");
+        assert_eq!(CustomFieldValue::Number(42.5).display(), "42.5");
+        assert_eq!(CustomFieldValue::Checkbox(true).display(), "Yes");
+        assert_eq!(CustomFieldValue::Checkbox(false).display(), "No");
+        assert_eq!(CustomFieldValue::Date("2024-01-01".into()).display(), "2024-01-01");
+        assert_eq!(
+            CustomFieldValue::List(vec!["a".into(), "b".into()]).display(),
+            "a, b"
+        );
+    }
+
+    #[test]
+    fn test_custom_field_value_is_empty() {
+        assert!(CustomFieldValue::Text(String::new()).is_empty());
+        assert!(!CustomFieldValue::Text("hello".into()).is_empty());
+        assert!(CustomFieldValue::Number(0.0).is_empty());
+        assert!(!CustomFieldValue::Number(1.0).is_empty());
+        assert!(CustomFieldValue::Checkbox(false).is_empty());
+        assert!(!CustomFieldValue::Checkbox(true).is_empty());
+        assert!(CustomFieldValue::Date(String::new()).is_empty());
+        assert!(!CustomFieldValue::Date("2024".into()).is_empty());
+        assert!(CustomFieldValue::List(vec![]).is_empty());
+        assert!(!CustomFieldValue::List(vec!["a".into()]).is_empty());
+    }
+
+    #[test]
+    fn test_metadata_is_empty() {
+        let meta = Metadata::default();
+        assert!(meta.is_empty());
+
+        let mut meta2 = Metadata::default();
+        meta2.add_keyword("tag");
+        assert!(!meta2.is_empty());
+    }
+
+    #[test]
+    fn test_metadata_summary() {
+        let meta = Metadata::default();
+        assert_eq!(meta.summary(), "No metadata");
+
+        let mut meta2 = Metadata::default();
+        meta2.label = Some(Label::new("Scene", LabelColor::Green));
+        meta2.status = Some(Status::new("Done"));
+        meta2.add_keyword("important");
+        let summary = meta2.summary();
+        assert!(summary.contains("Label: Scene"));
+        assert!(summary.contains("Status: Done"));
+        assert!(summary.contains("Keywords: important"));
+    }
+
+    #[test]
+    fn test_label_color_display_names() {
+        assert_eq!(LabelColor::Red.display_name(), "Red");
+        assert_eq!(LabelColor::Orange.display_name(), "Orange");
+        assert_eq!(LabelColor::Yellow.display_name(), "Yellow");
+        assert_eq!(LabelColor::Green.display_name(), "Green");
+        assert_eq!(LabelColor::Blue.display_name(), "Blue");
+        assert_eq!(LabelColor::Purple.display_name(), "Purple");
+        assert_eq!(LabelColor::Custom("#fff".into()).display_name(), "Custom");
+    }
+
+    #[test]
+    fn test_label_color_to_iced() {
+        for color in LabelColor::all_predefined() {
+            let iced = color.to_iced_color();
+            assert!(iced.r >= 0.0 && iced.r <= 1.0);
+            assert!(iced.g >= 0.0 && iced.g <= 1.0);
+            assert!(iced.b >= 0.0 && iced.b <= 1.0);
+        }
+    }
+
+    #[test]
+    fn test_label_color_custom_hex() {
+        let custom = LabelColor::Custom("#ff5500".to_string());
+        assert_eq!(custom.to_hex(), "#ff5500");
+        let iced = custom.to_iced_color();
+        assert!((iced.r - 1.0).abs() < 0.01);
+        assert!((iced.g - 85.0 / 255.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_custom_field_constructors() {
+        let text = CustomField::text("Name", "John");
+        assert_eq!(text.name, "Name");
+        assert_eq!(text.value, CustomFieldValue::Text("John".into()));
+
+        let num = CustomField::number("Count", 42.0);
+        assert_eq!(num.name, "Count");
+        assert_eq!(num.value, CustomFieldValue::Number(42.0));
+
+        let check = CustomField::checkbox("Done", true);
+        assert_eq!(check.name, "Done");
+        assert_eq!(check.value, CustomFieldValue::Checkbox(true));
+    }
+
+    #[test]
+    fn test_status_defaults() {
+        let defaults = Status::defaults();
+        assert!(defaults.len() >= 5);
+        assert!(defaults.iter().any(|s| s.name == "To Do"));
+        assert!(defaults.iter().any(|s| s.name == "Done"));
+    }
+
+    #[test]
+    fn test_target_progress_zero_target() {
+        let mut settings = ProjectSettings::default();
+        settings.target_word_count = Some(0);
+        let progress = settings.target_progress(5000).unwrap();
+        assert_eq!(progress, 100.0);
+    }
+
+    #[test]
+    fn test_days_to_deadline_none() {
+        let settings = ProjectSettings::default();
+        assert!(settings.days_to_deadline().is_none());
+    }
+
+    #[test]
+    fn test_days_to_deadline_invalid() {
+        let mut settings = ProjectSettings::default();
+        settings.target_deadline = Some("not-a-date".to_string());
+        assert!(settings.days_to_deadline().is_none());
+    }
+
+    #[test]
+    fn test_days_to_deadline_future() {
+        let mut settings = ProjectSettings::default();
+        settings.target_deadline = Some("2030-12-31".to_string());
+        let days = settings.days_to_deadline().unwrap();
+        assert!(days > 0);
+    }
+
+    #[test]
+    fn test_days_to_deadline_past() {
+        let mut settings = ProjectSettings::default();
+        settings.target_deadline = Some("2020-01-01".to_string());
+        let days = settings.days_to_deadline().unwrap();
+        assert!(days < 0);
+    }
+
+    #[test]
+    fn test_schema_validate_number() {
+        let mut schema = CustomMetadataSchema::new();
+        schema.fields.push(CustomFieldDefinition {
+            name: "Age".to_string(),
+            field_type: CustomFieldType::Number,
+            default_value: "0".to_string(),
+            required: true,
+            allowed_values: Vec::new(),
+        });
+        assert!(schema.validate_field("Age", "42"));
+        assert!(schema.validate_field("Age", "3.14"));
+        assert!(!schema.validate_field("Age", "not a number"));
+    }
+
+    #[test]
+    fn test_schema_validate_text() {
+        let mut schema = CustomMetadataSchema::new();
+        schema.add_text_field("Notes", false);
+        // Text fields accept any value
+        assert!(schema.validate_field("Notes", "anything goes"));
+        assert!(schema.validate_field("Notes", ""));
+    }
+
+    #[test]
+    fn test_schema_validate_unknown_field() {
+        let schema = CustomMetadataSchema::new();
+        assert!(!schema.validate_field("Unknown", "value"));
+    }
+
+    #[test]
+    fn test_find_label_not_found() {
+        let settings = ProjectSettings::default();
+        assert!(settings.find_label("NonexistentLabel").is_none());
+    }
+
+    #[test]
+    fn test_find_status_not_found() {
+        let settings = ProjectSettings::default();
+        assert!(settings.find_status("NonexistentStatus").is_none());
+    }
+
+    #[test]
+    fn test_metadata_summary_with_custom_fields() {
+        let mut meta = Metadata::default();
+        meta.set_custom_field("POV", CustomFieldValue::Text("First".into()));
+        let summary = meta.summary();
+        assert!(summary.contains("1 custom field"));
+    }
 }
