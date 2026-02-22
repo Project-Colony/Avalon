@@ -29,3 +29,4 @@ pub mod text_analysis;
 pub mod corkboard;
 pub mod outliner;
 pub mod find_replace;
+pub mod writing_prompts;

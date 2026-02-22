@@ -1317,14 +1317,14 @@ mod tests {
         });
 
         // We start at doc 0, match 0. find_next should advance to doc 1.
-        let m = session.find_next().unwrap();
+        let matched = session.find_next().unwrap().matched_text.clone();
         assert_eq!(session.current_result_index, 1);
-        assert_eq!(m.matched_text, "cat");
+        assert_eq!(matched, "cat");
 
         // find_next again wraps back to doc 0.
-        let m = session.find_next().unwrap();
+        let matched = session.find_next().unwrap().matched_text.clone();
         assert_eq!(session.current_result_index, 0);
-        assert_eq!(m.matched_text, "cat");
+        assert_eq!(matched, "cat");
     }
 
     // ---- session: replace all then undo ----
