@@ -506,4 +506,76 @@ mod tests {
     fn test_strip_inline_code() {
         assert_eq!(strip_inline_code("some `code` here"), "some code here");
     }
+
+    #[test]
+    fn test_import_markdown_h2_only() {
+        let md = "## Section 1\nContent 1.\n## Section 2\nContent 2.";
+        let items = import_markdown(md, "Sections").unwrap();
+        assert!(items.len() >= 1);
+    }
+
+    #[test]
+    fn test_import_markdown_flat_empty() {
+        let items = import_markdown_flat("");
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn test_import_markdown_flat_no_headings() {
+        let items = import_markdown_flat("Just plain text without any headings at all.");
+        // Flat import splits on headings - no headings means no splits, returns empty
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn test_markdown_to_plain_text_empty() {
+        assert_eq!(markdown_to_plain_text(""), "");
+    }
+
+    #[test]
+    fn test_markdown_to_plain_text_bold_italic() {
+        let plain = markdown_to_plain_text("**bold** and *italic*");
+        assert!(plain.contains("bold"));
+        assert!(plain.contains("italic"));
+        assert!(!plain.contains("**"));
+    }
+
+    #[test]
+    fn test_markdown_to_plain_text_heading_levels() {
+        let plain = markdown_to_plain_text("# H1\n## H2\n### H3");
+        assert!(plain.contains("H1"));
+        assert!(plain.contains("H2"));
+        assert!(plain.contains("H3"));
+    }
+
+    #[test]
+    fn test_extract_front_matter_partial() {
+        let md = "---\ntitle: My Book\n---\nContent";
+        let fm = extract_front_matter(md).unwrap();
+        assert_eq!(fm.title, Some("My Book".to_string()));
+        assert!(fm.author.is_none());
+    }
+
+    #[test]
+    fn test_strip_front_matter_preserves_body() {
+        let md = "---\ntitle: X\nauthor: Y\ntags: a, b\n---\n\nFirst paragraph.\n\nSecond paragraph.";
+        let body = strip_front_matter(md);
+        assert!(body.contains("First paragraph."));
+        assert!(body.contains("Second paragraph."));
+    }
+
+    #[test]
+    fn test_strip_links_no_links() {
+        assert_eq!(strip_links("no links here"), "no links here");
+    }
+
+    #[test]
+    fn test_strip_images_no_images() {
+        assert_eq!(strip_images("no images here"), "no images here");
+    }
+
+    #[test]
+    fn test_strip_inline_code_no_code() {
+        assert_eq!(strip_inline_code("no code"), "no code");
+    }
 }

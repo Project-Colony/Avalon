@@ -27,14 +27,28 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
         .count();
     let total_items: usize = data.collections.iter().map(|c| c.item_ids.len()).sum();
 
+    // Count unique items across all collections
+    let unique_items: usize = {
+        let all: std::collections::HashSet<Uuid> = data.collections.iter()
+            .flat_map(|c| c.item_ids.iter().copied())
+            .collect();
+        all.len()
+    };
+
+    let overlap_info = if unique_items < total_items && total_items > 0 {
+        format!(" ({} unique)", unique_items)
+    } else {
+        String::new()
+    };
+
     let header = row![
         text("COLLECTIONS")
             .size(11)
             .color(Theme::TEXT_SECONDARY),
         Space::with_width(8),
         text(format!(
-            "{} manual, {} smart | {} total items",
-            manual_count, smart_count, total_items
+            "{} manual, {} smart | {} items{}",
+            manual_count, smart_count, total_items, overlap_info
         ))
         .size(10)
         .color(Theme::TEXT_MUTED),
@@ -73,13 +87,18 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
             Theme::TEXT_PRIMARY
         };
 
-        let (kind_icon, kind_label) = match &coll.kind {
-            CollectionKind::Manual => ("\u{2630}", "Manual"),
+        let (kind_icon, kind_detail) = match &coll.kind {
+            CollectionKind::Manual => ("\u{2630}", "Manual".to_string()),
             CollectionKind::Search { query, .. } => {
                 if query.is_empty() {
-                    ("\u{2606}", "Smart")
+                    ("\u{2606}", "Smart".to_string())
                 } else {
-                    ("\u{2605}", "Smart")
+                    let truncated = if query.len() > 20 {
+                        format!("{}...", &query[..20])
+                    } else {
+                        query.clone()
+                    };
+                    ("\u{2605}", format!("Smart: \"{}\"", truncated))
                 }
             }
         };
@@ -101,7 +120,7 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
             .on_press(Message::SelectCollection(coll_id))
             .padding(Padding::from([2, 6])),
             Space::with_width(Length::Fill),
-            text(format!("{} ({} items)", kind_label, coll.item_ids.len()))
+            text(format!("{} ({} items)", kind_detail, coll.item_ids.len()))
                 .size(10)
                 .color(Theme::TEXT_MUTED),
             Space::with_width(4),
