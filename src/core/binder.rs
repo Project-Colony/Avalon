@@ -314,6 +314,86 @@ impl BinderItem {
         0 // This needs to be computed from context
     }
 
+    /// Compute the actual depth of a target item from this node.
+    /// Returns None if the item is not found under this node.
+    pub fn depth_of(&self, target_id: &Uuid) -> Option<usize> {
+        if &self.id == target_id {
+            return Some(0);
+        }
+        for child in &self.children {
+            if let Some(d) = child.depth_of(target_id) {
+                return Some(d + 1);
+            }
+        }
+        None
+    }
+
+    /// Get all ancestor IDs from root down to (but not including) the target.
+    pub fn ancestors_of(&self, target_id: &Uuid) -> Option<Vec<Uuid>> {
+        if &self.id == target_id {
+            return Some(Vec::new());
+        }
+        for child in &self.children {
+            if let Some(mut path) = child.ancestors_of(target_id) {
+                path.insert(0, self.id);
+                return Some(path);
+            }
+        }
+        None
+    }
+
+    /// Collect all descendant IDs (children, grandchildren, etc.) recursively.
+    pub fn descendant_ids(&self) -> Vec<Uuid> {
+        let mut ids = Vec::new();
+        for child in &self.children {
+            ids.push(child.id);
+            ids.extend(child.descendant_ids());
+        }
+        ids
+    }
+
+    /// Check if a target item is a descendant of this node.
+    pub fn is_ancestor_of(&self, target_id: &Uuid) -> bool {
+        for child in &self.children {
+            if &child.id == target_id || child.is_ancestor_of(target_id) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Get all leaf (text/document) items under this node.
+    pub fn leaf_items(&self) -> Vec<&BinderItem> {
+        let mut leaves = Vec::new();
+        if self.children.is_empty() && self.kind == BinderItemKind::Text {
+            leaves.push(self);
+        }
+        for child in &self.children {
+            leaves.extend(child.leaf_items());
+        }
+        leaves
+    }
+
+    /// Count total descendants (not including self).
+    pub fn descendant_count(&self) -> usize {
+        let mut count = 0;
+        for child in &self.children {
+            count += 1 + child.descendant_count();
+        }
+        count
+    }
+
+    /// Get the maximum nesting depth under this node.
+    pub fn max_depth(&self) -> usize {
+        if self.children.is_empty() {
+            return 0;
+        }
+        self.children.iter()
+            .map(|c| 1 + c.max_depth())
+            .max()
+            .unwrap_or(0)
+    }
+
     /// Find the parent of a child item by ID
     pub fn find_parent(&self, id: &Uuid) -> Option<(&BinderItem, usize)> {
         for (i, child) in self.children.iter().enumerate() {
@@ -442,6 +522,58 @@ impl Binder {
         self.all_items().into_iter()
             .filter(|i| i.kind == BinderItemKind::Text)
             .max_by_key(|i| i.document.as_ref().map(|d| d.word_count()).unwrap_or(0))
+    }
+
+    /// Get the depth of an item in the binder (across all root sections).
+    pub fn item_depth(&self, id: &Uuid) -> Option<usize> {
+        self.draft.depth_of(id)
+            .or_else(|| self.research.depth_of(id))
+            .or_else(|| self.trash.depth_of(id))
+    }
+
+    /// Get the ancestors of an item (UUIDs from root section down to parent).
+    pub fn item_ancestors(&self, id: &Uuid) -> Option<Vec<Uuid>> {
+        self.draft.ancestors_of(id)
+            .or_else(|| self.research.ancestors_of(id))
+            .or_else(|| self.trash.ancestors_of(id))
+    }
+
+    /// Get all descendant IDs under a given item.
+    pub fn descendants_of(&self, id: &Uuid) -> Vec<Uuid> {
+        if let Some(item) = self.find_item(id) {
+            item.descendant_ids()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get the maximum nesting depth across the entire binder.
+    pub fn max_nesting_depth(&self) -> usize {
+        let d = self.draft.max_depth();
+        let r = self.research.max_depth();
+        let t = self.trash.max_depth();
+        d.max(r).max(t)
+    }
+
+    /// Get all leaf documents (items with no children that are text type).
+    pub fn leaf_documents(&self) -> Vec<&BinderItem> {
+        let mut leaves = self.draft.leaf_items();
+        leaves.extend(self.research.leaf_items());
+        leaves
+    }
+
+    /// Get items by label name from metadata.
+    pub fn items_with_label(&self, label: &str) -> Vec<&BinderItem> {
+        self.all_items().into_iter()
+            .filter(|item| item.metadata.label.as_ref().map(|l| l.name.as_str()) == Some(label))
+            .collect()
+    }
+
+    /// Get items by status name from metadata.
+    pub fn items_with_status(&self, status: &str) -> Vec<&BinderItem> {
+        self.all_items().into_iter()
+            .filter(|item| item.metadata.status.as_ref().map(|s| s.name.as_str()) == Some(status))
+            .collect()
     }
 
     /// Check if the trash is empty
@@ -1851,5 +1983,276 @@ mod tests {
             assert!(!kind.label().is_empty());
             assert!(!kind.icon().is_empty());
         }
+    }
+
+    // --- Tree utility tests ---
+
+    #[test]
+    fn test_depth_of_root() {
+        let folder = BinderItem::new_folder("Root");
+        assert_eq!(folder.depth_of(&folder.id), Some(0));
+    }
+
+    #[test]
+    fn test_depth_of_nested() {
+        let mut root = BinderItem::new_folder("Root");
+        let mut sub = BinderItem::new_folder("Sub");
+        let leaf = BinderItem::new_text("Leaf");
+        let leaf_id = leaf.id;
+        sub.add_child(leaf);
+        root.add_child(sub);
+
+        assert_eq!(root.depth_of(&leaf_id), Some(2));
+    }
+
+    #[test]
+    fn test_depth_of_not_found() {
+        let root = BinderItem::new_folder("Root");
+        let fake_id = Uuid::new_v4();
+        assert_eq!(root.depth_of(&fake_id), None);
+    }
+
+    #[test]
+    fn test_binder_item_depth() {
+        let mut binder = Binder::default_structure();
+        let mut ch = BinderItem::new_folder("Ch1");
+        let scene = BinderItem::new_text("Scene");
+        let scene_id = scene.id;
+        ch.add_child(scene);
+        binder.draft.add_child(ch);
+
+        assert_eq!(binder.item_depth(&scene_id), Some(2));
+        assert_eq!(binder.item_depth(&binder.draft.id), Some(0));
+    }
+
+    #[test]
+    fn test_ancestors_of() {
+        let mut root = BinderItem::new_folder("Root");
+        let mut sub = BinderItem::new_folder("Sub");
+        let leaf = BinderItem::new_text("Leaf");
+        let root_id = root.id;
+        let sub_id = sub.id;
+        let leaf_id = leaf.id;
+        sub.add_child(leaf);
+        root.add_child(sub);
+
+        let ancestors = root.ancestors_of(&leaf_id).unwrap();
+        assert_eq!(ancestors, vec![root_id, sub_id]);
+    }
+
+    #[test]
+    fn test_ancestors_of_self() {
+        let root = BinderItem::new_folder("Root");
+        let ancestors = root.ancestors_of(&root.id).unwrap();
+        assert!(ancestors.is_empty());
+    }
+
+    #[test]
+    fn test_ancestors_of_not_found() {
+        let root = BinderItem::new_folder("Root");
+        assert!(root.ancestors_of(&Uuid::new_v4()).is_none());
+    }
+
+    #[test]
+    fn test_binder_item_ancestors() {
+        let mut binder = Binder::default_structure();
+        let mut ch = BinderItem::new_folder("Ch");
+        let scene = BinderItem::new_text("Sc");
+        let scene_id = scene.id;
+        let ch_id = ch.id;
+        ch.add_child(scene);
+        binder.draft.add_child(ch);
+
+        let anc = binder.item_ancestors(&scene_id).unwrap();
+        assert_eq!(anc.len(), 2); // draft, ch
+        assert_eq!(anc[0], binder.draft.id);
+        assert_eq!(anc[1], ch_id);
+    }
+
+    #[test]
+    fn test_descendant_ids() {
+        let mut root = BinderItem::new_folder("Root");
+        let a = BinderItem::new_text("A");
+        let b = BinderItem::new_text("B");
+        let a_id = a.id;
+        let b_id = b.id;
+        root.add_child(a);
+        root.add_child(b);
+
+        let desc = root.descendant_ids();
+        assert_eq!(desc.len(), 2);
+        assert!(desc.contains(&a_id));
+        assert!(desc.contains(&b_id));
+    }
+
+    #[test]
+    fn test_descendant_ids_nested() {
+        let mut root = BinderItem::new_folder("Root");
+        let mut sub = BinderItem::new_folder("Sub");
+        let leaf = BinderItem::new_text("Leaf");
+        let sub_id = sub.id;
+        let leaf_id = leaf.id;
+        sub.add_child(leaf);
+        root.add_child(sub);
+
+        let desc = root.descendant_ids();
+        assert_eq!(desc.len(), 2);
+        assert!(desc.contains(&sub_id));
+        assert!(desc.contains(&leaf_id));
+    }
+
+    #[test]
+    fn test_binder_descendants_of() {
+        let mut binder = Binder::default_structure();
+        let mut ch = BinderItem::new_folder("Ch");
+        let s1 = BinderItem::new_text("S1");
+        let s2 = BinderItem::new_text("S2");
+        let s1_id = s1.id;
+        let s2_id = s2.id;
+        let ch_id = ch.id;
+        ch.add_child(s1);
+        ch.add_child(s2);
+        binder.draft.add_child(ch);
+
+        let desc = binder.descendants_of(&ch_id);
+        assert_eq!(desc.len(), 2);
+        assert!(desc.contains(&s1_id));
+        assert!(desc.contains(&s2_id));
+    }
+
+    #[test]
+    fn test_binder_descendants_of_nonexistent() {
+        let binder = Binder::default_structure();
+        assert!(binder.descendants_of(&Uuid::new_v4()).is_empty());
+    }
+
+    #[test]
+    fn test_is_ancestor_of() {
+        let mut root = BinderItem::new_folder("Root");
+        let mut sub = BinderItem::new_folder("Sub");
+        let leaf = BinderItem::new_text("Leaf");
+        let leaf_id = leaf.id;
+        sub.add_child(leaf);
+        root.add_child(sub);
+
+        assert!(root.is_ancestor_of(&leaf_id));
+        assert!(!root.is_ancestor_of(&Uuid::new_v4()));
+    }
+
+    #[test]
+    fn test_descendant_count() {
+        let mut root = BinderItem::new_folder("Root");
+        let mut sub = BinderItem::new_folder("Sub");
+        sub.add_child(BinderItem::new_text("A"));
+        sub.add_child(BinderItem::new_text("B"));
+        root.add_child(sub);
+        root.add_child(BinderItem::new_text("C"));
+
+        assert_eq!(root.descendant_count(), 4); // Sub, A, B, C
+    }
+
+    #[test]
+    fn test_descendant_count_empty() {
+        let leaf = BinderItem::new_text("Leaf");
+        assert_eq!(leaf.descendant_count(), 0);
+    }
+
+    #[test]
+    fn test_max_depth() {
+        let mut root = BinderItem::new_folder("Root");
+        let mut sub = BinderItem::new_folder("Sub");
+        sub.add_child(BinderItem::new_text("Leaf"));
+        root.add_child(sub);
+        root.add_child(BinderItem::new_text("Shallow"));
+
+        assert_eq!(root.max_depth(), 2);
+    }
+
+    #[test]
+    fn test_max_depth_flat() {
+        let mut root = BinderItem::new_folder("Root");
+        root.add_child(BinderItem::new_text("A"));
+        root.add_child(BinderItem::new_text("B"));
+
+        assert_eq!(root.max_depth(), 1);
+    }
+
+    #[test]
+    fn test_max_depth_leaf() {
+        let leaf = BinderItem::new_text("Leaf");
+        assert_eq!(leaf.max_depth(), 0);
+    }
+
+    #[test]
+    fn test_binder_max_nesting_depth() {
+        let mut binder = Binder::default_structure();
+        let mut ch = BinderItem::new_folder("Ch");
+        let mut sub = BinderItem::new_folder("Sub");
+        sub.add_child(BinderItem::new_text("Deep"));
+        ch.add_child(sub);
+        binder.draft.add_child(ch);
+
+        assert_eq!(binder.max_nesting_depth(), 3);
+    }
+
+    #[test]
+    fn test_leaf_items() {
+        let mut root = BinderItem::new_folder("Root");
+        root.add_child(BinderItem::new_text("A"));
+        let mut sub = BinderItem::new_folder("Sub");
+        sub.add_child(BinderItem::new_text("B"));
+        root.add_child(sub);
+
+        let leaves = root.leaf_items();
+        assert_eq!(leaves.len(), 2);
+    }
+
+    #[test]
+    fn test_binder_leaf_documents() {
+        let mut binder = Binder::default_structure();
+        binder.draft.add_child(BinderItem::new_text("A"));
+        binder.draft.add_child(BinderItem::new_folder("F"));
+        binder.research.add_child(BinderItem::new_text("R"));
+
+        let leaves = binder.leaf_documents();
+        assert_eq!(leaves.len(), 2);
+    }
+
+    #[test]
+    fn test_items_with_label() {
+        use crate::core::metadata::{Label, LabelColor};
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Labeled");
+        item.metadata.label = Some(Label { name: "Important".to_string(), color: LabelColor::Red });
+        binder.draft.add_child(item);
+        binder.draft.add_child(BinderItem::new_text("No label"));
+
+        let found = binder.items_with_label("Important");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].title, "Labeled");
+    }
+
+    #[test]
+    fn test_items_with_label_none() {
+        let binder = Binder::default_structure();
+        assert!(binder.items_with_label("Missing").is_empty());
+    }
+
+    #[test]
+    fn test_items_with_status() {
+        use crate::core::metadata::Status;
+        let mut binder = Binder::default_structure();
+        let mut item1 = BinderItem::new_text("Done");
+        item1.metadata.status = Some(Status::new("Final"));
+        let mut item2 = BinderItem::new_text("WIP");
+        item2.metadata.status = Some(Status::new("Draft"));
+        let mut item3 = BinderItem::new_text("Also Done");
+        item3.metadata.status = Some(Status::new("Final"));
+        binder.draft.add_child(item1);
+        binder.draft.add_child(item2);
+        binder.draft.add_child(item3);
+
+        let final_items = binder.items_with_status("Final");
+        assert_eq!(final_items.len(), 2);
     }
 }

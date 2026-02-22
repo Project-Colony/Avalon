@@ -737,6 +737,68 @@ impl Project {
     pub fn is_valid_template(name: &str) -> bool {
         Self::available_templates().contains(&name)
     }
+
+    /// Compute content distribution: returns (folder_title, word_count) pairs for top-level items.
+    pub fn content_distribution(&self) -> Vec<(String, usize)> {
+        self.binder.draft.children.iter()
+            .map(|child| (child.title.clone(), child.total_word_count()))
+            .collect()
+    }
+
+    /// Analyze the project structure: (max_depth, avg_children, total_items).
+    pub fn structure_analysis(&self) -> (usize, f64, usize) {
+        let max_depth = self.binder.max_nesting_depth();
+        let total = self.binder.item_count();
+        let folders: Vec<&super::binder::BinderItem> = self.binder.all_items().into_iter()
+            .filter(|i| !i.children.is_empty())
+            .collect();
+        let avg_children = if folders.is_empty() {
+            0.0
+        } else {
+            folders.iter().map(|f| f.child_count() as f64).sum::<f64>() / folders.len() as f64
+        };
+        (max_depth, avg_children, total)
+    }
+
+    /// Writing velocity: average words per recorded history day.
+    pub fn writing_velocity(&self) -> f64 {
+        let entries = &self.writing_history.entries;
+        if entries.is_empty() {
+            return 0.0;
+        }
+        let total_words: i64 = entries.iter().map(|e| e.words_written).sum();
+        total_words as f64 / entries.len() as f64
+    }
+
+    /// Get the longest and shortest documents by word count.
+    pub fn word_count_extremes(&self) -> (Option<(String, usize)>, Option<(String, usize)>) {
+        let items: Vec<(&str, usize)> = self.binder.all_items().into_iter()
+            .filter(|i| i.kind == super::binder::BinderItemKind::Text)
+            .filter_map(|i| i.document.as_ref().map(|d| (i.title.as_str(), d.word_count())))
+            .filter(|(_, wc)| *wc > 0)
+            .collect();
+
+        let longest = items.iter()
+            .max_by_key(|(_, wc)| *wc)
+            .map(|(t, wc)| (t.to_string(), *wc));
+        let shortest = items.iter()
+            .min_by_key(|(_, wc)| *wc)
+            .map(|(t, wc)| (t.to_string(), *wc));
+        (longest, shortest)
+    }
+
+    /// Average document word count across all text items with content.
+    pub fn avg_document_word_count(&self) -> f64 {
+        let items: Vec<usize> = self.binder.all_items().into_iter()
+            .filter(|i| i.kind == super::binder::BinderItemKind::Text)
+            .filter_map(|i| i.document.as_ref().map(|d| d.word_count()))
+            .filter(|wc| *wc > 0)
+            .collect();
+        if items.is_empty() {
+            return 0.0;
+        }
+        items.iter().sum::<usize>() as f64 / items.len() as f64
+    }
 }
 
 #[cfg(test)]
@@ -1212,5 +1274,137 @@ mod tests {
     fn test_from_template_chicago_essay() {
         let project = Project::from_template("Test", "chicago_essay");
         assert_eq!(project.binder.draft.title, "Essay");
+    }
+
+    // --- Project analytics tests ---
+
+    #[test]
+    fn test_content_distribution_empty() {
+        let project = Project::new("Test");
+        let dist = project.content_distribution();
+        assert!(dist.is_empty() || dist.iter().all(|(_, wc)| *wc == 0));
+    }
+
+    #[test]
+    fn test_content_distribution_with_items() {
+        use crate::core::binder::BinderItem;
+        let mut project = Project::new("Test");
+        let mut ch1 = BinderItem::new_text("Chapter 1");
+        if let Some(ref mut doc) = ch1.document {
+            doc.content = "one two three four five".to_string();
+        }
+        let mut ch2 = BinderItem::new_text("Chapter 2");
+        if let Some(ref mut doc) = ch2.document {
+            doc.content = "six seven".to_string();
+        }
+        project.binder.draft.add_child(ch1);
+        project.binder.draft.add_child(ch2);
+
+        let dist = project.content_distribution();
+        assert_eq!(dist.len(), 2);
+        assert_eq!(dist[0].0, "Chapter 1");
+        assert_eq!(dist[0].1, 5);
+        assert_eq!(dist[1].0, "Chapter 2");
+        assert_eq!(dist[1].1, 2);
+    }
+
+    #[test]
+    fn test_structure_analysis() {
+        let mut project = Project::from_template("Novel", "novel");
+        let (max_depth, _avg_children, total) = project.structure_analysis();
+        assert!(max_depth >= 1);
+        assert!(total >= 3);
+    }
+
+    #[test]
+    fn test_structure_analysis_empty() {
+        let project = Project::new("Empty");
+        let (max_depth, _avg, total) = project.structure_analysis();
+        assert_eq!(max_depth, 0);
+        assert!(total >= 3); // Draft, Research, Trash always present
+    }
+
+    #[test]
+    fn test_writing_velocity_empty() {
+        let project = Project::new("Test");
+        assert_eq!(project.writing_velocity(), 0.0);
+    }
+
+    #[test]
+    fn test_writing_velocity_with_entries() {
+        use crate::core::history::DailyEntry;
+        use chrono::NaiveDate;
+
+        let mut project = Project::new("Test");
+        project.writing_history.entries.push(DailyEntry {
+            date: NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
+            word_count_start: 0,
+            word_count_end: 1000,
+            words_written: 1000,
+            time_spent_seconds: 3600,
+        });
+        project.writing_history.entries.push(DailyEntry {
+            date: NaiveDate::from_ymd_opt(2025, 1, 2).unwrap(),
+            word_count_start: 1000,
+            word_count_end: 1500,
+            words_written: 500,
+            time_spent_seconds: 1800,
+        });
+
+        let velocity = project.writing_velocity();
+        assert!((velocity - 750.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_word_count_extremes_empty() {
+        let project = Project::new("Test");
+        let (longest, shortest) = project.word_count_extremes();
+        assert!(longest.is_none());
+        assert!(shortest.is_none());
+    }
+
+    #[test]
+    fn test_word_count_extremes_with_items() {
+        use crate::core::binder::BinderItem;
+        let mut project = Project::new("Test");
+        let mut short = BinderItem::new_text("Short");
+        if let Some(ref mut doc) = short.document {
+            doc.content = "one two".to_string();
+        }
+        let mut long = BinderItem::new_text("Long");
+        if let Some(ref mut doc) = long.document {
+            doc.content = "one two three four five six seven eight".to_string();
+        }
+        project.binder.draft.add_child(short);
+        project.binder.draft.add_child(long);
+
+        let (longest, shortest) = project.word_count_extremes();
+        assert_eq!(longest.unwrap().0, "Long");
+        assert_eq!(shortest.unwrap().0, "Short");
+    }
+
+    #[test]
+    fn test_avg_document_word_count_empty() {
+        let project = Project::new("Test");
+        assert_eq!(project.avg_document_word_count(), 0.0);
+    }
+
+    #[test]
+    fn test_avg_document_word_count() {
+        use crate::core::binder::BinderItem;
+        let mut project = Project::new("Test");
+        let mut a = BinderItem::new_text("A");
+        if let Some(ref mut doc) = a.document {
+            doc.content = "one two three four".to_string();
+        }
+        let mut b = BinderItem::new_text("B");
+        if let Some(ref mut doc) = b.document {
+            doc.content = "five six".to_string();
+        }
+        project.binder.draft.add_child(a);
+        project.binder.draft.add_child(b);
+
+        let avg = project.avg_document_word_count();
+        assert!((avg - 3.0).abs() < 0.01);
     }
 }

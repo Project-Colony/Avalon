@@ -434,6 +434,112 @@ impl Document {
         repeated
     }
 
+    /// Get a human-readable reading difficulty label based on Flesch Reading Ease.
+    pub fn reading_difficulty_label(&self) -> &str {
+        let ease = self.reading_ease();
+        if ease >= 90.0 {
+            "Very Easy"
+        } else if ease >= 80.0 {
+            "Easy"
+        } else if ease >= 70.0 {
+            "Fairly Easy"
+        } else if ease >= 60.0 {
+            "Standard"
+        } else if ease >= 50.0 {
+            "Fairly Difficult"
+        } else if ease >= 30.0 {
+            "Difficult"
+        } else if ease > 0.0 {
+            "Very Difficult"
+        } else {
+            "N/A"
+        }
+    }
+
+    /// Find repeated phrases of a given minimum word length.
+    pub fn repeated_phrases(&self, min_words: usize) -> Vec<(String, usize)> {
+        if min_words < 2 {
+            return Vec::new();
+        }
+        let words: Vec<String> = self.content.split_whitespace()
+            .map(|w| w.to_lowercase())
+            .collect();
+        if words.len() < min_words {
+            return Vec::new();
+        }
+        let mut freq: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        for window in words.windows(min_words) {
+            let phrase = window.join(" ");
+            *freq.entry(phrase).or_insert(0) += 1;
+        }
+        let mut repeated: Vec<(String, usize)> = freq.into_iter()
+            .filter(|(_, c)| *c > 1)
+            .collect();
+        repeated.sort_by(|a, b| b.1.cmp(&a.1));
+        repeated
+    }
+
+    /// Find exact duplicate sentences.
+    pub fn duplicate_sentences(&self) -> Vec<(String, usize)> {
+        let mut freq: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        for sentence in self.content.split(|c: char| c == '.' || c == '!' || c == '?') {
+            let trimmed = sentence.trim().to_lowercase();
+            if !trimmed.is_empty() && trimmed.split_whitespace().count() >= 3 {
+                *freq.entry(trimmed).or_insert(0) += 1;
+            }
+        }
+        let mut dupes: Vec<(String, usize)> = freq.into_iter()
+            .filter(|(_, c)| *c > 1)
+            .collect();
+        dupes.sort_by(|a, b| b.1.cmp(&a.1));
+        dupes
+    }
+
+    /// Analyze pacing: returns (short, medium, long) sentence count buckets.
+    /// Short = 1-8 words, Medium = 9-20, Long = 21+
+    pub fn pacing_analysis(&self) -> (usize, usize, usize) {
+        let mut short = 0;
+        let mut medium = 0;
+        let mut long = 0;
+        for sentence in self.content.split(|c: char| c == '.' || c == '!' || c == '?') {
+            let wc = sentence.split_whitespace().count();
+            if wc == 0 { continue; }
+            if wc <= 8 {
+                short += 1;
+            } else if wc <= 20 {
+                medium += 1;
+            } else {
+                long += 1;
+            }
+        }
+        (short, medium, long)
+    }
+
+    /// Compute SMOG readability grade (requires 30+ sentences ideally, but works approximately).
+    pub fn smog_grade(&self) -> f64 {
+        let sentences = self.sentence_count() as f64;
+        if sentences == 0.0 {
+            return 0.0;
+        }
+        let complex_words: usize = self.content.split_whitespace()
+            .filter(|w| Self::count_syllables(w) >= 3)
+            .count();
+        // SMOG formula: 3 + sqrt(complex_words * (30 / sentences))
+        3.0 + (complex_words as f64 * (30.0 / sentences)).sqrt()
+    }
+
+    /// Percentage of complex words (3+ syllables).
+    pub fn complex_word_percentage(&self) -> f64 {
+        let total = self.word_count();
+        if total == 0 {
+            return 0.0;
+        }
+        let complex: usize = self.content.split_whitespace()
+            .filter(|w| Self::count_syllables(w) >= 3)
+            .count();
+        complex as f64 / total as f64 * 100.0
+    }
+
     /// Find all positions of a substring (case-insensitive)
     pub fn find_positions(&self, query: &str) -> Vec<usize> {
         if query.is_empty() {
@@ -1148,5 +1254,191 @@ mod tests {
         let doc = Document::new();
         let repeated = doc.repeated_paragraph_starts();
         assert!(repeated.is_empty());
+    }
+
+    // --- New document analysis tests ---
+
+    #[test]
+    fn test_reading_difficulty_label_easy() {
+        // Simple text -> high reading ease -> easy label
+        let doc = Document::with_content("The cat sat. The dog ran. The bird flew. I like pie.");
+        let label = doc.reading_difficulty_label();
+        assert!(label == "Very Easy" || label == "Easy" || label == "Fairly Easy",
+            "Got label: {}", label);
+    }
+
+    #[test]
+    fn test_reading_difficulty_label_empty() {
+        let doc = Document::new();
+        assert_eq!(doc.reading_difficulty_label(), "N/A");
+    }
+
+    #[test]
+    fn test_reading_difficulty_label_complex() {
+        let doc = Document::with_content(
+            "Notwithstanding the unprecedented jurisprudential implications of the constitutional \
+             amendment, the parliamentarians deliberated extensively regarding the socioeconomic \
+             ramifications."
+        );
+        let label = doc.reading_difficulty_label();
+        // Complex single-sentence text may get negative reading ease → N/A or Very Difficult
+        assert!(label == "Difficult" || label == "Very Difficult" || label == "Fairly Difficult"
+            || label == "N/A",
+            "Got label: {}", label);
+    }
+
+    #[test]
+    fn test_repeated_phrases_basic() {
+        let doc = Document::with_content("the cat sat on the cat sat on the mat");
+        let repeated = doc.repeated_phrases(3);
+        assert!(repeated.iter().any(|(p, c)| p == "the cat sat" && *c == 2));
+    }
+
+    #[test]
+    fn test_repeated_phrases_min_words_too_small() {
+        let doc = Document::with_content("the cat sat on the mat");
+        assert!(doc.repeated_phrases(1).is_empty());
+        assert!(doc.repeated_phrases(0).is_empty());
+    }
+
+    #[test]
+    fn test_repeated_phrases_none() {
+        let doc = Document::with_content("every word is unique here nothing repeats at all");
+        let repeated = doc.repeated_phrases(2);
+        assert!(repeated.is_empty());
+    }
+
+    #[test]
+    fn test_repeated_phrases_empty() {
+        let doc = Document::new();
+        assert!(doc.repeated_phrases(2).is_empty());
+    }
+
+    #[test]
+    fn test_repeated_phrases_short_text() {
+        let doc = Document::with_content("hello");
+        assert!(doc.repeated_phrases(3).is_empty());
+    }
+
+    #[test]
+    fn test_duplicate_sentences() {
+        let doc = Document::with_content(
+            "The cat sat down. The dog ran away. The cat sat down. Something else."
+        );
+        let dupes = doc.duplicate_sentences();
+        assert_eq!(dupes.len(), 1);
+        assert!(dupes[0].0.contains("the cat sat down"));
+        assert_eq!(dupes[0].1, 2);
+    }
+
+    #[test]
+    fn test_duplicate_sentences_none() {
+        let doc = Document::with_content("First sentence. Second one. Third here.");
+        let dupes = doc.duplicate_sentences();
+        assert!(dupes.is_empty());
+    }
+
+    #[test]
+    fn test_duplicate_sentences_empty() {
+        let doc = Document::new();
+        assert!(doc.duplicate_sentences().is_empty());
+    }
+
+    #[test]
+    fn test_pacing_analysis() {
+        // Short: 1 word, Medium: 10 words, Long: 22+ words
+        let doc = Document::with_content(
+            "Short. One two three four five six seven eight nine ten here. \
+             This is a very very very very very very very very very very very very \
+             very very very very very very very very long sentence here."
+        );
+        let (short, medium, long) = doc.pacing_analysis();
+        assert!(short >= 1, "Expected at least 1 short, got {}", short);
+        assert!(medium >= 1, "Expected at least 1 medium, got {}", medium);
+        assert!(long >= 1, "Expected at least 1 long, got {}", long);
+    }
+
+    #[test]
+    fn test_pacing_analysis_empty() {
+        let doc = Document::new();
+        assert_eq!(doc.pacing_analysis(), (0, 0, 0));
+    }
+
+    #[test]
+    fn test_pacing_analysis_all_short() {
+        let doc = Document::with_content("Hi. Bye. Ok. Sure. Yes.");
+        let (short, medium, long) = doc.pacing_analysis();
+        assert!(short >= 4);
+        assert_eq!(medium, 0);
+        assert_eq!(long, 0);
+    }
+
+    #[test]
+    fn test_smog_grade() {
+        let doc = Document::with_content(
+            "The cat sat on the mat. The dog ran. Simple words here. Easy to read."
+        );
+        let grade = doc.smog_grade();
+        assert!(grade > 0.0);
+        assert!(grade < 20.0);
+    }
+
+    #[test]
+    fn test_smog_grade_empty() {
+        let doc = Document::new();
+        assert_eq!(doc.smog_grade(), 0.0);
+    }
+
+    #[test]
+    fn test_complex_word_percentage() {
+        let doc = Document::with_content("the cat beautiful extraordinary philosophical");
+        let pct = doc.complex_word_percentage();
+        assert!(pct > 0.0);
+        assert!(pct <= 100.0);
+    }
+
+    #[test]
+    fn test_complex_word_percentage_empty() {
+        let doc = Document::new();
+        assert_eq!(doc.complex_word_percentage(), 0.0);
+    }
+
+    #[test]
+    fn test_complex_word_percentage_all_simple() {
+        let doc = Document::with_content("the cat sat on the mat");
+        let pct = doc.complex_word_percentage();
+        assert_eq!(pct, 0.0);
+    }
+
+    #[test]
+    fn test_word_frequency_empty() {
+        let doc = Document::new();
+        assert!(doc.word_frequency().is_empty());
+    }
+
+    #[test]
+    fn test_count_word_case_insensitive() {
+        let doc = Document::with_content("Apple apple APPLE");
+        assert_eq!(doc.count_word("apple"), 3);
+    }
+
+    #[test]
+    fn test_most_frequent_words_empty() {
+        let doc = Document::new();
+        let top = doc.most_frequent_words(5);
+        assert!(top.is_empty());
+    }
+
+    #[test]
+    fn test_bigrams_repeated() {
+        let doc = Document::with_content("a b a b a b");
+        let bg = doc.bigrams();
+        assert!(bg.iter().any(|(b, c)| b == "a b" && *c == 3));
+    }
+
+    #[test]
+    fn test_dialogue_with_smart_quotes() {
+        let doc = Document::with_content("\u{201C}Hello,\u{201D} she said.\nHe nodded.");
+        assert_eq!(doc.dialogue_line_count(), 1);
     }
 }

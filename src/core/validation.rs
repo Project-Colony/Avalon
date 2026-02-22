@@ -25,6 +25,12 @@ pub fn validate_project(binder: &Binder) -> ProjectValidation {
     // Check for very long documents (potential performance issue)
     check_document_lengths(binder, &mut issues);
 
+    // Check for deep nesting (performance/usability concern)
+    check_deep_nesting(binder, &mut issues);
+
+    // Check for inconsistent metadata
+    check_missing_metadata(binder, &mut issues);
+
     // Check for orphaned items in trash
     let trash_count = count_items(&binder.trash);
 
@@ -152,6 +158,64 @@ fn check_document_lengths(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
     }
 }
 
+fn check_deep_nesting(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
+    let max_depth_limit = 8;
+    fn check_depth(item: &BinderItem, depth: usize, limit: usize, issues: &mut Vec<ValidationIssue>) {
+        if depth > limit {
+            issues.push(ValidationIssue {
+                severity: Severity::Info,
+                kind: IssueKind::DeepNesting,
+                item_id: Some(item.id),
+                message: format!(
+                    "Item \"{}\" is nested {} levels deep — consider flattening for better organization",
+                    item.title, depth
+                ),
+            });
+        }
+        for child in &item.children {
+            check_depth(child, depth + 1, limit, issues);
+        }
+    }
+    check_depth(&binder.draft, 0, max_depth_limit, issues);
+    check_depth(&binder.research, 0, max_depth_limit, issues);
+}
+
+fn check_missing_metadata(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
+    let items = binder.all_items();
+    let total_text = items.iter().filter(|i| i.kind == BinderItemKind::Text).count();
+    if total_text < 3 {
+        return; // Don't check small projects
+    }
+
+    // Check if most items have labels but some don't
+    let with_label = items.iter().filter(|i| i.metadata.label.is_some()).count();
+    if with_label > 0 && with_label < total_text / 2 {
+        issues.push(ValidationIssue {
+            severity: Severity::Info,
+            kind: IssueKind::InconsistentMetadata,
+            item_id: None,
+            message: format!(
+                "Only {}/{} items have labels — consider labeling all items for better organization",
+                with_label, total_text
+            ),
+        });
+    }
+
+    // Check if most items have status but some don't
+    let with_status = items.iter().filter(|i| i.metadata.status.is_some()).count();
+    if with_status > 0 && with_status < total_text / 2 {
+        issues.push(ValidationIssue {
+            severity: Severity::Info,
+            kind: IssueKind::InconsistentMetadata,
+            item_id: None,
+            message: format!(
+                "Only {}/{} items have status — consider setting status for all items",
+                with_status, total_text
+            ),
+        });
+    }
+}
+
 /// The result of a project validation pass
 #[derive(Debug, Clone)]
 pub struct ProjectValidation {
@@ -222,6 +286,8 @@ pub enum IssueKind {
     BrokenLink,
     LargeDocument,
     Orphan,
+    DeepNesting,
+    InconsistentMetadata,
 }
 
 impl Severity {
@@ -265,12 +331,15 @@ impl IssueKind {
             IssueKind::BrokenLink => "Broken Link",
             IssueKind::LargeDocument => "Large Document",
             IssueKind::Orphan => "Orphan",
+            IssueKind::DeepNesting => "Deep Nesting",
+            IssueKind::InconsistentMetadata => "Inconsistent Metadata",
         }
     }
 
     /// Whether this kind is automatically fixable
     pub fn is_auto_fixable(&self) -> bool {
-        matches!(self, IssueKind::EmptyDocument | IssueKind::UntitledItem | IssueKind::EmptyFolder)
+        matches!(self, IssueKind::EmptyDocument | IssueKind::UntitledItem | IssueKind::EmptyFolder
+            | IssueKind::InconsistentMetadata)
     }
 
     /// Suggested fix description
@@ -284,6 +353,8 @@ impl IssueKind {
             IssueKind::BrokenLink => "Fix or remove the broken link",
             IssueKind::LargeDocument => "Split the document into smaller sections",
             IssueKind::Orphan => "Link to this document or move to trash",
+            IssueKind::DeepNesting => "Move deeply nested items closer to the root",
+            IssueKind::InconsistentMetadata => "Apply labels or status to remaining items",
         }
     }
 }
@@ -888,5 +959,88 @@ mod tests {
             trash_items: 0,
         };
         assert_eq!(good.health_grade(), "Good");
+    }
+
+    // --- New validation check tests ---
+
+    #[test]
+    fn test_validate_deep_nesting_not_triggered() {
+        let mut binder = Binder::default_structure();
+        let mut folder = BinderItem::new_folder("Level 1");
+        let mut sub = BinderItem::new_folder("Level 2");
+        let mut item = BinderItem::new_text("Leaf");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Content.".to_string();
+        }
+        sub.add_child(item);
+        folder.add_child(sub);
+        binder.draft.add_child(folder);
+
+        let result = validate_project(&binder);
+        assert!(!result.issues.iter().any(|i| i.kind == IssueKind::DeepNesting));
+    }
+
+    #[test]
+    fn test_validate_deep_nesting_triggered() {
+        let mut binder = Binder::default_structure();
+        // Build 10 levels deep
+        let mut current = BinderItem::new_text("Deep Leaf");
+        if let Some(ref mut doc) = current.document {
+            doc.content = "Content.".to_string();
+        }
+        for i in (0..10).rev() {
+            let mut folder = BinderItem::new_folder(&format!("Level {}", i));
+            folder.add_child(current);
+            current = folder;
+        }
+        binder.draft.add_child(current);
+
+        let result = validate_project(&binder);
+        assert!(result.issues.iter().any(|i| i.kind == IssueKind::DeepNesting));
+    }
+
+    #[test]
+    fn test_validate_inconsistent_metadata_not_triggered_small() {
+        // Small projects (< 3 text items) should not trigger
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Single");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Content.".to_string();
+        }
+        binder.draft.add_child(item);
+
+        let result = validate_project(&binder);
+        assert!(!result.issues.iter().any(|i| i.kind == IssueKind::InconsistentMetadata));
+    }
+
+    #[test]
+    fn test_validate_inconsistent_metadata_triggered() {
+        use crate::core::metadata::{Label, LabelColor};
+        let mut binder = Binder::default_structure();
+
+        // Create 6 items, only 1 with label
+        for i in 0..6 {
+            let mut item = BinderItem::new_text(&format!("Item {}", i));
+            if let Some(ref mut doc) = item.document {
+                doc.content = format!("Content for item {}", i);
+            }
+            if i == 0 {
+                item.metadata.label = Some(Label { name: "Important".to_string(), color: LabelColor::Red });
+            }
+            binder.draft.add_child(item);
+        }
+
+        let result = validate_project(&binder);
+        assert!(result.issues.iter().any(|i| i.kind == IssueKind::InconsistentMetadata));
+    }
+
+    #[test]
+    fn test_new_issue_kinds() {
+        assert_eq!(IssueKind::DeepNesting.label(), "Deep Nesting");
+        assert_eq!(IssueKind::InconsistentMetadata.label(), "Inconsistent Metadata");
+        assert!(!IssueKind::DeepNesting.is_auto_fixable());
+        assert!(IssueKind::InconsistentMetadata.is_auto_fixable());
+        assert!(!IssueKind::DeepNesting.fix_hint().is_empty());
+        assert!(!IssueKind::InconsistentMetadata.fix_hint().is_empty());
     }
 }

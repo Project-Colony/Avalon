@@ -448,6 +448,63 @@ pub fn match_with_context(content: &str, options: &SearchOptions, context_lines:
     results
 }
 
+/// Search for items by word count range.
+pub fn search_by_word_count(binder: &Binder, min: usize, max: usize) -> Vec<(Uuid, String, usize)> {
+    binder.all_items().into_iter()
+        .filter(|item| item.kind == super::binder::BinderItemKind::Text)
+        .filter_map(|item| {
+            item.document.as_ref().map(|doc| {
+                let wc = doc.word_count();
+                (item.id, item.title.clone(), wc)
+            })
+        })
+        .filter(|(_, _, wc)| *wc >= min && *wc <= max)
+        .collect()
+}
+
+/// Search for items by keyword in metadata.
+pub fn search_by_keyword(binder: &Binder, keyword: &str) -> Vec<(Uuid, String)> {
+    binder.all_items().into_iter()
+        .filter(|item| item.metadata.has_keyword(keyword))
+        .map(|item| (item.id, item.title.clone()))
+        .collect()
+}
+
+/// Search for items with a specific label.
+pub fn search_by_label(binder: &Binder, label: &str) -> Vec<(Uuid, String)> {
+    binder.all_items().into_iter()
+        .filter(|item| item.metadata.label.as_ref().map(|l| l.name.as_str()) == Some(label))
+        .map(|item| (item.id, item.title.clone()))
+        .collect()
+}
+
+/// Search for items with a specific status.
+pub fn search_by_status(binder: &Binder, status: &str) -> Vec<(Uuid, String)> {
+    binder.all_items().into_iter()
+        .filter(|item| item.metadata.status.as_ref().map(|s| s.name.as_str()) == Some(status))
+        .map(|item| (item.id, item.title.clone()))
+        .collect()
+}
+
+/// Search for items modified after a given date.
+pub fn search_modified_after(binder: &Binder, date: chrono::DateTime<chrono::Utc>) -> Vec<(Uuid, String)> {
+    binder.all_items().into_iter()
+        .filter(|item| item.modified_at > date)
+        .map(|item| (item.id, item.title.clone()))
+        .collect()
+}
+
+/// Search for empty documents (text items with no content).
+pub fn search_empty_documents(binder: &Binder) -> Vec<(Uuid, String)> {
+    binder.all_items().into_iter()
+        .filter(|item| item.kind == super::binder::BinderItemKind::Text)
+        .filter(|item| {
+            item.document.as_ref().map_or(true, |doc| doc.content.trim().is_empty())
+        })
+        .map(|item| (item.id, item.title.clone()))
+        .collect()
+}
+
 /// A match with surrounding context lines
 #[derive(Debug, Clone)]
 pub struct MatchContext {
@@ -1108,5 +1165,219 @@ mod tests {
         assert!(summary.contains("case-sensitive"));
         assert!(summary.contains("whole-word"));
         assert!(summary.contains("regex"));
+    }
+
+    // --- New search feature tests ---
+
+    #[test]
+    fn test_search_by_word_count() {
+        let mut binder = Binder::default_structure();
+        let mut short = BinderItem::new_text("Short");
+        if let Some(ref mut doc) = short.document {
+            doc.content = "one two".to_string();
+        }
+        let mut long = BinderItem::new_text("Long");
+        if let Some(ref mut doc) = long.document {
+            doc.content = "one two three four five six seven eight nine ten".to_string();
+        }
+        binder.draft.add_child(short);
+        binder.draft.add_child(long);
+
+        let results = search_by_word_count(&binder, 5, 20);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].1, "Long");
+        assert_eq!(results[0].2, 10);
+    }
+
+    #[test]
+    fn test_search_by_word_count_empty() {
+        let binder = Binder::default_structure();
+        let results = search_by_word_count(&binder, 100, 500);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_search_by_word_count_all() {
+        let mut binder = Binder::default_structure();
+        let mut a = BinderItem::new_text("A");
+        if let Some(ref mut doc) = a.document {
+            doc.content = "one two three".to_string();
+        }
+        binder.draft.add_child(a);
+
+        let results = search_by_word_count(&binder, 0, 1000);
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_search_by_keyword() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Tagged");
+        item.metadata.add_keyword("important");
+        let mut item2 = BinderItem::new_text("Other");
+        item2.metadata.add_keyword("trivial");
+        binder.draft.add_child(item);
+        binder.draft.add_child(item2);
+
+        let results = search_by_keyword(&binder, "important");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].1, "Tagged");
+    }
+
+    #[test]
+    fn test_search_by_keyword_not_found() {
+        let binder = Binder::default_structure();
+        assert!(search_by_keyword(&binder, "nonexistent").is_empty());
+    }
+
+    #[test]
+    fn test_search_by_label() {
+        use crate::core::metadata::{Label, LabelColor};
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Red Item");
+        item.metadata.label = Some(Label { name: "Red".to_string(), color: LabelColor::Red });
+        binder.draft.add_child(item);
+        binder.draft.add_child(BinderItem::new_text("No label"));
+
+        let results = search_by_label(&binder, "Red");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].1, "Red Item");
+    }
+
+    #[test]
+    fn test_search_by_label_not_found() {
+        let binder = Binder::default_structure();
+        assert!(search_by_label(&binder, "Missing").is_empty());
+    }
+
+    #[test]
+    fn test_search_by_status() {
+        use crate::core::metadata::Status;
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Done");
+        item.metadata.status = Some(Status::new("Final"));
+        binder.draft.add_child(item);
+
+        let results = search_by_status(&binder, "Final");
+        assert_eq!(results.len(), 1);
+    }
+
+    #[test]
+    fn test_search_by_status_not_found() {
+        let binder = Binder::default_structure();
+        assert!(search_by_status(&binder, "Missing").is_empty());
+    }
+
+    #[test]
+    fn test_search_modified_after() {
+        use chrono::{Duration, Utc};
+        let mut binder = Binder::default_structure();
+        binder.draft.add_child(BinderItem::new_text("Recent"));
+
+        let past = Utc::now() - Duration::days(1);
+        let results = search_modified_after(&binder, past);
+        // All items are freshly created, so all should match
+        assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn test_search_modified_after_future() {
+        use chrono::{Duration, Utc};
+        let binder = Binder::default_structure();
+        let future = Utc::now() + Duration::days(1);
+        let results = search_modified_after(&binder, future);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_search_empty_documents() {
+        let mut binder = Binder::default_structure();
+        binder.draft.add_child(BinderItem::new_text("Empty Doc")); // new text has empty content
+        let mut filled = BinderItem::new_text("Filled");
+        if let Some(ref mut doc) = filled.document {
+            doc.content = "Some content here".to_string();
+        }
+        binder.draft.add_child(filled);
+
+        let results = search_empty_documents(&binder);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].1, "Empty Doc");
+    }
+
+    #[test]
+    fn test_search_empty_documents_none() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Has Content");
+        if let Some(ref mut doc) = item.document {
+            doc.content = "Content here".to_string();
+        }
+        binder.draft.add_child(item);
+
+        let results = search_empty_documents(&binder);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn test_search_binder_content_and_title() {
+        let binder = make_binder_with_content(vec![
+            ("Cat Story", "The dog barked."),
+        ]);
+        let options = SearchOptions {
+            query: "cat".to_string(),
+            search_titles: true,
+            search_content: true,
+            ..Default::default()
+        };
+        let results = search_binder(&binder, &options);
+        assert_eq!(results.len(), 1);
+        // Should find in title
+        assert!(results[0].matches.iter().any(|m| m.context.contains("[Title]")));
+    }
+
+    #[test]
+    fn test_search_binder_multiple_docs() {
+        let binder = make_binder_with_content(vec![
+            ("Doc1", "alpha beta gamma"),
+            ("Doc2", "delta epsilon"),
+            ("Doc3", "alpha zeta"),
+        ]);
+        let options = SearchOptions::content_only("alpha");
+        let results = search_binder(&binder, &options);
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn test_search_binder_whole_word_in_notes() {
+        let mut binder = Binder::default_structure();
+        let mut item = BinderItem::new_text("Doc");
+        if let Some(ref mut doc) = item.document {
+            doc.notes = "The cat concatenated strings".to_string();
+        }
+        binder.draft.add_child(item);
+
+        let options = SearchOptions {
+            query: "cat".to_string(),
+            whole_word: true,
+            search_content: false,
+            search_titles: false,
+            search_notes: true,
+            ..Default::default()
+        };
+        let results = search_binder(&binder, &options);
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].matches.len(), 1); // Only "cat", not "concatenated"
+    }
+
+    #[test]
+    fn test_extract_matches_empty() {
+        let matches = extract_matches("no match here", &SearchOptions::simple("xyz"));
+        assert!(matches.is_empty());
+    }
+
+    #[test]
+    fn test_count_matches_regex() {
+        let opts = SearchOptions::regex_search(r"\b\w{4}\b");
+        let count = count_matches("The cats like some fish", &opts);
+        assert!(count >= 2); // cats, like, some, fish
     }
 }
