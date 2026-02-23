@@ -315,7 +315,7 @@ impl EditorState {
             return Vec::new();
         }
         let (search_text, search_query) = if case_sensitive {
-            (text.clone(), query.to_string())
+            (text, query.to_string())
         } else {
             (text.to_lowercase(), query.to_lowercase())
         };
@@ -330,26 +330,28 @@ impl EditorState {
             return 0;
         }
         let text = self.text();
-        let new_text = if case_sensitive {
-            text.replace(find, replace)
+        let (new_text, count) = if case_sensitive {
+            let count = text.matches(find).count();
+            (text.replace(find, replace), count)
         } else {
             let lower = text.to_lowercase();
             let lower_find = find.to_lowercase();
             let mut result = String::new();
             let mut last_end = 0;
+            let mut count = 0;
             for (start, _) in lower.match_indices(&lower_find) {
                 result.push_str(&text[last_end..start]);
                 result.push_str(replace);
                 last_end = start + find.len();
+                count += 1;
             }
             result.push_str(&text[last_end..]);
-            result
+            (result, count)
         };
-        let count = self.find_all(find, case_sensitive).len();
         if count > 0 {
             self.push_undo();
-            self.document.content = new_text.clone();
             self.content = iced::widget::text_editor::Content::with_text(&new_text);
+            self.document.content = new_text;
             self.dirty = true;
         }
         count
