@@ -87,10 +87,9 @@ pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
 
         // Show note below the bookmark if present
         if let Some(ref note) = bm.note {
-            let note_display = if note.len() > 80 {
-                format!("  {} ...", &note[..80])
-            } else {
-                format!("  {}", note)
+            let note_display = match note.char_indices().nth(80) {
+                Some((byte_idx, _)) => format!("  {} ...", &note[..byte_idx]),
+                None => format!("  {}", note),
             };
             list = list.push(
                 text(note_display).size(9).color(Theme::TEXT_MUTED)

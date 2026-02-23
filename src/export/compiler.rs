@@ -525,8 +525,8 @@ impl CompileStatistics {
             avg_words_per_section,
             longest_section,
             shortest_section,
-            estimated_pages: (total_words / 250).max(if total_words > 0 { 1 } else { 0 }),
-            estimated_reading_minutes: (total_words / 200).max(if total_words > 0 { 1 } else { 0 }),
+            estimated_pages: if total_words == 0 { 0 } else { (total_words / 250).max(1) },
+            estimated_reading_minutes: if total_words == 0 { 0 } else { (total_words / 200).max(1) },
         }
     }
 

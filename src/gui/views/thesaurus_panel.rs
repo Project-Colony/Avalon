@@ -63,10 +63,9 @@ pub fn view(
 
     for (idx, entry) in results.iter().take(12).enumerate() {
         let pos_text = format!("{}. ({})", idx + 1, entry.part_of_speech);
-        let def_text = if entry.definition.len() > 140 {
-            format!("{}...", &entry.definition[..140])
-        } else {
-            entry.definition.clone()
+        let def_text = match entry.definition.char_indices().nth(140) {
+            Some((byte_idx, _)) => format!("{}...", &entry.definition[..byte_idx]),
+            None => entry.definition.clone(),
         };
 
         // Synonyms row — click to insert, right-click hint to look up

@@ -94,10 +94,9 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
                 if query.is_empty() {
                     ("\u{f006}", "Smart".to_string())
                 } else {
-                    let truncated = if query.len() > 20 {
-                        format!("{}...", &query[..20])
-                    } else {
-                        query.clone()
+                    let truncated = match query.char_indices().nth(20) {
+                        Some((byte_idx, _)) => format!("{}...", &query[..byte_idx]),
+                        None => query.clone(),
                     };
                     ("\u{f005}", format!("Smart: \"{}\"", truncated))
                 }

@@ -203,10 +203,9 @@ impl Comment {
     /// Short display summary for sidebar / tooltip rendering.
     pub fn summary(&self) -> String {
         let status = if self.resolved { "resolved" } else { "open" };
-        let truncated = if self.text.len() > 50 {
-            format!("{}...", &self.text[..50])
-        } else {
-            self.text.clone()
+        let truncated = match self.text.char_indices().nth(50) {
+            Some((byte_idx, _)) => format!("{}...", &self.text[..byte_idx]),
+            None => self.text.clone(),
         };
         format!(
             "[{}|{}] {} — {} ({})",

@@ -188,10 +188,11 @@ fn collect_outline_rows(
     // Synopsis (truncated)
     let synopsis = if item.synopsis.is_empty() {
         "-".to_string()
-    } else if item.synopsis.len() > 40 {
-        format!("{}...", &item.synopsis[..40])
     } else {
-        item.synopsis.clone()
+        match item.synopsis.char_indices().nth(40) {
+            Some((byte_idx, _)) => format!("{}...", &item.synopsis[..byte_idx]),
+            None => item.synopsis.clone(),
+        }
     };
 
     // Pages estimate
