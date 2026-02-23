@@ -3,7 +3,7 @@ use iced::{Element, Length, Padding};
 
 use crate::core::timer::{TimerPreset, TimerState, WritingTimer};
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// Render the writing timer panel (bottom panel)
 pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static, Message> {
@@ -278,6 +278,7 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
     .padding(Padding::from([8, 12]));
 
     container(content)
+        .style(theme::panel_style)
         .width(Length::Fill)
         .into()
 }

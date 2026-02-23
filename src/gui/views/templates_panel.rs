@@ -3,7 +3,7 @@ use iced::{Element, Length, Padding};
 
 use crate::core::doc_templates::DocumentTemplate;
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// Render the document templates panel (bottom panel)
 pub fn view(templates: &[DocumentTemplate]) -> Element<'static, Message> {
@@ -71,6 +71,7 @@ pub fn view(templates: &[DocumentTemplate]) -> Element<'static, Message> {
     .padding(Padding::from([8, 12]));
 
     container(content)
+        .style(theme::panel_style)
         .width(Length::Fill)
         .into()
 }

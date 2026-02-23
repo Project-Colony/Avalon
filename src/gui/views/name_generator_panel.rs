@@ -2,7 +2,7 @@ use iced::widget::{button, column, container, row, scrollable, text, Space};
 use iced::{Element, Length, Padding};
 
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// Render the name generator panel (bottom panel)
 pub fn view(generated_names: &[String]) -> Element<'static, Message> {
@@ -112,6 +112,7 @@ pub fn view(generated_names: &[String]) -> Element<'static, Message> {
     .padding(Padding::from([8, 12]));
 
     container(content)
+        .style(theme::panel_style)
         .width(Length::Fill)
         .into()
 }

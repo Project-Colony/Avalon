@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::core::collection::{Collection, CollectionKind};
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// Data needed for the collections panel
 pub struct CollectionsData {
@@ -165,6 +165,7 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
     .padding(Padding::from([8, 12]));
 
     container(content)
+        .style(theme::panel_style)
         .width(Length::Fill)
         .into()
 }

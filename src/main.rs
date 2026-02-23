@@ -21,8 +21,7 @@ const JETBRAINS_MONO_BOLD: &[u8] =
 fn main() -> iced::Result {
     env_logger::init();
 
-    iced::application(ScrineverApp::title, ScrineverApp::update, ScrineverApp::view)
-        .window_size((1280.0, 800.0))
+    iced::daemon(ScrineverApp::title, ScrineverApp::update, ScrineverApp::view)
         .subscription(ScrineverApp::subscription)
         .theme(ScrineverApp::theme)
         .font(JETBRAINS_MONO_REGULAR)

@@ -3,7 +3,7 @@ use iced::{Element, Length, Padding};
 
 use crate::core::stats::Statistics;
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// View mode label for the status bar
 pub fn view_mode_label(mode: &str) -> &str {
@@ -167,17 +167,12 @@ pub fn view(
     .padding(Padding::from([3, 12]));
 
     container(content)
+        .style(theme::status_bar_style)
         .width(Length::Fill)
         .into()
 }
 
 /// Format a number with comma separators for large values
 fn format_stat(n: usize) -> String {
-    if n < 1000 {
-        n.to_string()
-    } else if n < 1_000_000 {
-        format!("{:.1}k", n as f64 / 1000.0)
-    } else {
-        format!("{:.1}M", n as f64 / 1_000_000.0)
-    }
+    theme::format_compact(n)
 }

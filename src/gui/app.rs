@@ -1,6 +1,7 @@
 use iced::keyboard;
 use iced::widget::{column, container, row, stack, text, text_editor, Space};
 use iced::{Element, Length, Padding, Subscription, Task as IcedTask};
+use iced::window;
 use uuid::Uuid;
 use chrono;
 
@@ -62,8 +63,33 @@ pub enum ToolbarMenu {
     Tools,
 }
 
+/// Active tab in the Settings window
+///
+/// Inspired by Scrivener (7 panes), Word (10 categories), Ulysses (7 tabs):
+/// - General: project identity, saving, labels/statuses
+/// - Editor: typing behavior, navigation, composition, script mode
+/// - Corrections: proofing, auto-correct substitutions, spell check
+/// - Appearance: font, layout, display toggles, UI scale
+/// - Backup: auto-backup, frequency, accessibility
+/// - Shortcuts: complete keyboard reference
+#[derive(Debug, Clone, PartialEq)]
+pub enum SettingsTab {
+    General,
+    Editor,
+    Corrections,
+    Appearance,
+    Backup,
+    Shortcuts,
+}
+
 /// Application state
 pub struct ScrineverApp {
+    // === Windows ===
+    pub main_window: window::Id,
+    pub settings_window: Option<window::Id>,
+    pub about_window: Option<window::Id>,
+    pub settings_active_tab: SettingsTab,
+
     // === Project ===
     pub project: Option<Project>,
     pub selected_item: Option<Uuid>,
@@ -78,7 +104,6 @@ pub struct ScrineverApp {
 
     // === Dialogs ===
     pub show_compile_dialog: bool,
-    pub show_settings_dialog: bool,
     pub compile_options: CompileOptions,
 
     // === Search ===
@@ -128,6 +153,7 @@ pub struct ScrineverApp {
 
     // === Annotations ===
     pub annotation_text: String,
+    pub annotation_next_color: crate::core::annotation::AnnotationColor,
 
     // === Recent projects ===
     pub recent_projects: crate::core::recent::RecentProjects,
@@ -269,9 +295,19 @@ pub enum Message {
     SetItemLabel(Uuid, String),
     ToggleIncludeInCompile(Uuid),
 
-    // Settings dialog
+    // Window management
+    OpenSettingsWindow,
+    CloseSettingsWindow,
+    OpenAboutWindow,
+    CloseAboutWindow,
+    WindowOpened(window::Id),
+    WindowClosed(window::Id),
+    MainWindowClosed,
+
+    // Settings
     ShowSettings,
     HideSettings,
+    SettingsChangeTab(SettingsTab),
     SettingsSetProjectTitle(String),
     SettingsSetFont(String),
     SettingsSetFontSize(String),
@@ -280,6 +316,23 @@ pub enum Message {
     SettingsSetTarget(String),
     SettingsSetAutoSave(String),
     SettingsToggleWordCount(bool),
+    SettingsSetLineSpacing(String),
+    SettingsSetLineSpacingPreset(String),
+    SettingsSetEditorWidth(String),
+    SettingsToggleSpellCheck(bool),
+    SettingsToggleTypewriterScroll(bool),
+    SettingsToggleShowParagraphMarks(bool),
+    SettingsToggleHighContrast(bool),
+    SettingsToggleLargeUI(bool),
+    SettingsToggleReduceMotion(bool),
+    SettingsToggleScreenReaderHints(bool),
+    SettingsSetUIScale(String),
+    SettingsToggleAutoBackup(bool),
+    SettingsSetBackupInterval(String),
+    SettingsToggleSmartPunctuation(bool),
+    SettingsSetDefaultDocType(String),
+    SettingsToggleShowSynopsis(bool),
+    SettingsToggleAutoNumbering(bool),
 
     // Writing session
     SessionToggle,
@@ -503,7 +556,17 @@ impl ScrineverApp {
         spell_checker.try_init();
         spell_checker.load_user_dictionary();
 
+        // Open the main window explicitly (daemon mode)
+        let (main_id, open_main) = window::open(window::Settings {
+            size: iced::Size::new(1280.0, 800.0),
+            ..window::Settings::default()
+        });
+
         let app = Self {
+            main_window: main_id,
+            settings_window: None,
+            about_window: None,
+            settings_active_tab: SettingsTab::General,
             project: None,
             selected_item: None,
             editor: EditorState::new(),
@@ -513,7 +576,6 @@ impl ScrineverApp {
             bottom_panel: BottomPanel::None,
             active_toolbar_menu: None,
             show_compile_dialog: false,
-            show_settings_dialog: false,
             compile_options: CompileOptions::default(),
             search_query: String::new(),
             search_results: Vec::new(),
@@ -541,6 +603,7 @@ impl ScrineverApp {
             selected_collection: None,
             new_collection_name: String::new(),
             annotation_text: String::new(),
+            annotation_next_color: crate::core::annotation::AnnotationColor::Yellow,
             recent_projects: crate::core::recent::RecentProjects::load(),
             split_editor_item: None,
             doc_find_text: String::new(),
@@ -571,10 +634,16 @@ impl ScrineverApp {
             last_milestone: 0,
         };
 
-        (app, IcedTask::none())
+        (app, open_main.map(Message::WindowOpened))
     }
 
-    pub fn title(&self) -> String {
+    pub fn title(&self, window_id: window::Id) -> String {
+        if Some(window_id) == self.settings_window {
+            return "Avalon - Settings".to_string();
+        }
+        if Some(window_id) == self.about_window {
+            return "Avalon - About".to_string();
+        }
         let dirty = if self.editor.dirty { " *" } else { "" };
         match &self.project {
             Some(p) => format!("Avalon - {}{}", p.title, dirty),
@@ -1319,12 +1388,22 @@ impl ScrineverApp {
             }
 
             // ========== Settings dialog ==========
-            Message::ShowSettings => {
-                self.show_settings_dialog = true;
+            Message::ShowSettings | Message::OpenSettingsWindow => {
+                if self.settings_window.is_some() {
+                    // Already open — focus it
+                    if let Some(id) = self.settings_window {
+                        return window::gain_focus(id);
+                    }
+                }
+                let (id, open_task) = window::open(window::Settings {
+                    size: iced::Size::new(780.0, 680.0),
+                    ..window::Settings::default()
+                });
+                self.settings_window = Some(id);
+                return open_task.map(Message::WindowOpened);
             }
 
-            Message::HideSettings => {
-                self.show_settings_dialog = false;
+            Message::HideSettings | Message::CloseSettingsWindow => {
                 // Persist settings by saving the project
                 if let Some(ref mut project) = self.project {
                     if let Some(path) = project.path.clone() {
@@ -1333,6 +1412,67 @@ impl ScrineverApp {
                         }
                     }
                 }
+                if let Some(id) = self.settings_window.take() {
+                    return window::close(id);
+                }
+            }
+
+            Message::OpenAboutWindow => {
+                if self.about_window.is_some() {
+                    if let Some(id) = self.about_window {
+                        return window::gain_focus(id);
+                    }
+                }
+                let (id, open_task) = window::open(window::Settings {
+                    size: iced::Size::new(420.0, 380.0),
+                    resizable: false,
+                    ..window::Settings::default()
+                });
+                self.about_window = Some(id);
+                return open_task.map(Message::WindowOpened);
+            }
+
+            Message::CloseAboutWindow => {
+                if let Some(id) = self.about_window.take() {
+                    return window::close(id);
+                }
+            }
+
+            Message::WindowOpened(_id) => {
+                // Window created — nothing extra to do
+            }
+
+            Message::WindowClosed(id) => {
+                // Clean up state when a window is closed externally (e.g. X button)
+                if Some(id) == self.settings_window {
+                    self.settings_window = None;
+                    // Save settings on close
+                    if let Some(ref mut project) = self.project {
+                        if let Some(path) = project.path.clone() {
+                            if let Some(parent) = path.parent() {
+                                let _ = project.save(parent);
+                            }
+                        }
+                    }
+                } else if Some(id) == self.about_window {
+                    self.about_window = None;
+                } else if id == self.main_window {
+                    // Main window closed — exit the app
+                    // Close secondary windows first
+                    let mut tasks = Vec::new();
+                    if let Some(sw) = self.settings_window.take() {
+                        tasks.push(window::close(sw));
+                    }
+                    if let Some(aw) = self.about_window.take() {
+                        tasks.push(window::close(aw));
+                    }
+                    tasks.push(iced::exit());
+                    return IcedTask::batch(tasks);
+                }
+            }
+
+            Message::MainWindowClosed => {
+                return iced::exit();
             }
 
             Message::SettingsSetProjectTitle(title) => {
@@ -1390,6 +1530,135 @@ impl ScrineverApp {
             Message::SettingsToggleWordCount(val) => {
                 if let Some(ref mut project) = self.project {
                     project.settings.show_word_count = val;
+                }
+            }
+
+            Message::SettingsChangeTab(tab) => {
+                self.settings_active_tab = tab;
+            }
+
+            Message::SettingsSetLineSpacing(val) => {
+                if let Ok(spacing) = val.parse::<f32>() {
+                    if (0.5..=4.0).contains(&spacing) {
+                        if let Some(ref mut project) = self.project {
+                            project.settings.line_spacing = spacing;
+                        }
+                    }
+                }
+            }
+
+            Message::SettingsSetLineSpacingPreset(preset) => {
+                let spacing = match preset.as_str() {
+                    "Single" => 1.0,
+                    "1.15" => 1.15,
+                    "1.5" => 1.5,
+                    "Double" => 2.0,
+                    _ => 1.5,
+                };
+                if let Some(ref mut project) = self.project {
+                    project.settings.line_spacing = spacing;
+                }
+            }
+
+            Message::SettingsSetEditorWidth(val) => {
+                if let Ok(w) = val.parse::<f32>() {
+                    if (30.0..=100.0).contains(&w) {
+                        if let Some(ref mut project) = self.project {
+                            project.settings.editor_width = w;
+                        }
+                    }
+                }
+            }
+
+            Message::SettingsToggleSpellCheck(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.spell_check_enabled = val;
+                }
+            }
+
+            Message::SettingsToggleTypewriterScroll(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.typewriter_scroll = val;
+                }
+            }
+
+            Message::SettingsToggleShowParagraphMarks(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.show_paragraph_marks = val;
+                }
+            }
+
+            Message::SettingsToggleHighContrast(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.high_contrast = val;
+                }
+            }
+
+            Message::SettingsToggleLargeUI(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.large_ui = val;
+                }
+            }
+
+            Message::SettingsToggleReduceMotion(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.reduce_motion = val;
+                }
+            }
+
+            Message::SettingsToggleScreenReaderHints(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.screen_reader_hints = val;
+                }
+            }
+
+            Message::SettingsSetUIScale(val) => {
+                if let Ok(scale) = val.parse::<f32>() {
+                    if (0.5..=3.0).contains(&scale) {
+                        if let Some(ref mut project) = self.project {
+                            project.settings.ui_scale = scale;
+                        }
+                    }
+                }
+            }
+
+            Message::SettingsToggleAutoBackup(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.auto_backup = val;
+                }
+            }
+
+            Message::SettingsSetBackupInterval(val) => {
+                if let Ok(n) = val.parse::<u32>() {
+                    if n > 0 && n <= 100 {
+                        if let Some(ref mut project) = self.project {
+                            project.settings.backup_interval_saves = n;
+                        }
+                    }
+                }
+            }
+
+            Message::SettingsToggleSmartPunctuation(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.smart_punctuation = val;
+                }
+            }
+
+            Message::SettingsSetDefaultDocType(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.default_doc_type = val;
+                }
+            }
+
+            Message::SettingsToggleShowSynopsis(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.show_synopsis_in_binder = val;
+                }
+            }
+
+            Message::SettingsToggleAutoNumbering(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.auto_numbering = val;
                 }
             }
 
@@ -1664,10 +1933,11 @@ impl ScrineverApp {
                                 // Use selection range if available, otherwise use cursor position
                                 let (start, end) = self.editor.selection_range()
                                     .unwrap_or((self.editor.cursor, self.editor.cursor));
-                                let mut ann = crate::core::annotation::Annotation::new(
+                                let mut ann = crate::core::annotation::Annotation::with_color(
                                     start,
                                     end,
                                     &self.annotation_text,
+                                    self.annotation_next_color.clone(),
                                 );
                                 // Set author from compile settings if available
                                 if !self.compile_options.author.is_empty() {
@@ -1752,8 +2022,7 @@ impl ScrineverApp {
             }
 
             Message::CycleAnnotationColor => {
-                // Cycle the color that will be used for the next annotation
-                // This is a UI convenience - stored as a temporary state
+                self.annotation_next_color = self.annotation_next_color.next();
             }
 
             // ========== Project targets ==========
@@ -3242,8 +3511,6 @@ impl ScrineverApp {
                     self.show_project_stats = false;
                 } else if self.show_compile_dialog {
                     self.show_compile_dialog = false;
-                } else if self.show_settings_dialog {
-                    self.show_settings_dialog = false;
                 } else if self.bottom_panel != BottomPanel::None {
                     self.bottom_panel = BottomPanel::None;
                 } else if self.notification.is_some() {
@@ -3255,7 +3522,36 @@ impl ScrineverApp {
         IcedTask::none()
     }
 
-    pub fn view(&self) -> Element<'_, Message> {
+    pub fn view(&self, window_id: window::Id) -> Element<'_, Message> {
+        // Route to Settings window
+        if Some(window_id) == self.settings_window {
+            if let Some(ref project) = self.project {
+                return views::settings_dialog::view(
+                    &project.settings,
+                    &project.title,
+                    self.script_mode,
+                    &self.auto_correction,
+                    &self.settings_active_tab,
+                );
+            }
+            // No project open — show placeholder
+            return container(
+                text("Open a project first to access settings.").size(14).color(super::theme::Theme::TEXT_MUTED),
+            )
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .center_x(Length::Fill)
+            .center_y(Length::Fill)
+            .into();
+        }
+
+        // Route to About window
+        if Some(window_id) == self.about_window {
+            return views::about_dialog::view();
+        }
+
+        // === Main window ===
+
         // Welcome screen
         if self.project.is_none() {
             return views::welcome_screen::view(&self.recent_projects);
@@ -3266,16 +3562,6 @@ impl ScrineverApp {
         // Compile dialog (overlay)
         if self.show_compile_dialog {
             return views::compile_dialog::view(&self.compile_options, &self.compile_presets);
-        }
-
-        // Settings dialog (overlay)
-        if self.show_settings_dialog {
-            return views::settings_dialog::view(
-                &project.settings,
-                &project.title,
-                self.script_mode,
-                &self.auto_correction,
-            );
         }
 
         // Project statistics dialog (overlay)
@@ -3932,11 +4218,13 @@ impl ScrineverApp {
         let tick_sub = iced::time::every(std::time::Duration::from_secs(1))
             .map(|_| Message::Tick);
 
-        Subscription::batch([key_sub, tick_sub])
+        let close_sub = window::close_events().map(Message::WindowClosed);
+
+        Subscription::batch([key_sub, tick_sub, close_sub])
     }
 
     /// Dark theme
-    pub fn theme(&self) -> iced::Theme {
+    pub fn theme(&self, _window_id: window::Id) -> iced::Theme {
         iced::Theme::Dark
     }
 }

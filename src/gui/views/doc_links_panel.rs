@@ -3,7 +3,7 @@ use iced::{Element, Length, Padding};
 use uuid::Uuid;
 
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// A resolved document link
 pub struct DocLink {
@@ -215,6 +215,7 @@ pub fn view(
     .padding(Padding::from([8, 12]));
 
     container(content)
+        .style(theme::panel_style)
         .width(Length::Fill)
         .into()
 }

@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::core::binder::BinderItem;
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// Data for the quick reference panel
 pub struct QuickRefData {
@@ -175,6 +175,7 @@ pub fn view(data: &QuickRefData) -> Element<'static, Message> {
     .padding(Padding::from([8, 12]));
 
     container(content)
+        .style(theme::panel_style)
         .width(Length::Fill)
         .into()
 }

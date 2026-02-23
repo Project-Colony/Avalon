@@ -3,7 +3,7 @@ use iced::{Element, Length, Padding};
 
 use crate::core::binder::BinderItem;
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// Render the corkboard view — index cards on a cork background
 pub fn view(items: &[&BinderItem], parent_title: &str) -> Element<'static, Message> {
@@ -29,7 +29,9 @@ pub fn view(items: &[&BinderItem], parent_title: &str) -> Element<'static, Messa
                 .color(Theme::TEXT_MUTED),
         ]
     )
-    .padding(Padding::from([8, 16]));
+    .style(theme::view_header_style)
+    .padding(Padding::from([8, 16]))
+    .width(Length::Fill);
 
     if items.is_empty() {
         let empty_msg = column![
@@ -78,15 +80,16 @@ pub fn view(items: &[&BinderItem], parent_title: &str) -> Element<'static, Messa
                 with_synopsis, item_count,
                 with_status, item_count,
                 with_label, item_count))
-                .size(9)
+                .size(10)
                 .color(Theme::TEXT_MUTED),
             Space::with_width(Length::Fill),
             text(format!("{:.1} pages", total_words as f64 / 250.0))
-                .size(9)
+                .size(10)
                 .color(Theme::TEXT_MUTED),
         ]
         .padding(Padding::from([4, 16]))
     )
+    .style(theme::view_footer_style)
     .width(Length::Fill);
 
     let content = column![

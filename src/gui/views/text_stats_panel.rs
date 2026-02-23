@@ -3,7 +3,7 @@ use iced::{Element, Length, Padding};
 
 use crate::core::stats::TextAnalysis;
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// Render the text statistics panel (bottom panel)
 pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
@@ -206,6 +206,7 @@ pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
     .padding(Padding::from([8, 12]));
 
     container(content)
+        .style(theme::panel_style)
         .width(Length::Fill)
         .into()
 }

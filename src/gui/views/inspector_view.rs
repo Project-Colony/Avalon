@@ -5,7 +5,7 @@ use uuid::Uuid;
 use crate::core::binder::BinderItem;
 use crate::core::metadata::ProjectSettings;
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Icons, Theme};
 
 /// Data extracted from a BinderItem for the inspector (all owned)
 pub struct InspectorData {
@@ -119,7 +119,7 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
 
     let header = container(
         row![
-            text("INSPECTOR").size(12).color(Theme::TEXT_SECONDARY),
+            text("INSPECTOR").size(11).color(Theme::TEXT_SECONDARY),
             Space::with_width(Length::Fill),
             button(
                 text(bookmark_label).size(10).color(bookmark_color),
@@ -372,6 +372,7 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
     .width(Length::Fixed(240.0));
 
     container(scrollable(content))
+        .style(theme::sidebar_style)
         .height(Length::Fill)
         .into()
 }

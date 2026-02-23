@@ -1,4 +1,5 @@
-use iced::Color;
+use iced::widget::container;
+use iced::{Background, Border, Color, Shadow, Vector};
 
 /// Nerd Font icon constants (JetBrains Mono Nerd Font)
 ///
@@ -287,5 +288,261 @@ impl Theme {
             ("Dialogue", Self::SCRIPT_DIALOGUE),
             ("Transition", Self::SCRIPT_TRANSITION),
         ]
+    }
+}
+
+// ── Shared UI Style Functions ────────────────────────────────────────
+//
+// These provide consistent container styles used across all views.
+// Every panel, sidebar, dialog, and card should use these functions
+// instead of defining ad-hoc inline styles.
+
+/// Style for bottom panels (search, timer, session, annotations, etc.)
+pub fn panel_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Theme::BG_SECONDARY)),
+        border: Border {
+            color: Theme::BORDER_SUBTLE,
+            width: 1.0,
+            radius: 6.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for the sidebar (binder, inspector)
+pub fn sidebar_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Theme::SIDEBAR_BG)),
+        border: Border {
+            color: Theme::BORDER_SUBTLE,
+            width: 0.0,
+            radius: 0.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for panel section headers (the colored top strip)
+pub fn panel_header_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Theme::BG_TERTIARY)),
+        border: Border {
+            color: Theme::BORDER_SUBTLE,
+            width: 0.0,
+            radius: 6.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for cards within panels (stat blocks, template cards, entries)
+pub fn card_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Theme::BG_CARD)),
+        border: Border {
+            color: Theme::BORDER_SUBTLE,
+            width: 1.0,
+            radius: 6.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for elevated cards with a subtle accent border
+pub fn accent_card_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Color::from_rgba(0.20, 0.35, 0.55, 0.15))),
+        border: Border {
+            color: Color::from_rgba(0.30, 0.60, 0.90, 0.30),
+            width: 1.0,
+            radius: 6.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for full-screen dialogs (compile, settings, project stats)
+pub fn dialog_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Theme::BG_DIALOG)),
+        border: Border {
+            color: Theme::BORDER,
+            width: 1.0,
+            radius: 10.0.into(),
+        },
+        shadow: Shadow {
+            color: Color::from_rgba(0.0, 0.0, 0.0, 0.5),
+            offset: Vector::new(0.0, 4.0),
+            blur_radius: 16.0,
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for the status bar at the bottom
+pub fn status_bar_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Theme::BG_STATUS_BAR)),
+        border: Border {
+            color: Theme::BORDER_SUBTLE,
+            width: 1.0,
+            radius: 0.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for the toolbar / menu bar area
+pub fn toolbar_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Theme::BG_TOOLBAR)),
+        border: Border {
+            color: Theme::BORDER_SUBTLE,
+            width: 0.0,
+            radius: 0.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for view headers (editor header, corkboard header, etc.)
+pub fn view_header_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Theme::BG_TERTIARY)),
+        border: Border {
+            color: Theme::BORDER_SUBTLE,
+            width: 0.0,
+            radius: 0.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for view footers (editor stats bar, corkboard footer, etc.)
+pub fn view_footer_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Theme::BG_PRIMARY)),
+        border: Border {
+            color: Theme::BORDER_SUBTLE,
+            width: 1.0,
+            radius: 0.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for separator lines within panels
+pub fn separator_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Theme::BORDER_SUBTLE)),
+        ..Default::default()
+    }
+}
+
+/// Style for the editor content area
+pub fn editor_bg_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Theme::BG_EDITOR)),
+        ..Default::default()
+    }
+}
+
+/// Style for the welcome screen hero section
+pub fn hero_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Theme::BG_EDITOR)),
+        border: Border {
+            color: Theme::BORDER_SUBTLE,
+            width: 0.0,
+            radius: 10.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for the footer section on welcome screen
+pub fn footer_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Color::from_rgba(0.14, 0.14, 0.17, 0.8))),
+        border: Border {
+            color: Theme::BORDER_SUBTLE,
+            width: 1.0,
+            radius: 6.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+// ── Shared Utility Functions ────────────────────────────────────────
+
+/// Format a number with abbreviated suffixes (1.2k, 3.5M)
+pub fn format_count(n: usize) -> String {
+    if n >= 1_000_000 {
+        format!("{:.1}M", n as f64 / 1_000_000.0)
+    } else if n >= 1_000 {
+        format!("{},{:03}", n / 1000, n % 1000)
+    } else {
+        n.to_string()
+    }
+}
+
+/// Format a number with compact suffixes for status bars
+pub fn format_compact(n: usize) -> String {
+    if n < 1000 {
+        n.to_string()
+    } else if n < 1_000_000 {
+        format!("{:.1}k", n as f64 / 1000.0)
+    } else {
+        format!("{:.1}M", n as f64 / 1_000_000.0)
+    }
+}
+
+/// Build a text progress bar string
+pub fn progress_bar_text(pct: f64, width: usize) -> String {
+    let filled = ((pct / 100.0) * width as f64).round() as usize;
+    let empty = width.saturating_sub(filled);
+    format!(
+        "{}{}",
+        "\u{2588}".repeat(filled),
+        "\u{2591}".repeat(empty),
+    )
+}
+
+/// Format byte sizes into human-readable strings
+pub fn format_size(bytes: u64) -> String {
+    if bytes < 1024 {
+        format!("{} B", bytes)
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else if bytes < 1024 * 1024 * 1024 {
+        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+    } else {
+        format!("{:.2} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
+    }
+}
+
+/// Format minutes into a human-readable time string
+pub fn format_time(minutes: f64) -> String {
+    if minutes < 1.0 {
+        format!("{:.0}s", minutes * 60.0)
+    } else if minutes < 60.0 {
+        format!("{:.0}m", minutes)
+    } else {
+        let hours = (minutes / 60.0).floor();
+        let mins = minutes - hours * 60.0;
+        format!("{:.0}h {:.0}m", hours, mins)
+    }
+}
+
+/// Format a reading time estimate from word count
+pub fn reading_time(word_count: usize) -> String {
+    let minutes = word_count as f64 / 250.0;
+    if minutes < 1.0 {
+        "<1m read".to_string()
+    } else if minutes < 60.0 {
+        format!("~{:.0}m read", minutes)
+    } else {
+        format!("~{:.1}h read", minutes / 60.0)
     }
 }

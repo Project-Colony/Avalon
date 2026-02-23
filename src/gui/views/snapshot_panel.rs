@@ -3,7 +3,7 @@ use iced::{Element, Length, Padding};
 
 use crate::core::snapshot::{DiffChunk, Snapshot};
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// Render the snapshot panel (bottom panel)
 pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Option<usize>) -> Element<'static, Message> {
@@ -238,6 +238,7 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
     .padding(Padding::from([8, 12]));
 
     container(content)
+        .style(theme::panel_style)
         .width(Length::Fill)
         .into()
 }
