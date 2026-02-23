@@ -4,10 +4,16 @@ use iced::{Border, Element, Length, Padding};
 use crate::gui::app::{BottomPanel, Message, ToolbarMenu, ViewMode};
 use crate::gui::theme::{self, Theme};
 
-/// Transparent button style for menu headers and dropdown items
-fn transparent_button(_theme: &iced::Theme, _status: button::Status) -> button::Style {
+/// Transparent button style with hover highlight for menu items
+fn menu_button_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+    let bg = match status {
+        button::Status::Hovered => Some(iced::Background::Color(iced::Color::from_rgba(1.0, 1.0, 1.0, 0.1))),
+        button::Status::Pressed => Some(iced::Background::Color(iced::Color::from_rgba(1.0, 1.0, 1.0, 0.15))),
+        _ => None,
+    };
+
     button::Style {
-        background: None,
+        background: bg,
         text_color: Theme::TEXT_PRIMARY,
         border: Border {
             color: iced::Color::TRANSPARENT,
@@ -58,14 +64,16 @@ pub fn dropdown_overlay(
         dropdown_content,
     ];
 
-    // Full overlay: dropdown at top, click-away area fills the rest
-    let overlay = column![
-        positioned_dropdown,
-        mouse_area(
-            Space::new(Length::Fill, Length::Fill)
-        )
-        .on_press(Message::CloseToolbarMenu),
-    ];
+    // Full-screen overlay: a mouse_area covering everything so clicking
+    // anywhere outside the dropdown closes the menu.
+    // The dropdown sits at the top-left; the rest is empty click-away space.
+    let overlay = mouse_area(
+        column![
+            positioned_dropdown,
+            Space::new(Length::Fill, Length::Fill),
+        ]
+    )
+    .on_press(Message::CloseToolbarMenu);
 
     Some(
         container(overlay)
@@ -85,7 +93,7 @@ fn menu_header(label: &str, menu: &ToolbarMenu, active: &Option<ToolbarMenu>) ->
     )
     .on_press(Message::ToggleToolbarMenu(menu.clone()))
     .padding(Padding::from([5, 12]))
-    .style(transparent_button)
+    .style(menu_button_style)
     .into()
 }
 
@@ -220,7 +228,8 @@ fn dropdown_btn(label: &str, message: Message) -> Element<'static, Message> {
     )
     .on_press(message)
     .padding(Padding::from([4, 12]))
-    .style(transparent_button)
+    .width(Length::Fill)
+    .style(menu_button_style)
     .into()
 }
 
@@ -234,7 +243,8 @@ fn view_btn(label: &str, mode: ViewMode, current: &ViewMode) -> Element<'static,
     )
     .on_press(Message::SwitchView(mode))
     .padding(Padding::from([4, 12]))
-    .style(transparent_button)
+    .width(Length::Fill)
+    .style(menu_button_style)
     .into()
 }
 
@@ -247,7 +257,8 @@ fn toggle_btn(label: &str, active: bool, message: Message) -> Element<'static, M
     )
     .on_press(message)
     .padding(Padding::from([4, 12]))
-    .style(transparent_button)
+    .width(Length::Fill)
+    .style(menu_button_style)
     .into()
 }
 
@@ -261,6 +272,7 @@ fn panel_btn(label: &str, panel: BottomPanel, current: &BottomPanel) -> Element<
     )
     .on_press(Message::ShowBottomPanel(panel))
     .padding(Padding::from([4, 12]))
-    .style(transparent_button)
+    .width(Length::Fill)
+    .style(menu_button_style)
     .into()
 }
