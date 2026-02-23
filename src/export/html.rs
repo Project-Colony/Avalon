@@ -4,7 +4,8 @@ use pulldown_cmark::{Parser, html::push_html};
 use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
-    let mut body = String::new();
+    let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 100).sum();
+    let mut body = String::with_capacity(estimated_size);
     let mut doc_index = 0usize;
 
     for (i, content) in contents.iter().enumerate() {

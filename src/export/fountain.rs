@@ -5,7 +5,8 @@ use super::compiler::{CompileContent, CompileOptions};
 
 /// Compile content to Fountain screenplay format
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
-    let mut output = String::new();
+    let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 20).sum();
+    let mut output = String::with_capacity(estimated_size);
 
     // Title page metadata
     if options.include_front_matter {
@@ -40,7 +41,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
 
 /// Attempt basic prose-to-Fountain conversion
 fn prose_to_fountain(text: &str) -> String {
-    let mut output = String::new();
+    let mut output = String::with_capacity(text.len());
     let lines: Vec<&str> = text.lines().collect();
     let mut i = 0;
 

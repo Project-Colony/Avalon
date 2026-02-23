@@ -4,7 +4,8 @@ use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
 
 /// Compile to RTF (Rich Text Format)
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
-    let mut rtf = String::new();
+    let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 60).sum::<usize>() + 512;
+    let mut rtf = String::with_capacity(estimated_size);
 
     // RTF header
     rtf.push_str("{\\rtf1\\ansi\\ansicpg1252\\deff0\n");

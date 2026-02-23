@@ -3,7 +3,8 @@ use anyhow::Result;
 use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
-    let mut output = String::new();
+    let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 20).sum();
+    let mut output = String::with_capacity(estimated_size);
 
     // Front matter / title page
     if options.include_front_matter && !options.title.is_empty() {

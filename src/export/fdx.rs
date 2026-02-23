@@ -76,7 +76,8 @@ pub fn escape_xml(text: &str) -> String { compiler::escape_xml(text) }
 
 /// Compile content to FinalDraft (.fdx) XML format
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
-    let mut output = String::new();
+    let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 80).sum::<usize>() + 256;
+    let mut output = String::with_capacity(estimated_size);
 
     // XML declaration and root element
     output.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");

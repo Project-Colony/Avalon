@@ -3,7 +3,8 @@ use anyhow::Result;
 use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
-    let mut output = String::new();
+    let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 20).sum();
+    let mut output = String::with_capacity(estimated_size);
 
     // YAML front matter block (common in Markdown publishing)
     if options.include_front_matter && !options.title.is_empty() {
@@ -15,7 +16,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
         let _ = writeln!(output,"date: \"{}\"", chrono::Local::now().format("%Y-%m-%d"));
 
         // Word count metadata
-        let total_words: usize = contents.iter().map(|c| c.text.split_whitespace().count()).sum();
+        let total_words = compiler::total_word_count(contents);
         let _ = writeln!(output,"wordcount: {}", total_words);
 
         output.push_str("---\n\n");

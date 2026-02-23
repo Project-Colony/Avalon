@@ -3,7 +3,8 @@ use anyhow::Result;
 use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
-    let mut output = String::new();
+    let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 40).sum::<usize>() + 512;
+    let mut output = String::with_capacity(estimated_size);
 
     // LaTeX preamble
     output.push_str("\\documentclass[12pt]{article}\n");
