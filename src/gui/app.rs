@@ -128,6 +128,7 @@ pub struct ScrineverApp {
 
     // === Annotations ===
     pub annotation_text: String,
+    pub annotation_next_color: crate::core::annotation::AnnotationColor,
 
     // === Recent projects ===
     pub recent_projects: crate::core::recent::RecentProjects,
@@ -541,6 +542,7 @@ impl ScrineverApp {
             selected_collection: None,
             new_collection_name: String::new(),
             annotation_text: String::new(),
+            annotation_next_color: crate::core::annotation::AnnotationColor::Yellow,
             recent_projects: crate::core::recent::RecentProjects::load(),
             split_editor_item: None,
             doc_find_text: String::new(),
@@ -1664,10 +1666,11 @@ impl ScrineverApp {
                                 // Use selection range if available, otherwise use cursor position
                                 let (start, end) = self.editor.selection_range()
                                     .unwrap_or((self.editor.cursor, self.editor.cursor));
-                                let mut ann = crate::core::annotation::Annotation::new(
+                                let mut ann = crate::core::annotation::Annotation::with_color(
                                     start,
                                     end,
                                     &self.annotation_text,
+                                    self.annotation_next_color.clone(),
                                 );
                                 // Set author from compile settings if available
                                 if !self.compile_options.author.is_empty() {
@@ -1752,8 +1755,7 @@ impl ScrineverApp {
             }
 
             Message::CycleAnnotationColor => {
-                // Cycle the color that will be used for the next annotation
-                // This is a UI convenience - stored as a temporary state
+                self.annotation_next_color = self.annotation_next_color.next();
             }
 
             // ========== Project targets ==========
