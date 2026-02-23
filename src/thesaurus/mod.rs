@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::fs;
 use anyhow::Result;
@@ -302,7 +302,7 @@ impl Thesaurus {
     pub fn total_unique_synonyms(&self) -> usize {
         self.entries.values()
             .flat_map(|entries| entries.iter().flat_map(|e| e.synonyms.iter()))
-            .collect::<std::collections::HashSet<_>>()
+            .collect::<HashSet<_>>()
             .len()
     }
 }
