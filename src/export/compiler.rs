@@ -675,7 +675,8 @@ pub struct SectionAssembler;
 impl SectionAssembler {
     /// Assemble contents into a single text with headings and separators
     pub fn assemble(contents: &[CompileContent], options: &CompileOptions) -> String {
-        let mut output = String::new();
+        let estimated: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 20).sum();
+        let mut output = String::with_capacity(estimated);
         let manifest = CompileManifest::from_contents(contents, options);
 
         for (i, entry) in manifest.sections.iter().enumerate() {

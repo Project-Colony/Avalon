@@ -307,7 +307,8 @@ fn lcs_diff(old: &[&str], new: &[&str]) -> Vec<DiffChunk> {
 /// Format a diff as a unified diff string (like `diff -u` output)
 pub fn format_unified_diff(chunks: &[DiffChunk], old_label: &str, new_label: &str) -> String {
     use std::fmt::Write;
-    let mut output = String::new();
+    let estimated = chunks.len() * 40 + old_label.len() + new_label.len() + 64;
+    let mut output = String::with_capacity(estimated);
     let _ = writeln!(output, "--- {}", old_label);
     let _ = writeln!(output, "+++ {}", new_label);
 

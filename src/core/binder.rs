@@ -112,7 +112,7 @@ impl Binder {
 
     /// Get all text content concatenated (for readability analysis)
     pub fn all_text(&self) -> String {
-        let mut result = String::new();
+        let mut result = String::with_capacity(self.total_char_count());
         self.for_each_item(|item| {
             if let Some(ref doc) = item.document {
                 if !doc.content.trim().is_empty() {

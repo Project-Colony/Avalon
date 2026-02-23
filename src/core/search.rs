@@ -519,7 +519,8 @@ pub struct MatchContext {
 impl MatchContext {
     /// Format as a displayable block
     pub fn display(&self) -> String {
-        let mut output = String::new();
+        let line_estimate = self.total_lines() * 40;
+        let mut output = String::with_capacity(line_estimate);
         for (i, line) in self.before.iter().enumerate() {
             let num = self.line_number - self.before.len() + i;
             let _ = writeln!(output, "  {:>4} | {}", num, line);
