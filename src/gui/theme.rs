@@ -145,9 +145,7 @@ impl Theme {
     pub const SCRIPT_CHARACTER: Color = Color::from_rgb(0.70, 0.60, 0.95);
     pub const SCRIPT_DIALOGUE: Color = Color::from_rgb(0.90, 0.85, 0.70);
     pub const SCRIPT_TRANSITION: Color = Color::from_rgb(0.60, 0.60, 0.70);
-}
 
-impl Theme {
     /// Parse a hex color string (e.g. "#3498db") to an iced Color
     pub fn from_hex(hex: &str) -> Color {
         let hex = hex.trim_start_matches('#');

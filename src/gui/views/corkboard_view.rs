@@ -115,8 +115,7 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
     let id = item.id;
 
     let word_count = item.document.as_ref()
-        .map(|d| d.word_count())
-        .unwrap_or(0);
+        .map_or(0, |d| d.word_count());
 
     let word_display = if word_count == 0 {
         "empty".to_string()
@@ -223,8 +222,7 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
 
     // Snapshot and notes indicators
     let has_notes = item.document.as_ref()
-        .map(|d| !d.notes.trim().is_empty())
-        .unwrap_or(false);
+        .is_some_and(|d| !d.notes.trim().is_empty());
 
     let mut indicator_parts: Vec<String> = Vec::new();
     if !item.snapshots.is_empty() {

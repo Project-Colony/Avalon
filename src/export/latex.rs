@@ -1,8 +1,10 @@
+use std::fmt::Write as _;
 use anyhow::Result;
-use super::compiler::{CompileContent, CompileOptions, SeparatorType};
+use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
-    let mut output = String::new();
+    let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 40).sum::<usize>() + 512;
+    let mut output = String::with_capacity(estimated_size);
 
     // LaTeX preamble
     output.push_str("\\documentclass[12pt]{article}\n");
@@ -23,19 +25,19 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
 
     // Header with author/title
     if !options.title.is_empty() {
-        output.push_str(&format!(
-            "\\fancyhead[R]{{\\textit{{{}}}}}\n",
+        let _ = writeln!(output,
+            "\\fancyhead[R]{{\\textit{{{}}}}}",
             escape_latex(&options.title)
-        ));
+        );
     }
 
     output.push('\n');
 
     if !options.title.is_empty() {
-        output.push_str(&format!("\\title{{{}}}\n", escape_latex(&options.title)));
+        let _ = writeln!(output,"\\title{{{}}}", escape_latex(&options.title));
     }
     if !options.author.is_empty() {
-        output.push_str(&format!("\\author{{{}}}\n", escape_latex(&options.author)));
+        let _ = writeln!(output,"\\author{{{}}}", escape_latex(&options.author));
     }
     output.push_str("\\date{}\n\n");
     output.push_str("\\begin{document}\n\n");
@@ -57,11 +59,11 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                 3 => "paragraph",
                 _ => "subparagraph",
             };
-            output.push_str(&format!(
+            let _ = write!(output,
                 "\\{}{{{}}} \n\n",
                 cmd,
                 escape_latex(&content.title)
-            ));
+            );
             prev_was_text = false;
         } else {
             // Separator between consecutive text documents
@@ -143,12 +145,12 @@ fn markdown_to_latex(text: &str) -> String {
         }
 
         // Blockquote
-        if trimmed.starts_with("> ") {
+        if let Some(quoted) = trimmed.strip_prefix("> ") {
             if !in_blockquote {
                 output.push_str("\\begin{quote}\n");
                 in_blockquote = true;
             }
-            let content = convert_inline_formatting(&trimmed[2..]);
+            let content = convert_inline_formatting(quoted);
             output.push_str(&content);
             output.push('\n');
             continue;
@@ -166,7 +168,7 @@ fn markdown_to_latex(text: &str) -> String {
         // Unordered list item
         if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
             let content = convert_inline_formatting(&trimmed[2..]);
-            output.push_str(&format!("\\textbullet\\ {}\n", content));
+            let _ = writeln!(output,"\\textbullet\\ {}", content);
             continue;
         }
 
@@ -219,7 +221,7 @@ fn convert_inline_formatting(text: &str) -> String {
         if i + 1 < len && chars[i] == '*' && chars[i + 1] == '*' {
             if let Some(end) = find_closing(&chars, i + 2, '*', '*') {
                 let inner: String = chars[i + 2..end].iter().collect();
-                result.push_str(&format!("\\textbf{{{}}}", escape_latex(&inner)));
+                let _ = write!(result,"\\textbf{{{}}}", escape_latex(&inner));
                 i = end + 2;
                 continue;
             }
@@ -229,7 +231,7 @@ fn convert_inline_formatting(text: &str) -> String {
         if chars[i] == '*' {
             if let Some(end) = find_closing_single(&chars, i + 1, '*') {
                 let inner: String = chars[i + 1..end].iter().collect();
-                result.push_str(&format!("\\textit{{{}}}", escape_latex(&inner)));
+                let _ = write!(result,"\\textit{{{}}}", escape_latex(&inner));
                 i = end + 1;
                 continue;
             }
@@ -239,7 +241,7 @@ fn convert_inline_formatting(text: &str) -> String {
         if i + 1 < len && chars[i] == '~' && chars[i + 1] == '~' {
             if let Some(end) = find_closing(&chars, i + 2, '~', '~') {
                 let inner: String = chars[i + 2..end].iter().collect();
-                result.push_str(&format!("\\sout{{{}}}", escape_latex(&inner)));
+                let _ = write!(result,"\\sout{{{}}}", escape_latex(&inner));
                 i = end + 2;
                 continue;
             }
@@ -249,7 +251,7 @@ fn convert_inline_formatting(text: &str) -> String {
         if chars[i] == '`' {
             if let Some(end) = find_closing_single(&chars, i + 1, '`') {
                 let inner: String = chars[i + 1..end].iter().collect();
-                result.push_str(&format!("\\texttt{{{}}}", escape_latex(&inner)));
+                let _ = write!(result,"\\texttt{{{}}}", escape_latex(&inner));
                 i = end + 1;
                 continue;
             }
@@ -289,17 +291,12 @@ fn find_closing(chars: &[char], start: usize, c1: char, c2: char) -> Option<usiz
 
 /// Find closing single-char delimiter (e.g. *)
 fn find_closing_single(chars: &[char], start: usize, c: char) -> Option<usize> {
-    for i in start..chars.len() {
-        if chars[i] == c {
-            return Some(i);
-        }
-    }
-    None
+    (start..chars.len()).find(|&i| chars[i] == c)
 }
 
 /// Count total words across all content sections
 pub fn word_count(contents: &[CompileContent]) -> usize {
-    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+    compiler::total_word_count(contents)
 }
 
 /// Estimate page count (LaTeX with double spacing, A4, 1-inch margins ~ 250 words/page)

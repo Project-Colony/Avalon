@@ -1,28 +1,30 @@
+use std::fmt::Write;
 use anyhow::Result;
-use super::compiler::{CompileContent, CompileOptions, SeparatorType};
+use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
-    let mut output = String::new();
+    let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 20).sum();
+    let mut output = String::with_capacity(estimated_size);
 
     // YAML front matter block (common in Markdown publishing)
     if options.include_front_matter && !options.title.is_empty() {
         output.push_str("---\n");
-        output.push_str(&format!("title: \"{}\"\n", escape_yaml(&options.title)));
+        let _ = writeln!(output,"title: \"{}\"", escape_yaml(&options.title));
         if !options.author.is_empty() {
-            output.push_str(&format!("author: \"{}\"\n", escape_yaml(&options.author)));
+            let _ = writeln!(output,"author: \"{}\"", escape_yaml(&options.author));
         }
-        output.push_str(&format!("date: \"{}\"\n", chrono::Local::now().format("%Y-%m-%d")));
+        let _ = writeln!(output,"date: \"{}\"", chrono::Local::now().format("%Y-%m-%d"));
 
         // Word count metadata
-        let total_words: usize = contents.iter().map(|c| c.text.split_whitespace().count()).sum();
-        output.push_str(&format!("wordcount: {}\n", total_words));
+        let total_words = compiler::total_word_count(contents);
+        let _ = writeln!(output,"wordcount: {}", total_words);
 
         output.push_str("---\n\n");
 
         // Title as H1
-        output.push_str(&format!("# {}\n\n", options.title));
+        let _ = write!(output,"# {}\n\n", options.title);
         if !options.author.is_empty() {
-            output.push_str(&format!("*by {}*\n\n", options.author));
+            let _ = write!(output,"*by {}*\n\n", options.author);
         }
         output.push_str("---\n\n");
     }
@@ -34,10 +36,10 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
             if content.is_folder || !content.text.is_empty() {
                 let indent = "  ".repeat(content.depth);
                 let anchor = slug(&content.title);
-                output.push_str(&format!(
-                    "{}- [{}](#{})\n",
+                let _ = writeln!(output,
+                    "{}- [{}](#{})",
                     indent, content.title, anchor
-                ));
+                );
             }
         }
         output.push_str("\n---\n\n");
@@ -55,7 +57,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
             // Folder becomes heading, depth maps: 0->##, 1->##, 2->###, etc.
             let level = (content.depth + 2).min(6);
             let hashes = "#".repeat(level);
-            output.push_str(&format!("{} {}\n\n", hashes, content.title));
+            let _ = write!(output,"{} {}\n\n", hashes, content.title);
             prev_was_text = false;
         } else if !content.text.is_empty() {
             // Section separator between consecutive text documents
@@ -69,7 +71,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                         output.push_str("\n---\n\n");
                     }
                     SeparatorType::Custom(s) => {
-                        output.push_str(&format!("\n{}\n\n", s));
+                        let _ = write!(output,"\n{}\n\n", s);
                     }
                     SeparatorType::None => {}
                 }
@@ -90,25 +92,11 @@ fn escape_yaml(s: &str) -> String {
      .replace('"', "\\\"")
 }
 
-/// Create a URL-safe slug from a title (for anchor links)
-fn slug(title: &str) -> String {
-    title
-        .to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '-' })
-        .collect::<String>()
-        .split('-')
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
-}
+fn slug(title: &str) -> String { compiler::slug(title) }
 
 /// Count total words across all content sections
 pub fn word_count(contents: &[CompileContent]) -> usize {
-    contents
-        .iter()
-        .map(|c| c.text.split_whitespace().count())
-        .sum()
+    compiler::total_word_count(contents)
 }
 
 /// Count total characters across all content sections

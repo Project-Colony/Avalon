@@ -71,19 +71,19 @@ pub fn view(generated_names: &[String]) -> Element<'static, Message> {
 
     let mut names_list = column![].spacing(2);
     for (idx, name) in generated_names.iter().rev().take(25).enumerate() {
-        let name_clone = name.clone();
+        let name_owned = name.clone();
         let index_str = format!("{}.", idx + 1);
         let name_row = row![
             text(index_str)
                 .size(10)
                 .color(Theme::TEXT_MUTED)
                 .width(Length::Fixed(24.0)),
-            text(name.clone()).size(13).color(Theme::TEXT_PRIMARY),
+            text(name_owned.clone()).size(13).color(Theme::TEXT_PRIMARY),
             Space::with_width(Length::Fill),
             button(
                 text("Insert").size(10).color(Theme::TEXT_ACCENT),
             )
-            .on_press(Message::InsertSynonym(name_clone))
+            .on_press(Message::InsertSynonym(name_owned))
             .padding(Padding::from([2, 6])),
         ]
         .align_y(iced::Alignment::Center);

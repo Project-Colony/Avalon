@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use std::path::PathBuf;
@@ -140,10 +141,15 @@ impl RecentProjects {
     pub fn save(&self) {
         let path = Self::config_path();
         if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                eprintln!("Warning: failed to create config dir: {}", e);
+                return;
+            }
         }
         if let Ok(json) = serde_json::to_string_pretty(self) {
-            let _ = std::fs::write(path, json);
+            if let Err(e) = std::fs::write(&path, json) {
+                eprintln!("Warning: failed to save recent files: {}", e);
+            }
         }
     }
 
@@ -160,11 +166,10 @@ impl RecentProjects {
 
     /// Get the total number of unique project paths
     pub fn unique_paths(&self) -> usize {
-        let mut seen = std::collections::HashSet::new();
-        for p in &self.projects {
-            seen.insert(p.path.clone());
-        }
-        seen.len()
+        self.projects.iter()
+            .map(|p| &p.path)
+            .collect::<HashSet<_>>()
+            .len()
     }
 
     /// Sort projects by title alphabetically

@@ -10,24 +10,17 @@ pub fn view<'a>(
     items: &[&BinderItem],
     parent_title: &str,
 ) -> Element<'a, Message> {
-    let total_words: usize = items.iter()
+    let (total_words, total_chars, total_sentences) = items.iter()
         .filter_map(|i| i.document.as_ref())
-        .map(|d| d.word_count())
-        .sum();
-
-    let total_chars: usize = items.iter()
-        .filter_map(|i| i.document.as_ref())
-        .map(|d| d.char_count())
-        .sum();
-
-    let total_sentences: usize = items.iter()
-        .filter_map(|i| i.document.as_ref())
-        .map(|d| {
-            d.content.chars()
-                .filter(|c| *c == '.' || *c == '!' || *c == '?')
-                .count()
-        })
-        .sum();
+        .fold((0usize, 0usize, 0usize), |(w, c, s), d| {
+            (
+                w + d.word_count(),
+                c + d.char_count(),
+                s + d.content.chars()
+                    .filter(|ch| *ch == '.' || *ch == '!' || *ch == '?')
+                    .count(),
+            )
+        });
 
     // Reading time
     let reading_min = total_words as f64 / 250.0;
@@ -79,13 +72,11 @@ pub fn view<'a>(
 
         for (i, item) in items.iter().enumerate() {
             let words = item.document.as_ref()
-                .map(|d| d.word_count())
-                .unwrap_or(0);
+                .map_or(0, |d| d.word_count());
             cumulative_words += words;
 
             let chars = item.document.as_ref()
-                .map(|d| d.char_count())
-                .unwrap_or(0);
+                .map_or(0, |d| d.char_count());
 
             // Progress through the composite document
             let progress_pct = if total_words > 0 {
@@ -96,16 +87,13 @@ pub fn view<'a>(
 
             // Document title header with section number, status, and label
             let status_text = item.metadata.status.as_ref()
-                .map(|s| format!(" [{}]", s.name))
-                .unwrap_or_default();
+                .map_or_else(String::new, |s| format!(" [{}]", s.name));
 
             let label_indicator = item.metadata.label.as_ref()
-                .map(|l| format!(" \u{f111} {}", l.name))
-                .unwrap_or_default();
+                .map_or_else(String::new, |l| format!(" \u{f111} {}", l.name));
 
             let label_color = item.metadata.label.as_ref()
-                .map(|l| l.color.to_iced_color())
-                .unwrap_or(Theme::TEXT_ACCENT);
+                .map_or(Theme::TEXT_ACCENT, |l| l.color.to_iced_color());
 
             // Section marker
             let section_marker = format!("\u{2503} {}.", i + 1);
@@ -170,8 +158,7 @@ pub fn view<'a>(
 
             // Document content
             let doc_content = item.document.as_ref()
-                .map(|d| d.content.as_str())
-                .unwrap_or("");
+                .map_or("", |d| d.content.as_str());
 
             let doc_text = container(
                 text(doc_content.to_string())
@@ -198,7 +185,7 @@ pub fn view<'a>(
                 let separator = container(
                     row![
                         Space::with_width(24),
-                        text(bar.clone())
+                        text(bar)
                             .size(8)
                             .color(Theme::BORDER),
                         Space::with_width(8),

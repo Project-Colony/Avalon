@@ -205,7 +205,7 @@ fn tab_general(
     project_title: &str,
 ) -> Element<'static, Message> {
     let title_input = text_input("Project title...", project_title)
-        .on_input(|val| Message::SettingsSetProjectTitle(val))
+        .on_input(Message::SettingsSetProjectTitle)
         .size(14)
         .padding(8);
 
@@ -213,21 +213,21 @@ fn tab_general(
         .map(|t| t.to_string())
         .unwrap_or_default();
     let target_input = text_input("e.g. 80000", &target_str)
-        .on_input(|val| Message::SettingsSetTarget(val))
+        .on_input(Message::SettingsSetTarget)
         .size(13)
         .padding(6)
         .width(Length::Fixed(160.0));
 
     let deadline_str = settings.target_deadline.clone().unwrap_or_default();
     let deadline_input = text_input("YYYY-MM-DD", &deadline_str)
-        .on_input(|val| Message::SettingsSetDeadline(val))
+        .on_input(Message::SettingsSetDeadline)
         .size(13)
         .padding(6)
         .width(Length::Fixed(160.0));
 
     let autosave_str = format!("{}", settings.auto_save_seconds);
     let autosave_input = text_input("30", &autosave_str)
-        .on_input(|val| Message::SettingsSetAutoSave(val))
+        .on_input(Message::SettingsSetAutoSave)
         .size(13)
         .padding(6)
         .width(Length::Fixed(80.0));
@@ -244,7 +244,7 @@ fn tab_general(
     let doc_type_picker = pick_list(
         doc_type_options,
         Some(current_doc_type),
-        |selected| Message::SettingsSetDefaultDocType(selected),
+        Message::SettingsSetDefaultDocType,
     )
     .width(Length::Fixed(160.0))
     .placeholder("None (default)");
@@ -373,7 +373,7 @@ fn tab_editor(
 ) -> Element<'static, Message> {
     let comp_width_str = format!("{:.0}", settings.fullscreen_text_width);
     let comp_width_input = text_input("60", &comp_width_str)
-        .on_input(|val| Message::SettingsSetCompWidth(val))
+        .on_input(Message::SettingsSetCompWidth)
         .size(13)
         .padding(6)
         .width(Length::Fixed(80.0));
@@ -506,13 +506,13 @@ fn tab_appearance(settings: &ProjectSettings) -> Element<'static, Message> {
     let font_picker = pick_list(
         font_options,
         Some(settings.editor_font.clone()),
-        |selected| Message::SettingsSetFont(selected),
+        Message::SettingsSetFont,
     )
     .width(Length::Fixed(180.0));
 
     let font_size_str = format!("{:.0}", settings.editor_font_size);
     let font_size_input = text_input("16", &font_size_str)
-        .on_input(|val| Message::SettingsSetFontSize(val))
+        .on_input(Message::SettingsSetFontSize)
         .size(13)
         .padding(6)
         .width(Length::Fixed(70.0));
@@ -532,7 +532,7 @@ fn tab_appearance(settings: &ProjectSettings) -> Element<'static, Message> {
     let spacing_picker = pick_list(
         spacing_options,
         Some(current_spacing),
-        |selected| Message::SettingsSetLineSpacingPreset(selected),
+        Message::SettingsSetLineSpacingPreset,
     )
     .width(Length::Fixed(110.0));
 
@@ -555,7 +555,7 @@ fn tab_appearance(settings: &ProjectSettings) -> Element<'static, Message> {
     // Editor width
     let editor_width_str = format!("{:.0}", settings.editor_width);
     let editor_width_input = text_input("80", &editor_width_str)
-        .on_input(|val| Message::SettingsSetEditorWidth(val))
+        .on_input(Message::SettingsSetEditorWidth)
         .size(13)
         .padding(6)
         .width(Length::Fixed(70.0));
@@ -651,7 +651,7 @@ fn tab_appearance(settings: &ProjectSettings) -> Element<'static, Message> {
 fn tab_backup(settings: &ProjectSettings) -> Element<'static, Message> {
     let backup_interval_str = format!("{}", settings.backup_interval_saves);
     let backup_interval_input = text_input("10", &backup_interval_str)
-        .on_input(|val| Message::SettingsSetBackupInterval(val))
+        .on_input(Message::SettingsSetBackupInterval)
         .size(13)
         .padding(6)
         .width(Length::Fixed(80.0));

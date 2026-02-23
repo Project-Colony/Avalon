@@ -2,7 +2,7 @@ use std::path::Path;
 use anyhow::Result;
 use docx_rs::*;
 
-use super::compiler::{CompileContent, CompileOptions, SeparatorType};
+use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
 
 pub fn save_docx(contents: &[CompileContent], options: &CompileOptions, path: &Path) -> Result<()> {
     let mut docx = Docx::new();
@@ -257,12 +257,7 @@ fn find_closing_double(chars: &[char], start: usize, c: char) -> Option<usize> {
 }
 
 fn find_closing_single(chars: &[char], start: usize, c: char) -> Option<usize> {
-    for i in start..chars.len() {
-        if chars[i] == c {
-            return Some(i);
-        }
-    }
-    None
+    (start..chars.len()).find(|&i| chars[i] == c)
 }
 
 /// Estimate page count from word count
@@ -273,7 +268,7 @@ pub fn estimate_pages(contents: &[CompileContent]) -> usize {
 
 /// Count total words across all content sections
 pub fn word_count(contents: &[CompileContent]) -> usize {
-    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+    compiler::total_word_count(contents)
 }
 
 /// Count total characters across all content sections

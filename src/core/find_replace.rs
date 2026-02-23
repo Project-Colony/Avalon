@@ -373,18 +373,17 @@ pub fn replace_all_in_documents(
     };
 
     for (id, _title, content) in documents.iter_mut() {
-        let original = content.clone();
-        let (new_text, count) = replace_in_text(&original, options);
+        let (new_text, count) = replace_in_text(content, options);
         if count > 0 {
+            let original = std::mem::replace(content, new_text);
             report.results.push(ReplaceResult {
                 item_id: *id,
+                new_text: content.clone(),
                 original_text: original,
-                new_text: new_text.clone(),
                 replacements_made: count,
             });
             report.total_replacements += count;
             report.total_documents_modified += 1;
-            *content = new_text;
         }
     }
 
@@ -622,24 +621,25 @@ impl FindReplaceSession {
             errors: Vec::new(),
         };
 
-        for result in &self.results {
+        for result in self.results.drain(..) {
             let count = result.matches.len();
             if count > 0 {
                 report.total_replacements += count;
                 report.total_documents_modified += 1;
 
-                // Record each replacement for undo.
-                for loc in &result.matches {
+                let item_id = result.item_id;
+                // Record each replacement for undo, consuming owned strings.
+                for loc in result.matches {
                     self.history.push(ReplacementRecord {
-                        item_id: result.item_id,
-                        original_text: loc.matched_text.clone(),
-                        new_text: loc.preview_replacement.clone(),
+                        item_id,
+                        original_text: loc.matched_text,
+                        new_text: loc.preview_replacement,
                         timestamp: Utc::now(),
                     });
                 }
 
                 report.results.push(ReplaceResult {
-                    item_id: result.item_id,
+                    item_id,
                     original_text: String::new(), // Full text not tracked in session
                     new_text: String::new(),
                     replacements_made: count,
@@ -647,7 +647,6 @@ impl FindReplaceSession {
             }
         }
 
-        self.results.clear();
         self.current_result_index = 0;
         self.current_match_index = 0;
 

@@ -87,24 +87,18 @@ pub fn view(result: Option<&ProjectValidation>) -> Element<'static, Message> {
                         Severity::Info => "I",
                     };
 
+                    let inner_row = row![
+                        text(severity_icon.to_string()).size(10).color(severity_color),
+                        Space::with_width(6),
+                        text(issue.message.clone()).size(11).color(Theme::TEXT_SECONDARY),
+                    ];
                     let issue_row: Element<'static, Message> = if let Some(item_id) = issue.item_id {
-                        button(
-                            row![
-                                text(severity_icon.to_string()).size(10).color(severity_color),
-                                Space::with_width(6),
-                                text(issue.message.clone()).size(11).color(Theme::TEXT_SECONDARY),
-                            ]
-                        )
-                        .on_press(Message::SelectBinderItem(item_id))
-                        .padding(Padding::from([2, 4]))
-                        .into()
+                        button(inner_row)
+                            .on_press(Message::SelectBinderItem(item_id))
+                            .padding(Padding::from([2, 4]))
+                            .into()
                     } else {
-                        row![
-                            text(severity_icon.to_string()).size(10).color(severity_color),
-                            Space::with_width(6),
-                            text(issue.message.clone()).size(11).color(Theme::TEXT_SECONDARY),
-                        ]
-                        .into()
+                        inner_row.into()
                     };
 
                     issue_list = issue_list.push(issue_row);

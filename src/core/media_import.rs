@@ -29,9 +29,7 @@ pub fn supported_image_extensions() -> Vec<&'static str> {
 
 /// Return the list of all media file extensions that can be imported (images + PDF).
 pub fn supported_media_extensions() -> Vec<&'static str> {
-    let mut exts = supported_image_extensions();
-    exts.push("pdf");
-    exts
+    vec!["png", "jpg", "jpeg", "gif", "bmp", "svg", "webp", "tiff", "pdf"]
 }
 
 /// Check whether `path` refers to a file whose extension is among the

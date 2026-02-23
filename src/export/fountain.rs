@@ -1,18 +1,20 @@
+use std::fmt::Write as _;
 use anyhow::Result;
 
 use super::compiler::{CompileContent, CompileOptions};
 
 /// Compile content to Fountain screenplay format
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
-    let mut output = String::new();
+    let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 20).sum();
+    let mut output = String::with_capacity(estimated_size);
 
     // Title page metadata
     if options.include_front_matter {
-        output.push_str(&format!("Title: {}\n", options.title));
+        let _ = writeln!(output,"Title: {}", options.title);
         if !options.author.is_empty() {
-            output.push_str(&format!("Author: {}\n", options.author));
+            let _ = writeln!(output,"Author: {}", options.author);
         }
-        output.push_str(&format!("Draft date: {}\n", chrono::Utc::now().format("%Y-%m-%d")));
+        let _ = writeln!(output,"Draft date: {}", chrono::Utc::now().format("%Y-%m-%d"));
         output.push_str("Contact:\n");
         output.push('\n');
     }
@@ -23,7 +25,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
             if i > 0 {
                 output.push_str("\n\n");
             }
-            output.push_str(&format!("# {}\n\n", content.title.to_uppercase()));
+            let _ = write!(output,"# {}\n\n", content.title.to_uppercase());
         } else {
             // Try to detect Fountain formatting, otherwise convert prose
             if !content.text.is_empty() {
@@ -39,7 +41,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
 
 /// Attempt basic prose-to-Fountain conversion
 fn prose_to_fountain(text: &str) -> String {
-    let mut output = String::new();
+    let mut output = String::with_capacity(text.len());
     let lines: Vec<&str> = text.lines().collect();
     let mut i = 0;
 
@@ -52,42 +54,10 @@ fn prose_to_fountain(text: &str) -> String {
             continue;
         }
 
-        // Already a scene heading
-        if is_scene_heading(line) {
-            output.push_str(line);
-            output.push('\n');
-        }
-        // Already a transition (ends with TO:)
-        else if is_transition(line) {
-            output.push_str(line);
-            output.push('\n');
-        }
-        // ALL CAPS line followed by non-empty = character cue
-        else if is_character_cue(line) && i + 1 < lines.len() && !lines[i + 1].trim().is_empty() {
-            output.push_str(line);
-            output.push('\n');
-        }
-        // Centered text
-        else if line.starts_with('>') && line.ends_with('<') {
-            output.push_str(line);
-            output.push('\n');
-        }
-        // Parenthetical
-        else if line.starts_with('(') && line.ends_with(')') {
-            output.push_str(line);
-            output.push('\n');
-        }
-        // Note
-        else if line.starts_with("[[") && line.ends_with("]]") {
-            output.push_str(line);
-            output.push('\n');
-        }
-        // Page break
-        else if line == "===" || line == "---" {
+        // Normalize page breaks to Fountain standard; pass everything else through
+        if line == "===" || line == "---" {
             output.push_str("===\n");
-        }
-        // Regular action text
-        else {
+        } else {
             output.push_str(line);
             output.push('\n');
         }
@@ -111,10 +81,11 @@ pub fn parse_fountain(input: &str) -> Vec<(String, String)> {
         // Scene headings: INT., EXT., or lines starting with .
         if is_scene_heading(trimmed) {
             if !current_content.trim().is_empty() || !sections.is_empty() {
-                sections.push((current_title.clone(), current_content.clone()));
-                current_content.clear();
+                let title = std::mem::replace(&mut current_title, trimmed.to_string());
+                sections.push((title, std::mem::take(&mut current_content)));
+            } else {
+                current_title = trimmed.to_string();
             }
-            current_title = trimmed.to_string();
         }
 
         current_content.push_str(line);

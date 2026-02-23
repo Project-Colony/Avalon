@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use uuid::Uuid;
 use super::binder::{Binder, BinderItem};
 
@@ -147,7 +148,7 @@ pub fn link_health_summary(binder: &Binder) -> LinkHealthSummary {
 
     // Find orphan documents (no incoming links)
     let all_items = binder.all_items();
-    let linked_ids: std::collections::HashSet<Uuid> = validations.iter()
+    let linked_ids: HashSet<Uuid> = validations.iter()
         .filter_map(|v| match &v.status {
             LinkStatus::Valid(id) => Some(*id),
             _ => None,
@@ -205,6 +206,28 @@ impl LinkHealthSummary {
                 if self.orphan_documents == 1 { "" } else { "s" }));
         }
         parts.join(", ")
+    }
+
+    /// Health score as a percentage (0-100)
+    pub fn health_score(&self) -> f64 {
+        if self.total_links == 0 {
+            return 100.0;
+        }
+        (self.valid_links as f64 / self.total_links as f64) * 100.0
+    }
+
+    /// Health grade label
+    pub fn health_grade(&self) -> &str {
+        let score = self.health_score();
+        if score >= 100.0 { "Excellent" }
+        else if score >= 80.0 { "Good" }
+        else if score >= 50.0 { "Needs Work" }
+        else { "Poor" }
+    }
+
+    /// Whether there are broken links that need fixing
+    pub fn needs_attention(&self) -> bool {
+        self.broken_links > 0 || self.ambiguous_links > 0
     }
 }
 
@@ -307,30 +330,6 @@ impl LinkValidation {
     }
 }
 
-impl LinkHealthSummary {
-    /// Health score as a percentage (0-100)
-    pub fn health_score(&self) -> f64 {
-        if self.total_links == 0 {
-            return 100.0;
-        }
-        (self.valid_links as f64 / self.total_links as f64) * 100.0
-    }
-
-    /// Health grade label
-    pub fn health_grade(&self) -> &str {
-        let score = self.health_score();
-        if score >= 100.0 { "Excellent" }
-        else if score >= 80.0 { "Good" }
-        else if score >= 50.0 { "Needs Work" }
-        else { "Poor" }
-    }
-
-    /// Whether there are broken links that need fixing
-    pub fn needs_attention(&self) -> bool {
-        self.broken_links > 0 || self.ambiguous_links > 0
-    }
-}
-
 /// Count total links in a content string
 pub fn count_links(content: &str) -> usize {
     extract_links(content).len()
@@ -358,11 +357,11 @@ fn edit_distance(a: &str, b: &str) -> usize {
     let b_len = b.len();
     let mut dp = vec![vec![0usize; b_len + 1]; a_len + 1];
 
-    for i in 0..=a_len {
-        dp[i][0] = i;
+    for (i, row) in dp.iter_mut().enumerate().take(a_len + 1) {
+        row[0] = i;
     }
-    for j in 0..=b_len {
-        dp[0][j] = j;
+    for (j, val) in dp[0].iter_mut().enumerate().take(b_len + 1) {
+        *val = j;
     }
 
     let a_bytes = a.as_bytes();

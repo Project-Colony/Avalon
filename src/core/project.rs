@@ -97,7 +97,9 @@ impl Project {
         // Save compile presets (if any)
         let presets_path = project_dir.join("compile_presets.json");
         if let Ok(json) = serde_json::to_string_pretty(&self.compile_presets) {
-            let _ = fs::write(&presets_path, json);
+            if let Err(e) = fs::write(&presets_path, json) {
+                eprintln!("Warning: failed to save compile presets: {}", e);
+            }
         }
 
         self.path = Some(project_dir);
@@ -141,7 +143,7 @@ impl Project {
     /// Save all documents to disk
     fn save_documents(&self, docs_dir: &Path) -> Result<()> {
         for item in self.binder.all_items() {
-            if let Some(ref doc) = item.document {
+            if let Some(doc) = &item.document {
                 let doc_path = docs_dir.join(format!("{}.json", item.id));
                 let json = serde_json::to_string_pretty(doc)?;
                 fs::write(doc_path, json)?;
@@ -570,7 +572,7 @@ impl Project {
     /// Create a snapshot of a document
     pub fn create_snapshot(&mut self, item_id: &Uuid, title: &str) -> Result<()> {
         if let Some(item) = self.binder.find_item_mut(item_id) {
-            if let Some(ref doc) = item.document {
+            if let Some(doc) = &item.document {
                 let snapshot = Snapshot::from_document(doc, title);
                 item.snapshots.push(snapshot);
             }
@@ -601,7 +603,7 @@ impl Project {
     /// Estimate the total page count (250 words per page)
     pub fn estimated_pages(&self) -> usize {
         let words = self.total_word_count();
-        (words / 250).max(if words > 0 { 1 } else { 0 })
+        if words == 0 { 0 } else { (words / 250).max(1) }
     }
 
     /// Get the project age as a human-readable string
@@ -664,10 +666,10 @@ impl Project {
 
     /// Get the project file path as a string (if saved)
     pub fn path_display(&self) -> String {
-        self.path
-            .as_ref()
-            .map(|p| p.display().to_string())
-            .unwrap_or_else(|| "Unsaved".to_string())
+        match &self.path {
+            Some(p) => p.display().to_string(),
+            None => "Unsaved".to_string(),
+        }
     }
 
     /// Get the number of compile presets
@@ -698,44 +700,42 @@ impl Project {
         self.compile_presets.len() < before
     }
 
+    /// All available template names (constant slice, no allocation).
+    const TEMPLATES: &'static [&'static str] = &[
+        "novel", "novel_with_parts", "short_story", "poetry",
+        "screenplay", "stage_play", "nonfiction", "essay",
+        "academic", "research_proposal", "thesis",
+        "recipes", "journal", "blog",
+        "comic_script", "radio_drama", "documentary",
+        "mla_paper", "chicago_essay",
+    ];
+
     /// Get all available template names
-    pub fn available_templates() -> Vec<&'static str> {
-        vec![
-            "novel", "novel_with_parts", "short_story", "poetry",
-            "screenplay", "stage_play", "nonfiction", "essay",
-            "academic", "research_proposal", "thesis",
-            "recipes", "journal", "blog",
-            "comic_script", "radio_drama", "documentary",
-            "mla_paper", "chicago_essay",
-        ]
+    pub fn available_templates() -> &'static [&'static str] {
+        Self::TEMPLATES
     }
 
     /// Get a comprehensive status summary
     pub fn status_summary(&self) -> String {
-        let words = self.total_word_count();
-        let docs = self.document_count();
-        let folders = self.folder_count();
-        let pages = self.estimated_pages();
         let collections = self.collection_count();
         let presets = self.preset_count();
-        let has_notes = !self.project_notes.is_empty();
 
         let mut parts = vec![
-            format!("{} words", words),
-            format!("{} pages", pages),
-            format!("{} documents", docs),
-            format!("{} folders", folders),
+            format!("{} words", self.total_word_count()),
+            format!("{} pages", self.estimated_pages()),
+            format!("{} documents", self.document_count()),
+            format!("{} folders", self.folder_count()),
         ];
         if collections > 0 { parts.push(format!("{} collections", collections)); }
         if presets > 0 { parts.push(format!("{} presets", presets)); }
-        if has_notes { parts.push("has project notes".to_string()); }
+        if !self.project_notes.is_empty() { parts.push("has project notes".to_string()); }
 
         parts.join(", ")
     }
 
     /// Check if a template name is valid
     pub fn is_valid_template(name: &str) -> bool {
-        Self::available_templates().contains(&name)
+        Self::TEMPLATES.contains(&name)
     }
 
     /// Compute content distribution: returns (folder_title, word_count) pairs for top-level items.
@@ -749,13 +749,17 @@ impl Project {
     pub fn structure_analysis(&self) -> (usize, f64, usize) {
         let max_depth = self.binder.max_nesting_depth();
         let total = self.binder.item_count();
-        let folders: Vec<&super::binder::BinderItem> = self.binder.all_items().into_iter()
-            .filter(|i| !i.children.is_empty())
-            .collect();
-        let avg_children = if folders.is_empty() {
+        let (mut folder_count, mut total_children) = (0usize, 0usize);
+        self.binder.for_each_item(|i| {
+            if !i.children.is_empty() {
+                folder_count += 1;
+                total_children += i.child_count();
+            }
+        });
+        let avg_children = if folder_count == 0 {
             0.0
         } else {
-            folders.iter().map(|f| f.child_count() as f64).sum::<f64>() / folders.len() as f64
+            total_children as f64 / folder_count as f64
         };
         (max_depth, avg_children, total)
     }
@@ -772,32 +776,43 @@ impl Project {
 
     /// Get the longest and shortest documents by word count.
     pub fn word_count_extremes(&self) -> (Option<(String, usize)>, Option<(String, usize)>) {
-        let items: Vec<(&str, usize)> = self.binder.all_items().into_iter()
-            .filter(|i| i.kind == super::binder::BinderItemKind::Text)
-            .filter_map(|i| i.document.as_ref().map(|d| (i.title.as_str(), d.word_count())))
-            .filter(|(_, wc)| *wc > 0)
-            .collect();
+        let mut longest: Option<(String, usize)> = None;
+        let mut shortest: Option<(String, usize)> = None;
 
-        let longest = items.iter()
-            .max_by_key(|(_, wc)| *wc)
-            .map(|(t, wc)| (t.to_string(), *wc));
-        let shortest = items.iter()
-            .min_by_key(|(_, wc)| *wc)
-            .map(|(t, wc)| (t.to_string(), *wc));
+        self.binder.for_each_item(|item| {
+            if item.kind != super::binder::BinderItemKind::Text { return; }
+            let wc = match item.document.as_ref() {
+                Some(d) => d.word_count(),
+                None => return,
+            };
+            if wc == 0 { return; }
+
+            if longest.as_ref().is_none_or(|(_, best)| wc > *best) {
+                longest = Some((item.title.clone(), wc));
+            }
+            if shortest.as_ref().is_none_or(|(_, best)| wc < *best) {
+                shortest = Some((item.title.clone(), wc));
+            }
+        });
+
         (longest, shortest)
     }
 
     /// Average document word count across all text items with content.
     pub fn avg_document_word_count(&self) -> f64 {
-        let items: Vec<usize> = self.binder.all_items().into_iter()
-            .filter(|i| i.kind == super::binder::BinderItemKind::Text)
-            .filter_map(|i| i.document.as_ref().map(|d| d.word_count()))
-            .filter(|wc| *wc > 0)
-            .collect();
-        if items.is_empty() {
+        let (mut count, mut total) = (0usize, 0usize);
+        self.binder.for_each_item(|i| {
+            if i.kind == super::binder::BinderItemKind::Text {
+                if let Some(wc) = i.document.as_ref().map(|d| d.word_count()).filter(|wc| *wc > 0) {
+                    count += 1;
+                    total += wc;
+                }
+            }
+        });
+        if count == 0 {
             return 0.0;
         }
-        items.iter().sum::<usize>() as f64 / items.len() as f64
+        total as f64 / count as f64
     }
 }
 
@@ -994,7 +1009,7 @@ mod tests {
 
         // Add a document with content
         let mut item = BinderItem::new_text("Chapter 1");
-        if let Some(ref mut doc) = item.document {
+        if let Some(doc) = &mut item.document {
             doc.content = "Hello world".to_string();
         }
         project.binder.draft.children.push(item);
@@ -1068,7 +1083,7 @@ mod tests {
 
         // Add a document with annotations
         let mut item = BinderItem::new_text("Chapter 1");
-        if let Some(ref mut doc) = item.document {
+        if let Some(doc) = &mut item.document {
             doc.content = "The quick brown fox jumps over the lazy dog.".to_string();
             doc.annotations.push(Annotation::new(4, 19, "Check this phrasing"));
             doc.annotations.push(Annotation::new(35, 43, "Consider stronger word"));
@@ -1101,7 +1116,7 @@ mod tests {
         let mut project = Project::new("MultiSnapTest");
 
         let mut item = BinderItem::new_text("Scene 1");
-        if let Some(ref mut doc) = item.document {
+        if let Some(doc) = &mut item.document {
             doc.content = "Version 1".to_string();
         }
         project.binder.draft.children.push(item);
@@ -1290,11 +1305,11 @@ mod tests {
         use crate::core::binder::BinderItem;
         let mut project = Project::new("Test");
         let mut ch1 = BinderItem::new_text("Chapter 1");
-        if let Some(ref mut doc) = ch1.document {
+        if let Some(doc) = &mut ch1.document {
             doc.content = "one two three four five".to_string();
         }
         let mut ch2 = BinderItem::new_text("Chapter 2");
-        if let Some(ref mut doc) = ch2.document {
+        if let Some(doc) = &mut ch2.document {
             doc.content = "six seven".to_string();
         }
         project.binder.draft.add_child(ch1);
@@ -1368,11 +1383,11 @@ mod tests {
         use crate::core::binder::BinderItem;
         let mut project = Project::new("Test");
         let mut short = BinderItem::new_text("Short");
-        if let Some(ref mut doc) = short.document {
+        if let Some(doc) = &mut short.document {
             doc.content = "one two".to_string();
         }
         let mut long = BinderItem::new_text("Long");
-        if let Some(ref mut doc) = long.document {
+        if let Some(doc) = &mut long.document {
             doc.content = "one two three four five six seven eight".to_string();
         }
         project.binder.draft.add_child(short);
@@ -1394,11 +1409,11 @@ mod tests {
         use crate::core::binder::BinderItem;
         let mut project = Project::new("Test");
         let mut a = BinderItem::new_text("A");
-        if let Some(ref mut doc) = a.document {
+        if let Some(doc) = &mut a.document {
             doc.content = "one two three four".to_string();
         }
         let mut b = BinderItem::new_text("B");
-        if let Some(ref mut doc) = b.document {
+        if let Some(doc) = &mut b.document {
             doc.content = "five six".to_string();
         }
         project.binder.draft.add_child(a);

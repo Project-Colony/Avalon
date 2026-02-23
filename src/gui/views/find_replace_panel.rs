@@ -60,14 +60,14 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
     ];
 
     let find_input = text_input("Find in document...", &data.find_text)
-        .on_input(|val| Message::DocFindChanged(val))
+        .on_input(Message::DocFindChanged)
         .on_submit(Message::DocFindNext)
         .size(12)
         .padding(4)
         .width(Length::FillPortion(3));
 
     let replace_input = text_input("Replace with...", &data.replace_text)
-        .on_input(|val| Message::DocReplaceChanged(val))
+        .on_input(Message::DocReplaceChanged)
         .size(12)
         .padding(4)
         .width(Length::FillPortion(3));
@@ -120,11 +120,11 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
     ]
     .align_y(iced::Alignment::Center);
 
-    let case_label = if data.case_sensitive { "Aa" } else { "Aa" };
+    let case_label = if data.case_sensitive { "[Aa]" } else { "Aa" };
     let case_color = if data.case_sensitive { Theme::TEXT_ACCENT } else { Theme::TEXT_MUTED };
-    let word_label = if data.whole_word { "W" } else { "W" };
+    let word_label = if data.whole_word { "[W]" } else { "W" };
     let word_color = if data.whole_word { Theme::TEXT_ACCENT } else { Theme::TEXT_MUTED };
-    let regex_label = if data.use_regex { ".*" } else { ".*" };
+    let regex_label = if data.use_regex { "[.*]" } else { ".*" };
     let regex_color = if data.use_regex { Theme::TEXT_ACCENT } else { Theme::TEXT_MUTED };
 
     let mode_hint = if data.use_regex {

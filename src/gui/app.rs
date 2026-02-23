@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::fmt::Write;
 use iced::keyboard;
 use iced::widget::{column, container, row, stack, text, text_editor, Space};
 use iced::{Element, Length, Padding, Subscription, Task as IcedTask};
@@ -124,7 +126,7 @@ pub struct ScrineverApp {
     pub notes_text: String,
 
     // === Target word count per item ===
-    pub item_targets: std::collections::HashMap<Uuid, usize>,
+    pub item_targets: HashMap<Uuid, usize>,
 
     // === Notification ===
     pub notification: Option<String>,
@@ -222,7 +224,7 @@ pub enum Message {
     NewFromTemplate(String),
     OpenProject,
     SaveProject,
-    ProjectLoaded(Option<Project>),
+    ProjectLoaded(Box<Option<Project>>),
 
     // Binder operations
     SelectBinderItem(Uuid),
@@ -588,7 +590,7 @@ impl ScrineverApp {
             thesaurus_query: String::new(),
             thesaurus_results: Vec::new(),
             notes_text: String::new(),
-            item_targets: std::collections::HashMap::new(),
+            item_targets: HashMap::new(),
             notification: None,
             notification_timer: 0,
             auto_save_counter: 0,
@@ -665,8 +667,7 @@ impl ScrineverApp {
     /// Get the current total word count for session tracking
     fn current_word_count(&self) -> usize {
         self.project.as_ref()
-            .map(|p| p.binder.total_word_count())
-            .unwrap_or(0)
+            .map_or(0, |p| p.binder.total_word_count())
     }
 
     /// Insert markdown-style wrapping markup (e.g., ** for bold)
@@ -720,7 +721,7 @@ impl ScrineverApp {
                     if let Ok(entries) = std::fs::read_dir(&projects_dir) {
                         for entry in entries.flatten() {
                             let path = entry.path();
-                            if path.is_dir() && path.extension().map(|e| e == "scriv").unwrap_or(false) {
+                            if path.is_dir() && path.extension().is_some_and(|e| e == "scriv") {
                                 match Project::load(&path) {
                                     Ok(p) => {
                                         self.compile_options.title = p.title.clone();
@@ -767,7 +768,7 @@ impl ScrineverApp {
             }
 
             Message::ProjectLoaded(project) => {
-                if let Some(p) = project {
+                if let Some(p) = *project {
                     self.compile_options.title = p.title.clone();
                     self.project_notes_text = p.project_notes.clone();
                     self.compile_presets = p.compile_presets.clone();
@@ -969,10 +970,11 @@ impl ScrineverApp {
                     };
 
                     if let Some(content) = split_content {
-                        let mid = content.len() / 2;
+                        // Find a char-boundary-safe midpoint
+                        let byte_mid = content.len() / 2;
+                        let mid = content.ceil_char_boundary(byte_mid);
                         let split_pos = content[mid..].find("\n\n")
-                            .map(|p| p + mid)
-                            .unwrap_or(mid);
+                            .map_or(mid, |p| p + mid);
 
                         if split_pos > 0 && split_pos < content.len() {
                             let first_half = content[..split_pos].to_string();
@@ -1155,7 +1157,9 @@ impl ScrineverApp {
 
                     let home = dirs::home_dir().unwrap_or_default();
                     let output_dir = home.join("Scrinever Output");
-                    let _ = std::fs::create_dir_all(&output_dir);
+                    if let Err(e) = std::fs::create_dir_all(&output_dir) {
+                        self.notification = Some(format!("Failed to create output dir: {}", e));
+                    }
                     let filename = format!(
                         "{}.{}",
                         self.compile_options.title.replace(' ', "_"),
@@ -1179,8 +1183,10 @@ impl ScrineverApp {
             Message::CreateSnapshot => {
                 self.sync_editor_to_project();
                 if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
-                    let _ = project.create_snapshot(&item_id, "Manual Snapshot");
-                    self.notification = Some("Snapshot created".to_string());
+                    match project.create_snapshot(&item_id, "Manual Snapshot") {
+                        Ok(_) => self.notification = Some("Snapshot created".to_string()),
+                        Err(e) => self.notification = Some(format!("Snapshot failed: {}", e)),
+                    }
                 }
             }
 
@@ -1389,11 +1395,9 @@ impl ScrineverApp {
 
             // ========== Settings dialog ==========
             Message::ShowSettings | Message::OpenSettingsWindow => {
-                if self.settings_window.is_some() {
+                if let Some(id) = self.settings_window {
                     // Already open — focus it
-                    if let Some(id) = self.settings_window {
-                        return window::gain_focus(id);
-                    }
+                    return window::gain_focus(id);
                 }
                 let (id, open_task) = window::open(window::Settings {
                     size: iced::Size::new(780.0, 680.0),
@@ -1406,9 +1410,9 @@ impl ScrineverApp {
             Message::HideSettings | Message::CloseSettingsWindow => {
                 // Persist settings by saving the project
                 if let Some(ref mut project) = self.project {
-                    if let Some(path) = project.path.clone() {
-                        if let Some(parent) = path.parent() {
-                            let _ = project.save(parent);
+                    if let Some(parent) = project.path.as_deref().and_then(|p| p.parent()).map(|p| p.to_path_buf()) {
+                        if let Err(e) = project.save(&parent) {
+                            self.notification = Some(format!("Settings save failed: {}", e));
                         }
                     }
                 }
@@ -1418,10 +1422,9 @@ impl ScrineverApp {
             }
 
             Message::OpenAboutWindow => {
-                if self.about_window.is_some() {
-                    if let Some(id) = self.about_window {
-                        return window::gain_focus(id);
-                    }
+                if let Some(id) = self.about_window {
+                    // Already open — focus it
+                    return window::gain_focus(id);
                 }
                 let (id, open_task) = window::open(window::Settings {
                     size: iced::Size::new(420.0, 380.0),
@@ -1450,7 +1453,9 @@ impl ScrineverApp {
                     if let Some(ref mut project) = self.project {
                         if let Some(path) = project.path.clone() {
                             if let Some(parent) = path.parent() {
-                                let _ = project.save(parent);
+                                if let Err(e) = project.save(parent) {
+                                    self.notification = Some(format!("Settings save failed: {}", e));
+                                }
                             }
                         }
                     }
@@ -1842,8 +1847,10 @@ impl ScrineverApp {
                             self.notification = Some("No importable files found in ~/Scrinever Import/. Supported: txt, md, html, tex, fountain, opml".to_string());
                         }
                     } else {
-                        let _ = std::fs::create_dir_all(&import_dir);
-                        self.notification = Some("Created ~/Scrinever Import/ — place files there and import again.".to_string());
+                        match std::fs::create_dir_all(&import_dir) {
+                            Ok(_) => self.notification = Some("Created ~/Scrinever Import/ — place files there and import again.".to_string()),
+                            Err(e) => self.notification = Some(format!("Failed to create import dir: {}", e)),
+                        }
                     }
                 } else {
                     self.notification = Some("Create or open a project first.".to_string());
@@ -1914,8 +1921,7 @@ impl ScrineverApp {
             Message::ToggleBookmark(item_id) => {
                 if let Some(ref mut project) = self.project {
                     let name = project.binder.find_item(&item_id)
-                        .map(|i| i.title.clone())
-                        .unwrap_or_default();
+                        .map_or_else(String::new, |i| i.title.clone());
                     project.bookmarks.toggle(item_id, &name);
                 }
             }
@@ -2157,18 +2163,35 @@ impl ScrineverApp {
                     if let Some(item) = project.binder.find_item(&item_id) {
                         if let Some(ref doc) = item.document {
                             if !self.doc_find_text.is_empty() {
-                                let content = if self.doc_find_case_sensitive {
-                                    doc.content.clone()
+                                if self.doc_find_case_sensitive {
+                                    for (pos, _) in doc.content.match_indices(&self.doc_find_text) {
+                                        self.doc_find_positions.push(pos);
+                                    }
                                 } else {
-                                    doc.content.to_lowercase()
-                                };
-                                let query = if self.doc_find_case_sensitive {
-                                    self.doc_find_text.clone()
-                                } else {
-                                    self.doc_find_text.to_lowercase()
-                                };
-                                for (pos, _) in content.match_indices(&query) {
-                                    self.doc_find_positions.push(pos);
+                                    // Case-insensitive: match char-by-char to get byte offsets
+                                    // in the *original* string (avoids lowered/original byte mismatch)
+                                    let find_lower: Vec<char> = self.doc_find_text.to_lowercase().chars().collect();
+                                    if !find_lower.is_empty() {
+                                        let content_ci: Vec<(usize, char)> = doc.content.char_indices().collect();
+                                        let mut i = 0;
+                                        while i + find_lower.len() <= content_ci.len() {
+                                            let mut matched = true;
+                                            for (fi, &fc) in find_lower.iter().enumerate() {
+                                                let cc_lower: Vec<char> = content_ci[i + fi].1.to_lowercase().collect();
+                                                if cc_lower.len() != 1 || cc_lower[0] != fc {
+                                                    matched = false;
+                                                    break;
+                                                }
+                                            }
+                                            if matched {
+                                                // Record byte offset of match start in original string
+                                                self.doc_find_positions.push(content_ci[i].0);
+                                                i += find_lower.len();
+                                            } else {
+                                                i += 1;
+                                            }
+                                        }
+                                    }
                                 }
                                 self.doc_find_match_count = self.doc_find_positions.len();
                             } else {
@@ -2220,13 +2243,24 @@ impl ScrineverApp {
                         if let Some(item) = project.binder.find_item_mut(&item_id) {
                             if let Some(ref mut doc) = item.document {
                                 let pos = self.doc_find_positions[self.doc_find_current_match];
-                                let find_len = self.doc_find_text.len();
-                                if pos + find_len <= doc.content.len() {
+                                // Compute byte length of the matched region in the original string.
+                                // For case-sensitive this equals self.doc_find_text.len();
+                                // for case-insensitive the original chars may differ in byte width.
+                                let find_char_count = self.doc_find_text.chars().count();
+                                let find_len = doc.content[pos..]
+                                    .char_indices()
+                                    .nth(find_char_count)
+                                    .map_or(doc.content.len() - pos, |(byte_off, _)| byte_off);
+                                let end = pos + find_len;
+                                if end <= doc.content.len()
+                                    && doc.content.is_char_boundary(pos)
+                                    && doc.content.is_char_boundary(end)
+                                {
                                     doc.content = format!(
                                         "{}{}{}",
                                         &doc.content[..pos],
                                         self.doc_replace_text,
-                                        &doc.content[pos + find_len..]
+                                        &doc.content[end..]
                                     );
                                     self.editor.load_document(doc);
                                     self.editor.mark_dirty();
@@ -2263,18 +2297,40 @@ impl ScrineverApp {
                                 if self.doc_find_case_sensitive {
                                     doc.content = doc.content.replace(&self.doc_find_text, &self.doc_replace_text);
                                 } else {
-                                    // Case-insensitive replace
-                                    let lower_content = doc.content.to_lowercase();
-                                    let lower_find = self.doc_find_text.to_lowercase();
-                                    let mut result = String::new();
-                                    let mut last_end = 0;
-                                    for (start, _) in lower_content.match_indices(&lower_find) {
-                                        result.push_str(&doc.content[last_end..start]);
-                                        result.push_str(&self.doc_replace_text);
-                                        last_end = start + self.doc_find_text.len();
+                                    // Case-insensitive replace using char-by-char matching
+                                    let find_lower: Vec<char> = self.doc_find_text.to_lowercase().chars().collect();
+                                    if !find_lower.is_empty() {
+                                        let mut result = String::new();
+                                        let content_chars: Vec<(usize, char)> = doc.content.char_indices().collect();
+                                        let mut i = 0;
+                                        while i < content_chars.len() {
+                                            let mut matched = true;
+                                            let mut fi = 0;
+                                            let mut ci = i;
+                                            for &fc in &find_lower {
+                                                if ci >= content_chars.len() {
+                                                    matched = false;
+                                                    break;
+                                                }
+                                                let cc_lower: Vec<char> = content_chars[ci].1.to_lowercase().collect();
+                                                if cc_lower.len() == 1 && cc_lower[0] == fc {
+                                                    ci += 1;
+                                                    fi += 1;
+                                                } else {
+                                                    matched = false;
+                                                    break;
+                                                }
+                                            }
+                                            if matched && fi == find_lower.len() {
+                                                result.push_str(&self.doc_replace_text);
+                                                i = ci;
+                                            } else {
+                                                result.push(content_chars[i].1);
+                                                i += 1;
+                                            }
+                                        }
+                                        doc.content = result;
                                     }
-                                    result.push_str(&doc.content[last_end..]);
-                                    doc.content = result;
                                 }
                                 self.editor.load_document(doc);
                                 self.editor.mark_dirty();
@@ -2377,7 +2433,7 @@ impl ScrineverApp {
                     "Revision 3" => Some(crate::core::script::RevisionLevel::Third),
                     "Revision 4" => Some(crate::core::script::RevisionLevel::Fourth),
                     "Revision 5" => Some(crate::core::script::RevisionLevel::Fifth),
-                    "None" | _ => None,
+                    _ => None,
                 };
             }
 
@@ -2548,9 +2604,10 @@ impl ScrineverApp {
                     if let Some(item) = project.binder.find_item(&item_id) {
                         if let Some(ref doc) = item.document {
                             let md = format!("# {}\n\n{}", item.title, doc.content);
-                            let _ = arboard::Clipboard::new()
-                                .and_then(|mut cb| cb.set_text(md));
-                            self.notification = Some("Copied as Markdown".to_string());
+                            match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(md)) {
+                                Ok(_) => self.notification = Some("Copied as Markdown".to_string()),
+                                Err(e) => self.notification = Some(format!("Clipboard error: {}", e)),
+                            }
                         }
                     }
                 }
@@ -2569,9 +2626,10 @@ impl ScrineverApp {
                                     .collect::<Vec<_>>()
                                     .join("\n")
                             );
-                            let _ = arboard::Clipboard::new()
-                                .and_then(|mut cb| cb.set_text(html));
-                            self.notification = Some("Copied as HTML".to_string());
+                            match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(html)) {
+                                Ok(_) => self.notification = Some("Copied as HTML".to_string()),
+                                Err(e) => self.notification = Some(format!("Clipboard error: {}", e)),
+                            }
                         }
                     }
                 }
@@ -2582,9 +2640,10 @@ impl ScrineverApp {
                 if let (Some(ref project), Some(item_id)) = (&self.project, self.selected_item) {
                     if let Some(item) = project.binder.find_item(&item_id) {
                         if let Some(ref doc) = item.document {
-                            let _ = arboard::Clipboard::new()
-                                .and_then(|mut cb| cb.set_text(doc.content.clone()));
-                            self.notification = Some("Copied as plain text".to_string());
+                            match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(doc.content.clone())) {
+                                Ok(_) => self.notification = Some("Copied as plain text".to_string()),
+                                Err(e) => self.notification = Some(format!("Clipboard error: {}", e)),
+                            }
                         }
                     }
                 }
@@ -2722,8 +2781,10 @@ impl ScrineverApp {
                             self.notification = Some("No importable files found in ~/Scrinever Import/".to_string());
                         }
                     } else {
-                        let _ = std::fs::create_dir_all(&import_dir);
-                        self.notification = Some("Created ~/Scrinever Import/ — place files there and import again.".to_string());
+                        match std::fs::create_dir_all(&import_dir) {
+                            Ok(_) => self.notification = Some("Created ~/Scrinever Import/ — place files there and import again.".to_string()),
+                            Err(e) => self.notification = Some(format!("Failed to create import dir: {}", e)),
+                        }
                     }
                 }
             }
@@ -2796,11 +2857,12 @@ impl ScrineverApp {
                                 is_folder: false,
                                 depth: 0,
                             }];
-                            let mut opts = CompileOptions::default();
-                            opts.title = item.title.clone();
+                            let opts = CompileOptions { title: item.title.clone(), ..CompileOptions::default() };
                             let home = dirs::home_dir().unwrap_or_default();
                             let print_path = home.join("Scrinever Projects").join("print.pdf");
-                            let _ = std::fs::create_dir_all(print_path.parent().unwrap());
+                            if let Some(parent) = print_path.parent() {
+                                let _ = std::fs::create_dir_all(parent);
+                            }
                             match crate::export::pdf::save_pdf(&contents, &opts, &print_path) {
                                 Ok(_) => {
                                     self.notification = Some(format!("PDF saved to {:?} — open to print", print_path));
@@ -2821,7 +2883,9 @@ impl ScrineverApp {
                     opts.format = crate::export::compiler::OutputFormat::Pdf;
                     let home = dirs::home_dir().unwrap_or_default();
                     let print_path = home.join("Scrinever Projects").join(format!("{}_print.pdf", project.title));
-                    let _ = std::fs::create_dir_all(print_path.parent().unwrap());
+                    if let Some(parent) = print_path.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
                     match crate::export::compiler::Compiler::save_to_file(&project.binder, &opts, &print_path) {
                         Ok(_) => {
                             self.notification = Some(format!("Project PDF saved to {:?}", print_path));
@@ -2855,8 +2919,11 @@ impl ScrineverApp {
             Message::SpellCheckAddWord(word) => {
                 self.spell_checker.add_to_dictionary(&word);
                 self.spell_check_results.retain(|r| r.word.to_lowercase() != word.to_lowercase());
-                let _ = self.spell_checker.save_user_dictionary();
-                self.notification = Some(format!("Added \"{}\" to dictionary", word));
+                if let Err(e) = self.spell_checker.save_user_dictionary() {
+                    self.notification = Some(format!("Added \"{}\" but failed to save dictionary: {}", word, e));
+                } else {
+                    self.notification = Some(format!("Added \"{}\" to dictionary", word));
+                }
             }
 
             Message::SpellCheckReplace(position, misspelled, replacement) => {
@@ -2865,8 +2932,15 @@ impl ScrineverApp {
                     if let Some(item) = project.binder.find_item_mut(&item_id) {
                         if let Some(ref mut doc) = item.document {
                             // Find the misspelled word at or near the given position and replace it
-                            if let Some(start) = doc.content[position..].find(&misspelled) {
-                                let actual_pos = position + start;
+                            let safe_pos = if position <= doc.content.len() && doc.content.is_char_boundary(position) {
+                                position
+                            } else {
+                                // Snap to nearest valid char boundary
+                                doc.content.ceil_char_boundary(position.min(doc.content.len()))
+                            };
+                            if safe_pos < doc.content.len() {
+                            if let Some(start) = doc.content[safe_pos..].find(&misspelled) {
+                                let actual_pos = safe_pos + start;
                                 let end_pos = actual_pos + misspelled.len();
                                 doc.content = format!(
                                     "{}{}{}",
@@ -2885,6 +2959,7 @@ impl ScrineverApp {
                                     !(r.word == misspelled && r.position == position)
                                 });
                             }
+                            } // safe_pos < doc.content.len()
                         }
                     }
                 }
@@ -2892,14 +2967,20 @@ impl ScrineverApp {
 
             Message::SpellCheckRemoveWord(word) => {
                 self.spell_checker.remove_from_dictionary(&word);
-                let _ = self.spell_checker.save_user_dictionary();
-                self.notification = Some(format!("Removed \"{}\" from user dictionary", word));
+                if let Err(e) = self.spell_checker.save_user_dictionary() {
+                    self.notification = Some(format!("Removed \"{}\" but failed to save: {}", word, e));
+                } else {
+                    self.notification = Some(format!("Removed \"{}\" from user dictionary", word));
+                }
             }
 
             Message::SpellCheckClearDict => {
                 self.spell_checker.clear_user_dictionary();
-                let _ = self.spell_checker.save_user_dictionary();
-                self.notification = Some("User dictionary cleared".to_string());
+                if let Err(e) = self.spell_checker.save_user_dictionary() {
+                    self.notification = Some(format!("Dictionary cleared but failed to save: {}", e));
+                } else {
+                    self.notification = Some("User dictionary cleared".to_string());
+                }
             }
 
             Message::ToggleSpellChecker => {
@@ -3122,7 +3203,7 @@ impl ScrineverApp {
                 // Header row
                 table.push('|');
                 for c in 0..cols {
-                    table.push_str(&format!(" Column {} |", c + 1));
+                    let _ = write!(table, " Column {} |", c + 1);
                 }
                 table.push('\n');
                 // Separator
@@ -3209,10 +3290,8 @@ impl ScrineverApp {
             Message::SmartPaste(text) => {
                 // Clean up pasted text: normalize whitespace, fix smart quotes, etc.
                 let cleaned = text
-                    .replace('\u{201C}', "\"")  // left double quote
-                    .replace('\u{201D}', "\"")  // right double quote
-                    .replace('\u{2018}', "'")   // left single quote
-                    .replace('\u{2019}', "'")   // right single quote
+                    .replace(['\u{201C}', '\u{201D}'], "\"")  // right double quote
+                    .replace(['\u{2018}', '\u{2019}'], "'")   // right single quote
                     .replace('\u{2013}', "--")  // en dash
                     .replace('\u{2014}', "---") // em dash
                     .replace('\u{2026}', "...") // ellipsis
@@ -3256,7 +3335,7 @@ impl ScrineverApp {
             Message::NewDocFromTemplate(template_id) => {
                 if let Some(ref mut project) = self.project {
                     if let Some(template) = crate::core::doc_templates::find_template(&template_id) {
-                        let item = template.create_item(&template.name);
+                        let item = template.create_item(template.name);
                         let new_id = item.id;
 
                         if let Some(sel_id) = self.selected_item {
@@ -3369,7 +3448,7 @@ impl ScrineverApp {
                 }
 
                 // Word count milestone detection (every 5 seconds)
-                if self.auto_save_counter % 5 == 0 {
+                if self.auto_save_counter.is_multiple_of(5) {
                     if let Some(ref project) = self.project {
                         let total_words = project.binder.total_word_count();
                         let milestones = [1000, 5000, 10000, 25000, 50000, 75000, 100000, 150000, 200000];
@@ -3408,7 +3487,7 @@ impl ScrineverApp {
                     }
 
                     // Check daily goal milestone
-                    if self.daily_goal > 0 && self.session_stats.time_elapsed_seconds % 10 == 0 {
+                    if self.daily_goal > 0 && self.session_stats.time_elapsed_seconds.is_multiple_of(10) {
                         let words_today = self.session_stats.words_written;
                         let daily_goal = self.daily_goal as i64;
                         if words_today >= daily_goal && (words_today - 10) < daily_goal {
@@ -3420,7 +3499,7 @@ impl ScrineverApp {
                     }
 
                     // Record writing history every 60 seconds
-                    if self.session_stats.time_elapsed_seconds % 60 == 0 {
+                    if self.session_stats.time_elapsed_seconds.is_multiple_of(60) {
                         if let Some(ref mut project) = self.project {
                             project.writing_history.record(current_words, 60);
                         }
@@ -3435,8 +3514,8 @@ impl ScrineverApp {
                 }
 
                 // Writing focus timer tick
-                if self.writing_timer.is_running() {
-                    if self.writing_timer.tick() {
+                if self.writing_timer.is_running()
+                    && self.writing_timer.tick() {
                         // Timer completed - auto-stop and record session
                         let word_count = self.current_word_count();
                         self.writing_timer.stop(word_count);
@@ -3446,10 +3525,9 @@ impl ScrineverApp {
                             summary
                         ));
                     }
-                }
 
                 // Auto-refresh smart collections every 30 seconds when collections panel is open
-                if self.bottom_panel == BottomPanel::Collections && self.auto_save_counter % 30 == 0 {
+                if self.bottom_panel == BottomPanel::Collections && self.auto_save_counter.is_multiple_of(30) {
                     if let Some(ref mut project) = self.project {
                         for coll in &mut project.collections {
                             if let crate::core::collection::CollectionKind::Search { ref query, case_sensitive, whole_word } = coll.kind {

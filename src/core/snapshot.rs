@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -34,6 +35,78 @@ impl Snapshot {
         let old_lines: Vec<&str> = self.content.lines().collect();
         let new_lines: Vec<&str> = current.lines().collect();
         lcs_diff(&old_lines, &new_lines)
+    }
+
+    /// Age as human-readable string
+    pub fn age_string(&self) -> String {
+        let duration = Utc::now().signed_duration_since(self.created_at);
+        let hours = duration.num_hours();
+        if hours < 1 {
+            format!("{}m ago", duration.num_minutes().max(1))
+        } else if hours < 24 {
+            format!("{}h ago", hours)
+        } else {
+            let days = duration.num_days();
+            if days < 7 {
+                format!("{}d ago", days)
+            } else {
+                format!("{}w ago", days / 7)
+            }
+        }
+    }
+
+    /// Character count at snapshot time
+    pub fn char_count(&self) -> usize {
+        self.content.len()
+    }
+
+    /// Line count at snapshot time
+    pub fn line_count(&self) -> usize {
+        if self.content.is_empty() {
+            0
+        } else {
+            self.content.lines().count()
+        }
+    }
+
+    /// Compute diff stats with current content
+    pub fn diff_stats_with(&self, current: &str) -> DiffStats {
+        let diff = self.diff_with(current);
+        DiffStats::from_chunks(&diff)
+    }
+
+    /// Paragraph count at snapshot time
+    pub fn paragraph_count(&self) -> usize {
+        if self.content.is_empty() {
+            0
+        } else {
+            self.content.split("\n\n").filter(|p| !p.trim().is_empty()).count()
+        }
+    }
+
+    /// Sentence count at snapshot time (approximate)
+    pub fn sentence_count(&self) -> usize {
+        self.content.chars().filter(|c| *c == '.' || *c == '!' || *c == '?').count()
+    }
+
+    /// Check if content has changed since snapshot
+    pub fn has_changed(&self, current: &str) -> bool {
+        self.content != current
+    }
+
+    /// Get a short label summarizing the snapshot
+    pub fn label(&self) -> String {
+        format!("{} ({} words, {})", self.title, self.word_count, self.age_string())
+    }
+
+    /// Similarity ratio with current content (0.0 - 1.0)
+    pub fn similarity(&self, current: &str) -> f64 {
+        let diff = self.diff_with(current);
+        let stats = DiffStats::from_chunks(&diff);
+        if stats.total_lines() == 0 {
+            return 1.0;
+        }
+        stats.lines_unchanged as f64 / stats.total_lines() as f64
     }
 }
 
@@ -120,80 +193,6 @@ impl DiffStats {
     /// Check if there are any changes
     pub fn has_changes(&self) -> bool {
         self.lines_added > 0 || self.lines_removed > 0
-    }
-}
-
-impl Snapshot {
-    /// Age as human-readable string
-    pub fn age_string(&self) -> String {
-        let duration = Utc::now().signed_duration_since(self.created_at);
-        let hours = duration.num_hours();
-        if hours < 1 {
-            format!("{}m ago", duration.num_minutes().max(1))
-        } else if hours < 24 {
-            format!("{}h ago", hours)
-        } else {
-            let days = duration.num_days();
-            if days < 7 {
-                format!("{}d ago", days)
-            } else {
-                format!("{}w ago", days / 7)
-            }
-        }
-    }
-
-    /// Character count at snapshot time
-    pub fn char_count(&self) -> usize {
-        self.content.len()
-    }
-
-    /// Line count at snapshot time
-    pub fn line_count(&self) -> usize {
-        if self.content.is_empty() {
-            0
-        } else {
-            self.content.lines().count()
-        }
-    }
-
-    /// Compute diff stats with current content
-    pub fn diff_stats_with(&self, current: &str) -> DiffStats {
-        let diff = self.diff_with(current);
-        DiffStats::from_chunks(&diff)
-    }
-
-    /// Paragraph count at snapshot time
-    pub fn paragraph_count(&self) -> usize {
-        if self.content.is_empty() {
-            0
-        } else {
-            self.content.split("\n\n").filter(|p| !p.trim().is_empty()).count()
-        }
-    }
-
-    /// Sentence count at snapshot time (approximate)
-    pub fn sentence_count(&self) -> usize {
-        self.content.chars().filter(|c| *c == '.' || *c == '!' || *c == '?').count()
-    }
-
-    /// Check if content has changed since snapshot
-    pub fn has_changed(&self, current: &str) -> bool {
-        self.content != current
-    }
-
-    /// Get a short label summarizing the snapshot
-    pub fn label(&self) -> String {
-        format!("{} ({} words, {})", self.title, self.word_count, self.age_string())
-    }
-
-    /// Similarity ratio with current content (0.0 - 1.0)
-    pub fn similarity(&self, current: &str) -> f64 {
-        let diff = self.diff_with(current);
-        let stats = DiffStats::from_chunks(&diff);
-        if stats.total_lines() == 0 {
-            return 1.0;
-        }
-        stats.lines_unchanged as f64 / stats.total_lines() as f64
     }
 }
 
@@ -307,22 +306,25 @@ fn lcs_diff(old: &[&str], new: &[&str]) -> Vec<DiffChunk> {
 
 /// Format a diff as a unified diff string (like `diff -u` output)
 pub fn format_unified_diff(chunks: &[DiffChunk], old_label: &str, new_label: &str) -> String {
-    let mut output = String::new();
-    output.push_str(&format!("--- {}\n", old_label));
-    output.push_str(&format!("+++ {}\n", new_label));
+    use std::fmt::Write;
+    let estimated = chunks.len() * 40 + old_label.len() + new_label.len() + 64;
+    let mut output = String::with_capacity(estimated);
+    let _ = writeln!(output, "--- {}", old_label);
+    let _ = writeln!(output, "+++ {}", new_label);
 
     // Group changes into hunks
     let hunks = group_into_hunks(chunks, 3);
     for hunk in hunks {
-        output.push_str(&format!(
-            "@@ -{},{} +{},{} @@\n",
+        let _ = writeln!(
+            output,
+            "@@ -{},{} +{},{} @@",
             hunk.old_start, hunk.old_count, hunk.new_start, hunk.new_count
-        ));
+        );
         for line in &hunk.lines {
             match line {
-                DiffChunk::Equal(text) => output.push_str(&format!(" {}\n", text)),
-                DiffChunk::Added(text) => output.push_str(&format!("+{}\n", text)),
-                DiffChunk::Removed(text) => output.push_str(&format!("-{}\n", text)),
+                DiffChunk::Equal(text) => { let _ = writeln!(output, " {}", text); }
+                DiffChunk::Added(text) => { let _ = writeln!(output, "+{}", text); }
+                DiffChunk::Removed(text) => { let _ = writeln!(output, "-{}", text); }
             }
         }
     }
@@ -510,8 +512,8 @@ impl RetentionPolicy {
             }
             RetentionPolicy::KeepAll => Vec::new(),
             RetentionPolicy::PerDay(max_per_day) => {
-                let mut by_day: std::collections::HashMap<String, Vec<&Snapshot>> =
-                    std::collections::HashMap::new();
+                let mut by_day: HashMap<String, Vec<&Snapshot>> =
+                    HashMap::new();
                 for s in snapshots {
                     let day = s.created_at.format("%Y-%m-%d").to_string();
                     by_day.entry(day).or_default().push(s);
@@ -545,7 +547,7 @@ impl RetentionPolicy {
 #[derive(Debug, Clone)]
 pub struct SnapshotManager {
     pub snapshots: Vec<Snapshot>,
-    pub tags: std::collections::HashMap<Uuid, Vec<String>>,
+    pub tags: HashMap<Uuid, Vec<String>>,
     pub retention: RetentionPolicy,
 }
 
@@ -553,7 +555,7 @@ impl SnapshotManager {
     pub fn new(retention: RetentionPolicy) -> Self {
         Self {
             snapshots: Vec::new(),
-            tags: std::collections::HashMap::new(),
+            tags: HashMap::new(),
             retention,
         }
     }
@@ -649,7 +651,7 @@ impl SnapshotManager {
     pub fn all_tags(&self) -> Vec<String> {
         let mut tags: Vec<String> = self.tags.values()
             .flat_map(|t| t.iter().cloned())
-            .collect::<std::collections::HashSet<_>>()
+            .collect::<HashSet<_>>()
             .into_iter()
             .collect();
         tags.sort();

@@ -122,6 +122,16 @@ impl TimerSession {
         let secs = self.duration.as_secs() % 60;
         format!("{:02}:{:02}", mins, secs)
     }
+
+    /// Session summary for display
+    pub fn summary(&self) -> String {
+        let mins = self.duration.as_secs() / 60;
+        let status = if self.completed { "completed" } else { "stopped" };
+        format!(
+            "{} min, {} words, {:.1} WPM ({})",
+            mins, self.words_written, self.words_per_minute(), status
+        )
+    }
 }
 
 impl WritingTimer {
@@ -180,12 +190,11 @@ impl WritingTimer {
 
     /// Check the timer (call on tick) — returns true if timer just completed
     pub fn tick(&mut self) -> bool {
-        if self.state == TimerState::Running {
-            if self.elapsed().as_secs() >= self.duration_secs {
+        if self.state == TimerState::Running
+            && self.elapsed().as_secs() >= self.duration_secs {
                 self.state = TimerState::Completed;
                 return true;
             }
-        }
         false
     }
 
@@ -377,18 +386,6 @@ impl WritingTimer {
             TimerState::Paused(_) => "Paused",
             TimerState::Completed => "Completed",
         }
-    }
-}
-
-impl TimerSession {
-    /// Session summary for display
-    pub fn summary(&self) -> String {
-        let mins = self.duration.as_secs() / 60;
-        let status = if self.completed { "completed" } else { "stopped" };
-        format!(
-            "{} min, {} words, {:.1} WPM ({})",
-            mins, self.words_written, self.words_per_minute(), status
-        )
     }
 }
 

@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::path::Path;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -63,6 +64,74 @@ impl OutputFormat {
             OutputFormat::Opml,
             OutputFormat::Fountain,
         ]
+    }
+
+    /// Whether this format supports table of contents
+    pub fn supports_toc(&self) -> bool {
+        matches!(self, OutputFormat::Html | OutputFormat::Markdown | OutputFormat::Latex
+            | OutputFormat::Pdf | OutputFormat::Docx | OutputFormat::Epub)
+    }
+
+    /// Whether this format supports front matter
+    pub fn supports_front_matter(&self) -> bool {
+        !matches!(self, OutputFormat::Opml)
+    }
+
+    /// Category label for grouping in UI
+    pub fn category(&self) -> &str {
+        match self {
+            OutputFormat::PlainText | OutputFormat::Markdown => "Text",
+            OutputFormat::Html | OutputFormat::Latex => "Markup",
+            OutputFormat::Pdf | OutputFormat::Docx | OutputFormat::Epub => "Document",
+            OutputFormat::Rtf => "Legacy",
+            OutputFormat::Opml => "Outline",
+            OutputFormat::Fountain => "Screenplay",
+        }
+    }
+
+    /// Check if this format requires save_to_file (binary formats)
+    pub fn is_binary(&self) -> bool {
+        matches!(self, OutputFormat::Pdf | OutputFormat::Docx | OutputFormat::Epub)
+    }
+
+    /// MIME type for this format
+    pub fn mime_type(&self) -> &str {
+        match self {
+            OutputFormat::PlainText => "text/plain",
+            OutputFormat::Markdown => "text/markdown",
+            OutputFormat::Html => "text/html",
+            OutputFormat::Pdf => "application/pdf",
+            OutputFormat::Latex => "application/x-latex",
+            OutputFormat::Docx => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            OutputFormat::Epub => "application/epub+zip",
+            OutputFormat::Rtf => "application/rtf",
+            OutputFormat::Opml => "text/x-opml",
+            OutputFormat::Fountain => "text/plain",
+        }
+    }
+
+    /// Parse an OutputFormat from a file extension string
+    pub fn from_extension(ext: &str) -> Option<Self> {
+        match ext.to_lowercase().trim_start_matches('.') {
+            "txt" | "text" => Some(OutputFormat::PlainText),
+            "md" | "markdown" => Some(OutputFormat::Markdown),
+            "html" | "htm" => Some(OutputFormat::Html),
+            "pdf" => Some(OutputFormat::Pdf),
+            "tex" | "latex" => Some(OutputFormat::Latex),
+            "docx" => Some(OutputFormat::Docx),
+            "epub" => Some(OutputFormat::Epub),
+            "rtf" => Some(OutputFormat::Rtf),
+            "opml" => Some(OutputFormat::Opml),
+            "fountain" => Some(OutputFormat::Fountain),
+            _ => None,
+        }
+    }
+
+    /// Parse an OutputFormat from a file path
+    pub fn from_path(path: &Path) -> Option<Self> {
+        path.extension()
+            .and_then(|e| e.to_str())
+            .and_then(Self::from_extension)
     }
 }
 
@@ -284,9 +353,7 @@ impl CompileContent {
     pub fn is_empty(&self) -> bool {
         self.text.trim().is_empty() && !self.is_folder
     }
-}
 
-impl CompileContent {
     /// Paragraph count for this content item
     pub fn paragraph_count(&self) -> usize {
         self.text.split("\n\n").filter(|p| !p.trim().is_empty()).count()
@@ -304,6 +371,11 @@ impl CompileContent {
     pub fn summary(&self) -> String {
         let kind = if self.is_folder { "Folder" } else { "Document" };
         format!("{}: \"{}\" ({} words, depth {})", kind, self.title, self.word_count(), self.depth)
+    }
+
+    /// Compute heading level based on depth (h1 = depth 0, capped at h6)
+    pub fn heading_level(&self) -> usize {
+        (self.depth + 1).min(6)
     }
 }
 
@@ -365,31 +437,6 @@ impl CompileOptions {
     }
 }
 
-impl OutputFormat {
-    /// Whether this format supports table of contents
-    pub fn supports_toc(&self) -> bool {
-        matches!(self, OutputFormat::Html | OutputFormat::Markdown | OutputFormat::Latex
-            | OutputFormat::Pdf | OutputFormat::Docx | OutputFormat::Epub)
-    }
-
-    /// Whether this format supports front matter
-    pub fn supports_front_matter(&self) -> bool {
-        !matches!(self, OutputFormat::Opml)
-    }
-
-    /// Category label for grouping in UI
-    pub fn category(&self) -> &str {
-        match self {
-            OutputFormat::PlainText | OutputFormat::Markdown => "Text",
-            OutputFormat::Html | OutputFormat::Latex => "Markup",
-            OutputFormat::Pdf | OutputFormat::Docx | OutputFormat::Epub => "Document",
-            OutputFormat::Rtf => "Legacy",
-            OutputFormat::Opml => "Outline",
-            OutputFormat::Fountain => "Screenplay",
-        }
-    }
-}
-
 impl SeparatorType {
     /// Get the actual separator string to insert between documents
     pub fn separator_string(&self) -> &str {
@@ -401,9 +448,7 @@ impl SeparatorType {
             SeparatorType::None => "",
         }
     }
-}
 
-impl SeparatorType {
     /// Human-readable label
     pub fn label(&self) -> &str {
         match self {
@@ -423,29 +468,6 @@ impl SeparatorType {
             SeparatorType::SectionBreak,
             SeparatorType::None,
         ]
-    }
-}
-
-impl OutputFormat {
-    /// Check if this format requires save_to_file (binary formats)
-    pub fn is_binary(&self) -> bool {
-        matches!(self, OutputFormat::Pdf | OutputFormat::Docx | OutputFormat::Epub)
-    }
-
-    /// MIME type for this format
-    pub fn mime_type(&self) -> &str {
-        match self {
-            OutputFormat::PlainText => "text/plain",
-            OutputFormat::Markdown => "text/markdown",
-            OutputFormat::Html => "text/html",
-            OutputFormat::Pdf => "application/pdf",
-            OutputFormat::Latex => "application/x-latex",
-            OutputFormat::Docx => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            OutputFormat::Epub => "application/epub+zip",
-            OutputFormat::Rtf => "application/rtf",
-            OutputFormat::Opml => "text/x-opml",
-            OutputFormat::Fountain => "text/plain",
-        }
     }
 }
 
@@ -503,8 +525,8 @@ impl CompileStatistics {
             avg_words_per_section,
             longest_section,
             shortest_section,
-            estimated_pages: (total_words / 250).max(if total_words > 0 { 1 } else { 0 }),
-            estimated_reading_minutes: (total_words / 200).max(if total_words > 0 { 1 } else { 0 }),
+            estimated_pages: if total_words == 0 { 0 } else { (total_words / 250).max(1) },
+            estimated_reading_minutes: if total_words == 0 { 0 } else { (total_words / 200).max(1) },
         }
     }
 
@@ -518,32 +540,6 @@ impl CompileStatistics {
             self.section_count,
             self.folder_count,
         )
-    }
-}
-
-impl OutputFormat {
-    /// Parse an OutputFormat from a file extension string
-    pub fn from_extension(ext: &str) -> Option<Self> {
-        match ext.to_lowercase().trim_start_matches('.') {
-            "txt" | "text" => Some(OutputFormat::PlainText),
-            "md" | "markdown" => Some(OutputFormat::Markdown),
-            "html" | "htm" => Some(OutputFormat::Html),
-            "pdf" => Some(OutputFormat::Pdf),
-            "tex" | "latex" => Some(OutputFormat::Latex),
-            "docx" => Some(OutputFormat::Docx),
-            "epub" => Some(OutputFormat::Epub),
-            "rtf" => Some(OutputFormat::Rtf),
-            "opml" => Some(OutputFormat::Opml),
-            "fountain" => Some(OutputFormat::Fountain),
-            _ => None,
-        }
-    }
-
-    /// Parse an OutputFormat from a file path
-    pub fn from_path(path: &Path) -> Option<Self> {
-        path.extension()
-            .and_then(|e| e.to_str())
-            .and_then(Self::from_extension)
     }
 }
 
@@ -622,10 +618,10 @@ impl CompileManifest {
             let indent = "  ".repeat(entry.depth);
             let kind = if entry.is_folder { "+" } else { "-" };
             let pb = if entry.has_page_break_before { " [PAGE BREAK]" } else { "" };
-            out.push_str(&format!(
-                "{}{} {} ({} words){}\n",
+            let _ = writeln!(out,
+                "{}{} {} ({} words){}",
                 indent, kind, entry.title, entry.word_count, pb
-            ));
+            );
         }
         out
     }
@@ -679,7 +675,8 @@ pub struct SectionAssembler;
 impl SectionAssembler {
     /// Assemble contents into a single text with headings and separators
     pub fn assemble(contents: &[CompileContent], options: &CompileOptions) -> String {
-        let mut output = String::new();
+        let estimated: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 20).sum();
+        let mut output = String::with_capacity(estimated);
         let manifest = CompileManifest::from_contents(contents, options);
 
         for (i, entry) in manifest.sections.iter().enumerate() {
@@ -743,15 +740,55 @@ impl SectionAssembler {
     }
 }
 
-impl CompileContent {
-    /// Compute heading level based on depth (h1 = depth 0, capped at h6)
-    pub fn heading_level(&self) -> usize {
-        (self.depth + 1).min(6)
-    }
-}
-
 fn plain_text_compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
     super::plain_text::compile(contents, options)
+}
+
+// ── Shared utility functions used by multiple export modules ──
+
+/// Total word count across all content sections.
+pub fn total_word_count(contents: &[CompileContent]) -> usize {
+    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+}
+
+/// Escape special characters for XML output (epub, fdx, opml, mobi).
+pub fn escape_xml(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+/// Escape special characters for HTML output.
+pub fn escape_html(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+/// Create a URL-safe slug from a title (for anchor links / TOC entries).
+pub fn slug(title: &str) -> String {
+    title
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
+        .collect::<String>()
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
+/// Decode the five standard XML entities back to characters.
+pub fn decode_xml_entities(text: &str) -> String {
+    text.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
 }
 
 #[cfg(test)]

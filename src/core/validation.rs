@@ -42,7 +42,7 @@ pub fn validate_project(binder: &Binder) -> ProjectValidation {
 }
 
 fn count_items(item: &BinderItem) -> usize {
-    1 + item.children.iter().map(|c| count_items(c)).sum::<usize>()
+    1 + item.children.iter().map(count_items).sum::<usize>()
 }
 
 fn check_duplicate_ids(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
@@ -256,6 +256,54 @@ impl ProjectValidation {
         if infos > 0 { parts.push(format!("{} info", infos)); }
         parts.join(", ")
     }
+
+    /// Get issues sorted by severity (errors first)
+    pub fn sorted_issues(&self) -> Vec<&ValidationIssue> {
+        let mut sorted: Vec<&ValidationIssue> = self.issues.iter().collect();
+        sorted.sort_by_key(|i| i.severity.weight());
+        sorted
+    }
+
+    /// Get issues of a specific kind
+    pub fn issues_of_kind(&self, kind: &IssueKind) -> Vec<&ValidationIssue> {
+        self.issues.iter().filter(|i| &i.kind == kind).collect()
+    }
+
+    /// Get issues for a specific item
+    pub fn issues_for_item(&self, item_id: Uuid) -> Vec<&ValidationIssue> {
+        self.issues.iter().filter(|i| i.item_id == Some(item_id)).collect()
+    }
+
+    /// Whether there are auto-fixable issues
+    pub fn has_auto_fixable(&self) -> bool {
+        self.issues.iter().any(|i| i.is_auto_fixable())
+    }
+
+    /// Count of auto-fixable issues
+    pub fn auto_fixable_count(&self) -> usize {
+        self.issues.iter().filter(|i| i.is_auto_fixable()).count()
+    }
+
+    /// Health score (0-100, higher is better)
+    pub fn health_score(&self) -> f64 {
+        if self.total_items == 0 {
+            return 100.0;
+        }
+        let error_penalty = self.error_count() as f64 * 10.0;
+        let warning_penalty = self.warning_count() as f64 * 3.0;
+        let info_penalty = self.info_count() as f64 * 1.0;
+        let total_penalty = error_penalty + warning_penalty + info_penalty;
+        (100.0 - total_penalty).clamp(0.0, 100.0)
+    }
+
+    /// Health grade
+    pub fn health_grade(&self) -> &str {
+        let score = self.health_score();
+        if score >= 95.0 { "Excellent" }
+        else if score >= 80.0 { "Good" }
+        else if score >= 60.0 { "Fair" }
+        else { "Needs Attention" }
+    }
 }
 
 /// A single validation issue found in the project
@@ -368,56 +416,6 @@ impl ValidationIssue {
     /// Whether this issue can be automatically fixed
     pub fn is_auto_fixable(&self) -> bool {
         self.kind.is_auto_fixable()
-    }
-}
-
-impl ProjectValidation {
-    /// Get issues sorted by severity (errors first)
-    pub fn sorted_issues(&self) -> Vec<&ValidationIssue> {
-        let mut sorted: Vec<&ValidationIssue> = self.issues.iter().collect();
-        sorted.sort_by_key(|i| i.severity.weight());
-        sorted
-    }
-
-    /// Get issues of a specific kind
-    pub fn issues_of_kind(&self, kind: &IssueKind) -> Vec<&ValidationIssue> {
-        self.issues.iter().filter(|i| &i.kind == kind).collect()
-    }
-
-    /// Get issues for a specific item
-    pub fn issues_for_item(&self, item_id: Uuid) -> Vec<&ValidationIssue> {
-        self.issues.iter().filter(|i| i.item_id == Some(item_id)).collect()
-    }
-
-    /// Whether there are auto-fixable issues
-    pub fn has_auto_fixable(&self) -> bool {
-        self.issues.iter().any(|i| i.is_auto_fixable())
-    }
-
-    /// Count of auto-fixable issues
-    pub fn auto_fixable_count(&self) -> usize {
-        self.issues.iter().filter(|i| i.is_auto_fixable()).count()
-    }
-
-    /// Health score (0-100, higher is better)
-    pub fn health_score(&self) -> f64 {
-        if self.total_items == 0 {
-            return 100.0;
-        }
-        let error_penalty = self.error_count() as f64 * 10.0;
-        let warning_penalty = self.warning_count() as f64 * 3.0;
-        let info_penalty = self.info_count() as f64 * 1.0;
-        let total_penalty = error_penalty + warning_penalty + info_penalty;
-        (100.0 - total_penalty).max(0.0).min(100.0)
-    }
-
-    /// Health grade
-    pub fn health_grade(&self) -> &str {
-        let score = self.health_score();
-        if score >= 95.0 { "Excellent" }
-        else if score >= 80.0 { "Good" }
-        else if score >= 60.0 { "Fair" }
-        else { "Needs Attention" }
     }
 }
 

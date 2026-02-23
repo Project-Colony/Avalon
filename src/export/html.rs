@@ -1,19 +1,21 @@
+use std::fmt::Write;
 use anyhow::Result;
 use pulldown_cmark::{Parser, html::push_html};
-use super::compiler::{CompileContent, CompileOptions, SeparatorType};
+use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
-    let mut body = String::new();
+    let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 100).sum();
+    let mut body = String::with_capacity(estimated_size);
     let mut doc_index = 0usize;
 
     for (i, content) in contents.iter().enumerate() {
         if content.is_folder {
             let level = (content.depth + 1).min(6);
             let id = slug(&content.title);
-            body.push_str(&format!(
-                "<h{} id=\"{}\" class=\"folder-heading depth-{}\">{}</h{}>\n",
+            let _ = writeln!(body,
+                "<h{} id=\"{}\" class=\"folder-heading depth-{}\">{}</h{}>",
                 level, id, content.depth, escape_html(&content.title), level
-            ));
+            );
         } else {
             doc_index += 1;
 
@@ -22,7 +24,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                 body.push_str(&separator_html(&options.separator));
             }
 
-            body.push_str(&format!("<div class=\"document\" data-index=\"{}\">\n", doc_index));
+            let _ = writeln!(body,"<div class=\"document\" data-index=\"{}\">", doc_index);
 
             // Convert markdown content to HTML
             let parser = Parser::new(&content.text);
@@ -109,16 +111,16 @@ fn build_front_matter(options: &CompileOptions) -> String {
     let mut fm = format!("<h1>{}</h1>\n", escape_html(&options.title));
 
     if !options.author.is_empty() {
-        fm.push_str(&format!(
-            "<p class=\"author\">by {}</p>\n",
+        let _ = writeln!(fm,
+            "<p class=\"author\">by {}</p>",
             escape_html(&options.author)
-        ));
+        );
     }
 
-    fm.push_str(&format!(
-        "<p class=\"date\">{}</p>\n",
+    let _ = writeln!(fm,
+        "<p class=\"date\">{}</p>",
         chrono::Local::now().format("%B %d, %Y")
-    ));
+    );
 
     fm.push_str("<hr>\n");
     fm
@@ -136,27 +138,8 @@ fn separator_html(sep: &SeparatorType) -> String {
     }
 }
 
-/// Create a URL-safe slug from a title
-fn slug(title: &str) -> String {
-    title
-        .to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '-' })
-        .collect::<String>()
-        .split('-')
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
-}
-
-/// Escape HTML special characters
-fn escape_html(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#39;")
-}
+fn slug(title: &str) -> String { compiler::slug(title) }
+fn escape_html(text: &str) -> String { compiler::escape_html(text) }
 
 /// Generate a standalone HTML table of contents
 pub fn generate_toc(contents: &[CompileContent]) -> String {
@@ -166,12 +149,12 @@ pub fn generate_toc(contents: &[CompileContent]) -> String {
         if content.is_folder || !content.text.is_empty() {
             let id = slug(&content.title);
             let indent = "  ".repeat(content.depth);
-            toc.push_str(&format!(
-                "{}<li><a href=\"#{}\">{}</a></li>\n",
+            let _ = writeln!(toc,
+                "{}<li><a href=\"#{}\">{}</a></li>",
                 indent,
                 id,
                 escape_html(&content.title)
-            ));
+            );
         }
     }
 
@@ -181,7 +164,7 @@ pub fn generate_toc(contents: &[CompileContent]) -> String {
 
 /// Count total words across all content sections
 pub fn word_count(contents: &[CompileContent]) -> usize {
-    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+    compiler::total_word_count(contents)
 }
 
 /// Count total characters across all content sections

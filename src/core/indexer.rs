@@ -31,7 +31,7 @@ pub struct DocMeta {
     pub word_count: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum IndexField {
     Title,
     Content,
@@ -96,9 +96,9 @@ impl SearchIndex {
         let terms = tokenize(text);
         let mut positions_map: HashMap<String, Vec<usize>> = HashMap::new();
 
-        for (pos, term) in terms.iter().enumerate() {
+        for (pos, term) in terms.into_iter().enumerate() {
             positions_map
-                .entry(term.clone())
+                .entry(term)
                 .or_default()
                 .push(pos);
         }
@@ -110,7 +110,7 @@ impl SearchIndex {
                 .push(IndexEntry {
                     doc_id,
                     positions,
-                    field: field.clone(),
+                    field,
                 });
         }
     }
@@ -168,7 +168,7 @@ impl SearchIndex {
             // Exact match
             if let Some(entries) = self.index.get(term) {
                 for entry in entries {
-                    let key = (entry.doc_id, entry.field.clone());
+                    let key = (entry.doc_id, entry.field);
                     let (score, positions) = doc_scores.entry(key).or_insert((0.0, Vec::new()));
                     // TF-IDF-like scoring
                     let tf = entry.positions.len() as f64;
@@ -190,7 +190,7 @@ impl SearchIndex {
                 for (indexed_term, entries) in &self.index {
                     if indexed_term.starts_with(term) && indexed_term != term {
                         for entry in entries {
-                            let key = (entry.doc_id, entry.field.clone());
+                            let key = (entry.doc_id, entry.field);
                             let (score, positions) = doc_scores.entry(key).or_insert((0.0, Vec::new()));
                             let tf = entry.positions.len() as f64;
                             let field_boost = match entry.field {
@@ -372,35 +372,45 @@ fn is_stop_word(word: &str) -> bool {
 fn generate_snippet(text: &str, query: &str) -> String {
     let text_lower = text.to_lowercase();
     if let Some(pos) = text_lower.find(query) {
-        let context_chars = 60;
-        let start = if pos > context_chars { pos - context_chars } else { 0 };
-        let end = (pos + query.len() + context_chars).min(text.len());
+        // pos and query.len() are byte offsets from find(), always on char boundaries.
+        // Walk back ~60 chars for context start.
+        let start_byte = text.char_indices()
+            .rev()
+            .find(|&(idx, _)| idx <= pos.saturating_sub(60))
+            .map(|(idx, _)| idx)
+            .unwrap_or(0);
+        // Walk forward ~60 chars past the match for context end.
+        let match_end = pos + query.len();
+        let end_byte = text.char_indices()
+            .find(|&(idx, _)| idx >= match_end + 60)
+            .map(|(idx, _)| idx)
+            .unwrap_or(text.len());
 
         // Align to word boundaries
-        let start = if start > 0 {
-            text[start..].find(' ').map(|p| start + p + 1).unwrap_or(start)
+        let start = if start_byte > 0 {
+            text[start_byte..].find(' ').map(|p| start_byte + p + 1).unwrap_or(start_byte)
         } else {
-            start
+            0
         };
-        let end = if end < text.len() {
-            text[..end].rfind(' ').unwrap_or(end)
+        let end = if end_byte < text.len() {
+            text[..end_byte].rfind(' ').unwrap_or(end_byte)
         } else {
-            end
+            text.len()
         };
 
         let mut snippet = text[start..end].to_string();
-        if start > 0 { snippet = format!("...{}", snippet); }
-        if end < text.len() { snippet = format!("{}...", snippet); }
+        if start > 0 { snippet.insert_str(0, "..."); }
+        if end < text.len() { snippet.push_str("..."); }
         snippet
     } else {
         // No direct match, return first 120 chars
-        let end = text.len().min(120);
-        let end = if end < text.len() {
-            text[..end].rfind(' ').unwrap_or(end)
-        } else {
-            end
-        };
-        format!("{}...", &text[..end])
+        match text.char_indices().nth(120) {
+            None => text.to_string(),
+            Some((byte_end, _)) => {
+                let end = text[..byte_end].rfind(' ').unwrap_or(byte_end);
+                format!("{}...", &text[..end])
+            }
+        }
     }
 }
 

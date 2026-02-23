@@ -20,7 +20,7 @@ pub fn view(
 
     // Search input row
     let search_input = text_input("Search...", query)
-        .on_input(|val| Message::SearchQueryChanged(val))
+        .on_input(Message::SearchQueryChanged)
         .on_submit(Message::DoSearch)
         .size(13)
         .padding(6)
@@ -51,7 +51,7 @@ pub fn view(
 
     // Replace row
     let replace_input = text_input("Replace with...", replace_text)
-        .on_input(|val| Message::ReplaceTextChanged(val))
+        .on_input(Message::ReplaceTextChanged)
         .size(13)
         .padding(6)
         .width(Length::Fixed(300.0));
@@ -87,12 +87,10 @@ pub fn view(
         let match_count = result.matches.len();
         let first_context = result.matches.first()
             .map(|m| {
-                let ctx = if m.context.len() > 80 {
-                    format!("{}...", &m.context[..80])
-                } else {
-                    m.context.clone()
-                };
-                ctx
+                match m.context.char_indices().nth(80) {
+                    Some((byte_idx, _)) => format!("{}...", &m.context[..byte_idx]),
+                    None => m.context.clone(),
+                }
             })
             .unwrap_or_default();
 

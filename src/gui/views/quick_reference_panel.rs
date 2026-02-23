@@ -27,34 +27,25 @@ pub struct QuickRefData {
 impl QuickRefData {
     pub fn from_item(item: &BinderItem) -> Self {
         let content = item.document.as_ref()
-            .map(|d| d.content.clone())
-            .unwrap_or_default();
+            .map_or_else(String::new, |d| d.content.clone());
         let notes = item.document.as_ref()
-            .map(|d| d.notes.clone())
-            .unwrap_or_default();
+            .map_or_else(String::new, |d| d.notes.clone());
         let word_count = item.document.as_ref()
-            .map(|d| d.word_count())
-            .unwrap_or(0);
+            .map_or(0, |d| d.word_count());
         let char_count = item.document.as_ref()
-            .map(|d| d.char_count())
-            .unwrap_or(0);
+            .map_or(0, |d| d.char_count());
         let paragraph_count = item.document.as_ref()
-            .map(|d| d.paragraph_count())
-            .unwrap_or(0);
+            .map_or(0, |d| d.paragraph_count());
         let modified_at = item.document.as_ref()
-            .map(|d| d.modified_at.format("%Y-%m-%d %H:%M").to_string())
-            .unwrap_or_default();
+            .map_or_else(String::new, |d| d.modified_at.format("%Y-%m-%d %H:%M").to_string());
         let reading_time = word_count as f64 / 250.0;
 
         let status = item.metadata.status.as_ref()
-            .map(|s| s.name.clone())
-            .unwrap_or_default();
+            .map_or_else(String::new, |s| s.name.clone());
         let label = item.metadata.label.as_ref()
-            .map(|l| l.name.clone())
-            .unwrap_or_default();
+            .map_or_else(String::new, |l| l.name.clone());
         let label_color = item.metadata.label.as_ref()
-            .map(|l| l.color.to_iced_color())
-            .unwrap_or(Theme::TEXT_MUTED);
+            .map_or(Theme::TEXT_MUTED, |l| l.color.to_iced_color());
 
         Self {
             title: item.title.clone(),

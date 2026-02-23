@@ -264,7 +264,7 @@ fn build_templates_section() -> Element<'static, Message> {
         }
 
         let icon = cat.icon().to_string();
-        let cat_name = format!("{}", cat);
+        let cat_name = cat.to_string();
         let cat_header = row![
             text(icon).size(13),
             Space::with_width(6),

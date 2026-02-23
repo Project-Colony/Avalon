@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use chrono::{NaiveDate, Utc};
 
@@ -154,7 +155,6 @@ impl WritingHistory {
     /// Most productive day of the week (0=Mon, 6=Sun)
     pub fn most_productive_weekday(&self) -> Option<chrono::Weekday> {
         use chrono::Datelike;
-        use std::collections::HashMap;
         let mut totals: HashMap<chrono::Weekday, i64> = HashMap::new();
         for entry in &self.entries {
             *totals.entry(entry.date.weekday()).or_insert(0) += entry.words_written.max(0);
@@ -164,17 +164,18 @@ impl WritingHistory {
 
     /// Check if user has written today
     pub fn wrote_today(&self) -> bool {
-        self.today().map_or(false, |e| e.words_written > 0)
+        self.today().is_some_and(|e| e.words_written > 0)
     }
 
     /// Average writing time per session in minutes
     pub fn average_session_minutes(&self) -> f64 {
-        let active: Vec<_> = self.entries.iter().filter(|e| e.time_spent_seconds > 0).collect();
-        if active.is_empty() {
+        let (count, total) = self.entries.iter()
+            .filter(|e| e.time_spent_seconds > 0)
+            .fold((0usize, 0u64), |(n, sum), e| (n + 1, sum + e.time_spent_seconds));
+        if count == 0 {
             return 0.0;
         }
-        let total: u64 = active.iter().map(|e| e.time_spent_seconds).sum();
-        (total as f64 / 60.0) / active.len() as f64
+        (total as f64 / 60.0) / count as f64
     }
 
     /// Format total time as a human-readable string
@@ -241,7 +242,7 @@ impl WritingHistory {
         }
         let cv = self.daily_std_dev() / avg;
         // Convert to a 0-100 score: CV of 0 = 100, CV of 2+ = 0
-        ((1.0 - cv / 2.0) * 100.0).max(0.0).min(100.0)
+        ((1.0 - cv / 2.0) * 100.0).clamp(0.0, 100.0)
     }
 
     /// Consistency label based on score

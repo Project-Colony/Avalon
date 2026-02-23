@@ -69,45 +69,61 @@ impl Binder {
 
     /// Find an item by title
     pub fn find_item_by_title(&self, title: &str) -> Option<&BinderItem> {
-        self.all_items().into_iter().find(|item| item.title == title)
+        self.draft.find_by_title(title)
+            .or_else(|| self.research.find_by_title(title))
+            .or_else(|| self.trash.find_by_title(title))
     }
 
     /// Move an item to trash
     pub fn move_to_trash(&mut self, id: &Uuid) -> bool {
-        if let Some(item) = self.draft.remove_child(id) {
-            self.trash.children.push(item);
-            return true;
-        }
-        if let Some(item) = self.research.remove_child(id) {
+        if let Some(item) = self.draft.remove_child(id).or_else(|| self.research.remove_child(id)) {
             self.trash.children.push(item);
             return true;
         }
         false
     }
 
+    /// Visit each item in the binder tree without allocating a Vec.
+    pub fn for_each_item<F: FnMut(&BinderItem)>(&self, mut f: F) {
+        self.draft.visit(&mut f);
+        self.research.visit(&mut f);
+        self.trash.visit(&mut f);
+    }
+
     /// Count total documents (text items only)
     pub fn document_count(&self) -> usize {
-        self.all_items().iter()
-            .filter(|i| i.kind == BinderItemKind::Text)
-            .count()
+        let mut count = 0;
+        self.for_each_item(|i| {
+            if i.kind == BinderItemKind::Text { count += 1; }
+        });
+        count
     }
 
     /// Count total words across all documents
     pub fn total_word_count(&self) -> usize {
-        self.all_items().iter()
-            .filter_map(|i| i.document.as_ref())
-            .map(|d| d.word_count())
-            .sum()
+        let mut total = 0;
+        self.for_each_item(|i| {
+            if let Some(ref doc) = i.document {
+                total += doc.word_count();
+            }
+        });
+        total
     }
 
     /// Get all text content concatenated (for readability analysis)
     pub fn all_text(&self) -> String {
-        self.all_items().iter()
-            .filter_map(|i| i.document.as_ref())
-            .filter(|d| !d.content.trim().is_empty())
-            .map(|d| d.content.as_str())
-            .collect::<Vec<_>>()
-            .join("\n\n")
+        let mut result = String::with_capacity(self.total_char_count());
+        self.for_each_item(|item| {
+            if let Some(ref doc) = item.document {
+                if !doc.content.trim().is_empty() {
+                    if !result.is_empty() {
+                        result.push_str("\n\n");
+                    }
+                    result.push_str(&doc.content);
+                }
+            }
+        });
+        result
     }
 
     /// Move an item up in its parent's children list
@@ -131,13 +147,8 @@ impl Binder {
 
     /// Duplicate an item (creates a copy next to the original)
     pub fn duplicate_item(&mut self, id: &Uuid) -> Option<Uuid> {
-        if let Some(new_id) = self.draft.duplicate_child(id) {
-            return Some(new_id);
-        }
-        if let Some(new_id) = self.research.duplicate_child(id) {
-            return Some(new_id);
-        }
-        None
+        self.draft.duplicate_child(id)
+            .or_else(|| self.research.duplicate_child(id))
     }
 
     /// Convert a text item into a folder (keeps content as a child document)
@@ -238,6 +249,19 @@ impl BinderItem {
         None
     }
 
+    /// Find an item by title recursively
+    pub fn find_by_title(&self, title: &str) -> Option<&BinderItem> {
+        if self.title == title {
+            return Some(self);
+        }
+        for child in &self.children {
+            if let Some(found) = child.find_by_title(title) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
     /// Find a mutable item by ID recursively
     pub fn find_mut(&mut self, id: &Uuid) -> Option<&mut BinderItem> {
         if &self.id == id {
@@ -264,6 +288,14 @@ impl BinderItem {
         None
     }
 
+    /// Visit this item and all descendants without allocating a Vec.
+    pub fn visit<F: FnMut(&BinderItem)>(&self, f: &mut F) {
+        f(self);
+        for child in &self.children {
+            child.visit(f);
+        }
+    }
+
     /// Collect all items into a flat list
     pub fn collect_all<'a>(&'a self, items: &mut Vec<&'a BinderItem>) {
         items.push(self);
@@ -272,16 +304,22 @@ impl BinderItem {
         }
     }
 
-    /// Collect all items into a mutable flat list
+    /// Collect all items into a mutable flat list.
+    ///
+    /// # Safety rationale
+    /// We split the mutable borrow of `self` into two non-overlapping parts:
+    /// the item's own fields (pushed into `items`) and its `children` vec.
+    /// Each node in the tree is unique, so no aliasing occurs.
     pub fn collect_all_mut<'a>(&'a mut self, items: &mut Vec<&'a mut BinderItem>) {
-        let self_ptr = self as *mut BinderItem;
-        // Safety: We need to collect mutable references to all items.
-        // We guarantee no aliasing because each item appears exactly once in the tree.
-        unsafe {
-            items.push(&mut *self_ptr);
-            for child in &mut (*self_ptr).children {
-                child.collect_all_mut(items);
-            }
+        // Split borrow: push self, then recurse into children only
+        let children_ptr = self.children.as_mut_ptr();
+        let children_len = self.children.len();
+        items.push(self);
+        // SAFETY: children_ptr/len come from self.children before self was moved;
+        // we only access children (disjoint from the &mut self already in `items`).
+        let children_slice = unsafe { std::slice::from_raw_parts_mut(children_ptr, children_len) };
+        for child in children_slice {
+            child.collect_all_mut(items);
         }
     }
 
@@ -300,9 +338,7 @@ impl BinderItem {
 
     /// Get the total word count for this item and all children
     pub fn total_word_count(&self) -> usize {
-        let own_count = self.document.as_ref()
-            .map(|d| d.word_count())
-            .unwrap_or(0);
+        let own_count = self.document.as_ref().map_or(0, |d| d.word_count());
         let children_count: usize = self.children.iter()
             .map(|c| c.total_word_count())
             .sum();
@@ -345,11 +381,15 @@ impl BinderItem {
     /// Collect all descendant IDs (children, grandchildren, etc.) recursively.
     pub fn descendant_ids(&self) -> Vec<Uuid> {
         let mut ids = Vec::new();
+        self.collect_descendant_ids(&mut ids);
+        ids
+    }
+
+    fn collect_descendant_ids(&self, ids: &mut Vec<Uuid>) {
         for child in &self.children {
             ids.push(child.id);
-            ids.extend(child.descendant_ids());
+            child.collect_descendant_ids(ids);
         }
-        ids
     }
 
     /// Check if a target item is a descendant of this node.
@@ -365,13 +405,17 @@ impl BinderItem {
     /// Get all leaf (text/document) items under this node.
     pub fn leaf_items(&self) -> Vec<&BinderItem> {
         let mut leaves = Vec::new();
+        self.collect_leaf_items(&mut leaves);
+        leaves
+    }
+
+    fn collect_leaf_items<'a>(&'a self, leaves: &mut Vec<&'a BinderItem>) {
         if self.children.is_empty() && self.kind == BinderItemKind::Text {
             leaves.push(self);
         }
         for child in &self.children {
-            leaves.extend(child.leaf_items());
+            child.collect_leaf_items(leaves);
         }
-        leaves
     }
 
     /// Count total descendants (not including self).
@@ -385,9 +429,6 @@ impl BinderItem {
 
     /// Get the maximum nesting depth under this node.
     pub fn max_depth(&self) -> usize {
-        if self.children.is_empty() {
-            return 0;
-        }
         self.children.iter()
             .map(|c| 1 + c.max_depth())
             .max()
@@ -482,7 +523,10 @@ impl BinderItem {
                 if !merged.is_empty() {
                     merged.push_str("\n\n---\n\n");
                 }
-                merged.push_str(&format!("## {}\n\n{}", child.title, doc.content));
+                merged.push_str("## ");
+                merged.push_str(&child.title);
+                merged.push_str("\n\n");
+                merged.push_str(&doc.content);
             }
         }
         merged
@@ -492,22 +536,27 @@ impl BinderItem {
 impl Binder {
     /// Count total folders in the binder
     pub fn folder_count(&self) -> usize {
-        self.all_items().iter()
-            .filter(|i| i.kind == BinderItemKind::Folder)
-            .count()
+        let mut count = 0;
+        self.for_each_item(|i| if i.kind == BinderItemKind::Folder { count += 1; });
+        count
     }
 
     /// Count total characters across all documents
     pub fn total_char_count(&self) -> usize {
-        self.all_items().iter()
-            .filter_map(|i| i.document.as_ref())
-            .map(|d| d.char_count())
-            .sum()
+        let mut total = 0;
+        self.for_each_item(|i| {
+            if let Some(d) = &i.document {
+                total += d.char_count();
+            }
+        });
+        total
     }
 
     /// Total number of items (documents + folders) in the entire binder
     pub fn item_count(&self) -> usize {
-        self.all_items().len()
+        let mut count = 0;
+        self.for_each_item(|_| count += 1);
+        count
     }
 
     /// Get all text items (documents only)
@@ -521,7 +570,7 @@ impl Binder {
     pub fn longest_document(&self) -> Option<&BinderItem> {
         self.all_items().into_iter()
             .filter(|i| i.kind == BinderItemKind::Text)
-            .max_by_key(|i| i.document.as_ref().map(|d| d.word_count()).unwrap_or(0))
+            .max_by_key(|i| i.document.as_ref().map_or(0, |d| d.word_count()))
     }
 
     /// Get the depth of an item in the binder (across all root sections).
@@ -540,19 +589,14 @@ impl Binder {
 
     /// Get all descendant IDs under a given item.
     pub fn descendants_of(&self, id: &Uuid) -> Vec<Uuid> {
-        if let Some(item) = self.find_item(id) {
-            item.descendant_ids()
-        } else {
-            Vec::new()
-        }
+        self.find_item(id).map_or_else(Vec::new, |item| item.descendant_ids())
     }
 
     /// Get the maximum nesting depth across the entire binder.
     pub fn max_nesting_depth(&self) -> usize {
-        let d = self.draft.max_depth();
-        let r = self.research.max_depth();
-        let t = self.trash.max_depth();
-        d.max(r).max(t)
+        self.draft.max_depth()
+            .max(self.research.max_depth())
+            .max(self.trash.max_depth())
     }
 
     /// Get all leaf documents (items with no children that are text type).
@@ -784,10 +828,10 @@ impl Binder {
             return new_ids;
         }
 
-        for (i, section) in sections.iter().enumerate() {
+        for (i, section) in sections.into_iter().enumerate() {
             let mut new_item = BinderItem::new_text(&format!("{} - Part {}", title, i + 1));
             if let Some(ref mut doc) = new_item.document {
-                doc.content = section.clone();
+                doc.content = section;
             }
             new_ids.push(new_item.id);
             self.draft.add_child(new_item);
@@ -826,15 +870,8 @@ impl Binder {
             return None;
         }
 
-        // Try in draft first
-        if let Some(id) = self.draft.group_children(item_ids, folder_title) {
-            return Some(id);
-        }
-        // Try in research
-        if let Some(id) = self.research.group_children(item_ids, folder_title) {
-            return Some(id);
-        }
-        None
+        self.draft.group_children(item_ids, folder_title)
+            .or_else(|| self.research.group_children(item_ids, folder_title))
     }
 }
 
@@ -893,8 +930,8 @@ impl BinderItem {
         }
 
         // Remove items (in reverse order to preserve indices)
-        let mut sorted_positions = positions.clone();
-        sorted_positions.sort();
+        let mut sorted_positions = positions;
+        sorted_positions.sort_unstable();
         sorted_positions.reverse();
 
         let mut items_to_group = Vec::new();

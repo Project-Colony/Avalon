@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use super::binder::Binder;
 
 /// Aggregated statistics for the project or a selection
@@ -20,10 +21,9 @@ impl Statistics {
     pub fn from_binder(binder: &Binder) -> Self {
         use super::binder::BinderItemKind;
 
-        let items = binder.all_items();
         let mut stats = Statistics::default();
 
-        for item in &items {
+        binder.for_each_item(|item| {
             match item.kind {
                 BinderItemKind::Text => stats.document_count += 1,
                 BinderItemKind::Folder => stats.folder_count += 1,
@@ -38,7 +38,7 @@ impl Statistics {
                 stats.sentence_count += doc.sentence_count();
                 stats.line_count += doc.line_count();
             }
-        }
+        });
 
         stats.page_count = stats.word_count as f64 / 250.0;
         stats.average_words_per_document = if stats.document_count > 0 {
@@ -50,10 +50,89 @@ impl Statistics {
         stats
     }
 
+    /// Get a summary string
+    pub fn summary(&self) -> String {
+        format!(
+            "{} words, {:.1} pages, {} docs in {} folders",
+            self.word_count, self.page_count, self.document_count, self.folder_count
+        )
+    }
+
+    /// Average words per page (should be ~250)
+    pub fn avg_words_per_page(&self) -> f64 {
+        if self.page_count > 0.0 {
+            self.word_count as f64 / self.page_count
+        } else {
+            0.0
+        }
+    }
+
+    /// Reading time estimate in minutes (250 WPM)
+    pub fn reading_time_minutes(&self) -> f64 {
+        self.word_count as f64 / 250.0
+    }
+
+    /// Speaking time estimate in minutes (150 WPM)
+    pub fn speaking_time_minutes(&self) -> f64 {
+        self.word_count as f64 / 150.0
+    }
+
+    /// Check if the project is empty
+    pub fn is_empty(&self) -> bool {
+        self.word_count == 0 && self.document_count == 0
+    }
+
+    /// Estimated completion percentage toward a word target
+    pub fn completion_toward_target(&self, target: usize) -> f64 {
+        if target == 0 {
+            return 0.0;
+        }
+        (self.word_count as f64 / target as f64 * 100.0).min(100.0)
+    }
+
+    /// Words remaining to reach a target
+    pub fn words_remaining(&self, target: usize) -> usize {
+        target.saturating_sub(self.word_count)
+    }
+
+    /// Estimated days to completion at a given daily word rate
+    pub fn days_to_completion(&self, target: usize, words_per_day: usize) -> Option<usize> {
+        if words_per_day == 0 {
+            return None;
+        }
+        let remaining = self.words_remaining(target);
+        if remaining == 0 {
+            return Some(0);
+        }
+        Some(remaining.div_ceil(words_per_day))
+    }
+
+    /// Average words per document
+    pub fn avg_words_per_doc(&self) -> f64 {
+        if self.document_count == 0 {
+            return 0.0;
+        }
+        self.word_count as f64 / self.document_count as f64
+    }
+
+    /// Project size classification
+    pub fn size_label(&self) -> &str {
+        match self.word_count {
+            0..=999 => "Flash Fiction / Note",
+            1000..=7499 => "Short Story",
+            7500..=17499 => "Novelette",
+            17500..=39999 => "Novella",
+            40000..=79999 => "Novel",
+            80000..=119999 => "Full Novel",
+            _ => "Epic / Tome",
+        }
+    }
+
     /// Compute statistics for a single text content
     pub fn from_text(text: &str) -> Self {
+        let word_count = text.split_whitespace().count();
         Statistics {
-            word_count: text.split_whitespace().count(),
+            word_count,
             char_count: text.len(),
             char_count_no_spaces: text.chars().filter(|c| !c.is_whitespace()).count(),
             paragraph_count: text.split("\n\n").filter(|p| !p.trim().is_empty()).count(),
@@ -62,10 +141,10 @@ impl Statistics {
                 .count()
                 .max(if text.is_empty() { 0 } else { 1 }),
             line_count: if text.is_empty() { 0 } else { text.lines().count() },
-            page_count: text.split_whitespace().count() as f64 / 250.0,
+            page_count: word_count as f64 / 250.0,
             document_count: 1,
             folder_count: 0,
-            average_words_per_document: text.split_whitespace().count() as f64,
+            average_words_per_document: word_count as f64,
         }
     }
 
@@ -140,86 +219,6 @@ impl SessionStats {
     }
 }
 
-impl Statistics {
-    /// Get a summary string
-    pub fn summary(&self) -> String {
-        format!(
-            "{} words, {:.1} pages, {} docs in {} folders",
-            self.word_count, self.page_count, self.document_count, self.folder_count
-        )
-    }
-
-    /// Average words per page (should be ~250)
-    pub fn avg_words_per_page(&self) -> f64 {
-        if self.page_count > 0.0 {
-            self.word_count as f64 / self.page_count
-        } else {
-            0.0
-        }
-    }
-
-    /// Reading time estimate in minutes (250 WPM)
-    pub fn reading_time_minutes(&self) -> f64 {
-        self.word_count as f64 / 250.0
-    }
-
-    /// Speaking time estimate in minutes (150 WPM)
-    pub fn speaking_time_minutes(&self) -> f64 {
-        self.word_count as f64 / 150.0
-    }
-
-    /// Check if the project is empty
-    pub fn is_empty(&self) -> bool {
-        self.word_count == 0 && self.document_count == 0
-    }
-
-    /// Estimated completion percentage toward a word target
-    pub fn completion_toward_target(&self, target: usize) -> f64 {
-        if target == 0 {
-            return 0.0;
-        }
-        (self.word_count as f64 / target as f64 * 100.0).min(100.0)
-    }
-
-    /// Words remaining to reach a target
-    pub fn words_remaining(&self, target: usize) -> usize {
-        target.saturating_sub(self.word_count)
-    }
-
-    /// Estimated days to completion at a given daily word rate
-    pub fn days_to_completion(&self, target: usize, words_per_day: usize) -> Option<usize> {
-        if words_per_day == 0 {
-            return None;
-        }
-        let remaining = self.words_remaining(target);
-        if remaining == 0 {
-            return Some(0);
-        }
-        Some((remaining + words_per_day - 1) / words_per_day) // ceiling division
-    }
-
-    /// Average words per document
-    pub fn avg_words_per_doc(&self) -> f64 {
-        if self.document_count == 0 {
-            return 0.0;
-        }
-        self.word_count as f64 / self.document_count as f64
-    }
-
-    /// Project size classification
-    pub fn size_label(&self) -> &str {
-        match self.word_count {
-            0..=999 => "Flash Fiction / Note",
-            1000..=7499 => "Short Story",
-            7500..=17499 => "Novelette",
-            17500..=39999 => "Novella",
-            40000..=79999 => "Novel",
-            80000..=119999 => "Full Novel",
-            _ => "Epic / Tome",
-        }
-    }
-}
-
 /// Detailed text analysis for the text statistics panel
 #[derive(Debug, Clone, Default)]
 pub struct TextAnalysis {
@@ -247,12 +246,15 @@ impl TextAnalysis {
         let words: Vec<&str> = text.split_whitespace().collect();
         let word_count = words.len();
         let char_count = text.len();
-        let char_no_spaces = text.chars().filter(|c| !c.is_whitespace()).count();
 
-        let sentence_count = text.chars()
-            .filter(|c| *c == '.' || *c == '!' || *c == '?')
-            .count()
-            .max(1);
+        // Single pass over characters for non-space count and sentence count
+        let (char_no_spaces, raw_sentences) = text.chars().fold((0usize, 0usize), |(ns, sc), c| {
+            (
+                ns + usize::from(!c.is_whitespace()),
+                sc + usize::from(matches!(c, '.' | '!' | '?')),
+            )
+        });
+        let sentence_count = raw_sentences.max(1);
 
         let paragraph_count = text.split("\n\n")
             .filter(|p| !p.trim().is_empty())
@@ -260,7 +262,7 @@ impl TextAnalysis {
             .max(1);
 
         // Unique words
-        let mut word_freq = std::collections::HashMap::new();
+        let mut word_freq = HashMap::new();
         for word in &words {
             let lower = word.to_lowercase()
                 .trim_matches(|c: char| !c.is_alphanumeric())
@@ -273,7 +275,7 @@ impl TextAnalysis {
 
         // Most common words (exclude short words)
         let mut word_list: Vec<(String, usize)> = word_freq.into_iter()
-            .filter(|(w, _)| w.len() > 3)
+            .filter(|(w, _): &(String, usize)| w.len() > 3)
             .collect();
         word_list.sort_by(|a, b| b.1.cmp(&a.1));
         word_list.truncate(20);
@@ -413,10 +415,11 @@ impl ReadabilityMetrics {
             .count()
             .max(1);
 
-        // Syllable analysis
-        let syllable_counts: Vec<usize> = words.iter().map(|w| count_syllables(w)).collect();
-        let total_syllables: usize = syllable_counts.iter().sum();
-        let complex_word_count = syllable_counts.iter().filter(|&&s| s >= 3).count();
+        // Syllable analysis — single pass, no intermediate Vec
+        let (total_syllables, complex_word_count) = words.iter().fold((0usize, 0usize), |(total, complex), w| {
+            let s = count_syllables(w);
+            (total + s, complex + usize::from(s >= 3))
+        });
 
         let avg_syllables_per_word = total_syllables as f64 / word_count as f64;
         let words_per_sentence = word_count as f64 / sentence_count as f64;
@@ -477,11 +480,10 @@ impl ReadabilityMetrics {
             self.coleman_liau,
             self.automated_readability,
         ];
-        let valid: Vec<f64> = grades.iter().copied().filter(|g| *g > 0.0).collect();
-        if valid.is_empty() {
-            return 0.0;
-        }
-        valid.iter().sum::<f64>() / valid.len() as f64
+        let (sum, count) = grades.iter().fold((0.0, 0u32), |(s, c), &g| {
+            if g > 0.0 { (s + g, c + 1) } else { (s, c) }
+        });
+        if count == 0 { 0.0 } else { sum / count as f64 }
     }
 
     /// Human-readable label for the Flesch score
@@ -539,19 +541,21 @@ impl WordFrequencyAnalysis {
         let total_count = words.len();
 
         // Word frequencies
-        let mut freq_map = std::collections::HashMap::new();
+        let mut freq_map: HashMap<&str, usize> = HashMap::new();
         for word in &words {
-            *freq_map.entry(word.clone()).or_insert(0usize) += 1;
+            *freq_map.entry(word).or_default() += 1;
         }
 
         let unique_count = freq_map.len();
         let hapax_count = freq_map.values().filter(|&&c| c == 1).count();
 
-        let mut frequencies: Vec<(String, usize)> = freq_map.into_iter().collect();
+        let mut frequencies: Vec<(String, usize)> = freq_map.into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect();
         frequencies.sort_by(|a, b| b.1.cmp(&a.1));
 
         // Bigrams
-        let mut bigram_map = std::collections::HashMap::new();
+        let mut bigram_map = HashMap::new();
         for window in words.windows(2) {
             let bigram = format!("{} {}", window[0], window[1]);
             *bigram_map.entry(bigram).or_insert(0usize) += 1;

@@ -403,7 +403,7 @@ impl CorkboardState {
             return Err(CorkboardError::CardNotFound(id));
         }
 
-        let appearance = self.appearances.entry(id).or_insert_with(CardAppearance::default);
+        let appearance = self.appearances.entry(id).or_default();
         appearance.pinned = pinned;
 
         Ok(CorkboardAction::PinCard { id, pinned })
@@ -487,7 +487,7 @@ impl CorkboardState {
 
     /// Set the zoom level. Must be in the range [0.1, 5.0].
     pub fn set_zoom(&mut self, level: f32) -> Result<()> {
-        if level < 0.1 || level > 5.0 {
+        if !(0.1..=5.0).contains(&level) {
             return Err(CorkboardError::InvalidZoom);
         }
         self.zoom = level;

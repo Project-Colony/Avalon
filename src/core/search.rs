@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+use std::fmt::Write;
 use uuid::Uuid;
 use regex::Regex;
 
@@ -72,7 +74,7 @@ pub fn search_binder(binder: &Binder, options: &SearchOptions) -> Vec<SearchResu
                     line_number: 0,
                     start: m.start(),
                     end: m.end(),
-                    context: format!("[Title] {}", item.title.clone()),
+                    context: format!("[Title] {}", item.title),
                 });
             }
         }
@@ -100,7 +102,7 @@ pub fn search_binder(binder: &Binder, options: &SearchOptions) -> Vec<SearchResu
                     line_number: 0,
                     start: m.start(),
                     end: m.end(),
-                    context: format!("[Synopsis] {}", item.synopsis.clone()),
+                    context: format!("[Synopsis] {}", item.synopsis),
                 });
             }
         }
@@ -113,7 +115,7 @@ pub fn search_binder(binder: &Binder, options: &SearchOptions) -> Vec<SearchResu
                         line_number: 0,
                         start: m.start(),
                         end: m.end(),
-                        context: format!("[Notes] {}", doc.notes.clone()),
+                        context: format!("[Notes] {}", doc.notes),
                     });
                 }
             }
@@ -202,10 +204,9 @@ impl SearchResult {
     /// Get context lines around a match (with surrounding text)
     pub fn context_preview(&self, match_index: usize, max_len: usize) -> String {
         if let Some(m) = self.matches.get(match_index) {
-            if m.context.len() <= max_len {
-                m.context.clone()
-            } else {
-                format!("{}...", &m.context[..max_len])
+            match m.context.char_indices().nth(max_len) {
+                None => m.context.clone(),
+                Some((byte_idx, _)) => format!("{}...", &m.context[..byte_idx]),
             }
         } else {
             String::new()
@@ -409,12 +410,12 @@ pub fn extract_matches(content: &str, options: &SearchOptions) -> Vec<String> {
         Ok(r) => r,
         Err(_) => return Vec::new(),
     };
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
     let mut results = Vec::new();
     for m in regex.find_iter(content) {
-        let s = m.as_str().to_string();
-        if seen.insert(s.clone()) {
-            results.push(s);
+        let s = m.as_str();
+        if seen.insert(s) {
+            results.push(s.to_string());
         }
     }
     results
@@ -500,7 +501,7 @@ pub fn search_empty_documents(binder: &Binder) -> Vec<(Uuid, String)> {
     binder.all_items().into_iter()
         .filter(|item| item.kind == super::binder::BinderItemKind::Text)
         .filter(|item| {
-            item.document.as_ref().map_or(true, |doc| doc.content.trim().is_empty())
+            item.document.as_ref().is_none_or(|doc| doc.content.trim().is_empty())
         })
         .map(|item| (item.id, item.title.clone()))
         .collect()
@@ -518,14 +519,15 @@ pub struct MatchContext {
 impl MatchContext {
     /// Format as a displayable block
     pub fn display(&self) -> String {
-        let mut output = String::new();
+        let line_estimate = self.total_lines() * 40;
+        let mut output = String::with_capacity(line_estimate);
         for (i, line) in self.before.iter().enumerate() {
             let num = self.line_number - self.before.len() + i;
-            output.push_str(&format!("  {:>4} | {}\n", num, line));
+            let _ = writeln!(output, "  {:>4} | {}", num, line);
         }
-        output.push_str(&format!("> {:>4} | {}\n", self.line_number, self.matched_line));
+        let _ = writeln!(output, "> {:>4} | {}", self.line_number, self.matched_line);
         for (i, line) in self.after.iter().enumerate() {
-            output.push_str(&format!("  {:>4} | {}\n", self.line_number + 1 + i, line));
+            let _ = writeln!(output, "  {:>4} | {}", self.line_number + 1 + i, line);
         }
         output
     }
@@ -549,8 +551,8 @@ pub fn levenshtein_distance(a: &str, b: &str) -> usize {
     let mut prev = vec![0usize; m + 1];
     let mut curr = vec![0usize; m + 1];
 
-    for j in 0..=m {
-        prev[j] = j;
+    for (j, val) in prev.iter_mut().enumerate().take(m + 1) {
+        *val = j;
     }
 
     for i in 1..=n {

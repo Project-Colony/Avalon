@@ -148,7 +148,7 @@ fn render_section(
             };
             format!("{} {} w", doc_count, word_label)
         } else {
-            format!("{}", doc_count)
+            doc_count.to_string()
         };
 
         container(
@@ -203,7 +203,7 @@ fn render_section(
 /// Count documents in a binder section (recursive)
 fn count_docs(item: &BinderItem) -> usize {
     let self_count = if item.kind == BinderItemKind::Text { 1 } else { 0 };
-    self_count + item.children.iter().map(|c| count_docs(c)).sum::<usize>()
+    self_count + item.children.iter().map(count_docs).sum::<usize>()
 }
 
 /// Render a single binder item and its children
@@ -254,7 +254,7 @@ fn render_item(
         if let Some(ref d) = item.document {
             let wc = d.word_count();
             if wc > 0 {
-                text(format!("{}", wc))
+                text(wc.to_string())
                     .size(9)
                     .color(Theme::TEXT_MUTED)
                     .into()

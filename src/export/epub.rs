@@ -1,10 +1,11 @@
 use std::path::Path;
 use std::fs;
 use std::io::Write;
+use std::fmt::Write as FmtWrite;
 use anyhow::Result;
 use pulldown_cmark::{Parser, html::push_html};
 
-use super::compiler::{CompileContent, CompileOptions};
+use super::compiler::{self, CompileContent, CompileOptions};
 
 /// Save compiled content as an ePub file.
 /// ePub is essentially a ZIP with XHTML content, metadata, and a manifest.
@@ -40,16 +41,17 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
             // Flush previous chapter
             if !current_chapter_html.is_empty() {
                 let filename = format!("chapter{}.xhtml", chapter_idx);
-                chapters.push((filename, current_chapter_title.clone(), current_chapter_html.clone()));
+                let title = std::mem::replace(&mut current_chapter_title, content.title.clone());
+                chapters.push((filename, title, std::mem::take(&mut current_chapter_html)));
                 chapter_idx += 1;
-                current_chapter_html.clear();
+            } else {
+                current_chapter_title = content.title.clone();
             }
-            current_chapter_title = content.title.clone();
             let level = (content.depth + 1).min(6);
-            current_chapter_html.push_str(&format!(
-                "<h{}>{}</h{}>\n",
+            let _ = writeln!(current_chapter_html,
+                "<h{}>{}</h{}>",
                 level, escape_xml(&content.title), level
-            ));
+            );
         } else {
             if current_chapter_title.is_empty() {
                 current_chapter_title = content.title.clone();
@@ -145,11 +147,11 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
     }
 
     for (i, (filename, _, _)) in chapters.iter().enumerate() {
-        manifest_items.push_str(&format!(
-            "    <item id=\"ch{}\" href=\"{}\" media-type=\"application/xhtml+xml\"/>\n",
+        let _ = writeln!(manifest_items,
+            "    <item id=\"ch{}\" href=\"{}\" media-type=\"application/xhtml+xml\"/>",
             i, filename
-        ));
-        spine_items.push_str(&format!("    <itemref idref=\"ch{}\"/>\n", i));
+        );
+        let _ = writeln!(spine_items,"    <itemref idref=\"ch{}\"/>", i);
     }
 
     // Table of contents nav
@@ -190,11 +192,11 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
         } else {
             title.clone()
         };
-        toc_entries.push_str(&format!(
-            "      <li><a href=\"{}\">{}</a></li>\n",
+        let _ = writeln!(toc_entries,
+            "      <li><a href=\"{}\">{}</a></li>",
             filename,
             escape_xml(&display_title)
-        ));
+        );
     }
 
     let toc = format!(
@@ -218,13 +220,7 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
     Ok(())
 }
 
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
+fn escape_xml(s: &str) -> String { compiler::escape_xml(s) }
 
 /// Estimate the number of chapters that would be generated
 pub fn estimate_chapter_count(contents: &[CompileContent]) -> usize {
@@ -261,7 +257,7 @@ pub fn estimate_file_size(contents: &[CompileContent], options: &CompileOptions)
 
 /// Count total words across all ePub content
 pub fn word_count(contents: &[CompileContent]) -> usize {
-    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+    compiler::total_word_count(contents)
 }
 
 #[cfg(test)]

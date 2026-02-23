@@ -115,7 +115,7 @@ pub fn view(data: &ProjectStatsData) -> Element<'static, Message> {
     // Target progress (if target set)
     let target_section: Element<'static, Message> = if let Some(target) = data.target_words {
         let pct = (data.word_count as f64 / target as f64 * 100.0).min(100.0);
-        let remaining = if target > data.word_count { target - data.word_count } else { 0 };
+        let remaining = target.saturating_sub(data.word_count);
 
         let mut items = vec![
             stat("Target", &format_number(target)),

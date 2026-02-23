@@ -89,16 +89,14 @@ impl InspectorData {
             keywords: item.metadata.keywords.clone(),
             is_bookmarked,
             footnote_count: item.document.as_ref()
-                .map(|d| d.footnotes.len())
-                .unwrap_or(0),
+                .map_or(0, |d| d.footnotes.len()),
             reference_count: item.document.as_ref()
-                .map(|d| d.references.len())
-                .unwrap_or(0),
+                .map_or(0, |d| d.references.len()),
             custom_fields: item.metadata.custom_metadata.iter()
                 .map(|f| {
                     let val = match &f.value {
                         crate::core::metadata::CustomFieldValue::Text(t) => t.clone(),
-                        crate::core::metadata::CustomFieldValue::Number(n) => format!("{}", n),
+                        crate::core::metadata::CustomFieldValue::Number(n) => n.to_string(),
                         crate::core::metadata::CustomFieldValue::Checkbox(b) => if *b { "Yes".to_string() } else { "No".to_string() },
                         crate::core::metadata::CustomFieldValue::Date(d) => d.clone(),
                         crate::core::metadata::CustomFieldValue::List(l) => l.join(", "),
@@ -332,7 +330,7 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
 
     // ── Notes & Keywords ────────────────────────────────────────
     let notes_input = text_input("Document notes...", &data.notes)
-        .on_input(|val| Message::NotesChanged(val))
+        .on_input(Message::NotesChanged)
         .size(12)
         .padding(6);
 

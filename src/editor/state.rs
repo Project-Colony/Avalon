@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use crate::core::document::Document;
 
 /// The state of the text editor
@@ -19,6 +20,13 @@ pub struct EditorState {
     pub scroll_offset: f32,
     /// The iced text editor content
     pub content: iced::widget::text_editor::Content,
+}
+
+/// An entry in the undo/redo stack
+#[derive(Debug, Clone)]
+pub struct UndoEntry {
+    pub content: String,
+    pub cursor: usize,
 }
 
 impl EditorState {
@@ -141,11 +149,11 @@ impl EditorState {
         }
         let bytes = text.as_bytes();
         let mut start = pos;
-        while start > 0 && bytes.get(start - 1).map_or(false, |b| b.is_ascii_alphanumeric() || *b == b'_') {
+        while start > 0 && bytes.get(start - 1).is_some_and(|b| b.is_ascii_alphanumeric() || *b == b'_') {
             start -= 1;
         }
         let mut end = pos;
-        while end < text.len() && bytes.get(end).map_or(false, |b| b.is_ascii_alphanumeric() || *b == b'_') {
+        while end < text.len() && bytes.get(end).is_some_and(|b| b.is_ascii_alphanumeric() || *b == b'_') {
             end += 1;
         }
         if start < end {
@@ -191,8 +199,8 @@ impl EditorState {
                 content: self.document.content.clone(),
                 cursor: self.cursor,
             });
-            self.document.content = entry.content.clone();
             self.content = iced::widget::text_editor::Content::with_text(&entry.content);
+            self.document.content = entry.content;
             self.cursor = entry.cursor;
             self.dirty = true;
             true
@@ -208,8 +216,8 @@ impl EditorState {
                 content: self.document.content.clone(),
                 cursor: self.cursor,
             });
-            self.document.content = entry.content.clone();
             self.content = iced::widget::text_editor::Content::with_text(&entry.content);
+            self.document.content = entry.content;
             self.cursor = entry.cursor;
             self.dirty = true;
             true
@@ -217,9 +225,7 @@ impl EditorState {
             false
         }
     }
-}
 
-impl EditorState {
     /// Get the current line text
     pub fn current_line_text(&self) -> String {
         let text = self.text();
@@ -301,16 +307,7 @@ impl EditorState {
         self.undo_stack.clear();
         self.redo_stack.clear();
     }
-}
 
-/// An entry in the undo/redo stack
-#[derive(Debug, Clone)]
-pub struct UndoEntry {
-    pub content: String,
-    pub cursor: usize,
-}
-
-impl EditorState {
     /// Find all occurrences of a query in the document text
     pub fn find_all(&self, query: &str, case_sensitive: bool) -> Vec<(usize, usize)> {
         let text = self.text();
@@ -318,7 +315,7 @@ impl EditorState {
             return Vec::new();
         }
         let (search_text, search_query) = if case_sensitive {
-            (text.clone(), query.to_string())
+            (text, query.to_string())
         } else {
             (text.to_lowercase(), query.to_lowercase())
         };
@@ -333,26 +330,28 @@ impl EditorState {
             return 0;
         }
         let text = self.text();
-        let new_text = if case_sensitive {
-            text.replace(find, replace)
+        let (new_text, count) = if case_sensitive {
+            let count = text.matches(find).count();
+            (text.replace(find, replace), count)
         } else {
             let lower = text.to_lowercase();
             let lower_find = find.to_lowercase();
             let mut result = String::new();
             let mut last_end = 0;
+            let mut count = 0;
             for (start, _) in lower.match_indices(&lower_find) {
                 result.push_str(&text[last_end..start]);
                 result.push_str(replace);
                 last_end = start + find.len();
+                count += 1;
             }
             result.push_str(&text[last_end..]);
-            result
+            (result, count)
         };
-        let count = self.find_all(find, case_sensitive).len();
         if count > 0 {
             self.push_undo();
-            self.document.content = new_text.clone();
             self.content = iced::widget::text_editor::Content::with_text(&new_text);
+            self.document.content = new_text;
             self.dirty = true;
         }
         count
@@ -362,7 +361,11 @@ impl EditorState {
     pub fn insert_at_cursor(&mut self, text: &str) {
         self.push_undo();
         let content = self.text();
-        let pos = self.cursor.min(content.len());
+        // Ensure pos lands on a valid char boundary
+        let mut pos = self.cursor.min(content.len());
+        while pos > 0 && !content.is_char_boundary(pos) {
+            pos -= 1;
+        }
         let new_content = format!("{}{}{}", &content[..pos], text, &content[pos..]);
         self.document.content = new_content.clone();
         self.content = iced::widget::text_editor::Content::with_text(&new_content);
@@ -375,6 +378,10 @@ impl EditorState {
         if let Some((start, end)) = self.selection_range() {
             self.push_undo();
             let text = self.text();
+            // Ensure boundaries are char-safe
+            if !text.is_char_boundary(start) || !text.is_char_boundary(end) {
+                return None;
+            }
             let deleted = text[start..end].to_string();
             let new_content = format!("{}{}", &text[..start], &text[end..]);
             self.document.content = new_content.clone();
@@ -459,18 +466,15 @@ impl EditorState {
             self.redo_depth(),
         )
     }
-}
 
-impl EditorState {
     /// Transpose the two characters around the cursor
     pub fn transpose_chars(&mut self) {
         let text = self.document.content.clone();
         let pos = self.cursor;
-        if pos == 0 || pos >= text.len() {
-            if pos < 2 || text.len() < 2 {
+        if (pos == 0 || pos >= text.len())
+            && (pos < 2 || text.len() < 2) {
                 return;
             }
-        }
 
         let swap_pos = if pos >= text.len() { pos - 2 } else { pos.saturating_sub(1) };
         let bytes = text.as_bytes();
@@ -515,7 +519,7 @@ impl EditorState {
             return;
         }
         self.push_undo();
-        let mut seen = std::collections::HashSet::new();
+        let mut seen = HashSet::new();
         let unique: Vec<&str> = lines.into_iter()
             .filter(|line| seen.insert(*line))
             .collect();
@@ -715,6 +719,7 @@ impl EditorState {
     }
 
     /// Transform text to uppercase - selection only if selected, otherwise whole document
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_uppercase(&mut self, selection_only: bool) {
         if selection_only {
             if let Some((start, end)) = self.selection_range() {
@@ -740,6 +745,7 @@ impl EditorState {
     }
 
     /// Transform text to lowercase - selection only if selected, otherwise whole document
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_lowercase(&mut self, selection_only: bool) {
         if selection_only {
             if let Some((start, end)) = self.selection_range() {
@@ -764,6 +770,7 @@ impl EditorState {
     }
 
     /// Transform text to title case - selection only if selected, otherwise whole document
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_title_case(&mut self, selection_only: bool) {
         fn title_case(s: &str) -> String {
             let mut result = String::with_capacity(s.len());
@@ -805,9 +812,7 @@ impl EditorState {
         self.content = iced::widget::text_editor::Content::with_text(&new_content);
         self.dirty = true;
     }
-}
 
-impl EditorState {
     /// Reverse the order of all lines in the document
     pub fn reverse_lines(&mut self) {
         let text = self.document.content.clone();
@@ -905,8 +910,8 @@ impl EditorState {
     }
 
     /// Get word frequency map (case-insensitive)
-    pub fn word_frequency(&self) -> std::collections::HashMap<String, usize> {
-        let mut freq = std::collections::HashMap::new();
+    pub fn word_frequency(&self) -> HashMap<String, usize> {
+        let mut freq = HashMap::new();
         for word in self.document.content.split_whitespace() {
             let lower = word
                 .trim_matches(|c: char| !c.is_alphanumeric())

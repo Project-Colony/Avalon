@@ -52,6 +52,31 @@ impl ScriptElement {
             ScriptElement::Note => "[[note]]",
         }
     }
+
+    /// Check if this element type is typically uppercase
+    pub fn is_uppercase(&self) -> bool {
+        matches!(self, ScriptElement::SceneHeading | ScriptElement::Character | ScriptElement::Transition)
+    }
+
+    /// Expected indentation level for Fountain format
+    pub fn indent_level(&self) -> usize {
+        match self {
+            ScriptElement::Character => 2,
+            ScriptElement::Dialogue | ScriptElement::Parenthetical => 1,
+            _ => 0,
+        }
+    }
+
+    /// Whether pressing Enter should auto-advance to another element type
+    pub fn next_element_on_enter(&self) -> Self {
+        match self {
+            ScriptElement::SceneHeading => ScriptElement::Action,
+            ScriptElement::Character => ScriptElement::Dialogue,
+            ScriptElement::Dialogue => ScriptElement::Character,
+            ScriptElement::Parenthetical => ScriptElement::Dialogue,
+            _ => ScriptElement::Action,
+        }
+    }
 }
 
 /// Auto-correction settings
@@ -117,6 +142,41 @@ impl AutoCorrection {
 
         result
     }
+
+    /// Check if any correction is enabled
+    pub fn any_enabled(&self) -> bool {
+        self.smart_quotes || self.em_dashes || self.ellipsis
+            || self.capitalize_sentences || self.superscript_ordinals
+    }
+
+    /// Get a summary of active corrections
+    pub fn active_list(&self) -> Vec<&str> {
+        let mut active = Vec::new();
+        if self.smart_quotes { active.push("Smart Quotes"); }
+        if self.em_dashes { active.push("Em Dashes"); }
+        if self.ellipsis { active.push("Ellipsis"); }
+        if self.capitalize_sentences { active.push("Auto-Capitalize"); }
+        if self.superscript_ordinals { active.push("Ordinals"); }
+        active
+    }
+
+    /// Disable all corrections
+    pub fn disable_all(&mut self) {
+        self.smart_quotes = false;
+        self.em_dashes = false;
+        self.ellipsis = false;
+        self.capitalize_sentences = false;
+        self.superscript_ordinals = false;
+    }
+
+    /// Enable all corrections
+    pub fn enable_all(&mut self) {
+        self.smart_quotes = true;
+        self.em_dashes = true;
+        self.ellipsis = true;
+        self.capitalize_sentences = true;
+        self.superscript_ordinals = true;
+    }
 }
 
 /// Revision level for tracking changes
@@ -181,75 +241,6 @@ impl RevisionLevel {
             RevisionLevel::Fourth => RevisionLevel::Fifth,
             RevisionLevel::Fifth => RevisionLevel::First,
         }
-    }
-}
-
-impl ScriptElement {
-    /// Check if this element type is typically uppercase
-    pub fn is_uppercase(&self) -> bool {
-        matches!(self, ScriptElement::SceneHeading | ScriptElement::Character | ScriptElement::Transition)
-    }
-
-    /// Expected indentation level for Fountain format
-    pub fn indent_level(&self) -> usize {
-        match self {
-            ScriptElement::SceneHeading => 0,
-            ScriptElement::Action => 0,
-            ScriptElement::Character => 2,
-            ScriptElement::Dialogue => 1,
-            ScriptElement::Parenthetical => 1,
-            ScriptElement::Transition => 0,
-            ScriptElement::Shot => 0,
-            ScriptElement::Note => 0,
-        }
-    }
-
-    /// Whether pressing Enter should auto-advance to another element type
-    pub fn next_element_on_enter(&self) -> Self {
-        match self {
-            ScriptElement::SceneHeading => ScriptElement::Action,
-            ScriptElement::Character => ScriptElement::Dialogue,
-            ScriptElement::Dialogue => ScriptElement::Character,
-            ScriptElement::Parenthetical => ScriptElement::Dialogue,
-            _ => ScriptElement::Action,
-        }
-    }
-}
-
-impl AutoCorrection {
-    /// Check if any correction is enabled
-    pub fn any_enabled(&self) -> bool {
-        self.smart_quotes || self.em_dashes || self.ellipsis
-            || self.capitalize_sentences || self.superscript_ordinals
-    }
-
-    /// Get a summary of active corrections
-    pub fn active_list(&self) -> Vec<&str> {
-        let mut active = Vec::new();
-        if self.smart_quotes { active.push("Smart Quotes"); }
-        if self.em_dashes { active.push("Em Dashes"); }
-        if self.ellipsis { active.push("Ellipsis"); }
-        if self.capitalize_sentences { active.push("Auto-Capitalize"); }
-        if self.superscript_ordinals { active.push("Ordinals"); }
-        active
-    }
-
-    /// Disable all corrections
-    pub fn disable_all(&mut self) {
-        self.smart_quotes = false;
-        self.em_dashes = false;
-        self.ellipsis = false;
-        self.capitalize_sentences = false;
-        self.superscript_ordinals = false;
-    }
-
-    /// Enable all corrections
-    pub fn enable_all(&mut self) {
-        self.smart_quotes = true;
-        self.em_dashes = true;
-        self.ellipsis = true;
-        self.capitalize_sentences = true;
-        self.superscript_ordinals = true;
     }
 }
 

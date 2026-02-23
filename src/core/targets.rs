@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Write;
 use uuid::Uuid;
 use serde::{Deserialize, Serialize};
 
@@ -318,6 +319,37 @@ impl TargetProgress {
             format!("{} words over target", -self.words_remaining)
         }
     }
+
+    /// Format with deadline info
+    pub fn full_display(&self) -> String {
+        let mut display = self.compact_display();
+        if let Some(days) = self.days_remaining {
+            let _ = write!(display, ", {} days left", days);
+        }
+        if let Some(wpd) = self.words_per_day_needed {
+            let _ = write!(display, ", {} words/day needed", wpd);
+        }
+        display
+    }
+
+    /// Check if deadline is approaching (less than 7 days)
+    pub fn deadline_approaching(&self) -> bool {
+        self.days_remaining.is_some_and(|d| d > 0 && d <= 7)
+    }
+
+    /// Check if deadline is overdue
+    pub fn deadline_overdue(&self) -> bool {
+        self.days_remaining.is_some_and(|d| d < 0)
+    }
+
+    /// Whether the target is on track (enough daily capacity to finish in time)
+    pub fn is_on_track(&self) -> bool {
+        match (self.status == TargetStatus::Complete, self.words_per_day_needed) {
+            (true, _) => true,
+            (_, Some(wpd)) => wpd <= 2000, // Reasonable daily target
+            (_, None) => self.days_remaining.is_none(), // No deadline = on track
+        }
+    }
 }
 
 impl DocumentTarget {
@@ -431,39 +463,6 @@ impl TargetStatus {
     /// Check if this needs attention
     pub fn needs_attention(&self) -> bool {
         matches!(self, TargetStatus::AlmostDone | TargetStatus::OverLimit)
-    }
-}
-
-impl TargetProgress {
-    /// Format with deadline info
-    pub fn full_display(&self) -> String {
-        let mut display = self.compact_display();
-        if let Some(days) = self.days_remaining {
-            display.push_str(&format!(", {} days left", days));
-        }
-        if let Some(wpd) = self.words_per_day_needed {
-            display.push_str(&format!(", {} words/day needed", wpd));
-        }
-        display
-    }
-
-    /// Check if deadline is approaching (less than 7 days)
-    pub fn deadline_approaching(&self) -> bool {
-        self.days_remaining.map_or(false, |d| d > 0 && d <= 7)
-    }
-
-    /// Check if deadline is overdue
-    pub fn deadline_overdue(&self) -> bool {
-        self.days_remaining.map_or(false, |d| d < 0)
-    }
-
-    /// Whether the target is on track (enough daily capacity to finish in time)
-    pub fn is_on_track(&self) -> bool {
-        match (self.status == TargetStatus::Complete, self.words_per_day_needed) {
-            (true, _) => true,
-            (_, Some(wpd)) => wpd <= 2000, // Reasonable daily target
-            (_, None) => self.days_remaining.is_none(), // No deadline = on track
-        }
     }
 }
 

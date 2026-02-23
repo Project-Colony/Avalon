@@ -1,5 +1,5 @@
-/// Spell checking module with a built-in common English word list.
-/// Uses Levenshtein distance for spelling suggestions.
+//! Spell checking module with a built-in common English word list.
+//! Uses Levenshtein distance for spelling suggestions.
 
 use std::collections::HashSet;
 
@@ -23,9 +23,7 @@ pub struct SpellChecker {
 
 /// Built-in common English words (~3000 most frequent)
 fn built_in_dictionary() -> HashSet<String> {
-    // Common English words - this covers the vast majority of everyday writing
-    let words = include_str!("wordlist.txt");
-    words.lines()
+    include_str!("wordlist.txt").lines()
         .filter(|l| !l.is_empty() && !l.starts_with('#'))
         .map(|w| w.trim().to_lowercase())
         .collect()
@@ -66,9 +64,7 @@ impl SpellChecker {
     /// Initialize with built-in dictionary
     pub fn try_init(&mut self) -> bool {
         self.dictionary = built_in_dictionary();
-        if !self.dictionary.is_empty() {
-            self.active = true;
-        }
+        self.active = !self.dictionary.is_empty();
         self.active
     }
 
@@ -78,15 +74,12 @@ impl SpellChecker {
             return true;
         }
         let lower = word.to_lowercase();
-        // Single letters are always valid
-        if lower.len() <= 1 {
+        // Single letters and numbers are always valid
+        if lower.len() <= 1 || lower.chars().all(|c| c.is_ascii_digit()) {
             return true;
         }
-        // Numbers are valid
-        if lower.chars().all(|c| c.is_ascii_digit()) {
-            return true;
-        }
-        self.dictionary.contains(&lower) || self.is_in_user_dict(word)
+        // User words are already in `dictionary`, so a single lookup suffices
+        self.dictionary.contains(&lower)
     }
 
     /// Get suggestions for a misspelled word using edit distance
@@ -205,22 +198,15 @@ impl SpellChecker {
             return Vec::new();
         }
         let lower = word.to_lowercase();
-        let mut candidates: Vec<(String, usize)> = self
-            .dictionary
-            .iter()
-            .map(|dict_word| {
-                let dist = edit_distance(&lower, dict_word);
-                (dict_word.clone(), dist)
-            })
+        let mut candidates: Vec<(String, usize)> = self.dictionary.iter()
+            .map(|dict_word| (dict_word.clone(), edit_distance(&lower, dict_word)))
             .filter(|(_, dist)| *dist > 0)
             .collect();
         candidates.sort_by_key(|(_, dist)| *dist);
         candidates.truncate(max_results);
         candidates
     }
-}
 
-impl SpellChecker {
     /// Save the user dictionary to disk
     pub fn save_user_dictionary(&self) -> Result<(), String> {
         if self.user_dictionary.is_empty() {
@@ -236,10 +222,7 @@ impl SpellChecker {
 
     /// Load the user dictionary from disk
     pub fn load_user_dictionary(&mut self) {
-        let home = match dirs::home_dir() {
-            Some(h) => h,
-            None => return,
-        };
+        let Some(home) = dirs::home_dir() else { return };
         let dict_path = home.join(".avalon").join("user_dictionary.txt");
         if let Ok(content) = std::fs::read_to_string(&dict_path) {
             for word in content.lines() {
@@ -292,19 +275,19 @@ pub fn count_misspellings(checker: &SpellChecker, text: &str) -> usize {
     text.split_whitespace()
         .filter(|w| {
             let clean: String = w.chars().filter(|c| c.is_alphanumeric() || *c == '\'').collect();
-            !clean.is_empty() && clean.len() > 1 && !checker.check_text(&clean).is_empty()
+            !clean.is_empty() && clean.len() > 1 && !checker.check_word(&clean)
         })
         .count()
 }
 
 /// Get spelling accuracy as a percentage
 pub fn spelling_accuracy(checker: &SpellChecker, text: &str) -> f64 {
-    let words: Vec<&str> = text.split_whitespace().collect();
-    if words.is_empty() {
+    let word_count = text.split_whitespace().count();
+    if word_count == 0 {
         return 100.0;
     }
     let misspelled = count_misspellings(checker, text);
-    (1.0 - misspelled as f64 / words.len() as f64) * 100.0
+    (1.0 - misspelled as f64 / word_count as f64) * 100.0
 }
 
 #[cfg(test)]

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use iced::widget::{button, column, container, row, scrollable, text, text_input, Space};
 use iced::{Element, Length, Padding};
 use uuid::Uuid;
@@ -29,7 +30,7 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
 
     // Count unique items across all collections
     let unique_items: usize = {
-        let all: std::collections::HashSet<Uuid> = data.collections.iter()
+        let all: HashSet<Uuid> = data.collections.iter()
             .flat_map(|c| c.item_ids.iter().copied())
             .collect();
         all.len()
@@ -62,7 +63,7 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
 
     // New collection input
     let new_input = text_input("New collection name...", &data.new_collection_name)
-        .on_input(|val| Message::CollectionNameInput(val))
+        .on_input(Message::CollectionNameInput)
         .size(12)
         .padding(4)
         .width(Length::FillPortion(3));
@@ -93,10 +94,9 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
                 if query.is_empty() {
                     ("\u{f006}", "Smart".to_string())
                 } else {
-                    let truncated = if query.len() > 20 {
-                        format!("{}...", &query[..20])
-                    } else {
-                        query.clone()
+                    let truncated = match query.char_indices().nth(20) {
+                        Some((byte_idx, _)) => format!("{}...", &query[..byte_idx]),
+                        None => query.clone(),
                     };
                     ("\u{f005}", format!("Smart: \"{}\"", truncated))
                 }

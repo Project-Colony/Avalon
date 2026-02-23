@@ -85,7 +85,7 @@ impl AutoSaveManager {
     pub fn should_backup(&self) -> bool {
         self.backup_every_n_saves > 0
             && self.save_count > 0
-            && self.save_count % self.backup_every_n_saves as u64 == 0
+            && self.save_count.is_multiple_of(self.backup_every_n_saves as u64)
     }
 
     /// Whether there are unsaved changes
@@ -304,7 +304,8 @@ impl SaveQueue {
 
         // If queue is too large, keep only the most recent
         if self.pending.len() > self.max_queue_size {
-            self.pending = self.pending.split_off(self.pending.len() - self.max_queue_size);
+            let drain_count = self.pending.len() - self.max_queue_size;
+            self.pending.drain(..drain_count);
         }
     }
 

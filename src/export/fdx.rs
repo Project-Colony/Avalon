@@ -1,6 +1,7 @@
+use std::fmt::Write;
 use anyhow::Result;
 
-use super::compiler::{CompileContent, CompileOptions};
+use super::compiler::{self, CompileContent, CompileOptions};
 
 /// FinalDraft paragraph element types
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,18 +72,12 @@ impl FdxParagraph {
     }
 }
 
-/// Escape special XML characters in text
-pub fn escape_xml(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
+pub fn escape_xml(text: &str) -> String { compiler::escape_xml(text) }
 
 /// Compile content to FinalDraft (.fdx) XML format
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
-    let mut output = String::new();
+    let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 80).sum::<usize>() + 256;
+    let mut output = String::with_capacity(estimated_size);
 
     // XML declaration and root element
     output.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
@@ -117,17 +112,19 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
         output.push_str("    <Content>\n");
 
         if !options.title.is_empty() {
-            output.push_str(&format!(
+            let _ = write!(
+                output,
                 "      <Paragraph Type=\"Title\">\n        <Text>{}</Text>\n      </Paragraph>\n",
                 escape_xml(&options.title),
-            ));
+            );
         }
 
         if !options.author.is_empty() {
-            output.push_str(&format!(
+            let _ = write!(
+                output,
                 "      <Paragraph Type=\"Author\">\n        <Text>Written by {}</Text>\n      </Paragraph>\n",
                 escape_xml(&options.author),
-            ));
+            );
         }
 
         output.push_str("    </Content>\n");

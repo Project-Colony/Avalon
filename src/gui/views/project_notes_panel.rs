@@ -31,7 +31,7 @@ pub fn view(notes: &str) -> Element<'static, Message> {
     ];
 
     let notes_input = text_input("Write project-level notes, ideas, reminders...", notes)
-        .on_input(|val| Message::ProjectNotesChanged(val))
+        .on_input(Message::ProjectNotesChanged)
         .size(13)
         .padding(8)
         .width(Length::Fill);

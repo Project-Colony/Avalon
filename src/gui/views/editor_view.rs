@@ -131,7 +131,7 @@ pub fn view<'a>(
     .width(Length::Fill);
 
     let editor = text_editor(&editor_state.content)
-        .on_action(|action| Message::EditorAction(action))
+        .on_action(Message::EditorAction)
         .padding(Padding::from([16, 24]))
         .height(Length::Fill);
 
@@ -234,7 +234,7 @@ pub fn view_composition<'a>(editor_state: &'a EditorState, title: &str, word_cou
     .width(Length::Fill);
 
     let editor = text_editor(&editor_state.content)
-        .on_action(|action| Message::EditorAction(action))
+        .on_action(Message::EditorAction)
         .padding(Padding::from([32, 120]))
         .height(Length::Fill);
 
@@ -301,7 +301,7 @@ pub fn view_fullscreen<'a>(editor_state: &'a EditorState, title: &str) -> Elemen
     .width(Length::Fill);
 
     let editor = text_editor(&editor_state.content)
-        .on_action(|action| Message::EditorAction(action))
+        .on_action(Message::EditorAction)
         .padding(Padding::from([24, 80]))
         .height(Length::Fill);
 

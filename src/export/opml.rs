@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use anyhow::Result;
 
 use crate::core::binder::{Binder, BinderItem, BinderItemKind};
@@ -8,7 +9,7 @@ pub fn export_opml(binder: &Binder, title: &str) -> Result<String> {
     output.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     output.push_str("<opml version=\"2.0\">\n");
     output.push_str("  <head>\n");
-    output.push_str(&format!("    <title>{}</title>\n", escape_xml(title)));
+    let _ = writeln!(output, "    <title>{}</title>", escape_xml(title));
     output.push_str("  </head>\n");
     output.push_str("  <body>\n");
 
@@ -27,42 +28,43 @@ pub fn export_opml(binder: &Binder, title: &str) -> Result<String> {
 fn write_opml_item(item: &BinderItem, depth: usize, output: &mut String) {
     let indent = "  ".repeat(depth);
     let text_attr = escape_xml(&item.title);
-    let note_attr = item.synopsis.clone();
 
     let content_note = item.document.as_ref()
         .map(|d| escape_xml(&d.content))
         .unwrap_or_default();
 
-    let combined_note = if !note_attr.is_empty() && !content_note.is_empty() {
-        format!("{}\n\n{}", escape_xml(&note_attr), content_note)
-    } else if !note_attr.is_empty() {
-        escape_xml(&note_attr)
+    let combined_note = if !item.synopsis.is_empty() && !content_note.is_empty() {
+        format!("{}\n\n{}", escape_xml(&item.synopsis), content_note)
+    } else if !item.synopsis.is_empty() {
+        escape_xml(&item.synopsis)
     } else {
         content_note
     };
 
     if item.children.is_empty() {
         if combined_note.is_empty() {
-            output.push_str(&format!("{}<outline text=\"{}\"/>\n", indent, text_attr));
+            let _ = writeln!(output, "{}<outline text=\"{}\"/>", indent, text_attr);
         } else {
-            output.push_str(&format!(
-                "{}<outline text=\"{}\" _note=\"{}\"/>\n",
+            let _ = writeln!(
+                output,
+                "{}<outline text=\"{}\" _note=\"{}\"/>",
                 indent, text_attr, combined_note
-            ));
+            );
         }
     } else {
         if combined_note.is_empty() {
-            output.push_str(&format!("{}<outline text=\"{}\">\n", indent, text_attr));
+            let _ = writeln!(output, "{}<outline text=\"{}\">", indent, text_attr);
         } else {
-            output.push_str(&format!(
-                "{}<outline text=\"{}\" _note=\"{}\">\n",
+            let _ = writeln!(
+                output,
+                "{}<outline text=\"{}\" _note=\"{}\">",
                 indent, text_attr, combined_note
-            ));
+            );
         }
         for child in &item.children {
             write_opml_item(child, depth + 1, output);
         }
-        output.push_str(&format!("{}</outline>\n", indent));
+        let _ = writeln!(output, "{}</outline>", indent);
     }
 }
 
@@ -155,12 +157,7 @@ fn extract_attr(line: &str, attr_name: &str) -> Option<String> {
     None
 }
 
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
+fn escape_xml(s: &str) -> String { super::compiler::escape_xml(s) }
 
 fn unescape_xml(s: &str) -> String {
     s.replace("&amp;", "&")
@@ -171,7 +168,7 @@ fn unescape_xml(s: &str) -> String {
 
 /// Count the total number of outline items in a binder tree
 pub fn count_items(item: &BinderItem) -> usize {
-    1 + item.children.iter().map(|c| count_items(c)).sum::<usize>()
+    1 + item.children.iter().map(count_items).sum::<usize>()
 }
 
 /// Count the depth of the deepest item in the tree
@@ -179,7 +176,7 @@ pub fn max_depth(item: &BinderItem) -> usize {
     if item.children.is_empty() {
         0
     } else {
-        1 + item.children.iter().map(|c| max_depth(c)).max().unwrap_or(0)
+        1 + item.children.iter().map(max_depth).max().unwrap_or(0)
     }
 }
 
