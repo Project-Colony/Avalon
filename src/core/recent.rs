@@ -141,10 +141,15 @@ impl RecentProjects {
     pub fn save(&self) {
         let path = Self::config_path();
         if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+            if let Err(e) = std::fs::create_dir_all(parent) {
+                eprintln!("Warning: failed to create config dir: {}", e);
+                return;
+            }
         }
         if let Ok(json) = serde_json::to_string_pretty(self) {
-            let _ = std::fs::write(path, json);
+            if let Err(e) = std::fs::write(&path, json) {
+                eprintln!("Warning: failed to save recent files: {}", e);
+            }
         }
     }
 

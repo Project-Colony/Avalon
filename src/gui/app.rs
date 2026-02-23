@@ -1156,7 +1156,9 @@ impl ScrineverApp {
 
                     let home = dirs::home_dir().unwrap_or_default();
                     let output_dir = home.join("Scrinever Output");
-                    let _ = std::fs::create_dir_all(&output_dir);
+                    if let Err(e) = std::fs::create_dir_all(&output_dir) {
+                        self.notification = Some(format!("Failed to create output dir: {}", e));
+                    }
                     let filename = format!(
                         "{}.{}",
                         self.compile_options.title.replace(' ', "_"),
@@ -1180,8 +1182,10 @@ impl ScrineverApp {
             Message::CreateSnapshot => {
                 self.sync_editor_to_project();
                 if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
-                    let _ = project.create_snapshot(&item_id, "Manual Snapshot");
-                    self.notification = Some("Snapshot created".to_string());
+                    match project.create_snapshot(&item_id, "Manual Snapshot") {
+                        Ok(_) => self.notification = Some("Snapshot created".to_string()),
+                        Err(e) => self.notification = Some(format!("Snapshot failed: {}", e)),
+                    }
                 }
             }
 
@@ -1409,7 +1413,9 @@ impl ScrineverApp {
                 if let Some(ref mut project) = self.project {
                     if let Some(path) = project.path.clone() {
                         if let Some(parent) = path.parent() {
-                            let _ = project.save(parent);
+                            if let Err(e) = project.save(parent) {
+                                self.notification = Some(format!("Settings save failed: {}", e));
+                            }
                         }
                     }
                 }
@@ -1451,7 +1457,9 @@ impl ScrineverApp {
                     if let Some(ref mut project) = self.project {
                         if let Some(path) = project.path.clone() {
                             if let Some(parent) = path.parent() {
-                                let _ = project.save(parent);
+                                if let Err(e) = project.save(parent) {
+                                    self.notification = Some(format!("Settings save failed: {}", e));
+                                }
                             }
                         }
                     }
@@ -1843,8 +1851,10 @@ impl ScrineverApp {
                             self.notification = Some("No importable files found in ~/Scrinever Import/. Supported: txt, md, html, tex, fountain, opml".to_string());
                         }
                     } else {
-                        let _ = std::fs::create_dir_all(&import_dir);
-                        self.notification = Some("Created ~/Scrinever Import/ — place files there and import again.".to_string());
+                        match std::fs::create_dir_all(&import_dir) {
+                            Ok(_) => self.notification = Some("Created ~/Scrinever Import/ — place files there and import again.".to_string()),
+                            Err(e) => self.notification = Some(format!("Failed to create import dir: {}", e)),
+                        }
                     }
                 } else {
                     self.notification = Some("Create or open a project first.".to_string());
@@ -2598,9 +2608,10 @@ impl ScrineverApp {
                     if let Some(item) = project.binder.find_item(&item_id) {
                         if let Some(ref doc) = item.document {
                             let md = format!("# {}\n\n{}", item.title, doc.content);
-                            let _ = arboard::Clipboard::new()
-                                .and_then(|mut cb| cb.set_text(md));
-                            self.notification = Some("Copied as Markdown".to_string());
+                            match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(md)) {
+                                Ok(_) => self.notification = Some("Copied as Markdown".to_string()),
+                                Err(e) => self.notification = Some(format!("Clipboard error: {}", e)),
+                            }
                         }
                     }
                 }
@@ -2619,9 +2630,10 @@ impl ScrineverApp {
                                     .collect::<Vec<_>>()
                                     .join("\n")
                             );
-                            let _ = arboard::Clipboard::new()
-                                .and_then(|mut cb| cb.set_text(html));
-                            self.notification = Some("Copied as HTML".to_string());
+                            match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(html)) {
+                                Ok(_) => self.notification = Some("Copied as HTML".to_string()),
+                                Err(e) => self.notification = Some(format!("Clipboard error: {}", e)),
+                            }
                         }
                     }
                 }
@@ -2632,9 +2644,10 @@ impl ScrineverApp {
                 if let (Some(ref project), Some(item_id)) = (&self.project, self.selected_item) {
                     if let Some(item) = project.binder.find_item(&item_id) {
                         if let Some(ref doc) = item.document {
-                            let _ = arboard::Clipboard::new()
-                                .and_then(|mut cb| cb.set_text(doc.content.clone()));
-                            self.notification = Some("Copied as plain text".to_string());
+                            match arboard::Clipboard::new().and_then(|mut cb| cb.set_text(doc.content.clone())) {
+                                Ok(_) => self.notification = Some("Copied as plain text".to_string()),
+                                Err(e) => self.notification = Some(format!("Clipboard error: {}", e)),
+                            }
                         }
                     }
                 }
@@ -2772,8 +2785,10 @@ impl ScrineverApp {
                             self.notification = Some("No importable files found in ~/Scrinever Import/".to_string());
                         }
                     } else {
-                        let _ = std::fs::create_dir_all(&import_dir);
-                        self.notification = Some("Created ~/Scrinever Import/ — place files there and import again.".to_string());
+                        match std::fs::create_dir_all(&import_dir) {
+                            Ok(_) => self.notification = Some("Created ~/Scrinever Import/ — place files there and import again.".to_string()),
+                            Err(e) => self.notification = Some(format!("Failed to create import dir: {}", e)),
+                        }
                     }
                 }
             }
@@ -2909,8 +2924,11 @@ impl ScrineverApp {
             Message::SpellCheckAddWord(word) => {
                 self.spell_checker.add_to_dictionary(&word);
                 self.spell_check_results.retain(|r| r.word.to_lowercase() != word.to_lowercase());
-                let _ = self.spell_checker.save_user_dictionary();
-                self.notification = Some(format!("Added \"{}\" to dictionary", word));
+                if let Err(e) = self.spell_checker.save_user_dictionary() {
+                    self.notification = Some(format!("Added \"{}\" but failed to save dictionary: {}", word, e));
+                } else {
+                    self.notification = Some(format!("Added \"{}\" to dictionary", word));
+                }
             }
 
             Message::SpellCheckReplace(position, misspelled, replacement) => {
@@ -2954,14 +2972,20 @@ impl ScrineverApp {
 
             Message::SpellCheckRemoveWord(word) => {
                 self.spell_checker.remove_from_dictionary(&word);
-                let _ = self.spell_checker.save_user_dictionary();
-                self.notification = Some(format!("Removed \"{}\" from user dictionary", word));
+                if let Err(e) = self.spell_checker.save_user_dictionary() {
+                    self.notification = Some(format!("Removed \"{}\" but failed to save: {}", word, e));
+                } else {
+                    self.notification = Some(format!("Removed \"{}\" from user dictionary", word));
+                }
             }
 
             Message::SpellCheckClearDict => {
                 self.spell_checker.clear_user_dictionary();
-                let _ = self.spell_checker.save_user_dictionary();
-                self.notification = Some("User dictionary cleared".to_string());
+                if let Err(e) = self.spell_checker.save_user_dictionary() {
+                    self.notification = Some(format!("Dictionary cleared but failed to save: {}", e));
+                } else {
+                    self.notification = Some("User dictionary cleared".to_string());
+                }
             }
 
             Message::ToggleSpellChecker => {
