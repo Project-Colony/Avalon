@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use anyhow::Result;
 use super::compiler::{CompileContent, CompileOptions, SeparatorType};
 
@@ -23,19 +24,19 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
 
     // Header with author/title
     if !options.title.is_empty() {
-        output.push_str(&format!(
+        let _ = write!(output,
             "\\fancyhead[R]{{\\textit{{{}}}}}\n",
             escape_latex(&options.title)
-        ));
+        );
     }
 
     output.push('\n');
 
     if !options.title.is_empty() {
-        output.push_str(&format!("\\title{{{}}}\n", escape_latex(&options.title)));
+        let _ = write!(output,"\\title{{{}}}\n", escape_latex(&options.title));
     }
     if !options.author.is_empty() {
-        output.push_str(&format!("\\author{{{}}}\n", escape_latex(&options.author)));
+        let _ = write!(output,"\\author{{{}}}\n", escape_latex(&options.author));
     }
     output.push_str("\\date{}\n\n");
     output.push_str("\\begin{document}\n\n");
@@ -57,11 +58,11 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                 3 => "paragraph",
                 _ => "subparagraph",
             };
-            output.push_str(&format!(
+            let _ = write!(output,
                 "\\{}{{{}}} \n\n",
                 cmd,
                 escape_latex(&content.title)
-            ));
+            );
             prev_was_text = false;
         } else {
             // Separator between consecutive text documents
@@ -166,7 +167,7 @@ fn markdown_to_latex(text: &str) -> String {
         // Unordered list item
         if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
             let content = convert_inline_formatting(&trimmed[2..]);
-            output.push_str(&format!("\\textbullet\\ {}\n", content));
+            let _ = write!(output,"\\textbullet\\ {}\n", content);
             continue;
         }
 
@@ -219,7 +220,7 @@ fn convert_inline_formatting(text: &str) -> String {
         if i + 1 < len && chars[i] == '*' && chars[i + 1] == '*' {
             if let Some(end) = find_closing(&chars, i + 2, '*', '*') {
                 let inner: String = chars[i + 2..end].iter().collect();
-                result.push_str(&format!("\\textbf{{{}}}", escape_latex(&inner)));
+                let _ = write!(result,"\\textbf{{{}}}", escape_latex(&inner));
                 i = end + 2;
                 continue;
             }
@@ -229,7 +230,7 @@ fn convert_inline_formatting(text: &str) -> String {
         if chars[i] == '*' {
             if let Some(end) = find_closing_single(&chars, i + 1, '*') {
                 let inner: String = chars[i + 1..end].iter().collect();
-                result.push_str(&format!("\\textit{{{}}}", escape_latex(&inner)));
+                let _ = write!(result,"\\textit{{{}}}", escape_latex(&inner));
                 i = end + 1;
                 continue;
             }
@@ -239,7 +240,7 @@ fn convert_inline_formatting(text: &str) -> String {
         if i + 1 < len && chars[i] == '~' && chars[i + 1] == '~' {
             if let Some(end) = find_closing(&chars, i + 2, '~', '~') {
                 let inner: String = chars[i + 2..end].iter().collect();
-                result.push_str(&format!("\\sout{{{}}}", escape_latex(&inner)));
+                let _ = write!(result,"\\sout{{{}}}", escape_latex(&inner));
                 i = end + 2;
                 continue;
             }
@@ -249,7 +250,7 @@ fn convert_inline_formatting(text: &str) -> String {
         if chars[i] == '`' {
             if let Some(end) = find_closing_single(&chars, i + 1, '`') {
                 let inner: String = chars[i + 1..end].iter().collect();
-                result.push_str(&format!("\\texttt{{{}}}", escape_latex(&inner)));
+                let _ = write!(result,"\\texttt{{{}}}", escape_latex(&inner));
                 i = end + 1;
                 continue;
             }

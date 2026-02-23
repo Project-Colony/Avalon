@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt::Write;
 use uuid::Uuid;
 use regex::Regex;
 
@@ -522,11 +523,11 @@ impl MatchContext {
         let mut output = String::new();
         for (i, line) in self.before.iter().enumerate() {
             let num = self.line_number - self.before.len() + i;
-            output.push_str(&format!("  {:>4} | {}\n", num, line));
+            let _ = write!(output, "  {:>4} | {}\n", num, line);
         }
-        output.push_str(&format!("> {:>4} | {}\n", self.line_number, self.matched_line));
+        let _ = write!(output, "> {:>4} | {}\n", self.line_number, self.matched_line);
         for (i, line) in self.after.iter().enumerate() {
-            output.push_str(&format!("  {:>4} | {}\n", self.line_number + 1 + i, line));
+            let _ = write!(output, "  {:>4} | {}\n", self.line_number + 1 + i, line);
         }
         output
     }

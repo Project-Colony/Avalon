@@ -1,6 +1,7 @@
 use std::path::Path;
 use std::fs;
 use std::io::Write;
+use std::fmt::Write as FmtWrite;
 use anyhow::Result;
 use pulldown_cmark::{Parser, html::push_html};
 
@@ -47,10 +48,10 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
                 current_chapter_title = content.title.clone();
             }
             let level = (content.depth + 1).min(6);
-            current_chapter_html.push_str(&format!(
+            let _ = write!(current_chapter_html,
                 "<h{}>{}</h{}>\n",
                 level, escape_xml(&content.title), level
-            ));
+            );
         } else {
             if current_chapter_title.is_empty() {
                 current_chapter_title = content.title.clone();
@@ -146,11 +147,11 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
     }
 
     for (i, (filename, _, _)) in chapters.iter().enumerate() {
-        manifest_items.push_str(&format!(
+        let _ = write!(manifest_items,
             "    <item id=\"ch{}\" href=\"{}\" media-type=\"application/xhtml+xml\"/>\n",
             i, filename
-        ));
-        spine_items.push_str(&format!("    <itemref idref=\"ch{}\"/>\n", i));
+        );
+        let _ = write!(spine_items,"    <itemref idref=\"ch{}\"/>\n", i);
     }
 
     // Table of contents nav
@@ -191,11 +192,11 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
         } else {
             title.clone()
         };
-        toc_entries.push_str(&format!(
+        let _ = write!(toc_entries,
             "      <li><a href=\"{}\">{}</a></li>\n",
             filename,
             escape_xml(&display_title)
-        ));
+        );
     }
 
     let toc = format!(

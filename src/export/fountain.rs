@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use anyhow::Result;
 
 use super::compiler::{CompileContent, CompileOptions};
@@ -8,11 +9,11 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
 
     // Title page metadata
     if options.include_front_matter {
-        output.push_str(&format!("Title: {}\n", options.title));
+        let _ = write!(output,"Title: {}\n", options.title);
         if !options.author.is_empty() {
-            output.push_str(&format!("Author: {}\n", options.author));
+            let _ = write!(output,"Author: {}\n", options.author);
         }
-        output.push_str(&format!("Draft date: {}\n", chrono::Utc::now().format("%Y-%m-%d")));
+        let _ = write!(output,"Draft date: {}\n", chrono::Utc::now().format("%Y-%m-%d"));
         output.push_str("Contact:\n");
         output.push('\n');
     }
@@ -23,7 +24,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
             if i > 0 {
                 output.push_str("\n\n");
             }
-            output.push_str(&format!("# {}\n\n", content.title.to_uppercase()));
+            let _ = write!(output,"# {}\n\n", content.title.to_uppercase());
         } else {
             // Try to detect Fountain formatting, otherwise convert prose
             if !content.text.is_empty() {

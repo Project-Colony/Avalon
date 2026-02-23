@@ -1,3 +1,4 @@
+use std::fmt::Write as _;
 use chrono::Utc;
 
 /// Replace placeholders in compiled text with actual values.
@@ -78,7 +79,7 @@ pub fn generate_toc(sections: &[(String, usize)]) -> String {
     for (i, (title, depth)) in sections.iter().enumerate() {
         let indent = "  ".repeat(*depth);
         let num = i + 1;
-        toc.push_str(&format!("{}{}.  {}\n", indent, num, title));
+        let _ = write!(toc,"{}{}.  {}\n", indent, num, title);
     }
     toc.push('\n');
     toc
@@ -93,7 +94,7 @@ pub fn generate_toc_markdown(sections: &[(String, usize)]) -> String {
         let indent = "  ".repeat(*depth);
         let slug = title.to_lowercase().replace(' ', "-")
             .chars().filter(|c| c.is_alphanumeric() || *c == '-').collect::<String>();
-        toc.push_str(&format!("{}- [{}](#{})\n", indent, title, slug));
+        let _ = write!(toc,"{}- [{}](#{})\n", indent, title, slug);
     }
     toc.push('\n');
     toc
@@ -107,7 +108,7 @@ pub fn generate_toc_html(sections: &[(String, usize)]) -> String {
     for (title, _depth) in sections {
         let slug = title.to_lowercase().replace(' ', "-")
             .chars().filter(|c| c.is_alphanumeric() || *c == '-').collect::<String>();
-        toc.push_str(&format!("  <li><a href=\"#{}\">{}</a></li>\n", slug, title));
+        let _ = write!(toc,"  <li><a href=\"#{}\">{}</a></li>\n", slug, title);
     }
 
     toc.push_str("</ul>\n</nav>\n");

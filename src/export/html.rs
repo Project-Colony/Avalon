@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use anyhow::Result;
 use pulldown_cmark::{Parser, html::push_html};
 use super::compiler::{CompileContent, CompileOptions, SeparatorType};
@@ -10,10 +11,10 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
         if content.is_folder {
             let level = (content.depth + 1).min(6);
             let id = slug(&content.title);
-            body.push_str(&format!(
+            let _ = write!(body,
                 "<h{} id=\"{}\" class=\"folder-heading depth-{}\">{}</h{}>\n",
                 level, id, content.depth, escape_html(&content.title), level
-            ));
+            );
         } else {
             doc_index += 1;
 
@@ -22,7 +23,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                 body.push_str(&separator_html(&options.separator));
             }
 
-            body.push_str(&format!("<div class=\"document\" data-index=\"{}\">\n", doc_index));
+            let _ = write!(body,"<div class=\"document\" data-index=\"{}\">\n", doc_index);
 
             // Convert markdown content to HTML
             let parser = Parser::new(&content.text);
@@ -109,16 +110,16 @@ fn build_front_matter(options: &CompileOptions) -> String {
     let mut fm = format!("<h1>{}</h1>\n", escape_html(&options.title));
 
     if !options.author.is_empty() {
-        fm.push_str(&format!(
+        let _ = write!(fm,
             "<p class=\"author\">by {}</p>\n",
             escape_html(&options.author)
-        ));
+        );
     }
 
-    fm.push_str(&format!(
+    let _ = write!(fm,
         "<p class=\"date\">{}</p>\n",
         chrono::Local::now().format("%B %d, %Y")
-    ));
+    );
 
     fm.push_str("<hr>\n");
     fm
@@ -166,12 +167,12 @@ pub fn generate_toc(contents: &[CompileContent]) -> String {
         if content.is_folder || !content.text.is_empty() {
             let id = slug(&content.title);
             let indent = "  ".repeat(content.depth);
-            toc.push_str(&format!(
+            let _ = write!(toc,
                 "{}<li><a href=\"#{}\">{}</a></li>\n",
                 indent,
                 id,
                 escape_html(&content.title)
-            ));
+            );
         }
     }
 
