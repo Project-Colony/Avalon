@@ -481,11 +481,10 @@ impl ReadabilityMetrics {
             self.coleman_liau,
             self.automated_readability,
         ];
-        let valid: Vec<f64> = grades.iter().copied().filter(|g| *g > 0.0).collect();
-        if valid.is_empty() {
-            return 0.0;
-        }
-        valid.iter().sum::<f64>() / valid.len() as f64
+        let (sum, count) = grades.iter().fold((0.0, 0u32), |(s, c), &g| {
+            if g > 0.0 { (s + g, c + 1) } else { (s, c) }
+        });
+        if count == 0 { 0.0 } else { sum / count as f64 }
     }
 
     /// Human-readable label for the Flesch score
