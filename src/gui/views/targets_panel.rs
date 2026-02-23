@@ -2,7 +2,7 @@ use iced::widget::{column, container, row, text, text_input, Space};
 use iced::{Element, Length, Padding};
 
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// Data for the project targets panel
 pub struct TargetsData {
@@ -201,6 +201,7 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
     .padding(Padding::from([8, 12]));
 
     container(content)
+        .style(theme::panel_style)
         .width(Length::Fill)
         .into()
 }

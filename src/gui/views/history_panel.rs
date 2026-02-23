@@ -3,7 +3,7 @@ use iced::{Element, Length, Padding};
 
 use crate::core::history::WritingHistory;
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// Render the writing history panel (bottom panel)
 pub fn view(history: &WritingHistory) -> Element<'static, Message> {
@@ -149,6 +149,7 @@ pub fn view(history: &WritingHistory) -> Element<'static, Message> {
     .padding(Padding::from([8, 12]));
 
     container(content)
+        .style(theme::panel_style)
         .width(Length::Fill)
         .into()
 }

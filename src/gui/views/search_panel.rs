@@ -3,7 +3,7 @@ use iced::{Element, Length, Padding};
 
 use crate::core::search::SearchResult;
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// Render the search panel (bottom panel)
 pub fn view(
@@ -158,6 +158,7 @@ pub fn view(
     .padding(Padding::from([8, 12]));
 
     container(content)
+        .style(theme::panel_style)
         .width(Length::Fill)
         .into()
 }

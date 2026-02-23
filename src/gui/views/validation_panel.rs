@@ -3,7 +3,7 @@ use iced::{Element, Length, Padding};
 
 use crate::core::validation::{ProjectValidation, Severity};
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// Render the project validation panel (bottom panel)
 pub fn view(result: Option<&ProjectValidation>) -> Element<'static, Message> {
@@ -135,6 +135,7 @@ pub fn view(result: Option<&ProjectValidation>) -> Element<'static, Message> {
     .padding(Padding::from([8, 12]));
 
     container(content)
+        .style(theme::panel_style)
         .width(Length::Fill)
         .into()
 }

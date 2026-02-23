@@ -2,7 +2,7 @@ use iced::widget::{button, container, mouse_area, row, text, column, Space};
 use iced::{Element, Length, Padding};
 
 use crate::gui::app::{BottomPanel, Message, ToolbarMenu, ViewMode};
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// Render the menu bar (just the category header buttons)
 pub fn menu_bar(active_menu: &Option<ToolbarMenu>) -> Element<'static, Message> {
@@ -16,6 +16,7 @@ pub fn menu_bar(active_menu: &Option<ToolbarMenu>) -> Element<'static, Message> 
             .spacing(2)
             .padding(Padding::from([4, 8]))
     )
+    .style(theme::toolbar_style)
     .width(Length::Fill)
     .into()
 }

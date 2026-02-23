@@ -3,7 +3,7 @@ use iced::{Element, Length, Padding};
 
 use crate::editor::EditorState;
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// Render the main text editor view
 pub fn view<'a>(
@@ -52,7 +52,9 @@ pub fn view<'a>(
             },
         ]
     )
-    .padding(Padding::from([8, 16]));
+    .style(theme::view_header_style)
+    .padding(Padding::from([8, 16]))
+    .width(Length::Fill);
 
     // Script element picker bar (only shown in script mode)
     let script_bar: Element<'a, Message> = if script_mode {
@@ -81,6 +83,7 @@ pub fn view<'a>(
     let format_bar = container(
         scrollable(
             row![
+
                 fmt_btn("B", Message::InsertBold),
                 fmt_btn("I", Message::InsertItalic),
                 fmt_btn("U", Message::InsertUnderline),
@@ -123,7 +126,9 @@ pub fn view<'a>(
         )
         .direction(scrollable::Direction::Horizontal(scrollable::Scrollbar::new()))
     )
-    .padding(Padding::from([2, 16]));
+    .style(theme::view_header_style)
+    .padding(Padding::from([4, 16]))
+    .width(Length::Fill);
 
     let editor = text_editor(&editor_state.content)
         .on_action(|action| Message::EditorAction(action))
@@ -166,7 +171,9 @@ pub fn view<'a>(
                 .color(Theme::TEXT_MUTED),
         ]
     )
-    .padding(Padding::from([4, 16]));
+    .style(theme::view_footer_style)
+    .padding(Padding::from([4, 16]))
+    .width(Length::Fill);
 
     let content = column![
         header,
@@ -198,7 +205,7 @@ fn fmt_btn(label: &str, message: Message) -> Element<'static, Message> {
         text(label.to_string()).size(11).color(Theme::TEXT_SECONDARY),
     )
     .on_press(message)
-    .padding(Padding::from([2, 6]))
+    .padding(Padding::from([4, 8]))
     .into()
 }
 

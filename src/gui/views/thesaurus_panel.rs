@@ -2,7 +2,7 @@ use iced::widget::{button, column, container, row, scrollable, text, text_input,
 use iced::{Element, Length, Padding};
 
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 use crate::thesaurus::ThesaurusEntry;
 
 /// Render the thesaurus panel (bottom panel)
@@ -145,6 +145,7 @@ pub fn view(
     .padding(Padding::from([8, 12]));
 
     container(content)
+        .style(theme::panel_style)
         .width(Length::Fill)
         .into()
 }

@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::core::binder::{BinderItem, BinderItemKind};
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Icons, Theme};
 
 /// Render the binder sidebar
 pub fn view(
@@ -14,11 +14,18 @@ pub fn view(
     selected_id: Option<Uuid>,
 ) -> Element<'static, Message> {
     let header = container(
-        text("BINDER")
-            .size(12)
-            .color(Theme::TEXT_SECONDARY),
+        row![
+            text(Icons::BOOK).size(12).color(Theme::TEXT_ACCENT),
+            Space::with_width(6),
+            text("BINDER")
+                .size(11)
+                .color(Theme::TEXT_SECONDARY),
+        ]
+        .align_y(iced::Alignment::Center),
     )
-    .padding(Padding::from([8, 12]));
+    .style(theme::panel_header_style)
+    .padding(Padding::from([8, 12]))
+    .width(Length::Fill);
 
     let draft_tree = render_section("Draft", draft, selected_id, 0);
     let research_tree = render_section("Research", research, selected_id, 0);
@@ -93,6 +100,7 @@ pub fn view(
     .width(Length::Fixed(240.0));
 
     container(content)
+        .style(theme::sidebar_style)
         .height(Length::Fill)
         .into()
 }
@@ -270,6 +278,6 @@ fn small_action_btn(label: &str, message: Message) -> Element<'static, Message> 
         text(label.to_string()).size(11).color(Theme::TEXT_SECONDARY),
     )
     .on_press(message)
-    .padding(Padding::from([3, 6]))
+    .padding(Padding::from([4, 8]))
     .into()
 }

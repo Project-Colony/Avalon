@@ -3,7 +3,7 @@ use iced::{Element, Length, Padding};
 
 use crate::core::backup::BackupEntry;
 use crate::gui::app::Message;
-use crate::gui::theme::Theme;
+use crate::gui::theme::{self, Theme};
 
 /// Render the backup management panel
 pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Message> {
@@ -113,6 +113,7 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
     .padding(Padding::from([8, 12]));
 
     container(content)
+        .style(theme::panel_style)
         .width(Length::Fill)
         .into()
 }
