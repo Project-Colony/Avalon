@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use std::path::Path;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -617,10 +618,10 @@ impl CompileManifest {
             let indent = "  ".repeat(entry.depth);
             let kind = if entry.is_folder { "+" } else { "-" };
             let pb = if entry.has_page_break_before { " [PAGE BREAK]" } else { "" };
-            out.push_str(&format!(
-                "{}{} {} ({} words){}\n",
+            let _ = writeln!(out,
+                "{}{} {} ({} words){}",
                 indent, kind, entry.title, entry.word_count, pb
-            ));
+            );
         }
         out
     }

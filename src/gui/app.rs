@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Write;
 use iced::keyboard;
 use iced::widget::{column, container, row, stack, text, text_editor, Space};
 use iced::{Element, Length, Padding, Subscription, Task as IcedTask};
@@ -3202,7 +3203,7 @@ impl ScrineverApp {
                 // Header row
                 table.push('|');
                 for c in 0..cols {
-                    table.push_str(&format!(" Column {} |", c + 1));
+                    let _ = write!(table, " Column {} |", c + 1);
                 }
                 table.push('\n');
                 // Separator

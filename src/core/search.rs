@@ -415,7 +415,7 @@ pub fn extract_matches(content: &str, options: &SearchOptions) -> Vec<String> {
     let mut results = Vec::new();
     for m in regex.find_iter(content) {
         let s = m.as_str();
-        if seen.insert(s.to_string()) {
+        if seen.insert(s) {
             results.push(s.to_string());
         }
     }

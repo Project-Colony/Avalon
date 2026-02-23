@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt::Write;
 use uuid::Uuid;
 use serde::{Deserialize, Serialize};
 
@@ -323,10 +324,10 @@ impl TargetProgress {
     pub fn full_display(&self) -> String {
         let mut display = self.compact_display();
         if let Some(days) = self.days_remaining {
-            display.push_str(&format!(", {} days left", days));
+            let _ = write!(display, ", {} days left", days);
         }
         if let Some(wpd) = self.words_per_day_needed {
-            display.push_str(&format!(", {} words/day needed", wpd));
+            let _ = write!(display, ", {} words/day needed", wpd);
         }
         display
     }

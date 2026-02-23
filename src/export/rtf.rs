@@ -120,7 +120,7 @@ fn rtf_escape(text: &str) -> String {
             '{' => result.push_str("\\{"),
             '}' => result.push_str("\\}"),
             c if c as u32 > 127 => {
-                result.push_str(&format!("\\u{}?", c as i32));
+                let _ = write!(result, "\\u{}?", c as i32);
             }
             c => result.push(c),
         }

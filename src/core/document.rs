@@ -279,17 +279,13 @@ impl Document {
 
     /// Get the first N characters as a preview
     pub fn preview(&self, max_chars: usize) -> String {
-        // Use char count (not byte length) to avoid panics on multi-byte UTF-8
-        let char_count = self.content.chars().count();
-        if char_count <= max_chars {
-            self.content.clone()
-        } else {
-            let byte_end = self.content
-                .char_indices()
-                .nth(max_chars)
-                .map_or(self.content.len(), |(i, _)| i);
-            let truncated = &self.content[..byte_end];
-            format!("{}...", truncated.trim_end())
+        // Single-pass: only iterate up to max_chars characters
+        match self.content.char_indices().nth(max_chars) {
+            None => self.content.clone(),
+            Some((byte_end, _)) => {
+                let truncated = &self.content[..byte_end];
+                format!("{}...", truncated.trim_end())
+            }
         }
     }
 
