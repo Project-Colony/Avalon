@@ -64,12 +64,21 @@ pub enum ToolbarMenu {
 }
 
 /// Active tab in the Settings window
+///
+/// Inspired by Scrivener (7 panes), Word (10 categories), Ulysses (7 tabs):
+/// - General: project identity, saving, labels/statuses
+/// - Editor: typing behavior, navigation, composition, script mode
+/// - Corrections: proofing, auto-correct substitutions, spell check
+/// - Appearance: font, layout, display toggles, UI scale
+/// - Backup: auto-backup, frequency, accessibility
+/// - Shortcuts: complete keyboard reference
 #[derive(Debug, Clone, PartialEq)]
 pub enum SettingsTab {
     General,
     Editor,
+    Corrections,
     Appearance,
-    Compile,
+    Backup,
     Shortcuts,
 }
 

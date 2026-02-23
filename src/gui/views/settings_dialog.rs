@@ -129,7 +129,7 @@ pub fn view(
     auto_correction: &crate::core::script::AutoCorrection,
     active_tab: &SettingsTab,
 ) -> Element<'static, Message> {
-    // ── Sidebar navigation ──
+    // ── Sidebar ──
     let sidebar = container(
         column![
             text("Settings").size(17).color(Theme::TEXT_PRIMARY),
@@ -138,9 +138,11 @@ pub fn view(
             Space::with_height(2),
             tab_button("\u{f040}", "Editor", SettingsTab::Editor, active_tab),
             Space::with_height(2),
+            tab_button("\u{f00c}", "Corrections", SettingsTab::Corrections, active_tab),
+            Space::with_height(2),
             tab_button("\u{f1fc}", "Appearance", SettingsTab::Appearance, active_tab),
             Space::with_height(2),
-            tab_button("\u{f1c1}", "Compile", SettingsTab::Compile, active_tab),
+            tab_button("\u{f0c7}", "Backup", SettingsTab::Backup, active_tab),
             Space::with_height(2),
             tab_button("\u{f11c}", "Shortcuts", SettingsTab::Shortcuts, active_tab),
             Space::with_height(Length::Fill),
@@ -152,7 +154,7 @@ pub fn view(
             .width(Length::Fill),
         ]
         .padding(16)
-        .width(Length::Fixed(180.0))
+        .width(Length::Fixed(185.0))
     )
     .style(|_theme: &iced::Theme| container::Style {
         background: Some(iced::Background::Color(Theme::SIDEBAR_BG)),
@@ -168,9 +170,10 @@ pub fn view(
     // ── Content panel ──
     let content: Element<'_, Message> = match active_tab {
         SettingsTab::General => tab_general(settings, project_title),
-        SettingsTab::Editor => tab_editor(settings, script_mode, auto_correction),
+        SettingsTab::Editor => tab_editor(settings, script_mode),
+        SettingsTab::Corrections => tab_corrections(settings, auto_correction),
         SettingsTab::Appearance => tab_appearance(settings),
-        SettingsTab::Compile => tab_compile(settings),
+        SettingsTab::Backup => tab_backup(settings),
         SettingsTab::Shortcuts => tab_shortcuts(),
     };
 
@@ -193,14 +196,14 @@ pub fn view(
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  GENERAL — Project, Saving, Backups, Accessibility
+//  GENERAL — Project identity, saving, labels, statuses
+//  (cf. Scrivener "General" + Word "General")
 // ═══════════════════════════════════════════════════════════════════════
 
 fn tab_general(
     settings: &ProjectSettings,
     project_title: &str,
 ) -> Element<'static, Message> {
-    // ── Project ──
     let title_input = text_input("Project title...", project_title)
         .on_input(|val| Message::SettingsSetProjectTitle(val))
         .size(14)
@@ -222,7 +225,6 @@ fn tab_general(
         .padding(6)
         .width(Length::Fixed(160.0));
 
-    // ── Saving ──
     let autosave_str = format!("{}", settings.auto_save_seconds);
     let autosave_input = text_input("30", &autosave_str)
         .on_input(|val| Message::SettingsSetAutoSave(val))
@@ -230,366 +232,24 @@ fn tab_general(
         .padding(6)
         .width(Length::Fixed(80.0));
 
-    // ── Backups ──
-    let backup_interval_str = format!("{}", settings.backup_interval_saves);
-    let backup_interval_input = text_input("10", &backup_interval_str)
-        .on_input(|val| Message::SettingsSetBackupInterval(val))
-        .size(13)
-        .padding(6)
-        .width(Length::Fixed(80.0));
-
-    // ── Accessibility ──
-    let ui_scale_str = format!("{:.0}%", settings.ui_scale * 100.0);
-    let ui_scale_options = vec![
-        "75%".to_string(), "100%".to_string(), "125%".to_string(),
-        "150%".to_string(), "200%".to_string(),
+    let doc_type_options = vec![
+        "".to_string(), "Scene".to_string(), "Chapter".to_string(),
+        "Part".to_string(), "Note".to_string(),
     ];
-    let ui_scale_picker = pick_list(
-        ui_scale_options,
-        Some(ui_scale_str),
-        |selected| {
-            let val = selected.trim_end_matches('%');
-            if let Ok(pct) = val.parse::<f32>() {
-                Message::SettingsSetUIScale(format!("{}", pct / 100.0))
-            } else {
-                Message::SettingsSetUIScale("1.0".to_string())
-            }
-        },
-    )
-    .width(Length::Fixed(110.0));
-
-    column![
-        // ── Project ──
-        section_header("Project"),
-        setting_label("Project Title"),
-        title_input,
-        Space::with_height(10),
-        row![
-            column![
-                setting_label("Target Word Count"),
-                Space::with_height(4),
-                target_input,
-                setting_description("Leave empty for no target"),
-            ],
-            Space::with_width(24),
-            column![
-                setting_label("Target Deadline"),
-                Space::with_height(4),
-                deadline_input,
-                setting_description("Format: YYYY-MM-DD"),
-            ],
-        ],
-
-        divider(),
-
-        // ── Saving ──
-        section_header("Saving"),
-        row![
-            column![
-                setting_label("Auto-save Interval"),
-                Space::with_height(4),
-                row![
-                    autosave_input,
-                    Space::with_width(6),
-                    text("seconds").size(12).color(Theme::TEXT_MUTED),
-                ].align_y(iced::Alignment::Center),
-            ],
-        ],
-
-        divider(),
-
-        // ── Backups ──
-        section_header("Backups"),
-        toggle_setting(
-            settings.auto_backup,
-            "Automatic backups",
-            "Create periodic backup copies of the project",
-            Message::SettingsToggleAutoBackup,
-        ),
-        row![
-            column![
-                setting_label("Backup frequency"),
-                Space::with_height(4),
-                row![
-                    text("Every").size(12).color(Theme::TEXT_MUTED),
-                    Space::with_width(6),
-                    backup_interval_input,
-                    Space::with_width(6),
-                    text("saves").size(12).color(Theme::TEXT_MUTED),
-                ].align_y(iced::Alignment::Center),
-            ],
-        ],
-
-        divider(),
-
-        // ── Accessibility ──
-        section_header("Accessibility"),
-        setting_label("Interface Scale"),
-        Space::with_height(4),
-        ui_scale_picker,
-        setting_description("Scale all UI elements proportionally"),
-        Space::with_height(10),
-        toggle_setting(
-            settings.high_contrast,
-            "High contrast",
-            "Sharper borders and stronger color differences",
-            Message::SettingsToggleHighContrast,
-        ),
-        toggle_setting(
-            settings.large_ui,
-            "Large UI elements",
-            "Bigger buttons, toggles, and click targets",
-            Message::SettingsToggleLargeUI,
-        ),
-        toggle_setting(
-            settings.reduce_motion,
-            "Reduce motion",
-            "Disable transitions and animations",
-            Message::SettingsToggleReduceMotion,
-        ),
-        toggle_setting(
-            settings.screen_reader_hints,
-            "Screen reader hints",
-            "Add semantic labels for assistive technology",
-            Message::SettingsToggleScreenReaderHints,
-        ),
-    ]
-    .spacing(2)
-    .max_width(540)
-    .into()
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  EDITOR — Typing, Corrections, Composition, Script mode
-// ═══════════════════════════════════════════════════════════════════════
-
-fn tab_editor(
-    settings: &ProjectSettings,
-    script_mode: bool,
-    auto_correction: &crate::core::script::AutoCorrection,
-) -> Element<'static, Message> {
-    // ── Composition ──
-    let comp_width_str = format!("{:.0}", settings.fullscreen_text_width);
-    let comp_width_input = text_input("60", &comp_width_str)
-        .on_input(|val| Message::SettingsSetCompWidth(val))
-        .size(13)
-        .padding(6)
-        .width(Length::Fixed(80.0));
-
-    column![
-        // ── Input ──
-        section_header("Input"),
-        toggle_setting(
-            settings.typewriter_scroll,
-            "Typewriter scrolling",
-            "Keep the active line vertically centered while typing",
-            Message::SettingsToggleTypewriterScroll,
-        ),
-        toggle_setting(
-            settings.spell_check_enabled,
-            "Check spelling while typing",
-            "Underline misspelled words in real time",
-            Message::SettingsToggleSpellCheck,
-        ),
-
-        divider(),
-
-        // ── Auto-Correction (Proofing) ──
-        section_header("Proofing & Auto-Correct"),
-        toggle_setting(
-            settings.smart_punctuation,
-            "Smart punctuation",
-            "Replace straight quotes and hyphens with typographic equivalents",
-            Message::SettingsToggleSmartPunctuation,
-        ),
-
-        subsection_header("Substitutions"),
-        toggler(auto_correction.smart_quotes)
-            .label("Curly quotes   \"...\"  \u{2192}  \u{201c}...\u{201d}")
-            .on_toggle(|_| Message::ToggleAutoCorrectSmartQuotes),
-        Space::with_height(4),
-        toggler(auto_correction.em_dashes)
-            .label("Em dash   --  \u{2192}  \u{2014}")
-            .on_toggle(|_| Message::ToggleAutoCorrectEmDashes),
-        Space::with_height(4),
-        toggler(auto_correction.ellipsis)
-            .label("Ellipsis   ...  \u{2192}  \u{2026}")
-            .on_toggle(|_| Message::ToggleAutoCorrectEllipsis),
-
-        divider(),
-
-        // ── Composition mode ──
-        section_header("Composition Mode"),
-        setting_description("Distraction-free writing environment (F5)"),
-        Space::with_height(8),
-        setting_label("Text width in composition"),
-        Space::with_height(4),
-        row![
-            comp_width_input,
-            Space::with_width(6),
-            text("% of screen").size(12).color(Theme::TEXT_MUTED),
-        ].align_y(iced::Alignment::Center),
-
-        divider(),
-
-        // ── Script mode ──
-        section_header("Screenplay / Script"),
-        toggler(script_mode)
-            .label("Enable script mode")
-            .on_toggle(|_| Message::ToggleScriptMode),
-        Space::with_height(2),
-        setting_description(
-            "Format documents with scene headings, action, character names, \
-             dialogue, and transitions. Applies standard screenplay formatting."
-        ),
-    ]
-    .spacing(2)
-    .max_width(540)
-    .into()
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  APPEARANCE — Typography, Editor Layout, Display
-// ═══════════════════════════════════════════════════════════════════════
-
-fn tab_appearance(settings: &ProjectSettings) -> Element<'static, Message> {
-    // ── Font ──
-    let font_options = vec![
-        "monospace".to_string(),
-        "serif".to_string(),
-        "sans-serif".to_string(),
-    ];
-    let font_picker = pick_list(
-        font_options,
-        Some(settings.editor_font.clone()),
-        |selected| Message::SettingsSetFont(selected),
-    )
-    .width(Length::Fixed(180.0));
-
-    let font_size_str = format!("{:.0}", settings.editor_font_size);
-    let font_size_input = text_input("16", &font_size_str)
-        .on_input(|val| Message::SettingsSetFontSize(val))
-        .size(13)
-        .padding(6)
-        .width(Length::Fixed(70.0));
-
-    // ── Line spacing ──
-    let spacing_options = vec![
-        "Single".to_string(),
-        "1.15".to_string(),
-        "1.5".to_string(),
-        "Double".to_string(),
-    ];
-    let current_spacing = match settings.line_spacing {
-        s if (s - 1.0).abs() < 0.01 => "Single".to_string(),
-        s if (s - 1.15).abs() < 0.01 => "1.15".to_string(),
-        s if (s - 1.5).abs() < 0.01 => "1.5".to_string(),
-        s if (s - 2.0).abs() < 0.01 => "Double".to_string(),
-        s => format!("{:.2}", s),
+    let current_doc_type = if settings.default_doc_type.is_empty() {
+        "".to_string()
+    } else {
+        settings.default_doc_type.clone()
     };
-    let spacing_picker = pick_list(
-        spacing_options,
-        Some(current_spacing),
-        |selected| Message::SettingsSetLineSpacingPreset(selected),
+    let doc_type_picker = pick_list(
+        doc_type_options,
+        Some(current_doc_type),
+        |selected| Message::SettingsSetDefaultDocType(selected),
     )
-    .width(Length::Fixed(110.0));
+    .width(Length::Fixed(160.0))
+    .placeholder("None (default)");
 
-    // ── Zoom ──
-    let zoom_str = format!("{:.0}%", settings.editor_zoom * 100.0);
-    let zoom_row = row![
-        button(text("-").size(14).color(Theme::TEXT_PRIMARY))
-            .on_press(Message::SettingsZoomOut)
-            .padding(Padding::from([4, 12])),
-        container(
-            text(zoom_str).size(13).color(Theme::TEXT_PRIMARY)
-        ).padding(Padding::from([0, 8])),
-        button(text("+").size(14).color(Theme::TEXT_PRIMARY))
-            .on_press(Message::SettingsZoomIn)
-            .padding(Padding::from([4, 12])),
-    ]
-    .spacing(2)
-    .align_y(iced::Alignment::Center);
-
-    // ── Editor width ──
-    let editor_width_str = format!("{:.0}", settings.editor_width);
-    let editor_width_input = text_input("80", &editor_width_str)
-        .on_input(|val| Message::SettingsSetEditorWidth(val))
-        .size(13)
-        .padding(6)
-        .width(Length::Fixed(70.0));
-
-    column![
-        // ── Font ──
-        section_header("Font"),
-        row![
-            column![
-                setting_label("Font Family"),
-                Space::with_height(4),
-                font_picker,
-            ],
-            Space::with_width(24),
-            column![
-                setting_label("Size (pt)"),
-                Space::with_height(4),
-                font_size_input,
-            ],
-        ],
-        Space::with_height(12),
-        row![
-            column![
-                setting_label("Line Spacing"),
-                Space::with_height(4),
-                spacing_picker,
-            ],
-            Space::with_width(24),
-            column![
-                setting_label("Editor Zoom"),
-                Space::with_height(4),
-                zoom_row,
-            ],
-        ],
-
-        divider(),
-
-        // ── Editor layout ──
-        section_header("Layout"),
-        setting_label("Editor text width"),
-        Space::with_height(4),
-        row![
-            editor_width_input,
-            Space::with_width(6),
-            text("% of panel width").size(12).color(Theme::TEXT_MUTED),
-        ].align_y(iced::Alignment::Center),
-        setting_description("Controls how wide the text column is in the main editor"),
-
-        divider(),
-
-        // ── Display toggles ──
-        section_header("Display"),
-        toggle_setting(
-            settings.show_word_count,
-            "Word count in status bar",
-            "Show live word and character counts at the bottom",
-            Message::SettingsToggleWordCount,
-        ),
-        toggle_setting(
-            settings.show_paragraph_marks,
-            "Paragraph marks",
-            "Show invisible formatting characters in the editor",
-            Message::SettingsToggleShowParagraphMarks,
-        ),
-    ]
-    .spacing(2)
-    .max_width(540)
-    .into()
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-//  COMPILE — Labels, Statuses, Compile defaults
-// ═══════════════════════════════════════════════════════════════════════
-
-fn tab_compile(settings: &ProjectSettings) -> Element<'static, Message> {
-    // ── Labels ──
+    // Labels
     let mut labels_col = column![].spacing(4);
     for lbl in &settings.labels {
         let color = lbl.color.to_iced_color();
@@ -613,7 +273,7 @@ fn tab_compile(settings: &ProjectSettings) -> Element<'static, Message> {
         );
     }
 
-    // ── Statuses ──
+    // Statuses
     let mut statuses_col = column![].spacing(4);
     for (idx, st) in settings.statuses.iter().enumerate() {
         let status_color = Theme::status_color(&st.name);
@@ -635,29 +295,56 @@ fn tab_compile(settings: &ProjectSettings) -> Element<'static, Message> {
         );
     }
 
-    // ── Default doc type ──
-    let doc_type_options = vec![
-        "".to_string(),
-        "Scene".to_string(),
-        "Chapter".to_string(),
-        "Part".to_string(),
-        "Note".to_string(),
-    ];
-    let current_doc_type = if settings.default_doc_type.is_empty() {
-        "".to_string()
-    } else {
-        settings.default_doc_type.clone()
-    };
-    let doc_type_picker = pick_list(
-        doc_type_options,
-        Some(current_doc_type),
-        |selected| Message::SettingsSetDefaultDocType(selected),
-    )
-    .width(Length::Fixed(160.0))
-    .placeholder("None (default)");
-
     column![
-        // ── Labels ──
+        section_header("Project"),
+        setting_label("Title"),
+        title_input,
+        Space::with_height(10),
+        row![
+            column![
+                setting_label("Word Count Target"),
+                Space::with_height(4),
+                target_input,
+                setting_description("Leave empty for no target"),
+            ],
+            Space::with_width(24),
+            column![
+                setting_label("Deadline"),
+                Space::with_height(4),
+                deadline_input,
+                setting_description("Format: YYYY-MM-DD"),
+            ],
+        ],
+
+        divider(),
+
+        section_header("Saving"),
+        setting_label("Auto-save interval"),
+        Space::with_height(4),
+        row![
+            autosave_input,
+            Space::with_width(6),
+            text("seconds").size(12).color(Theme::TEXT_MUTED),
+        ].align_y(iced::Alignment::Center),
+        setting_description("How often unsaved changes are written to disk"),
+
+        divider(),
+
+        section_header("New Documents"),
+        setting_label("Default type for new documents"),
+        Space::with_height(4),
+        doc_type_picker,
+        setting_description("Pre-selected type when creating a new binder item"),
+        Space::with_height(8),
+        toggle_setting(
+            settings.show_synopsis_in_binder,
+            "Show synopses in binder",
+            "Display document synopsis as a tooltip on hover",
+            Message::SettingsToggleShowSynopsis,
+        ),
+
+        divider(),
+
         section_header("Labels"),
         setting_description("Color-coded tags for organizing binder items"),
         Space::with_height(6),
@@ -665,35 +352,10 @@ fn tab_compile(settings: &ProjectSettings) -> Element<'static, Message> {
 
         divider(),
 
-        // ── Statuses ──
         section_header("Statuses"),
         setting_description("Track document progress through your workflow"),
         Space::with_height(6),
         statuses_col,
-
-        divider(),
-
-        // ── Compile options ──
-        section_header("Compile Defaults"),
-
-        toggle_setting(
-            settings.auto_numbering,
-            "Auto-number chapters",
-            "Automatically prepend chapter numbers during compile",
-            Message::SettingsToggleAutoNumbering,
-        ),
-
-        toggle_setting(
-            settings.show_synopsis_in_binder,
-            "Include synopses in binder tooltip",
-            "Show the document synopsis when hovering over binder items",
-            Message::SettingsToggleShowSynopsis,
-        ),
-
-        setting_label("Default new document type"),
-        Space::with_height(4),
-        doc_type_picker,
-        setting_description("Pre-selected type when creating a new document"),
     ]
     .spacing(2)
     .max_width(540)
@@ -701,7 +363,352 @@ fn tab_compile(settings: &ProjectSettings) -> Element<'static, Message> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-//  SHORTCUTS — Full keyboard reference
+//  EDITOR — Input behavior, composition mode, script mode
+//  (cf. Scrivener "Editing" + "Behaviors")
+// ═══════════════════════════════════════════════════════════════════════
+
+fn tab_editor(
+    settings: &ProjectSettings,
+    script_mode: bool,
+) -> Element<'static, Message> {
+    let comp_width_str = format!("{:.0}", settings.fullscreen_text_width);
+    let comp_width_input = text_input("60", &comp_width_str)
+        .on_input(|val| Message::SettingsSetCompWidth(val))
+        .size(13)
+        .padding(6)
+        .width(Length::Fixed(80.0));
+
+    column![
+        section_header("Typing"),
+        toggle_setting(
+            settings.typewriter_scroll,
+            "Typewriter scrolling",
+            "Keep the active line vertically centered while typing",
+            Message::SettingsToggleTypewriterScroll,
+        ),
+        toggle_setting(
+            settings.show_paragraph_marks,
+            "Show paragraph marks",
+            "Display invisible formatting characters in the editor",
+            Message::SettingsToggleShowParagraphMarks,
+        ),
+
+        divider(),
+
+        section_header("Composition Mode"),
+        setting_description(
+            "Distraction-free writing environment. \
+             Toggle with F5 or Ctrl+Shift+F."
+        ),
+        Space::with_height(8),
+        setting_label("Text width"),
+        Space::with_height(4),
+        row![
+            comp_width_input,
+            Space::with_width(6),
+            text("% of screen").size(12).color(Theme::TEXT_MUTED),
+        ].align_y(iced::Alignment::Center),
+        setting_description("How much of the screen is used for text in composition mode"),
+
+        divider(),
+
+        section_header("Screenplay / Script"),
+        toggler(script_mode)
+            .label("Enable script mode")
+            .on_toggle(|_| Message::ToggleScriptMode),
+        Space::with_height(2),
+        setting_description(
+            "Format documents with scene headings, action, character names, \
+             dialogue, parentheticals, and transitions following standard \
+             screenplay formatting rules."
+        ),
+        Space::with_height(8),
+        toggle_setting(
+            settings.auto_numbering,
+            "Auto-number scenes on compile",
+            "Prepend sequential scene numbers when compiling",
+            Message::SettingsToggleAutoNumbering,
+        ),
+    ]
+    .spacing(2)
+    .max_width(540)
+    .into()
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CORRECTIONS — Spelling, proofing, auto-correct substitutions
+//  (cf. Scrivener "Corrections" + Word "Proofing")
+// ═══════════════════════════════════════════════════════════════════════
+
+fn tab_corrections(
+    settings: &ProjectSettings,
+    auto_correction: &crate::core::script::AutoCorrection,
+) -> Element<'static, Message> {
+    column![
+        section_header("Spelling"),
+        toggle_setting(
+            settings.spell_check_enabled,
+            "Check spelling while typing",
+            "Underline misspelled words in real time (F7 for full check)",
+            Message::SettingsToggleSpellCheck,
+        ),
+
+        divider(),
+
+        section_header("Auto-Correct"),
+        toggle_setting(
+            settings.smart_punctuation,
+            "Smart punctuation",
+            "Automatically replace straight quotes and hyphens with typographic equivalents",
+            Message::SettingsToggleSmartPunctuation,
+        ),
+
+        divider(),
+
+        section_header("Substitutions"),
+        setting_description("Individual text replacement rules applied as you type"),
+        Space::with_height(8),
+        toggler(auto_correction.smart_quotes)
+            .label("Curly quotes   \"...\"  \u{2192}  \u{201c}...\u{201d}")
+            .on_toggle(|_| Message::ToggleAutoCorrectSmartQuotes),
+        Space::with_height(2),
+        setting_description("Replace straight quotes with directional quotation marks"),
+        Space::with_height(8),
+        toggler(auto_correction.em_dashes)
+            .label("Em dash   --  \u{2192}  \u{2014}")
+            .on_toggle(|_| Message::ToggleAutoCorrectEmDashes),
+        Space::with_height(2),
+        setting_description("Convert double hyphens into a proper em dash"),
+        Space::with_height(8),
+        toggler(auto_correction.ellipsis)
+            .label("Ellipsis   ...  \u{2192}  \u{2026}")
+            .on_toggle(|_| Message::ToggleAutoCorrectEllipsis),
+        Space::with_height(2),
+        setting_description("Convert three consecutive dots into a single ellipsis character"),
+    ]
+    .spacing(2)
+    .max_width(540)
+    .into()
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  APPEARANCE — Typography, layout, display, zoom
+//  (cf. Scrivener "Appearance" + Word "Display")
+// ═══════════════════════════════════════════════════════════════════════
+
+fn tab_appearance(settings: &ProjectSettings) -> Element<'static, Message> {
+    // Font
+    let font_options = vec![
+        "monospace".to_string(),
+        "serif".to_string(),
+        "sans-serif".to_string(),
+    ];
+    let font_picker = pick_list(
+        font_options,
+        Some(settings.editor_font.clone()),
+        |selected| Message::SettingsSetFont(selected),
+    )
+    .width(Length::Fixed(180.0));
+
+    let font_size_str = format!("{:.0}", settings.editor_font_size);
+    let font_size_input = text_input("16", &font_size_str)
+        .on_input(|val| Message::SettingsSetFontSize(val))
+        .size(13)
+        .padding(6)
+        .width(Length::Fixed(70.0));
+
+    // Line spacing
+    let spacing_options = vec![
+        "Single".to_string(), "1.15".to_string(),
+        "1.5".to_string(), "Double".to_string(),
+    ];
+    let current_spacing = match settings.line_spacing {
+        s if (s - 1.0).abs() < 0.01 => "Single".to_string(),
+        s if (s - 1.15).abs() < 0.01 => "1.15".to_string(),
+        s if (s - 1.5).abs() < 0.01 => "1.5".to_string(),
+        s if (s - 2.0).abs() < 0.01 => "Double".to_string(),
+        s => format!("{:.2}", s),
+    };
+    let spacing_picker = pick_list(
+        spacing_options,
+        Some(current_spacing),
+        |selected| Message::SettingsSetLineSpacingPreset(selected),
+    )
+    .width(Length::Fixed(110.0));
+
+    // Zoom
+    let zoom_str = format!("{:.0}%", settings.editor_zoom * 100.0);
+    let zoom_row = row![
+        button(text("-").size(14).color(Theme::TEXT_PRIMARY))
+            .on_press(Message::SettingsZoomOut)
+            .padding(Padding::from([4, 12])),
+        container(
+            text(zoom_str).size(13).color(Theme::TEXT_PRIMARY)
+        ).padding(Padding::from([0, 8])),
+        button(text("+").size(14).color(Theme::TEXT_PRIMARY))
+            .on_press(Message::SettingsZoomIn)
+            .padding(Padding::from([4, 12])),
+    ]
+    .spacing(2)
+    .align_y(iced::Alignment::Center);
+
+    // Editor width
+    let editor_width_str = format!("{:.0}", settings.editor_width);
+    let editor_width_input = text_input("80", &editor_width_str)
+        .on_input(|val| Message::SettingsSetEditorWidth(val))
+        .size(13)
+        .padding(6)
+        .width(Length::Fixed(70.0));
+
+    // UI scale
+    let ui_scale_str = format!("{:.0}%", settings.ui_scale * 100.0);
+    let ui_scale_options = vec![
+        "75%".to_string(), "100%".to_string(), "125%".to_string(),
+        "150%".to_string(), "200%".to_string(),
+    ];
+    let ui_scale_picker = pick_list(
+        ui_scale_options,
+        Some(ui_scale_str),
+        |selected| {
+            let val = selected.trim_end_matches('%');
+            if let Ok(pct) = val.parse::<f32>() {
+                Message::SettingsSetUIScale(format!("{}", pct / 100.0))
+            } else {
+                Message::SettingsSetUIScale("1.0".to_string())
+            }
+        },
+    )
+    .width(Length::Fixed(110.0));
+
+    column![
+        section_header("Font"),
+        row![
+            column![
+                setting_label("Font Family"),
+                Space::with_height(4),
+                font_picker,
+            ],
+            Space::with_width(24),
+            column![
+                setting_label("Size (pt)"),
+                Space::with_height(4),
+                font_size_input,
+            ],
+        ],
+        Space::with_height(12),
+        row![
+            column![
+                setting_label("Line Spacing"),
+                Space::with_height(4),
+                spacing_picker,
+            ],
+            Space::with_width(24),
+            column![
+                setting_label("Zoom"),
+                Space::with_height(4),
+                zoom_row,
+            ],
+        ],
+
+        divider(),
+
+        section_header("Layout"),
+        setting_label("Editor text width"),
+        Space::with_height(4),
+        row![
+            editor_width_input,
+            Space::with_width(6),
+            text("% of panel width").size(12).color(Theme::TEXT_MUTED),
+        ].align_y(iced::Alignment::Center),
+        setting_description("Controls how wide the text column is in the main editor"),
+
+        divider(),
+
+        section_header("Interface"),
+        subsection_header("Scale"),
+        setting_label("UI Scale"),
+        Space::with_height(4),
+        ui_scale_picker,
+        setting_description("Scale all interface elements proportionally"),
+        Space::with_height(12),
+        toggle_setting(
+            settings.show_word_count,
+            "Word count in status bar",
+            "Show live word and character counts at the bottom",
+            Message::SettingsToggleWordCount,
+        ),
+    ]
+    .spacing(2)
+    .max_width(540)
+    .into()
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  BACKUP — Auto-backup, frequency, accessibility
+//  (cf. Scrivener "Backup" + Ulysses "Backup" + Word "Accessibility")
+// ═══════════════════════════════════════════════════════════════════════
+
+fn tab_backup(settings: &ProjectSettings) -> Element<'static, Message> {
+    let backup_interval_str = format!("{}", settings.backup_interval_saves);
+    let backup_interval_input = text_input("10", &backup_interval_str)
+        .on_input(|val| Message::SettingsSetBackupInterval(val))
+        .size(13)
+        .padding(6)
+        .width(Length::Fixed(80.0));
+
+    column![
+        section_header("Automatic Backups"),
+        toggle_setting(
+            settings.auto_backup,
+            "Back up on save",
+            "Create a backup copy each time the project is saved",
+            Message::SettingsToggleAutoBackup,
+        ),
+        setting_label("Keep a backup every"),
+        Space::with_height(4),
+        row![
+            backup_interval_input,
+            Space::with_width(6),
+            text("saves").size(12).color(Theme::TEXT_MUTED),
+        ].align_y(iced::Alignment::Center),
+        setting_description("A new backup is created after this many save operations"),
+
+        divider(),
+
+        section_header("Accessibility"),
+        toggle_setting(
+            settings.high_contrast,
+            "High contrast",
+            "Sharper borders and stronger color differences for better visibility",
+            Message::SettingsToggleHighContrast,
+        ),
+        toggle_setting(
+            settings.large_ui,
+            "Large interface elements",
+            "Bigger buttons, toggles, and click targets throughout the UI",
+            Message::SettingsToggleLargeUI,
+        ),
+        toggle_setting(
+            settings.reduce_motion,
+            "Reduce motion",
+            "Disable transitions, fades, and smooth scrolling",
+            Message::SettingsToggleReduceMotion,
+        ),
+        toggle_setting(
+            settings.screen_reader_hints,
+            "Screen reader hints",
+            "Add extra semantic labels for assistive technology",
+            Message::SettingsToggleScreenReaderHints,
+        ),
+    ]
+    .spacing(2)
+    .max_width(540)
+    .into()
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  SHORTCUTS — Complete keyboard reference
+//  (cf. VS Code keyboard shortcuts panel)
 // ═══════════════════════════════════════════════════════════════════════
 
 fn tab_shortcuts() -> Element<'static, Message> {
@@ -731,7 +738,7 @@ fn tab_shortcuts() -> Element<'static, Message> {
         section_header("Navigation"),
         shortcut_row("Ctrl+F", "Search project"),
         shortcut_row("Ctrl+I", "Toggle inspector"),
-        shortcut_row("F3", "Find next"),
+        shortcut_row("F3", "Find next match"),
         shortcut_row("F6", "Search panel"),
 
         divider(),
@@ -745,13 +752,13 @@ fn tab_shortcuts() -> Element<'static, Message> {
 
         divider(),
 
-        section_header("Text"),
-        shortcut_row("Alt+U", "UPPERCASE"),
-        shortcut_row("Alt+L", "lowercase"),
+        section_header("Text Manipulation"),
+        shortcut_row("Alt+U", "UPPERCASE selection"),
+        shortcut_row("Alt+L", "lowercase selection"),
         shortcut_row("Alt+\u{2191}", "Move line up"),
         shortcut_row("Alt+\u{2193}", "Move line down"),
-        shortcut_row("Alt+[", "Unindent"),
-        shortcut_row("Alt+]", "Indent"),
+        shortcut_row("Alt+[", "Unindent line"),
+        shortcut_row("Alt+]", "Indent line"),
         shortcut_row("Ctrl+Shift+L", "Sort lines"),
         shortcut_row("Ctrl+Shift+U", "Remove duplicate lines"),
 
@@ -759,7 +766,7 @@ fn tab_shortcuts() -> Element<'static, Message> {
 
         section_header("Tools"),
         shortcut_row("F7", "Spell check"),
-        shortcut_row("F8", "Validation"),
+        shortcut_row("F8", "Project validation"),
         shortcut_row("F9", "Create snapshot"),
         shortcut_row("Ctrl+Shift+B", "Create backup"),
         shortcut_row("Ctrl+Shift+H", "Writing history"),
@@ -769,7 +776,6 @@ fn tab_shortcuts() -> Element<'static, Message> {
 
         divider(),
 
-        section_header("General"),
         shortcut_row("Escape", "Close current panel / dialog"),
     ]
     .spacing(2)
