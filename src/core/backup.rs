@@ -94,17 +94,49 @@ impl BackupManager {
     }
 
     /// Remove old backups, keeping only the most recent `keep` backups
-    fn prune_backups(backup_dir: &Path, project_name: &str, keep: usize) -> Result<()> {
+    fn prune_backups(_backup_dir: &Path, project_name: &str, keep: usize) -> Result<()> {
         let mut backups = Self::list_backups(project_name)?;
         if backups.len() > keep {
-            // Remove oldest backups
             let to_remove = backups.split_off(keep);
             for entry in to_remove {
                 let _ = fs::remove_file(&entry.path);
             }
         }
-        let _ = backup_dir; // suppress unused warning
         Ok(())
+    }
+
+    /// Delete a specific backup
+    pub fn delete_backup(backup_path: &Path) -> Result<()> {
+        fs::remove_file(backup_path)
+            .context("Failed to delete backup")?;
+        Ok(())
+    }
+
+    /// Get total size of all backups for a project
+    pub fn total_backup_size(project_name: &str) -> Result<u64> {
+        let backups = Self::list_backups(project_name)?;
+        Ok(backups.iter().map(|b| b.size_bytes).sum())
+    }
+
+    /// Get the number of backups for a project
+    pub fn backup_count(project_name: &str) -> Result<usize> {
+        Ok(Self::list_backups(project_name)?.len())
+    }
+
+    /// Get the most recent backup for a project
+    pub fn latest_backup(project_name: &str) -> Result<Option<BackupEntry>> {
+        Ok(Self::list_backups(project_name)?.into_iter().next())
+    }
+
+    /// Get the backup directory path (public accessor)
+    pub fn backup_dir_path() -> Result<PathBuf> {
+        Self::backup_directory()
+    }
+
+    /// Get total backup size as a human-readable string
+    pub fn total_backup_size_display(project_name: &str) -> Result<String> {
+        let total = Self::total_backup_size(project_name)?;
+        Ok(BackupEntry::format_bytes(total))
     }
 }
 
@@ -118,20 +150,24 @@ pub struct BackupEntry {
 }
 
 impl BackupEntry {
-    pub fn display_size(&self) -> String {
-        if self.size_bytes < 1024 {
-            format!("{} B", self.size_bytes)
-        } else if self.size_bytes < 1024 * 1024 {
-            format!("{:.1} KB", self.size_bytes as f64 / 1024.0)
-        } else if self.size_bytes < 1024 * 1024 * 1024 {
-            format!("{:.1} MB", self.size_bytes as f64 / (1024.0 * 1024.0))
+    /// Format bytes into human-readable size string
+    pub fn format_bytes(bytes: u64) -> String {
+        if bytes < 1024 {
+            format!("{} B", bytes)
+        } else if bytes < 1024 * 1024 {
+            format!("{:.1} KB", bytes as f64 / 1024.0)
+        } else if bytes < 1024 * 1024 * 1024 {
+            format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
         } else {
-            format!("{:.2} GB", self.size_bytes as f64 / (1024.0 * 1024.0 * 1024.0))
+            format!("{:.2} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
         }
     }
 
+    pub fn display_size(&self) -> String {
+        Self::format_bytes(self.size_bytes)
+    }
+
     pub fn display_timestamp(&self) -> String {
-        // Parse YYYYMMDD_HHMMSS format
         if self.timestamp.len() >= 15 {
             format!(
                 "{}-{}-{} {}:{}:{}",
@@ -192,59 +228,6 @@ impl BackupEntry {
     /// Check if the backup file exists on disk
     pub fn exists(&self) -> bool {
         self.path.exists()
-    }
-}
-
-impl BackupManager {
-    /// Delete a specific backup
-    pub fn delete_backup(backup_path: &Path) -> Result<()> {
-        fs::remove_file(backup_path)
-            .context("Failed to delete backup")?;
-        Ok(())
-    }
-
-    /// Get total size of all backups for a project
-    pub fn total_backup_size(project_name: &str) -> Result<u64> {
-        let backups = Self::list_backups(project_name)?;
-        Ok(backups.iter().map(|b| b.size_bytes).sum())
-    }
-
-    /// Get the number of backups for a project
-    pub fn backup_count(project_name: &str) -> Result<usize> {
-        let backups = Self::list_backups(project_name)?;
-        Ok(backups.len())
-    }
-
-    /// Get the most recent backup for a project
-    pub fn latest_backup(project_name: &str) -> Result<Option<BackupEntry>> {
-        let backups = Self::list_backups(project_name)?;
-        Ok(backups.into_iter().next())
-    }
-
-    /// Get the backup directory path (public accessor)
-    pub fn backup_dir_path() -> Result<PathBuf> {
-        Self::backup_directory()
-    }
-
-    /// Get total backup size as a human-readable string
-    pub fn total_backup_size_display(project_name: &str) -> Result<String> {
-        let total = Self::total_backup_size(project_name)?;
-        Ok(BackupEntry::format_bytes(total))
-    }
-}
-
-impl BackupEntry {
-    /// Format bytes into human-readable size string
-    pub fn format_bytes(bytes: u64) -> String {
-        if bytes < 1024 {
-            format!("{} B", bytes)
-        } else if bytes < 1024 * 1024 {
-            format!("{:.1} KB", bytes as f64 / 1024.0)
-        } else if bytes < 1024 * 1024 * 1024 {
-            format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
-        } else {
-            format!("{:.2} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
-        }
     }
 
     /// Check if this backup is from today

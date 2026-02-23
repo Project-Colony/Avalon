@@ -121,7 +121,7 @@ impl Thesaurus {
 
                 self.entries
                     .entry(word.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(entry);
             }
         }
@@ -150,15 +150,7 @@ impl Thesaurus {
         synonyms.dedup();
         synonyms
     }
-}
 
-impl Default for Thesaurus {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Thesaurus {
     /// Load a built-in thesaurus with common synonyms as a fallback
     /// when WordNet data files are not available
     pub fn load_builtin(&mut self) {
@@ -214,7 +206,7 @@ impl Thesaurus {
 
             self.entries
                 .entry(word.to_string())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(entry);
         }
 
@@ -259,17 +251,14 @@ impl Thesaurus {
         Some(synonyms[idx].clone())
     }
 
-    /// Get all antonyms for a word across all entries
+    /// Get all antonyms for a word across all entries (deduplicated)
     pub fn antonyms(&self, word: &str) -> Vec<String> {
         let entries = self.lookup(word);
-        let mut antonyms = Vec::new();
-        for entry in entries {
-            for ant in &entry.antonyms {
-                if !antonyms.contains(ant) {
-                    antonyms.push(ant.clone());
-                }
-            }
-        }
+        let mut antonyms: Vec<String> = entries.iter()
+            .flat_map(|e| e.antonyms.iter().cloned())
+            .collect();
+        antonyms.sort();
+        antonyms.dedup();
         antonyms
     }
 
@@ -311,12 +300,16 @@ impl Thesaurus {
 
     /// Count total unique synonyms across all words.
     pub fn total_unique_synonyms(&self) -> usize {
-        let mut all_syns: Vec<String> = self.entries.values()
-            .flat_map(|entries| entries.iter().flat_map(|e| e.synonyms.iter().cloned()))
-            .collect();
-        all_syns.sort();
-        all_syns.dedup();
-        all_syns.len()
+        self.entries.values()
+            .flat_map(|entries| entries.iter().flat_map(|e| e.synonyms.iter()))
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+    }
+}
+
+impl Default for Thesaurus {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

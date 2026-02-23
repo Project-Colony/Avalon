@@ -160,11 +160,10 @@ impl RecentProjects {
 
     /// Get the total number of unique project paths
     pub fn unique_paths(&self) -> usize {
-        let mut seen = std::collections::HashSet::new();
-        for p in &self.projects {
-            seen.insert(p.path.clone());
-        }
-        seen.len()
+        self.projects.iter()
+            .map(|p| &p.path)
+            .collect::<std::collections::HashSet<_>>()
+            .len()
     }
 
     /// Sort projects by title alphabetically

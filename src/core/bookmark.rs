@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
@@ -212,8 +213,8 @@ impl BookmarkList {
     }
 
     /// Get bookmarks grouped by color (None group = no color)
-    pub fn grouped_by_color(&self) -> std::collections::HashMap<Option<String>, Vec<&Bookmark>> {
-        let mut groups: std::collections::HashMap<Option<String>, Vec<&Bookmark>> = std::collections::HashMap::new();
+    pub fn grouped_by_color(&self) -> HashMap<Option<String>, Vec<&Bookmark>> {
+        let mut groups: HashMap<Option<String>, Vec<&Bookmark>> = HashMap::new();
         for bm in &self.bookmarks {
             groups.entry(bm.color.clone()).or_default().push(bm);
         }
