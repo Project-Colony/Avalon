@@ -330,7 +330,7 @@ pub fn panel_header_style(_theme: &iced::Theme) -> container::Style {
         border: Border {
             color: Theme::BORDER_SUBTLE,
             width: 0.0,
-            radius: [6.0, 6.0, 0.0, 0.0].into(),
+            radius: 6.0.into(),
         },
         ..Default::default()
     }
