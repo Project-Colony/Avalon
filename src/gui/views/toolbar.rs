@@ -1,8 +1,22 @@
 use iced::widget::{button, container, mouse_area, row, text, column, Space};
-use iced::{Element, Length, Padding};
+use iced::{Border, Element, Length, Padding};
 
 use crate::gui::app::{BottomPanel, Message, ToolbarMenu, ViewMode};
 use crate::gui::theme::{self, Theme};
+
+/// Transparent button style for menu headers and dropdown items
+fn transparent_button(_theme: &iced::Theme, _status: button::Status) -> button::Style {
+    button::Style {
+        background: None,
+        text_color: Theme::TEXT_PRIMARY,
+        border: Border {
+            color: iced::Color::TRANSPARENT,
+            width: 0.0,
+            radius: 4.0.into(),
+        },
+        ..Default::default()
+    }
+}
 
 /// Render the menu bar (just the category header buttons)
 pub fn menu_bar(active_menu: &Option<ToolbarMenu>) -> Element<'static, Message> {
@@ -71,6 +85,7 @@ fn menu_header(label: &str, menu: &ToolbarMenu, active: &Option<ToolbarMenu>) ->
     )
     .on_press(Message::ToggleToolbarMenu(menu.clone()))
     .padding(Padding::from([5, 12]))
+    .style(transparent_button)
     .into()
 }
 
@@ -205,6 +220,7 @@ fn dropdown_btn(label: &str, message: Message) -> Element<'static, Message> {
     )
     .on_press(message)
     .padding(Padding::from([4, 12]))
+    .style(transparent_button)
     .into()
 }
 
@@ -218,6 +234,7 @@ fn view_btn(label: &str, mode: ViewMode, current: &ViewMode) -> Element<'static,
     )
     .on_press(Message::SwitchView(mode))
     .padding(Padding::from([4, 12]))
+    .style(transparent_button)
     .into()
 }
 
@@ -230,6 +247,7 @@ fn toggle_btn(label: &str, active: bool, message: Message) -> Element<'static, M
     )
     .on_press(message)
     .padding(Padding::from([4, 12]))
+    .style(transparent_button)
     .into()
 }
 
@@ -243,5 +261,6 @@ fn panel_btn(label: &str, panel: BottomPanel, current: &BottomPanel) -> Element<
     )
     .on_press(Message::ShowBottomPanel(panel))
     .padding(Padding::from([4, 12]))
+    .style(transparent_button)
     .into()
 }
