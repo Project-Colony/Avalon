@@ -335,12 +335,12 @@ impl CollectionManager {
 
     /// Duplicate a collection with a new name
     pub fn duplicate(&mut self, id: &Uuid, new_name: &str) -> Option<Uuid> {
-        let original = self.get(id)?.clone();
+        let original = self.get(id)?;
         let dup = Collection {
             id: Uuid::new_v4(),
             name: new_name.to_string(),
-            kind: original.kind,
-            item_ids: original.item_ids,
+            kind: original.kind.clone(),
+            item_ids: original.item_ids.clone(),
         };
         let new_id = dup.id;
         self.collections.push(dup);

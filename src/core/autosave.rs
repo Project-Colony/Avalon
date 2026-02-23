@@ -304,7 +304,8 @@ impl SaveQueue {
 
         // If queue is too large, keep only the most recent
         if self.pending.len() > self.max_queue_size {
-            self.pending = self.pending.split_off(self.pending.len() - self.max_queue_size);
+            let drain_count = self.pending.len() - self.max_queue_size;
+            self.pending.drain(..drain_count);
         }
     }
 

@@ -169,12 +169,13 @@ impl WritingHistory {
 
     /// Average writing time per session in minutes
     pub fn average_session_minutes(&self) -> f64 {
-        let active: Vec<_> = self.entries.iter().filter(|e| e.time_spent_seconds > 0).collect();
-        if active.is_empty() {
+        let (count, total) = self.entries.iter()
+            .filter(|e| e.time_spent_seconds > 0)
+            .fold((0usize, 0u64), |(n, sum), e| (n + 1, sum + e.time_spent_seconds));
+        if count == 0 {
             return 0.0;
         }
-        let total: u64 = active.iter().map(|e| e.time_spent_seconds).sum();
-        (total as f64 / 60.0) / active.len() as f64
+        (total as f64 / 60.0) / count as f64
     }
 
     /// Format total time as a human-readable string
