@@ -717,6 +717,7 @@ impl EditorState {
     }
 
     /// Transform text to uppercase - selection only if selected, otherwise whole document
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_uppercase(&mut self, selection_only: bool) {
         if selection_only {
             if let Some((start, end)) = self.selection_range() {
@@ -742,6 +743,7 @@ impl EditorState {
     }
 
     /// Transform text to lowercase - selection only if selected, otherwise whole document
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_lowercase(&mut self, selection_only: bool) {
         if selection_only {
             if let Some((start, end)) = self.selection_range() {
@@ -766,6 +768,7 @@ impl EditorState {
     }
 
     /// Transform text to title case - selection only if selected, otherwise whole document
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_title_case(&mut self, selection_only: bool) {
         fn title_case(s: &str) -> String {
             let mut result = String::with_capacity(s.len());

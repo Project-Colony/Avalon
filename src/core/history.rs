@@ -241,7 +241,7 @@ impl WritingHistory {
         }
         let cv = self.daily_std_dev() / avg;
         // Convert to a 0-100 score: CV of 0 = 100, CV of 2+ = 0
-        ((1.0 - cv / 2.0) * 100.0).max(0.0).min(100.0)
+        ((1.0 - cv / 2.0) * 100.0).clamp(0.0, 100.0)
     }
 
     /// Consistency label based on score

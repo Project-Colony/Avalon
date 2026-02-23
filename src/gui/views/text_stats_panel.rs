@@ -137,7 +137,7 @@ pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
 
     // Grade level estimation (from Flesch reading ease)
     // Approximate grade: (100 - score) / 6.67, clamped
-    let est_grade = ((100.0 - analysis.readability_score) / 6.67).max(0.0).min(20.0);
+    let est_grade = ((100.0 - analysis.readability_score) / 6.67).clamp(0.0, 20.0);
     let est_audience = if est_grade <= 6.0 { "Children / General Public" }
     else if est_grade <= 9.0 { "Young Adults" }
     else if est_grade <= 13.0 { "General Adults" }

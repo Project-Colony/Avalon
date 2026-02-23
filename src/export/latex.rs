@@ -143,12 +143,12 @@ fn markdown_to_latex(text: &str) -> String {
         }
 
         // Blockquote
-        if trimmed.starts_with("> ") {
+        if let Some(quoted) = trimmed.strip_prefix("> ") {
             if !in_blockquote {
                 output.push_str("\\begin{quote}\n");
                 in_blockquote = true;
             }
-            let content = convert_inline_formatting(&trimmed[2..]);
+            let content = convert_inline_formatting(quoted);
             output.push_str(&content);
             output.push('\n');
             continue;

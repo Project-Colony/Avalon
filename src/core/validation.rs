@@ -293,7 +293,7 @@ impl ProjectValidation {
         let warning_penalty = self.warning_count() as f64 * 3.0;
         let info_penalty = self.info_count() as f64 * 1.0;
         let total_penalty = error_penalty + warning_penalty + info_penalty;
-        (100.0 - total_penalty).max(0.0).min(100.0)
+        (100.0 - total_penalty).clamp(0.0, 100.0)
     }
 
     /// Health grade

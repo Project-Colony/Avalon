@@ -77,8 +77,8 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                 }
 
                 // Handle blockquotes
-                if trimmed.starts_with("> ") {
-                    let quote_text = convert_basic_markdown(&trimmed[2..]);
+                if let Some(quoted) = trimmed.strip_prefix("> ") {
+                    let quote_text = convert_basic_markdown(quoted);
                     rtf.push_str(&format!(
                         "\\pard\\li720\\ri720\\sa60\\fs{} \\i {}\\i0\\par\n",
                         fs, quote_text
