@@ -8,15 +8,15 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
     // YAML front matter block (common in Markdown publishing)
     if options.include_front_matter && !options.title.is_empty() {
         output.push_str("---\n");
-        let _ = write!(output,"title: \"{}\"\n", escape_yaml(&options.title));
+        let _ = writeln!(output,"title: \"{}\"", escape_yaml(&options.title));
         if !options.author.is_empty() {
-            let _ = write!(output,"author: \"{}\"\n", escape_yaml(&options.author));
+            let _ = writeln!(output,"author: \"{}\"", escape_yaml(&options.author));
         }
-        let _ = write!(output,"date: \"{}\"\n", chrono::Local::now().format("%Y-%m-%d"));
+        let _ = writeln!(output,"date: \"{}\"", chrono::Local::now().format("%Y-%m-%d"));
 
         // Word count metadata
         let total_words: usize = contents.iter().map(|c| c.text.split_whitespace().count()).sum();
-        let _ = write!(output,"wordcount: {}\n", total_words);
+        let _ = writeln!(output,"wordcount: {}", total_words);
 
         output.push_str("---\n\n");
 
@@ -35,8 +35,8 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
             if content.is_folder || !content.text.is_empty() {
                 let indent = "  ".repeat(content.depth);
                 let anchor = slug(&content.title);
-                let _ = write!(output,
-                    "{}- [{}](#{})\n",
+                let _ = writeln!(output,
+                    "{}- [{}](#{})",
                     indent, content.title, anchor
                 );
             }

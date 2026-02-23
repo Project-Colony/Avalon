@@ -48,8 +48,8 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
                 current_chapter_title = content.title.clone();
             }
             let level = (content.depth + 1).min(6);
-            let _ = write!(current_chapter_html,
-                "<h{}>{}</h{}>\n",
+            let _ = writeln!(current_chapter_html,
+                "<h{}>{}</h{}>",
                 level, escape_xml(&content.title), level
             );
         } else {
@@ -147,11 +147,11 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
     }
 
     for (i, (filename, _, _)) in chapters.iter().enumerate() {
-        let _ = write!(manifest_items,
-            "    <item id=\"ch{}\" href=\"{}\" media-type=\"application/xhtml+xml\"/>\n",
+        let _ = writeln!(manifest_items,
+            "    <item id=\"ch{}\" href=\"{}\" media-type=\"application/xhtml+xml\"/>",
             i, filename
         );
-        let _ = write!(spine_items,"    <itemref idref=\"ch{}\"/>\n", i);
+        let _ = writeln!(spine_items,"    <itemref idref=\"ch{}\"/>", i);
     }
 
     // Table of contents nav
@@ -192,8 +192,8 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
         } else {
             title.clone()
         };
-        let _ = write!(toc_entries,
-            "      <li><a href=\"{}\">{}</a></li>\n",
+        let _ = writeln!(toc_entries,
+            "      <li><a href=\"{}\">{}</a></li>",
             filename,
             escape_xml(&display_title)
         );

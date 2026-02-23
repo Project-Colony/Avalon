@@ -24,8 +24,8 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
 
     // Header with author/title
     if !options.title.is_empty() {
-        let _ = write!(output,
-            "\\fancyhead[R]{{\\textit{{{}}}}}\n",
+        let _ = writeln!(output,
+            "\\fancyhead[R]{{\\textit{{{}}}}}",
             escape_latex(&options.title)
         );
     }
@@ -33,10 +33,10 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
     output.push('\n');
 
     if !options.title.is_empty() {
-        let _ = write!(output,"\\title{{{}}}\n", escape_latex(&options.title));
+        let _ = writeln!(output,"\\title{{{}}}", escape_latex(&options.title));
     }
     if !options.author.is_empty() {
-        let _ = write!(output,"\\author{{{}}}\n", escape_latex(&options.author));
+        let _ = writeln!(output,"\\author{{{}}}", escape_latex(&options.author));
     }
     output.push_str("\\date{}\n\n");
     output.push_str("\\begin{document}\n\n");
@@ -167,7 +167,7 @@ fn markdown_to_latex(text: &str) -> String {
         // Unordered list item
         if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
             let content = convert_inline_formatting(&trimmed[2..]);
-            let _ = write!(output,"\\textbullet\\ {}\n", content);
+            let _ = writeln!(output,"\\textbullet\\ {}", content);
             continue;
         }
 

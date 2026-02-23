@@ -523,11 +523,11 @@ impl MatchContext {
         let mut output = String::new();
         for (i, line) in self.before.iter().enumerate() {
             let num = self.line_number - self.before.len() + i;
-            let _ = write!(output, "  {:>4} | {}\n", num, line);
+            let _ = writeln!(output, "  {:>4} | {}", num, line);
         }
-        let _ = write!(output, "> {:>4} | {}\n", self.line_number, self.matched_line);
+        let _ = writeln!(output, "> {:>4} | {}", self.line_number, self.matched_line);
         for (i, line) in self.after.iter().enumerate() {
-            let _ = write!(output, "  {:>4} | {}\n", self.line_number + 1 + i, line);
+            let _ = writeln!(output, "  {:>4} | {}", self.line_number + 1 + i, line);
         }
         output
     }

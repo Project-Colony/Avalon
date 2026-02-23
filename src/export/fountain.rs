@@ -9,11 +9,11 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
 
     // Title page metadata
     if options.include_front_matter {
-        let _ = write!(output,"Title: {}\n", options.title);
+        let _ = writeln!(output,"Title: {}", options.title);
         if !options.author.is_empty() {
-            let _ = write!(output,"Author: {}\n", options.author);
+            let _ = writeln!(output,"Author: {}", options.author);
         }
-        let _ = write!(output,"Draft date: {}\n", chrono::Utc::now().format("%Y-%m-%d"));
+        let _ = writeln!(output,"Draft date: {}", chrono::Utc::now().format("%Y-%m-%d"));
         output.push_str("Contact:\n");
         output.push('\n');
     }

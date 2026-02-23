@@ -787,10 +787,10 @@ impl Project {
             };
             if wc == 0 { return; }
 
-            if longest.as_ref().map_or(true, |(_, best)| wc > *best) {
+            if longest.as_ref().is_none_or(|(_, best)| wc > *best) {
                 longest = Some((item.title.clone(), wc));
             }
-            if shortest.as_ref().map_or(true, |(_, best)| wc < *best) {
+            if shortest.as_ref().is_none_or(|(_, best)| wc < *best) {
                 shortest = Some((item.title.clone(), wc));
             }
         });

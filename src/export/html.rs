@@ -11,8 +11,8 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
         if content.is_folder {
             let level = (content.depth + 1).min(6);
             let id = slug(&content.title);
-            let _ = write!(body,
-                "<h{} id=\"{}\" class=\"folder-heading depth-{}\">{}</h{}>\n",
+            let _ = writeln!(body,
+                "<h{} id=\"{}\" class=\"folder-heading depth-{}\">{}</h{}>",
                 level, id, content.depth, escape_html(&content.title), level
             );
         } else {
@@ -23,7 +23,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                 body.push_str(&separator_html(&options.separator));
             }
 
-            let _ = write!(body,"<div class=\"document\" data-index=\"{}\">\n", doc_index);
+            let _ = writeln!(body,"<div class=\"document\" data-index=\"{}\">", doc_index);
 
             // Convert markdown content to HTML
             let parser = Parser::new(&content.text);
@@ -110,14 +110,14 @@ fn build_front_matter(options: &CompileOptions) -> String {
     let mut fm = format!("<h1>{}</h1>\n", escape_html(&options.title));
 
     if !options.author.is_empty() {
-        let _ = write!(fm,
-            "<p class=\"author\">by {}</p>\n",
+        let _ = writeln!(fm,
+            "<p class=\"author\">by {}</p>",
             escape_html(&options.author)
         );
     }
 
-    let _ = write!(fm,
-        "<p class=\"date\">{}</p>\n",
+    let _ = writeln!(fm,
+        "<p class=\"date\">{}</p>",
         chrono::Local::now().format("%B %d, %Y")
     );
 
@@ -167,8 +167,8 @@ pub fn generate_toc(contents: &[CompileContent]) -> String {
         if content.is_folder || !content.text.is_empty() {
             let id = slug(&content.title);
             let indent = "  ".repeat(content.depth);
-            let _ = write!(toc,
-                "{}<li><a href=\"#{}\">{}</a></li>\n",
+            let _ = writeln!(toc,
+                "{}<li><a href=\"#{}\">{}</a></li>",
                 indent,
                 id,
                 escape_html(&content.title)
