@@ -5,7 +5,7 @@ use std::fmt::Write as FmtWrite;
 use anyhow::Result;
 use pulldown_cmark::{Parser, html::push_html};
 
-use super::compiler::{CompileContent, CompileOptions};
+use super::compiler::{self, CompileContent, CompileOptions};
 
 /// Save compiled content as an ePub file.
 /// ePub is essentially a ZIP with XHTML content, metadata, and a manifest.
@@ -220,13 +220,7 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
     Ok(())
 }
 
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
+fn escape_xml(s: &str) -> String { compiler::escape_xml(s) }
 
 /// Estimate the number of chapters that would be generated
 pub fn estimate_chapter_count(contents: &[CompileContent]) -> usize {
@@ -263,7 +257,7 @@ pub fn estimate_file_size(contents: &[CompileContent], options: &CompileOptions)
 
 /// Count total words across all ePub content
 pub fn word_count(contents: &[CompileContent]) -> usize {
-    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+    compiler::total_word_count(contents)
 }
 
 #[cfg(test)]

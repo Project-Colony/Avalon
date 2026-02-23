@@ -1,6 +1,6 @@
 use std::fmt::Write;
 use anyhow::Result;
-use super::compiler::{CompileContent, CompileOptions, SeparatorType};
+use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
 
 /// Compile to RTF (Rich Text Format)
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
@@ -186,7 +186,7 @@ pub fn estimate_output_size(contents: &[CompileContent], options: &CompileOption
 
 /// Count total words across all content sections
 pub fn word_count(contents: &[CompileContent]) -> usize {
-    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+    compiler::total_word_count(contents)
 }
 
 /// Count total characters across all content sections

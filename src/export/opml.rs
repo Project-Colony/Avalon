@@ -157,12 +157,7 @@ fn extract_attr(line: &str, attr_name: &str) -> Option<String> {
     None
 }
 
-fn escape_xml(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-}
+fn escape_xml(s: &str) -> String { super::compiler::escape_xml(s) }
 
 fn unescape_xml(s: &str) -> String {
     s.replace("&amp;", "&")

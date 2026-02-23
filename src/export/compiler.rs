@@ -743,6 +743,44 @@ fn plain_text_compile(contents: &[CompileContent], options: &CompileOptions) -> 
     super::plain_text::compile(contents, options)
 }
 
+// ── Shared utility functions used by multiple export modules ──
+
+/// Total word count across all content sections.
+pub fn total_word_count(contents: &[CompileContent]) -> usize {
+    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+}
+
+/// Escape special characters for XML output (epub, fdx, opml, mobi).
+pub fn escape_xml(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+/// Escape special characters for HTML output.
+pub fn escape_html(text: &str) -> String {
+    text.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
+}
+
+/// Create a URL-safe slug from a title (for anchor links / TOC entries).
+pub fn slug(title: &str) -> String {
+    title
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
+        .collect::<String>()
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

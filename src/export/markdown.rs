@@ -1,6 +1,6 @@
 use std::fmt::Write;
 use anyhow::Result;
-use super::compiler::{CompileContent, CompileOptions, SeparatorType};
+use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
     let mut output = String::new();
@@ -91,25 +91,11 @@ fn escape_yaml(s: &str) -> String {
      .replace('"', "\\\"")
 }
 
-/// Create a URL-safe slug from a title (for anchor links)
-fn slug(title: &str) -> String {
-    title
-        .to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '-' })
-        .collect::<String>()
-        .split('-')
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
-}
+fn slug(title: &str) -> String { compiler::slug(title) }
 
 /// Count total words across all content sections
 pub fn word_count(contents: &[CompileContent]) -> usize {
-    contents
-        .iter()
-        .map(|c| c.text.split_whitespace().count())
-        .sum()
+    compiler::total_word_count(contents)
 }
 
 /// Count total characters across all content sections

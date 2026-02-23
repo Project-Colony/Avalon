@@ -2,7 +2,7 @@ use std::path::Path;
 use anyhow::Result;
 use printpdf::*;
 
-use super::compiler::{CompileContent, CompileOptions, SeparatorType};
+use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
 
 pub fn save_pdf(contents: &[CompileContent], options: &CompileOptions, path: &Path) -> Result<()> {
     let (doc, page1, layer1) = PdfDocument::new(
@@ -168,7 +168,7 @@ fn strip_markdown(text: &str) -> String {
 
 /// Count total words across all content sections
 pub fn word_count(contents: &[CompileContent]) -> usize {
-    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+    compiler::total_word_count(contents)
 }
 
 /// Count total characters across all content sections

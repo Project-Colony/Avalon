@@ -2,7 +2,7 @@ use std::fmt::Write;
 use anyhow::Result;
 use pulldown_cmark::{Parser, html::push_html};
 
-use super::compiler::{CompileContent, CompileOptions};
+use super::compiler::{self, CompileContent, CompileOptions};
 
 /// Metadata for a MOBI/Kindle publication.
 #[derive(Debug, Clone)]
@@ -40,28 +40,8 @@ pub struct MobiChapter {
     pub anchor_id: String,
 }
 
-/// Escape XML/HTML special characters so that text is safe to embed in
-/// markup elements and attribute values.
-pub fn escape_xml(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
-
-/// Create a URL-safe anchor identifier from a title string.
-fn anchor_id(title: &str) -> String {
-    let slug: String = title
-        .to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '-' })
-        .collect();
-    slug.split('-')
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
-}
+pub fn escape_xml(text: &str) -> String { compiler::escape_xml(text) }
+fn anchor_id(title: &str) -> String { compiler::slug(title) }
 
 /// Organise flat `CompileContent` items into discrete chapters.
 ///

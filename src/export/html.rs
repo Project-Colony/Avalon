@@ -1,7 +1,7 @@
 use std::fmt::Write;
 use anyhow::Result;
 use pulldown_cmark::{Parser, html::push_html};
-use super::compiler::{CompileContent, CompileOptions, SeparatorType};
+use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
     let mut body = String::new();
@@ -137,27 +137,8 @@ fn separator_html(sep: &SeparatorType) -> String {
     }
 }
 
-/// Create a URL-safe slug from a title
-fn slug(title: &str) -> String {
-    title
-        .to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '-' })
-        .collect::<String>()
-        .split('-')
-        .filter(|s| !s.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
-}
-
-/// Escape HTML special characters
-fn escape_html(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#39;")
-}
+fn slug(title: &str) -> String { compiler::slug(title) }
+fn escape_html(text: &str) -> String { compiler::escape_html(text) }
 
 /// Generate a standalone HTML table of contents
 pub fn generate_toc(contents: &[CompileContent]) -> String {
@@ -182,7 +163,7 @@ pub fn generate_toc(contents: &[CompileContent]) -> String {
 
 /// Count total words across all content sections
 pub fn word_count(contents: &[CompileContent]) -> usize {
-    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+    compiler::total_word_count(contents)
 }
 
 /// Count total characters across all content sections

@@ -1,7 +1,7 @@
 use std::fmt::Write;
 use anyhow::Result;
 
-use super::compiler::{CompileContent, CompileOptions};
+use super::compiler::{self, CompileContent, CompileOptions};
 
 /// FinalDraft paragraph element types
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,14 +72,7 @@ impl FdxParagraph {
     }
 }
 
-/// Escape special XML characters in text
-pub fn escape_xml(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&apos;")
-}
+pub fn escape_xml(text: &str) -> String { compiler::escape_xml(text) }
 
 /// Compile content to FinalDraft (.fdx) XML format
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {

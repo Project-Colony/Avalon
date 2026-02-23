@@ -1,6 +1,6 @@
 use std::fmt::Write as _;
 use anyhow::Result;
-use super::compiler::{CompileContent, CompileOptions, SeparatorType};
+use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
     let mut output = String::new();
@@ -295,7 +295,7 @@ fn find_closing_single(chars: &[char], start: usize, c: char) -> Option<usize> {
 
 /// Count total words across all content sections
 pub fn word_count(contents: &[CompileContent]) -> usize {
-    contents.iter().map(|c| c.text.split_whitespace().count()).sum()
+    compiler::total_word_count(contents)
 }
 
 /// Estimate page count (LaTeX with double spacing, A4, 1-inch margins ~ 250 words/page)
