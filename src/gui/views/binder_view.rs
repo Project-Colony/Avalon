@@ -350,19 +350,7 @@ fn render_item(
         for child in &item.children {
             children_col = children_col.push(render_item(child, selected_id, depth + 1));
         }
-
-        // Wrap children with a left indent guide
-        let children_with_guide = row![
-            Space::with_width(indent + 6),
-            container(Space::with_width(0))
-                .style(theme::binder_indent_guide_style)
-                .width(1)
-                .height(Length::Fill),
-            Space::with_width(3),
-            children_col.width(Length::Fill),
-        ];
-
-        col = col.push(children_with_guide);
+        col = col.push(children_col);
     }
 
     col.into()
