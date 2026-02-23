@@ -409,11 +409,16 @@ pub fn create_web_page_item(html: &str, url: &str) -> BinderItem {
         );
     }
 
-    // Set synopsis to a preview of the content
-    let preview_len = 200;
+    // Set synopsis to a preview of the content (char-safe truncation)
+    let preview_chars = 200;
     let content = item.document.as_ref().map(|d| &d.content).cloned().unwrap_or_default();
-    if content.len() > preview_len {
-        item.synopsis = format!("{}...", content[..preview_len].trim_end());
+    let char_count = content.chars().count();
+    if char_count > preview_chars {
+        let byte_end = content
+            .char_indices()
+            .nth(preview_chars)
+            .map_or(content.len(), |(i, _)| i);
+        item.synopsis = format!("{}...", content[..byte_end].trim_end());
     } else {
         item.synopsis = content;
     }

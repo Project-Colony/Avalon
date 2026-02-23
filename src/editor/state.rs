@@ -359,7 +359,11 @@ impl EditorState {
     pub fn insert_at_cursor(&mut self, text: &str) {
         self.push_undo();
         let content = self.text();
-        let pos = self.cursor.min(content.len());
+        // Ensure pos lands on a valid char boundary
+        let mut pos = self.cursor.min(content.len());
+        while pos > 0 && !content.is_char_boundary(pos) {
+            pos -= 1;
+        }
         let new_content = format!("{}{}{}", &content[..pos], text, &content[pos..]);
         self.document.content = new_content.clone();
         self.content = iced::widget::text_editor::Content::with_text(&new_content);
@@ -372,6 +376,10 @@ impl EditorState {
         if let Some((start, end)) = self.selection_range() {
             self.push_undo();
             let text = self.text();
+            // Ensure boundaries are char-safe
+            if !text.is_char_boundary(start) || !text.is_char_boundary(end) {
+                return None;
+            }
             let deleted = text[start..end].to_string();
             let new_content = format!("{}{}", &text[..start], &text[end..]);
             self.document.content = new_content.clone();

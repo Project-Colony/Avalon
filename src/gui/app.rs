@@ -969,7 +969,9 @@ impl ScrineverApp {
                     };
 
                     if let Some(content) = split_content {
-                        let mid = content.len() / 2;
+                        // Find a char-boundary-safe midpoint
+                        let byte_mid = content.len() / 2;
+                        let mid = content.ceil_char_boundary(byte_mid);
                         let split_pos = content[mid..].find("\n\n")
                             .map_or(mid, |p| p + mid);
 
@@ -2155,18 +2157,35 @@ impl ScrineverApp {
                     if let Some(item) = project.binder.find_item(&item_id) {
                         if let Some(ref doc) = item.document {
                             if !self.doc_find_text.is_empty() {
-                                let content = if self.doc_find_case_sensitive {
-                                    doc.content.clone()
+                                if self.doc_find_case_sensitive {
+                                    for (pos, _) in doc.content.match_indices(&self.doc_find_text) {
+                                        self.doc_find_positions.push(pos);
+                                    }
                                 } else {
-                                    doc.content.to_lowercase()
-                                };
-                                let query = if self.doc_find_case_sensitive {
-                                    self.doc_find_text.clone()
-                                } else {
-                                    self.doc_find_text.to_lowercase()
-                                };
-                                for (pos, _) in content.match_indices(&query) {
-                                    self.doc_find_positions.push(pos);
+                                    // Case-insensitive: match char-by-char to get byte offsets
+                                    // in the *original* string (avoids lowered/original byte mismatch)
+                                    let find_lower: Vec<char> = self.doc_find_text.to_lowercase().chars().collect();
+                                    if !find_lower.is_empty() {
+                                        let content_ci: Vec<(usize, char)> = doc.content.char_indices().collect();
+                                        let mut i = 0;
+                                        while i + find_lower.len() <= content_ci.len() {
+                                            let mut matched = true;
+                                            for (fi, &fc) in find_lower.iter().enumerate() {
+                                                let cc_lower: Vec<char> = content_ci[i + fi].1.to_lowercase().collect();
+                                                if cc_lower.len() != 1 || cc_lower[0] != fc {
+                                                    matched = false;
+                                                    break;
+                                                }
+                                            }
+                                            if matched {
+                                                // Record byte offset of match start in original string
+                                                self.doc_find_positions.push(content_ci[i].0);
+                                                i += find_lower.len();
+                                            } else {
+                                                i += 1;
+                                            }
+                                        }
+                                    }
                                 }
                                 self.doc_find_match_count = self.doc_find_positions.len();
                             } else {
@@ -2218,13 +2237,24 @@ impl ScrineverApp {
                         if let Some(item) = project.binder.find_item_mut(&item_id) {
                             if let Some(ref mut doc) = item.document {
                                 let pos = self.doc_find_positions[self.doc_find_current_match];
-                                let find_len = self.doc_find_text.len();
-                                if pos + find_len <= doc.content.len() {
+                                // Compute byte length of the matched region in the original string.
+                                // For case-sensitive this equals self.doc_find_text.len();
+                                // for case-insensitive the original chars may differ in byte width.
+                                let find_char_count = self.doc_find_text.chars().count();
+                                let find_len = doc.content[pos..]
+                                    .char_indices()
+                                    .nth(find_char_count)
+                                    .map_or(doc.content.len() - pos, |(byte_off, _)| byte_off);
+                                let end = pos + find_len;
+                                if end <= doc.content.len()
+                                    && doc.content.is_char_boundary(pos)
+                                    && doc.content.is_char_boundary(end)
+                                {
                                     doc.content = format!(
                                         "{}{}{}",
                                         &doc.content[..pos],
                                         self.doc_replace_text,
-                                        &doc.content[pos + find_len..]
+                                        &doc.content[end..]
                                     );
                                     self.editor.load_document(doc);
                                     self.editor.mark_dirty();
@@ -2261,18 +2291,40 @@ impl ScrineverApp {
                                 if self.doc_find_case_sensitive {
                                     doc.content = doc.content.replace(&self.doc_find_text, &self.doc_replace_text);
                                 } else {
-                                    // Case-insensitive replace
-                                    let lower_content = doc.content.to_lowercase();
-                                    let lower_find = self.doc_find_text.to_lowercase();
-                                    let mut result = String::new();
-                                    let mut last_end = 0;
-                                    for (start, _) in lower_content.match_indices(&lower_find) {
-                                        result.push_str(&doc.content[last_end..start]);
-                                        result.push_str(&self.doc_replace_text);
-                                        last_end = start + self.doc_find_text.len();
+                                    // Case-insensitive replace using char-by-char matching
+                                    let find_lower: Vec<char> = self.doc_find_text.to_lowercase().chars().collect();
+                                    if !find_lower.is_empty() {
+                                        let mut result = String::new();
+                                        let content_chars: Vec<(usize, char)> = doc.content.char_indices().collect();
+                                        let mut i = 0;
+                                        while i < content_chars.len() {
+                                            let mut matched = true;
+                                            let mut fi = 0;
+                                            let mut ci = i;
+                                            for &fc in &find_lower {
+                                                if ci >= content_chars.len() {
+                                                    matched = false;
+                                                    break;
+                                                }
+                                                let cc_lower: Vec<char> = content_chars[ci].1.to_lowercase().collect();
+                                                if cc_lower.len() == 1 && cc_lower[0] == fc {
+                                                    ci += 1;
+                                                    fi += 1;
+                                                } else {
+                                                    matched = false;
+                                                    break;
+                                                }
+                                            }
+                                            if matched && fi == find_lower.len() {
+                                                result.push_str(&self.doc_replace_text);
+                                                i = ci;
+                                            } else {
+                                                result.push(content_chars[i].1);
+                                                i += 1;
+                                            }
+                                        }
+                                        doc.content = result;
                                     }
-                                    result.push_str(&doc.content[last_end..]);
-                                    doc.content = result;
                                 }
                                 self.editor.load_document(doc);
                                 self.editor.mark_dirty();
@@ -2863,8 +2915,15 @@ impl ScrineverApp {
                     if let Some(item) = project.binder.find_item_mut(&item_id) {
                         if let Some(ref mut doc) = item.document {
                             // Find the misspelled word at or near the given position and replace it
-                            if let Some(start) = doc.content[position..].find(&misspelled) {
-                                let actual_pos = position + start;
+                            let safe_pos = if position <= doc.content.len() && doc.content.is_char_boundary(position) {
+                                position
+                            } else {
+                                // Snap to nearest valid char boundary
+                                doc.content.ceil_char_boundary(position.min(doc.content.len()))
+                            };
+                            if safe_pos < doc.content.len() {
+                            if let Some(start) = doc.content[safe_pos..].find(&misspelled) {
+                                let actual_pos = safe_pos + start;
                                 let end_pos = actual_pos + misspelled.len();
                                 doc.content = format!(
                                     "{}{}{}",
@@ -2883,6 +2942,7 @@ impl ScrineverApp {
                                     !(r.word == misspelled && r.position == position)
                                 });
                             }
+                            } // safe_pos < doc.content.len()
                         }
                     }
                 }
