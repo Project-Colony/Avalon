@@ -30,7 +30,7 @@ pub fn view(
     ];
 
     let input = text_input("Look up a word...", query)
-        .on_input(|val| Message::ThesaurusQueryChanged(val))
+        .on_input(Message::ThesaurusQueryChanged)
         .on_submit(Message::DoThesaurusLookup)
         .size(13)
         .padding(6)

@@ -167,14 +167,12 @@ fn convert_basic_markdown(text: &str) -> String {
                     result.push_str("\\b ");
                     in_bold = true;
                 }
+            } else if in_italic {
+                result.push_str("\\i0 ");
+                in_italic = false;
             } else {
-                if in_italic {
-                    result.push_str("\\i0 ");
-                    in_italic = false;
-                } else {
-                    result.push_str("\\i ");
-                    in_italic = true;
-                }
+                result.push_str("\\i ");
+                in_italic = true;
             }
         } else {
             result.push(ch);

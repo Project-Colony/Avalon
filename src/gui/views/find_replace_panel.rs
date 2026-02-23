@@ -60,14 +60,14 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
     ];
 
     let find_input = text_input("Find in document...", &data.find_text)
-        .on_input(|val| Message::DocFindChanged(val))
+        .on_input(Message::DocFindChanged)
         .on_submit(Message::DocFindNext)
         .size(12)
         .padding(4)
         .width(Length::FillPortion(3));
 
     let replace_input = text_input("Replace with...", &data.replace_text)
-        .on_input(|val| Message::DocReplaceChanged(val))
+        .on_input(Message::DocReplaceChanged)
         .size(12)
         .padding(4)
         .width(Length::FillPortion(3));

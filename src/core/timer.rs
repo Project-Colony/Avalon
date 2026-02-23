@@ -190,12 +190,11 @@ impl WritingTimer {
 
     /// Check the timer (call on tick) — returns true if timer just completed
     pub fn tick(&mut self) -> bool {
-        if self.state == TimerState::Running {
-            if self.elapsed().as_secs() >= self.duration_secs {
+        if self.state == TimerState::Running
+            && self.elapsed().as_secs() >= self.duration_secs {
                 self.state = TimerState::Completed;
                 return true;
             }
-        }
         false
     }
 

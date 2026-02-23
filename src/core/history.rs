@@ -164,7 +164,7 @@ impl WritingHistory {
 
     /// Check if user has written today
     pub fn wrote_today(&self) -> bool {
-        self.today().map_or(false, |e| e.words_written > 0)
+        self.today().is_some_and(|e| e.words_written > 0)
     }
 
     /// Average writing time per session in minutes

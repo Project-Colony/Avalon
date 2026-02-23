@@ -720,7 +720,7 @@ impl ScrineverApp {
                     if let Ok(entries) = std::fs::read_dir(&projects_dir) {
                         for entry in entries.flatten() {
                             let path = entry.path();
-                            if path.is_dir() && path.extension().map_or(false, |e| e == "scriv") {
+                            if path.is_dir() && path.extension().is_some_and(|e| e == "scriv") {
                                 match Project::load(&path) {
                                     Ok(p) => {
                                         self.compile_options.title = p.title.clone();
@@ -3295,10 +3295,8 @@ impl ScrineverApp {
             Message::SmartPaste(text) => {
                 // Clean up pasted text: normalize whitespace, fix smart quotes, etc.
                 let cleaned = text
-                    .replace('\u{201C}', "\"")  // left double quote
-                    .replace('\u{201D}', "\"")  // right double quote
-                    .replace('\u{2018}', "'")   // left single quote
-                    .replace('\u{2019}', "'")   // right single quote
+                    .replace(['\u{201C}', '\u{201D}'], "\"")  // right double quote
+                    .replace(['\u{2018}', '\u{2019}'], "'")   // right single quote
                     .replace('\u{2013}', "--")  // en dash
                     .replace('\u{2014}', "---") // em dash
                     .replace('\u{2026}', "...") // ellipsis
@@ -3342,7 +3340,7 @@ impl ScrineverApp {
             Message::NewDocFromTemplate(template_id) => {
                 if let Some(ref mut project) = self.project {
                     if let Some(template) = crate::core::doc_templates::find_template(&template_id) {
-                        let item = template.create_item(&template.name);
+                        let item = template.create_item(template.name);
                         let new_id = item.id;
 
                         if let Some(sel_id) = self.selected_item {
@@ -3455,7 +3453,7 @@ impl ScrineverApp {
                 }
 
                 // Word count milestone detection (every 5 seconds)
-                if self.auto_save_counter % 5 == 0 {
+                if self.auto_save_counter.is_multiple_of(5) {
                     if let Some(ref project) = self.project {
                         let total_words = project.binder.total_word_count();
                         let milestones = [1000, 5000, 10000, 25000, 50000, 75000, 100000, 150000, 200000];
@@ -3494,7 +3492,7 @@ impl ScrineverApp {
                     }
 
                     // Check daily goal milestone
-                    if self.daily_goal > 0 && self.session_stats.time_elapsed_seconds % 10 == 0 {
+                    if self.daily_goal > 0 && self.session_stats.time_elapsed_seconds.is_multiple_of(10) {
                         let words_today = self.session_stats.words_written;
                         let daily_goal = self.daily_goal as i64;
                         if words_today >= daily_goal && (words_today - 10) < daily_goal {
@@ -3506,7 +3504,7 @@ impl ScrineverApp {
                     }
 
                     // Record writing history every 60 seconds
-                    if self.session_stats.time_elapsed_seconds % 60 == 0 {
+                    if self.session_stats.time_elapsed_seconds.is_multiple_of(60) {
                         if let Some(ref mut project) = self.project {
                             project.writing_history.record(current_words, 60);
                         }
@@ -3521,8 +3519,8 @@ impl ScrineverApp {
                 }
 
                 // Writing focus timer tick
-                if self.writing_timer.is_running() {
-                    if self.writing_timer.tick() {
+                if self.writing_timer.is_running()
+                    && self.writing_timer.tick() {
                         // Timer completed - auto-stop and record session
                         let word_count = self.current_word_count();
                         self.writing_timer.stop(word_count);
@@ -3532,10 +3530,9 @@ impl ScrineverApp {
                             summary
                         ));
                     }
-                }
 
                 // Auto-refresh smart collections every 30 seconds when collections panel is open
-                if self.bottom_panel == BottomPanel::Collections && self.auto_save_counter % 30 == 0 {
+                if self.bottom_panel == BottomPanel::Collections && self.auto_save_counter.is_multiple_of(30) {
                     if let Some(ref mut project) = self.project {
                         for coll in &mut project.collections {
                             if let crate::core::collection::CollectionKind::Search { ref query, case_sensitive, whole_word } = coll.kind {

@@ -330,7 +330,7 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
 
     // ── Notes & Keywords ────────────────────────────────────────
     let notes_input = text_input("Document notes...", &data.notes)
-        .on_input(|val| Message::NotesChanged(val))
+        .on_input(Message::NotesChanged)
         .size(12)
         .padding(6);
 

@@ -42,7 +42,7 @@ pub fn validate_project(binder: &Binder) -> ProjectValidation {
 }
 
 fn count_items(item: &BinderItem) -> usize {
-    1 + item.children.iter().map(|c| count_items(c)).sum::<usize>()
+    1 + item.children.iter().map(count_items).sum::<usize>()
 }
 
 fn check_duplicate_ids(binder: &Binder, issues: &mut Vec<ValidationIssue>) {

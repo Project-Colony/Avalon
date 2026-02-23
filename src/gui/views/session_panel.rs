@@ -111,7 +111,7 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
     // Session goal
     let goal_label = text("Session Goal:").size(11).color(Theme::TEXT_MUTED);
     let goal_input = text_input("e.g. 1000", &data.session_goal_text)
-        .on_input(|val| Message::SessionSetGoal(val))
+        .on_input(Message::SessionSetGoal)
         .size(12)
         .padding(4)
         .width(Length::Fixed(100.0));

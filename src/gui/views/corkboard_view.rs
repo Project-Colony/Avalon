@@ -222,7 +222,7 @@ fn render_card(item: &BinderItem) -> Element<'static, Message> {
 
     // Snapshot and notes indicators
     let has_notes = item.document.as_ref()
-        .map_or(false, |d| !d.notes.trim().is_empty());
+        .is_some_and(|d| !d.notes.trim().is_empty());
 
     let mut indicator_parts: Vec<String> = Vec::new();
     if !item.snapshots.is_empty() {

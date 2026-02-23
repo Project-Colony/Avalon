@@ -63,7 +63,7 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
 
     // New collection input
     let new_input = text_input("New collection name...", &data.new_collection_name)
-        .on_input(|val| Message::CollectionNameInput(val))
+        .on_input(Message::CollectionNameInput)
         .size(12)
         .padding(4)
         .width(Length::FillPortion(3));

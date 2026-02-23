@@ -138,7 +138,7 @@ pub fn save_pdf(contents: &[CompileContent], options: &CompileOptions, path: &Pa
 /// Add a page number footer to the current layer
 fn add_page_number(layer: &PdfLayerReference, page_num: usize, font: &IndirectFontRef) {
     layer.use_text(
-        &format!("- {} -", page_num),
+        format!("- {} -", page_num),
         10.0,
         Mm(100.0),
         Mm(15.0),

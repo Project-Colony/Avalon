@@ -32,7 +32,7 @@ pub fn view<'a>(
     .width(Length::Fill);
 
     let primary = text_editor(&primary_editor.content)
-        .on_action(|action| Message::EditorAction(action))
+        .on_action(Message::EditorAction)
         .padding(Padding::from([12, 16]))
         .height(Length::Fill);
 

@@ -171,7 +171,7 @@ fn unescape_xml(s: &str) -> String {
 
 /// Count the total number of outline items in a binder tree
 pub fn count_items(item: &BinderItem) -> usize {
-    1 + item.children.iter().map(|c| count_items(c)).sum::<usize>()
+    1 + item.children.iter().map(count_items).sum::<usize>()
 }
 
 /// Count the depth of the deepest item in the tree
@@ -179,7 +179,7 @@ pub fn max_depth(item: &BinderItem) -> usize {
     if item.children.is_empty() {
         0
     } else {
-        1 + item.children.iter().map(|c| max_depth(c)).max().unwrap_or(0)
+        1 + item.children.iter().map(max_depth).max().unwrap_or(0)
     }
 }
 

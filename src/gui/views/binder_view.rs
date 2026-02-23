@@ -203,7 +203,7 @@ fn render_section(
 /// Count documents in a binder section (recursive)
 fn count_docs(item: &BinderItem) -> usize {
     let self_count = if item.kind == BinderItemKind::Text { 1 } else { 0 };
-    self_count + item.children.iter().map(|c| count_docs(c)).sum::<usize>()
+    self_count + item.children.iter().map(count_docs).sum::<usize>()
 }
 
 /// Render a single binder item and its children

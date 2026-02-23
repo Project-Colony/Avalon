@@ -26,7 +26,7 @@ pub fn view(data: &WritingGoalsData) -> Element<'static, Message> {
     // Daily goal
     let daily_label = text("Daily Goal").size(11).color(Theme::TEXT_MUTED);
     let daily_input = text_input("e.g. 1000", &data.daily_goal_text)
-        .on_input(|val| Message::SetDailyGoal(val))
+        .on_input(Message::SetDailyGoal)
         .size(12)
         .padding(4)
         .width(Length::Fixed(100.0));
@@ -58,7 +58,7 @@ pub fn view(data: &WritingGoalsData) -> Element<'static, Message> {
     // Weekly goal
     let weekly_label = text("Weekly Goal").size(11).color(Theme::TEXT_MUTED);
     let weekly_input = text_input("e.g. 5000", &data.weekly_goal_text)
-        .on_input(|val| Message::SetWeeklyGoal(val))
+        .on_input(Message::SetWeeklyGoal)
         .size(12)
         .padding(4)
         .width(Length::Fixed(100.0));

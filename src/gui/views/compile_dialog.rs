@@ -21,21 +21,21 @@ pub fn view(options: &CompileOptions, presets: &[(String, CompileOptions)]) -> E
     let format_picker = pick_list(
         format_options,
         Some(current_format),
-        |selected| Message::CompileSetFormat(selected),
+        Message::CompileSetFormat,
     )
     .width(Length::Fixed(200.0));
 
     // Title
     let title_label = text("Title").size(12).color(Theme::TEXT_MUTED);
     let title_input = text_input("Document title...", &options.title)
-        .on_input(|val| Message::CompileSetTitle(val))
+        .on_input(Message::CompileSetTitle)
         .size(14)
         .padding(6);
 
     // Author
     let author_label = text("Author").size(12).color(Theme::TEXT_MUTED);
     let author_input = text_input("Author name...", &options.author)
-        .on_input(|val| Message::CompileSetAuthor(val))
+        .on_input(Message::CompileSetAuthor)
         .size(14)
         .padding(6);
 
@@ -51,7 +51,7 @@ pub fn view(options: &CompileOptions, presets: &[(String, CompileOptions)]) -> E
     let font_picker = pick_list(
         font_options,
         Some(options.font_family.clone()),
-        |selected| Message::CompileSetFontFamily(selected),
+        Message::CompileSetFontFamily,
     )
     .width(Length::Fixed(200.0));
 
@@ -59,7 +59,7 @@ pub fn view(options: &CompileOptions, presets: &[(String, CompileOptions)]) -> E
     let font_size_label = text("Font Size").size(12).color(Theme::TEXT_MUTED);
     let font_size_str = format!("{:.0}", options.font_size);
     let font_size_input = text_input("12", &font_size_str)
-        .on_input(|val| Message::CompileSetFontSize(val))
+        .on_input(Message::CompileSetFontSize)
         .size(14)
         .padding(6)
         .width(Length::Fixed(80.0));
@@ -82,30 +82,30 @@ pub fn view(options: &CompileOptions, presets: &[(String, CompileOptions)]) -> E
     let sep_picker = pick_list(
         sep_options,
         Some(current_sep.to_string()),
-        |selected| Message::CompileSetSeparator(selected),
+        Message::CompileSetSeparator,
     )
     .width(Length::Fixed(200.0));
 
     // Options
     let front_matter_toggle = toggler(options.include_front_matter)
         .label("Include front matter (title page)")
-        .on_toggle(|val| Message::CompileSetFrontMatter(val));
+        .on_toggle(Message::CompileSetFrontMatter);
 
     let compile_marked_toggle = toggler(options.compile_marked_only)
         .label("Only compile marked documents")
-        .on_toggle(|val| Message::CompileSetMarkedOnly(val));
+        .on_toggle(Message::CompileSetMarkedOnly);
 
     let page_break_toggle = toggler(options.page_break_between_folders)
         .label("Page break between chapters")
-        .on_toggle(|val| Message::CompileSetPageBreaks(val));
+        .on_toggle(Message::CompileSetPageBreaks);
 
     let toc_toggle = toggler(options.include_toc)
         .label("Include table of contents")
-        .on_toggle(|val| Message::CompileSetToc(val));
+        .on_toggle(Message::CompileSetToc);
 
     let placeholders_toggle = toggler(options.replace_placeholders)
         .label("Replace placeholders (<$n>, <$date>, etc.)")
-        .on_toggle(|val| Message::CompileSetPlaceholders(val));
+        .on_toggle(Message::CompileSetPlaceholders);
 
     // Buttons
     let compile_btn = button(

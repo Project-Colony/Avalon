@@ -193,7 +193,7 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
                     text(format!("{}.", i + 1)).size(9).color(Theme::TEXT_MUTED).width(Length::Fixed(16.0)),
                     text(status_icon).size(9).color(status_color),
                     Space::with_width(4),
-                    text(format!("{}", session.preset.label())).size(9).color(Theme::TEXT_MUTED),
+                    text(session.preset.label().to_string()).size(9).color(Theme::TEXT_MUTED),
                     Space::with_width(4),
                     text(format!("{:.1}m", duration_mins)).size(9).color(Theme::TEXT_SECONDARY),
                     Space::with_width(4),

@@ -180,7 +180,7 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
         text("Set deadline:").size(11).color(Theme::TEXT_MUTED),
         Space::with_width(4),
         text_input("YYYY-MM-DD", &data.deadline)
-            .on_input(|val| Message::SettingsSetDeadline(val))
+            .on_input(Message::SettingsSetDeadline)
             .size(11)
             .padding(4)
             .width(Length::Fixed(120.0)),

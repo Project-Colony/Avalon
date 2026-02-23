@@ -149,11 +149,11 @@ impl EditorState {
         }
         let bytes = text.as_bytes();
         let mut start = pos;
-        while start > 0 && bytes.get(start - 1).map_or(false, |b| b.is_ascii_alphanumeric() || *b == b'_') {
+        while start > 0 && bytes.get(start - 1).is_some_and(|b| b.is_ascii_alphanumeric() || *b == b'_') {
             start -= 1;
         }
         let mut end = pos;
-        while end < text.len() && bytes.get(end).map_or(false, |b| b.is_ascii_alphanumeric() || *b == b'_') {
+        while end < text.len() && bytes.get(end).is_some_and(|b| b.is_ascii_alphanumeric() || *b == b'_') {
             end += 1;
         }
         if start < end {
@@ -469,11 +469,10 @@ impl EditorState {
     pub fn transpose_chars(&mut self) {
         let text = self.document.content.clone();
         let pos = self.cursor;
-        if pos == 0 || pos >= text.len() {
-            if pos < 2 || text.len() < 2 {
+        if (pos == 0 || pos >= text.len())
+            && (pos < 2 || text.len() < 2) {
                 return;
             }
-        }
 
         let swap_pos = if pos >= text.len() { pos - 2 } else { pos.saturating_sub(1) };
         let bytes = text.as_bytes();

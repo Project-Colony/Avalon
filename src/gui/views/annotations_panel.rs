@@ -37,7 +37,7 @@ pub fn view(
     // Add annotation input
     let input_row = row![
         text_input("Add a comment or note...", new_annotation_text)
-            .on_input(|val| Message::AnnotationTextInput(val))
+            .on_input(Message::AnnotationTextInput)
             .size(12)
             .padding(4)
             .width(Length::FillPortion(3)),
