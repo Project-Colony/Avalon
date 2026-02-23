@@ -10,12 +10,12 @@ use crate::gui::theme::Theme;
 /// Render the outliner view — a hierarchical table with section numbering
 pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>) -> Element<'static, Message> {
     let total_words = draft.total_word_count();
-    let doc_count_header = count_text_items(draft);
+    let doc_count = count_text_items(draft);
 
     let header_info = container(
         row![
             text(format!("\u{f0ea} Outliner: {} docs | {} words | {:.1} pages",
-                doc_count_header, total_words, total_words as f64 / 250.0))
+                doc_count, total_words, total_words as f64 / 250.0))
                 .size(12)
                 .color(Theme::TEXT_SECONDARY),
             Space::with_width(Length::Fill),
@@ -50,7 +50,6 @@ pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>) -> Element<'stat
     }
 
     // Summary footer with target completion stats
-    let doc_count = count_text_items(draft);
     let targeted_count = targets.len();
     let completed_targets = targets.iter()
         .filter(|(id, target)| {
@@ -208,7 +207,7 @@ fn collect_outline_rows(
         text(synopsis).size(10).color(Theme::TEXT_MUTED).width(Length::FillPortion(3)),
         text(status).size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(2)),
         text(label).size(11).color(label_color).width(Length::FillPortion(2)),
-        text(format!("{}", word_count)).size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
+        text(word_count.to_string()).size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
         text(format!("{} ({})", target_text, progress_text)).size(11).color(progress_color).width(Length::FillPortion(2)),
         text(pages_text).size(11).color(Theme::TEXT_MUTED).width(Length::FillPortion(1)),
         text(compile_text).size(11).color(compile_color).width(Length::FillPortion(1)),

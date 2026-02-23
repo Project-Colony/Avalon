@@ -130,6 +130,7 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
             let mut added = 0usize;
             let mut removed = 0usize;
             let mut unchanged = 0usize;
+            let current_words = current_content.split_whitespace().count();
 
             let mut diff_col = column![
                 row![
@@ -139,7 +140,7 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
                     Space::with_width(Length::Fill),
                     text(format!("Snapshot: {} words | Current: {} words",
                         snapshot.word_count,
-                        current_content.split_whitespace().count()
+                        current_words
                     ))
                     .size(10)
                     .color(Theme::TEXT_MUTED),
@@ -195,11 +196,10 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
             let net_text = if net_change > 0 {
                 format!("+{}", net_change)
             } else {
-                format!("{}", net_change)
+                net_change.to_string()
             };
 
             // Compute word count difference
-            let current_words = current_content.split_whitespace().count();
             let word_diff = current_words as i64 - snapshot.word_count as i64;
             let word_diff_text = if word_diff > 0 {
                 format!("+{} words", word_diff)

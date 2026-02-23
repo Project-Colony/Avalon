@@ -204,10 +204,9 @@ impl SearchResult {
     /// Get context lines around a match (with surrounding text)
     pub fn context_preview(&self, match_index: usize, max_len: usize) -> String {
         if let Some(m) = self.matches.get(match_index) {
-            if m.context.len() <= max_len {
-                m.context.clone()
-            } else {
-                format!("{}...", &m.context[..max_len])
+            match m.context.char_indices().nth(max_len) {
+                None => m.context.clone(),
+                Some((byte_idx, _)) => format!("{}...", &m.context[..byte_idx]),
             }
         } else {
             String::new()

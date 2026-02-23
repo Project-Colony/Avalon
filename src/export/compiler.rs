@@ -781,6 +781,15 @@ pub fn slug(title: &str) -> String {
         .join("-")
 }
 
+/// Decode the five standard XML entities back to characters.
+pub fn decode_xml_entities(text: &str) -> String {
+    text.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&apos;", "'")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

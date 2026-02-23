@@ -96,7 +96,7 @@ impl InspectorData {
                 .map(|f| {
                     let val = match &f.value {
                         crate::core::metadata::CustomFieldValue::Text(t) => t.clone(),
-                        crate::core::metadata::CustomFieldValue::Number(n) => format!("{}", n),
+                        crate::core::metadata::CustomFieldValue::Number(n) => n.to_string(),
                         crate::core::metadata::CustomFieldValue::Checkbox(b) => if *b { "Yes".to_string() } else { "No".to_string() },
                         crate::core::metadata::CustomFieldValue::Date(d) => d.clone(),
                         crate::core::metadata::CustomFieldValue::List(l) => l.join(", "),

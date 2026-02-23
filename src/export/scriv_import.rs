@@ -62,11 +62,7 @@ pub struct ScrivNode {
 
 /// Decode the five standard XML entities.
 fn decode_xml_entities(text: &str) -> String {
-    text.replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
+    super::compiler::decode_xml_entities(text)
 }
 
 /// Extract the value of a named attribute from an XML tag string.

@@ -181,11 +181,7 @@ fn find_tag_start(xml: &str, tag_name: &str) -> Option<usize> {
 
 /// Decode basic XML entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&apos;`).
 fn decode_xml_entities(text: &str) -> String {
-    text.replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", "\"")
-        .replace("&apos;", "'")
+    super::compiler::decode_xml_entities(text)
 }
 
 /// Build a flat text string from the parsed paragraphs, joining each non-empty
