@@ -153,12 +153,12 @@ impl ExternalChangeTracker {
             match event {
                 WatchEvent::FileModified(path) | WatchEvent::FileCreated(path) => {
                     self.modified_paths.push(path.clone());
-                    if path.file_name().map_or(false, |n| n == "project.json") {
+                    if path.file_name().is_some_and(|n| n == "project.json") {
                         self.project_metadata_changed = true;
                     }
-                    if path.extension().map_or(false, |e| e == "json") {
+                    if path.extension().is_some_and(|e| e == "json") {
                         if let Some(parent) = path.parent() {
-                            if parent.file_name().map_or(false, |n| n == "docs") {
+                            if parent.file_name().is_some_and(|n| n == "docs") {
                                 self.documents_changed.push(path.clone());
                             }
                         }

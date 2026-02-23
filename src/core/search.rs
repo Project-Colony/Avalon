@@ -501,7 +501,7 @@ pub fn search_empty_documents(binder: &Binder) -> Vec<(Uuid, String)> {
     binder.all_items().into_iter()
         .filter(|item| item.kind == super::binder::BinderItemKind::Text)
         .filter(|item| {
-            item.document.as_ref().map_or(true, |doc| doc.content.trim().is_empty())
+            item.document.as_ref().is_none_or(|doc| doc.content.trim().is_empty())
         })
         .map(|item| (item.id, item.title.clone()))
         .collect()
@@ -550,8 +550,8 @@ pub fn levenshtein_distance(a: &str, b: &str) -> usize {
     let mut prev = vec![0usize; m + 1];
     let mut curr = vec![0usize; m + 1];
 
-    for j in 0..=m {
-        prev[j] = j;
+    for (j, val) in prev.iter_mut().enumerate().take(m + 1) {
+        *val = j;
     }
 
     for i in 1..=n {

@@ -781,10 +781,10 @@ impl Project {
             };
             if wc == 0 { continue; }
 
-            if longest.map_or(true, |(_, best)| wc > best) {
+            if longest.is_none_or(|(_, best)| wc > best) {
                 longest = Some((item.title.as_str(), wc));
             }
-            if shortest.map_or(true, |(_, best)| wc < best) {
+            if shortest.is_none_or(|(_, best)| wc < best) {
                 shortest = Some((item.title.as_str(), wc));
             }
         }

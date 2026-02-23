@@ -52,42 +52,10 @@ fn prose_to_fountain(text: &str) -> String {
             continue;
         }
 
-        // Already a scene heading
-        if is_scene_heading(line) {
-            output.push_str(line);
-            output.push('\n');
-        }
-        // Already a transition (ends with TO:)
-        else if is_transition(line) {
-            output.push_str(line);
-            output.push('\n');
-        }
-        // ALL CAPS line followed by non-empty = character cue
-        else if is_character_cue(line) && i + 1 < lines.len() && !lines[i + 1].trim().is_empty() {
-            output.push_str(line);
-            output.push('\n');
-        }
-        // Centered text
-        else if line.starts_with('>') && line.ends_with('<') {
-            output.push_str(line);
-            output.push('\n');
-        }
-        // Parenthetical
-        else if line.starts_with('(') && line.ends_with(')') {
-            output.push_str(line);
-            output.push('\n');
-        }
-        // Note
-        else if line.starts_with("[[") && line.ends_with("]]") {
-            output.push_str(line);
-            output.push('\n');
-        }
-        // Page break
-        else if line == "===" || line == "---" {
+        // Normalize page breaks to Fountain standard; pass everything else through
+        if line == "===" || line == "---" {
             output.push_str("===\n");
-        }
-        // Regular action text
-        else {
+        } else {
             output.push_str(line);
             output.push('\n');
         }

@@ -85,7 +85,7 @@ impl AutoSaveManager {
     pub fn should_backup(&self) -> bool {
         self.backup_every_n_saves > 0
             && self.save_count > 0
-            && self.save_count % self.backup_every_n_saves as u64 == 0
+            && self.save_count.is_multiple_of(self.backup_every_n_saves as u64)
     }
 
     /// Whether there are unsaved changes

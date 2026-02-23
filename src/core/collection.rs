@@ -311,7 +311,7 @@ impl CollectionManager {
     /// Get collections sorted by item count (descending)
     pub fn sorted_by_count(&self) -> Vec<&Collection> {
         let mut sorted: Vec<&Collection> = self.collections.iter().collect();
-        sorted.sort_by(|a, b| b.count().cmp(&a.count()));
+        sorted.sort_by_key(|b| std::cmp::Reverse(b.count()));
         sorted
     }
 

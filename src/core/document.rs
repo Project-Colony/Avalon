@@ -221,7 +221,7 @@ impl Document {
     /// Get all unique words in the document
     pub fn unique_words(&self) -> Vec<String> {
         let set: BTreeSet<String> = self.content.split_whitespace()
-            .map(|w| Self::clean_word(w))
+            .map(Self::clean_word)
             .filter(|w| !w.is_empty())
             .collect();
         set.into_iter().collect()
@@ -352,7 +352,7 @@ impl Document {
     /// Get bigrams (two-word phrases) and their frequencies
     pub fn bigrams(&self) -> Vec<(String, usize)> {
         let words: Vec<String> = self.content.split_whitespace()
-            .map(|w| Self::clean_word(w))
+            .map(Self::clean_word)
             .filter(|w| !w.is_empty())
             .collect();
 
@@ -377,7 +377,7 @@ impl Document {
     /// Analyze sentence length variety (standard deviation of sentence lengths)
     pub fn sentence_length_variety(&self) -> f64 {
         let lengths: Vec<f64> = self.content
-            .split(|c: char| matches!(c, '.' | '!' | '?'))
+            .split(['.', '!', '?'])
             .filter(|s| !s.trim().is_empty())
             .map(|s| s.split_whitespace().count() as f64)
             .collect();
@@ -415,7 +415,7 @@ impl Document {
     pub fn repeated_paragraph_starts(&self) -> Vec<(String, usize)> {
         let mut starts = HashMap::new();
         for para in self.content.split("\n\n") {
-            if let Some(first_word) = para.trim().split_whitespace().next() {
+            if let Some(first_word) = para.split_whitespace().next() {
                 let clean = first_word.to_lowercase();
                 *starts.entry(clean).or_default() += 1;
             }
@@ -467,7 +467,7 @@ impl Document {
     /// Find exact duplicate sentences.
     pub fn duplicate_sentences(&self) -> Vec<(String, usize)> {
         let mut freq: HashMap<String, usize> = HashMap::new();
-        for sentence in self.content.split(|c: char| matches!(c, '.' | '!' | '?')) {
+        for sentence in self.content.split(['.', '!', '?']) {
             let trimmed = sentence.trim().to_lowercase();
             if !trimmed.is_empty() && trimmed.split_whitespace().count() >= 3 {
                 *freq.entry(trimmed).or_default() += 1;
@@ -486,7 +486,7 @@ impl Document {
         let mut short = 0;
         let mut medium = 0;
         let mut long = 0;
-        for sentence in self.content.split(|c: char| matches!(c, '.' | '!' | '?')) {
+        for sentence in self.content.split(['.', '!', '?']) {
             let wc = sentence.split_whitespace().count();
             if wc == 0 { continue; }
             if wc <= 8 {
@@ -551,7 +551,7 @@ pub struct TextSpan {
 }
 
 /// Styling for a text span
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SpanStyle {
     pub bold: bool,
     pub italic: bool,
@@ -561,21 +561,6 @@ pub struct SpanStyle {
     pub font_family: Option<String>,
     pub color: Option<String>,
     pub highlight: Option<String>,
-}
-
-impl Default for SpanStyle {
-    fn default() -> Self {
-        Self {
-            bold: false,
-            italic: false,
-            underline: false,
-            strikethrough: false,
-            font_size: None,
-            font_family: None,
-            color: None,
-            highlight: None,
-        }
-    }
 }
 
 /// A reference/link to an external resource

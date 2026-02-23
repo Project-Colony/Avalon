@@ -373,7 +373,7 @@ fn generate_snippet(text: &str, query: &str) -> String {
     let text_lower = text.to_lowercase();
     if let Some(pos) = text_lower.find(query) {
         let context_chars = 60;
-        let start = if pos > context_chars { pos - context_chars } else { 0 };
+        let start = pos.saturating_sub(context_chars);
         let end = (pos + query.len() + context_chars).min(text.len());
 
         // Align to word boundaries

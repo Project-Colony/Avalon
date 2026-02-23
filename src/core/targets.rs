@@ -333,12 +333,12 @@ impl TargetProgress {
 
     /// Check if deadline is approaching (less than 7 days)
     pub fn deadline_approaching(&self) -> bool {
-        self.days_remaining.map_or(false, |d| d > 0 && d <= 7)
+        self.days_remaining.is_some_and(|d| d > 0 && d <= 7)
     }
 
     /// Check if deadline is overdue
     pub fn deadline_overdue(&self) -> bool {
-        self.days_remaining.map_or(false, |d| d < 0)
+        self.days_remaining.is_some_and(|d| d < 0)
     }
 
     /// Whether the target is on track (enough daily capacity to finish in time)

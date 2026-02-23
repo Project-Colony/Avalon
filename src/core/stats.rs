@@ -105,7 +105,7 @@ impl Statistics {
         if remaining == 0 {
             return Some(0);
         }
-        Some((remaining + words_per_day - 1) / words_per_day) // ceiling division
+        Some(remaining.div_ceil(words_per_day))
     }
 
     /// Average words per document
@@ -539,15 +539,17 @@ impl WordFrequencyAnalysis {
         let total_count = words.len();
 
         // Word frequencies
-        let mut freq_map = HashMap::new();
+        let mut freq_map: HashMap<&str, usize> = HashMap::new();
         for word in &words {
-            *freq_map.entry(word.clone()).or_insert(0usize) += 1;
+            *freq_map.entry(word).or_default() += 1;
         }
 
         let unique_count = freq_map.len();
         let hapax_count = freq_map.values().filter(|&&c| c == 1).count();
 
-        let mut frequencies: Vec<(String, usize)> = freq_map.into_iter().collect();
+        let mut frequencies: Vec<(String, usize)> = freq_map.into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect();
         frequencies.sort_by(|a, b| b.1.cmp(&a.1));
 
         // Bigrams

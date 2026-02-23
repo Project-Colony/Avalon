@@ -1,4 +1,4 @@
-/// RTF import utilities for extracting plain text from RTF content.
+//! RTF import utilities for extracting plain text from RTF content.
 
 /// Extract plain text from RTF content by stripping all RTF control words and formatting.
 /// This is a best-effort parser that handles common RTF constructs.

@@ -357,11 +357,11 @@ fn edit_distance(a: &str, b: &str) -> usize {
     let b_len = b.len();
     let mut dp = vec![vec![0usize; b_len + 1]; a_len + 1];
 
-    for i in 0..=a_len {
-        dp[i][0] = i;
+    for (i, row) in dp.iter_mut().enumerate().take(a_len + 1) {
+        row[0] = i;
     }
-    for j in 0..=b_len {
-        dp[0][j] = j;
+    for (j, val) in dp[0].iter_mut().enumerate().take(b_len + 1) {
+        *val = j;
     }
 
     let a_bytes = a.as_bytes();

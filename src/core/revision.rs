@@ -16,6 +16,7 @@ pub enum RevisionColor {
 
 impl RevisionColor {
     /// Return the CSS hex color string for this revision color.
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_hex(&self) -> &str {
         match self {
             RevisionColor::Red => "#FF0000",
