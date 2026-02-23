@@ -51,8 +51,9 @@ fn extract_wt_texts(xml: &str) -> Vec<String> {
             None => break,
         };
 
-        // Check for self-closing tag `/>`.
-        if xml[tag_start..content_start].ends_with('/') {
+        // Check for self-closing tag `/>` — content_start is 1 past '>',
+        // so the slice includes '>' and we check if '/' precedes it.
+        if xml[tag_start..content_start].ends_with("/>") {
             search_from = content_start;
             continue;
         }

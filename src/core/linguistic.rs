@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::LazyLock;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -196,10 +197,11 @@ pub struct PassiveVoiceMatch {
 /// Past participles are approximated as words ending in "-ed", "-en", "-wn",
 /// "-ne", or "-nt" (common English patterns).
 pub fn detect_passive_voice(text: &str) -> Vec<PassiveVoiceMatch> {
-    let re = Regex::new(
-        r"(?i)\b(was|were|been|being|is|are|am)\s+([\w]+(?:ed|en|wn|ne|nt))\b",
-    )
-    .expect("passive voice regex must compile");
+    static RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)\b(was|were|been|being|is|are|am)\s+([\w]+(?:ed|en|wn|ne|nt))\b")
+            .expect("passive voice regex must compile")
+    });
+    let re = &*RE;
 
     let mut results = Vec::new();
     for cap in re.captures_iter(text) {
@@ -269,7 +271,10 @@ pub fn detect_repetitions(
         "if", "then", "than", "as", "into", "about",
     ];
 
-    let word_re = Regex::new(r"[a-zA-Z]+").expect("word regex must compile");
+    static WORD_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"[a-zA-Z]+").expect("word regex must compile")
+    });
+    let word_re = &*WORD_RE;
 
     // Collect (word_lowercase, byte_position, word_index)
     let mut word_entries: Vec<(String, usize, usize)> = Vec::new();
@@ -341,7 +346,10 @@ pub fn detect_adverbs(text: &str) -> Vec<(usize, String)> {
         "melancholy", "butterfly", "assembly",
     ];
 
-    let word_re = Regex::new(r"\b([a-zA-Z]+ly)\b").expect("adverb regex must compile");
+    static ADVERB_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"\b([a-zA-Z]+ly)\b").expect("adverb regex must compile")
+    });
+    let word_re = &*ADVERB_RE;
     let mut results = Vec::new();
 
     for cap in word_re.captures_iter(text) {
@@ -374,8 +382,10 @@ pub struct SentenceLengthWarning {
 
 /// Detect sentences that exceed a given word count threshold.
 pub fn detect_long_sentences(text: &str, max_words: usize) -> Vec<SentenceLengthWarning> {
-    let sentence_re =
-        Regex::new(r"[^.!?]+[.!?]+").expect("sentence regex must compile");
+    static SENTENCE_RE: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"[^.!?]+[.!?]+").expect("sentence regex must compile")
+    });
+    let sentence_re = &*SENTENCE_RE;
     let mut warnings = Vec::new();
 
     for m in sentence_re.find_iter(text) {
@@ -520,17 +530,20 @@ const OVERUSED_DIALOG_TAGS: &[&str] = &[
 ///
 /// Returns (byte_position, tag_word) for each occurrence found.
 pub fn detect_said_alternatives(text: &str) -> Vec<(usize, String)> {
-    let mut results = Vec::new();
+    // Build a single combined regex for all dialog tags (compiled once)
+    static DIALOG_RE: LazyLock<Regex> = LazyLock::new(|| {
+        let alternatives: Vec<String> = OVERUSED_DIALOG_TAGS
+            .iter()
+            .map(|tag| regex::escape(tag))
+            .collect();
+        let pattern = format!(r"(?i)\b(?:{})\b", alternatives.join("|"));
+        Regex::new(&pattern).expect("dialog tag regex must compile")
+    });
 
-    for tag in OVERUSED_DIALOG_TAGS {
-        // Match the tag as a whole word, case-insensitive
-        let pattern = format!(r"(?i)\b{}\b", regex::escape(tag));
-        let re = Regex::new(&pattern).expect("dialog tag regex must compile");
-        for m in re.find_iter(text) {
-            results.push((m.start(), m.as_str().to_string()));
-        }
-    }
-
+    let mut results: Vec<(usize, String)> = DIALOG_RE
+        .find_iter(text)
+        .map(|m| (m.start(), m.as_str().to_string()))
+        .collect();
     results.sort_by_key(|(pos, _)| *pos);
     results
 }
