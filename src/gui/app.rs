@@ -2850,7 +2850,9 @@ impl ScrineverApp {
                             opts.title = item.title.clone();
                             let home = dirs::home_dir().unwrap_or_default();
                             let print_path = home.join("Scrinever Projects").join("print.pdf");
-                            let _ = std::fs::create_dir_all(print_path.parent().unwrap());
+                            if let Some(parent) = print_path.parent() {
+                                let _ = std::fs::create_dir_all(parent);
+                            }
                             match crate::export::pdf::save_pdf(&contents, &opts, &print_path) {
                                 Ok(_) => {
                                     self.notification = Some(format!("PDF saved to {:?} — open to print", print_path));
@@ -2871,7 +2873,9 @@ impl ScrineverApp {
                     opts.format = crate::export::compiler::OutputFormat::Pdf;
                     let home = dirs::home_dir().unwrap_or_default();
                     let print_path = home.join("Scrinever Projects").join(format!("{}_print.pdf", project.title));
-                    let _ = std::fs::create_dir_all(print_path.parent().unwrap());
+                    if let Some(parent) = print_path.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
                     match crate::export::compiler::Compiler::save_to_file(&project.binder, &opts, &print_path) {
                         Ok(_) => {
                             self.notification = Some(format!("Project PDF saved to {:?}", print_path));

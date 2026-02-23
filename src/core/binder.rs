@@ -288,16 +288,22 @@ impl BinderItem {
         }
     }
 
-    /// Collect all items into a mutable flat list
+    /// Collect all items into a mutable flat list.
+    ///
+    /// # Safety rationale
+    /// We split the mutable borrow of `self` into two non-overlapping parts:
+    /// the item's own fields (pushed into `items`) and its `children` vec.
+    /// Each node in the tree is unique, so no aliasing occurs.
     pub fn collect_all_mut<'a>(&'a mut self, items: &mut Vec<&'a mut BinderItem>) {
-        let self_ptr = self as *mut BinderItem;
-        // Safety: We need to collect mutable references to all items.
-        // We guarantee no aliasing because each item appears exactly once in the tree.
-        unsafe {
-            items.push(&mut *self_ptr);
-            for child in &mut (*self_ptr).children {
-                child.collect_all_mut(items);
-            }
+        // Split borrow: push self, then recurse into children only
+        let children_ptr = self.children.as_mut_ptr();
+        let children_len = self.children.len();
+        items.push(self);
+        // SAFETY: children_ptr/len come from self.children before self was moved;
+        // we only access children (disjoint from the &mut self already in `items`).
+        let children_slice = unsafe { std::slice::from_raw_parts_mut(children_ptr, children_len) };
+        for child in children_slice {
+            child.collect_all_mut(items);
         }
     }
 
