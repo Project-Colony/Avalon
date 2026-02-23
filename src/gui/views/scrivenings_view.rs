@@ -10,24 +10,17 @@ pub fn view<'a>(
     items: &[&BinderItem],
     parent_title: &str,
 ) -> Element<'a, Message> {
-    let total_words: usize = items.iter()
+    let (total_words, total_chars, total_sentences) = items.iter()
         .filter_map(|i| i.document.as_ref())
-        .map(|d| d.word_count())
-        .sum();
-
-    let total_chars: usize = items.iter()
-        .filter_map(|i| i.document.as_ref())
-        .map(|d| d.char_count())
-        .sum();
-
-    let total_sentences: usize = items.iter()
-        .filter_map(|i| i.document.as_ref())
-        .map(|d| {
-            d.content.chars()
-                .filter(|c| *c == '.' || *c == '!' || *c == '?')
-                .count()
-        })
-        .sum();
+        .fold((0usize, 0usize, 0usize), |(w, c, s), d| {
+            (
+                w + d.word_count(),
+                c + d.char_count(),
+                s + d.content.chars()
+                    .filter(|ch| *ch == '.' || *ch == '!' || *ch == '?')
+                    .count(),
+            )
+        });
 
     // Reading time
     let reading_min = total_words as f64 / 250.0;
@@ -192,7 +185,7 @@ pub fn view<'a>(
                 let separator = container(
                     row![
                         Space::with_width(24),
-                        text(bar.clone())
+                        text(bar)
                             .size(8)
                             .color(Theme::BORDER),
                         Space::with_width(8),
