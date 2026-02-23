@@ -230,7 +230,6 @@ fn dropdown_btn(label: &str, message: Message) -> Element<'static, Message> {
     )
     .on_press(message)
     .padding(Padding::from([4, 12]))
-    .width(Length::Fill)
     .style(menu_button_style)
     .into()
 }
@@ -245,7 +244,6 @@ fn view_btn(label: &str, mode: ViewMode, current: &ViewMode) -> Element<'static,
     )
     .on_press(Message::SwitchView(mode))
     .padding(Padding::from([4, 12]))
-    .width(Length::Fill)
     .style(menu_button_style)
     .into()
 }
@@ -259,7 +257,6 @@ fn toggle_btn(label: &str, active: bool, message: Message) -> Element<'static, M
     )
     .on_press(message)
     .padding(Padding::from([4, 12]))
-    .width(Length::Fill)
     .style(menu_button_style)
     .into()
 }
@@ -274,7 +271,6 @@ fn panel_btn(label: &str, panel: BottomPanel, current: &BottomPanel) -> Element<
     )
     .on_press(Message::ShowBottomPanel(panel))
     .padding(Padding::from([4, 12]))
-    .width(Length::Fill)
     .style(menu_button_style)
     .into()
 }
