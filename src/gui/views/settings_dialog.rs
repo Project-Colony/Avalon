@@ -179,7 +179,7 @@ pub fn view(
     let done_btn = button(
         text("  Done  ").size(14).color(Theme::TEXT_PRIMARY),
     )
-    .on_press(Message::HideSettings)
+    .on_press(Message::CloseSettingsWindow)
     .padding(Padding::from([8, 20]));
 
     let content = column![

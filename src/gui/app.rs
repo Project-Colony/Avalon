@@ -1,6 +1,7 @@
 use iced::keyboard;
 use iced::widget::{column, container, row, stack, text, text_editor, Space};
 use iced::{Element, Length, Padding, Subscription, Task as IcedTask};
+use iced::window;
 use uuid::Uuid;
 use chrono;
 
@@ -64,6 +65,11 @@ pub enum ToolbarMenu {
 
 /// Application state
 pub struct ScrineverApp {
+    // === Windows ===
+    pub main_window: window::Id,
+    pub settings_window: Option<window::Id>,
+    pub about_window: Option<window::Id>,
+
     // === Project ===
     pub project: Option<Project>,
     pub selected_item: Option<Uuid>,
@@ -78,7 +84,6 @@ pub struct ScrineverApp {
 
     // === Dialogs ===
     pub show_compile_dialog: bool,
-    pub show_settings_dialog: bool,
     pub compile_options: CompileOptions,
 
     // === Search ===
@@ -270,7 +275,16 @@ pub enum Message {
     SetItemLabel(Uuid, String),
     ToggleIncludeInCompile(Uuid),
 
-    // Settings dialog
+    // Window management
+    OpenSettingsWindow,
+    CloseSettingsWindow,
+    OpenAboutWindow,
+    CloseAboutWindow,
+    WindowOpened(window::Id),
+    WindowClosed(window::Id),
+    MainWindowClosed,
+
+    // Settings dialog (legacy kept for compatibility)
     ShowSettings,
     HideSettings,
     SettingsSetProjectTitle(String),
@@ -504,7 +518,16 @@ impl ScrineverApp {
         spell_checker.try_init();
         spell_checker.load_user_dictionary();
 
+        // Open the main window explicitly (daemon mode)
+        let (main_id, open_main) = window::open(window::Settings {
+            size: iced::Size::new(1280.0, 800.0),
+            ..window::Settings::default()
+        });
+
         let app = Self {
+            main_window: main_id,
+            settings_window: None,
+            about_window: None,
             project: None,
             selected_item: None,
             editor: EditorState::new(),
@@ -514,7 +537,6 @@ impl ScrineverApp {
             bottom_panel: BottomPanel::None,
             active_toolbar_menu: None,
             show_compile_dialog: false,
-            show_settings_dialog: false,
             compile_options: CompileOptions::default(),
             search_query: String::new(),
             search_results: Vec::new(),
@@ -573,10 +595,16 @@ impl ScrineverApp {
             last_milestone: 0,
         };
 
-        (app, IcedTask::none())
+        (app, open_main.map(Message::WindowOpened))
     }
 
-    pub fn title(&self) -> String {
+    pub fn title(&self, window_id: window::Id) -> String {
+        if Some(window_id) == self.settings_window {
+            return "Avalon - Settings".to_string();
+        }
+        if Some(window_id) == self.about_window {
+            return "Avalon - About".to_string();
+        }
         let dirty = if self.editor.dirty { " *" } else { "" };
         match &self.project {
             Some(p) => format!("Avalon - {}{}", p.title, dirty),
@@ -1321,12 +1349,22 @@ impl ScrineverApp {
             }
 
             // ========== Settings dialog ==========
-            Message::ShowSettings => {
-                self.show_settings_dialog = true;
+            Message::ShowSettings | Message::OpenSettingsWindow => {
+                if self.settings_window.is_some() {
+                    // Already open — focus it
+                    if let Some(id) = self.settings_window {
+                        return window::gain_focus(id);
+                    }
+                }
+                let (id, open_task) = window::open(window::Settings {
+                    size: iced::Size::new(520.0, 650.0),
+                    ..window::Settings::default()
+                });
+                self.settings_window = Some(id);
+                return open_task.map(Message::WindowOpened);
             }
 
-            Message::HideSettings => {
-                self.show_settings_dialog = false;
+            Message::HideSettings | Message::CloseSettingsWindow => {
                 // Persist settings by saving the project
                 if let Some(ref mut project) = self.project {
                     if let Some(path) = project.path.clone() {
@@ -1335,6 +1373,67 @@ impl ScrineverApp {
                         }
                     }
                 }
+                if let Some(id) = self.settings_window.take() {
+                    return window::close(id);
+                }
+            }
+
+            Message::OpenAboutWindow => {
+                if self.about_window.is_some() {
+                    if let Some(id) = self.about_window {
+                        return window::gain_focus(id);
+                    }
+                }
+                let (id, open_task) = window::open(window::Settings {
+                    size: iced::Size::new(420.0, 380.0),
+                    resizable: false,
+                    ..window::Settings::default()
+                });
+                self.about_window = Some(id);
+                return open_task.map(Message::WindowOpened);
+            }
+
+            Message::CloseAboutWindow => {
+                if let Some(id) = self.about_window.take() {
+                    return window::close(id);
+                }
+            }
+
+            Message::WindowOpened(_id) => {
+                // Window created — nothing extra to do
+            }
+
+            Message::WindowClosed(id) => {
+                // Clean up state when a window is closed externally (e.g. X button)
+                if Some(id) == self.settings_window {
+                    self.settings_window = None;
+                    // Save settings on close
+                    if let Some(ref mut project) = self.project {
+                        if let Some(path) = project.path.clone() {
+                            if let Some(parent) = path.parent() {
+                                let _ = project.save(parent);
+                            }
+                        }
+                    }
+                } else if Some(id) == self.about_window {
+                    self.about_window = None;
+                } else if id == self.main_window {
+                    // Main window closed — exit the app
+                    // Close secondary windows first
+                    let mut tasks = Vec::new();
+                    if let Some(sw) = self.settings_window.take() {
+                        tasks.push(window::close(sw));
+                    }
+                    if let Some(aw) = self.about_window.take() {
+                        tasks.push(window::close(aw));
+                    }
+                    tasks.push(iced::exit());
+                    return IcedTask::batch(tasks);
+                }
+            }
+
+            Message::MainWindowClosed => {
+                return iced::exit();
             }
 
             Message::SettingsSetProjectTitle(title) => {
@@ -3244,8 +3343,6 @@ impl ScrineverApp {
                     self.show_project_stats = false;
                 } else if self.show_compile_dialog {
                     self.show_compile_dialog = false;
-                } else if self.show_settings_dialog {
-                    self.show_settings_dialog = false;
                 } else if self.bottom_panel != BottomPanel::None {
                     self.bottom_panel = BottomPanel::None;
                 } else if self.notification.is_some() {
@@ -3257,7 +3354,35 @@ impl ScrineverApp {
         IcedTask::none()
     }
 
-    pub fn view(&self) -> Element<'_, Message> {
+    pub fn view(&self, window_id: window::Id) -> Element<'_, Message> {
+        // Route to Settings window
+        if Some(window_id) == self.settings_window {
+            if let Some(ref project) = self.project {
+                return views::settings_dialog::view(
+                    &project.settings,
+                    &project.title,
+                    self.script_mode,
+                    &self.auto_correction,
+                );
+            }
+            // No project open — show placeholder
+            return container(
+                text("Open a project first to access settings.").size(14).color(super::theme::Theme::TEXT_MUTED),
+            )
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .center_x(Length::Fill)
+            .center_y(Length::Fill)
+            .into();
+        }
+
+        // Route to About window
+        if Some(window_id) == self.about_window {
+            return views::about_dialog::view();
+        }
+
+        // === Main window ===
+
         // Welcome screen
         if self.project.is_none() {
             return views::welcome_screen::view(&self.recent_projects);
@@ -3268,16 +3393,6 @@ impl ScrineverApp {
         // Compile dialog (overlay)
         if self.show_compile_dialog {
             return views::compile_dialog::view(&self.compile_options, &self.compile_presets);
-        }
-
-        // Settings dialog (overlay)
-        if self.show_settings_dialog {
-            return views::settings_dialog::view(
-                &project.settings,
-                &project.title,
-                self.script_mode,
-                &self.auto_correction,
-            );
         }
 
         // Project statistics dialog (overlay)
@@ -3934,11 +4049,13 @@ impl ScrineverApp {
         let tick_sub = iced::time::every(std::time::Duration::from_secs(1))
             .map(|_| Message::Tick);
 
-        Subscription::batch([key_sub, tick_sub])
+        let close_sub = window::close_events().map(Message::WindowClosed);
+
+        Subscription::batch([key_sub, tick_sub, close_sub])
     }
 
     /// Dark theme
-    pub fn theme(&self) -> iced::Theme {
+    pub fn theme(&self, _window_id: window::Id) -> iced::Theme {
         iced::Theme::Dark
     }
 }

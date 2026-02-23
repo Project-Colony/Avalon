@@ -174,8 +174,10 @@ fn panels_dropdown(bottom_panel: &BottomPanel) -> Element<'static, Message> {
 /// Tools menu dropdown (vertical)
 fn tools_dropdown() -> Element<'static, Message> {
     dropdown_panel(column![
-        dropdown_btn("Settings", Message::ShowSettings),
+        dropdown_btn("Settings", Message::OpenSettingsWindow),
         dropdown_btn("Project Stats", Message::ShowProjectStats),
+        dropdown_separator(),
+        dropdown_btn("About Avalon", Message::OpenAboutWindow),
     ]
     .spacing(1))
 }
