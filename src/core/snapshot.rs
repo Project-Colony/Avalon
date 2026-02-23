@@ -306,22 +306,24 @@ fn lcs_diff(old: &[&str], new: &[&str]) -> Vec<DiffChunk> {
 
 /// Format a diff as a unified diff string (like `diff -u` output)
 pub fn format_unified_diff(chunks: &[DiffChunk], old_label: &str, new_label: &str) -> String {
+    use std::fmt::Write;
     let mut output = String::new();
-    output.push_str(&format!("--- {}\n", old_label));
-    output.push_str(&format!("+++ {}\n", new_label));
+    let _ = writeln!(output, "--- {}", old_label);
+    let _ = writeln!(output, "+++ {}", new_label);
 
     // Group changes into hunks
     let hunks = group_into_hunks(chunks, 3);
     for hunk in hunks {
-        output.push_str(&format!(
-            "@@ -{},{} +{},{} @@\n",
+        let _ = writeln!(
+            output,
+            "@@ -{},{} +{},{} @@",
             hunk.old_start, hunk.old_count, hunk.new_start, hunk.new_count
-        ));
+        );
         for line in &hunk.lines {
             match line {
-                DiffChunk::Equal(text) => output.push_str(&format!(" {}\n", text)),
-                DiffChunk::Added(text) => output.push_str(&format!("+{}\n", text)),
-                DiffChunk::Removed(text) => output.push_str(&format!("-{}\n", text)),
+                DiffChunk::Equal(text) => { let _ = writeln!(output, " {}", text); }
+                DiffChunk::Added(text) => { let _ = writeln!(output, "+{}", text); }
+                DiffChunk::Removed(text) => { let _ = writeln!(output, "-{}", text); }
             }
         }
     }

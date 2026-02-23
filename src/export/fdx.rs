@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use anyhow::Result;
 
 use super::compiler::{CompileContent, CompileOptions};
@@ -117,17 +118,19 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
         output.push_str("    <Content>\n");
 
         if !options.title.is_empty() {
-            output.push_str(&format!(
+            let _ = write!(
+                output,
                 "      <Paragraph Type=\"Title\">\n        <Text>{}</Text>\n      </Paragraph>\n",
                 escape_xml(&options.title),
-            ));
+            );
         }
 
         if !options.author.is_empty() {
-            output.push_str(&format!(
+            let _ = write!(
+                output,
                 "      <Paragraph Type=\"Author\">\n        <Text>Written by {}</Text>\n      </Paragraph>\n",
                 escape_xml(&options.author),
-            ));
+            );
         }
 
         output.push_str("    </Content>\n");

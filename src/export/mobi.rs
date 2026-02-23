@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use anyhow::Result;
 use pulldown_cmark::{Parser, html::push_html};
 
@@ -82,21 +83,23 @@ pub fn split_into_chapters(contents: &[CompileContent]) -> Vec<MobiChapter> {
                 } else {
                     anchor_id(&current_title)
                 };
+                let title = std::mem::replace(&mut current_title, content.title.clone());
                 chapters.push(MobiChapter {
-                    title: current_title.clone(),
-                    content: current_html.clone(),
+                    title,
+                    content: std::mem::take(&mut current_html),
                     anchor_id: id,
                 });
                 chapter_idx += 1;
-                current_html.clear();
+            } else {
+                current_title = content.title.clone();
             }
-            current_title = content.title.clone();
             let level = (content.depth + 1).min(6);
-            current_html.push_str(&format!(
+            let _ = write!(
+                current_html,
                 "<h{level}>{title}</h{level}>\n",
                 level = level,
                 title = escape_xml(&content.title),
-            ));
+            );
         } else {
             if current_title.is_empty() && chapters.is_empty() {
                 current_title = content.title.clone();
@@ -143,21 +146,12 @@ pub fn compile_to_html(
     // Front matter (title page).
     if options.include_front_matter && !options.title.is_empty() {
         body.push_str("<div class=\"title-page\">\n");
-        body.push_str(&format!(
-            "<h1 class=\"book-title\">{}</h1>\n",
-            escape_xml(&metadata.title),
-        ));
+        let _ = write!(body, "<h1 class=\"book-title\">{}</h1>\n", escape_xml(&metadata.title));
         if !metadata.author.is_empty() {
-            body.push_str(&format!(
-                "<p class=\"book-author\">{}</p>\n",
-                escape_xml(&metadata.author),
-            ));
+            let _ = write!(body, "<p class=\"book-author\">{}</p>\n", escape_xml(&metadata.author));
         }
         if let Some(ref desc) = metadata.description {
-            body.push_str(&format!(
-                "<p class=\"book-description\">{}</p>\n",
-                escape_xml(desc),
-            ));
+            let _ = write!(body, "<p class=\"book-description\">{}</p>\n", escape_xml(desc));
         }
         body.push_str("</div>\n<mbp:pagebreak />\n");
     }
@@ -170,11 +164,12 @@ pub fn compile_to_html(
 
     // Chapter content.
     for (i, ch) in chapters.iter().enumerate() {
-        body.push_str(&format!(
+        let _ = write!(
+            body,
             "<a id=\"{}\"></a>\n<div class=\"chapter\">\n{}</div>\n",
             escape_xml(&ch.anchor_id),
             ch.content,
-        ));
+        );
         if i < chapters.len() - 1 {
             body.push_str("<mbp:pagebreak />\n");
         }
@@ -245,11 +240,12 @@ pub fn generate_toc_html(contents: &[CompileContent]) -> String {
         } else {
             ch.title.clone()
         };
-        toc.push_str(&format!(
+        let _ = write!(
+            toc,
             "  <li><a href=\"#{anchor}\">{title}</a></li>\n",
             anchor = escape_xml(&ch.anchor_id),
             title = escape_xml(&display),
-        ));
+        );
     }
 
     toc.push_str("</ol>\n</div>\n");
@@ -269,22 +265,13 @@ pub fn generate_opf(metadata: &MobiMetadata, has_toc: bool) -> String {
 
     let mut meta_extras = String::new();
     if let Some(ref publisher) = metadata.publisher {
-        meta_extras.push_str(&format!(
-            "    <dc:publisher>{}</dc:publisher>\n",
-            escape_xml(publisher),
-        ));
+        let _ = write!(meta_extras, "    <dc:publisher>{}</dc:publisher>\n", escape_xml(publisher));
     }
     if let Some(ref isbn) = metadata.isbn {
-        meta_extras.push_str(&format!(
-            "    <dc:identifier opf:scheme=\"ISBN\">{}</dc:identifier>\n",
-            escape_xml(isbn),
-        ));
+        let _ = write!(meta_extras, "    <dc:identifier opf:scheme=\"ISBN\">{}</dc:identifier>\n", escape_xml(isbn));
     }
     if let Some(ref description) = metadata.description {
-        meta_extras.push_str(&format!(
-            "    <dc:description>{}</dc:description>\n",
-            escape_xml(description),
-        ));
+        let _ = write!(meta_extras, "    <dc:description>{}</dc:description>\n", escape_xml(description));
     }
 
     let mut manifest_items = String::from(
@@ -343,7 +330,8 @@ pub fn generate_ncx(contents: &[CompileContent], metadata: &MobiMetadata) -> Str
         } else {
             ch.title.clone()
         };
-        nav_points.push_str(&format!(
+        let _ = write!(
+            nav_points,
             r#"    <navPoint id="navpoint-{idx}" playOrder="{order}">
       <navLabel><text>{title}</text></navLabel>
       <content src="content.html#{anchor}" />
@@ -353,7 +341,7 @@ pub fn generate_ncx(contents: &[CompileContent], metadata: &MobiMetadata) -> Str
             order = i + 1,
             title = escape_xml(&display),
             anchor = escape_xml(&ch.anchor_id),
-        ));
+        );
     }
 
     format!(

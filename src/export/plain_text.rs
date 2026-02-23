@@ -1,3 +1,4 @@
+use std::fmt::Write;
 use anyhow::Result;
 use super::compiler::{CompileContent, CompileOptions, SeparatorType};
 
@@ -14,7 +15,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
         output.push('\n');
 
         if !options.author.is_empty() {
-            output.push_str(&format!("by {}", options.author));
+            let _ = write!(output, "by {}", options.author);
             output.push('\n');
         }
 
@@ -50,7 +51,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                 }
                 _ => {
                     let indent = "  ".repeat(content.depth.saturating_sub(2));
-                    output.push_str(&format!("{}* {}", indent, content.title));
+                    let _ = write!(output, "{}* {}", indent, content.title);
                 }
             }
             output.push_str("\n\n");
@@ -64,7 +65,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                         output.push_str("\n        * * *\n\n");
                     }
                     SeparatorType::Custom(s) => {
-                        output.push_str(&format!("\n{}\n\n", s));
+                        let _ = write!(output, "\n{}\n\n", s);
                     }
                     SeparatorType::PageBreak => {
                         output.push_str("\n\n");
