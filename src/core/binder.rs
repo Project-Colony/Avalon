@@ -83,25 +83,37 @@ impl Binder {
         false
     }
 
+    /// Visit each item in the binder tree without allocating a Vec.
+    pub fn for_each_item<F: FnMut(&BinderItem)>(&self, mut f: F) {
+        self.draft.visit(&mut f);
+        self.research.visit(&mut f);
+        self.trash.visit(&mut f);
+    }
+
     /// Count total documents (text items only)
     pub fn document_count(&self) -> usize {
-        self.all_items().iter()
-            .filter(|i| i.kind == BinderItemKind::Text)
-            .count()
+        let mut count = 0;
+        self.for_each_item(|i| {
+            if i.kind == BinderItemKind::Text { count += 1; }
+        });
+        count
     }
 
     /// Count total words across all documents
     pub fn total_word_count(&self) -> usize {
-        self.all_items().iter()
-            .filter_map(|i| i.document.as_ref())
-            .map(|d| d.word_count())
-            .sum()
+        let mut total = 0;
+        self.for_each_item(|i| {
+            if let Some(ref doc) = i.document {
+                total += doc.word_count();
+            }
+        });
+        total
     }
 
     /// Get all text content concatenated (for readability analysis)
     pub fn all_text(&self) -> String {
         let mut result = String::new();
-        for item in self.all_items() {
+        self.for_each_item(|item| {
             if let Some(ref doc) = item.document {
                 if !doc.content.trim().is_empty() {
                     if !result.is_empty() {
@@ -110,7 +122,7 @@ impl Binder {
                     result.push_str(&doc.content);
                 }
             }
-        }
+        });
         result
     }
 
@@ -274,6 +286,14 @@ impl BinderItem {
             }
         }
         None
+    }
+
+    /// Visit this item and all descendants without allocating a Vec.
+    pub fn visit<F: FnMut(&BinderItem)>(&self, f: &mut F) {
+        f(self);
+        for child in &self.children {
+            child.visit(f);
+        }
     }
 
     /// Collect all items into a flat list

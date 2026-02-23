@@ -247,12 +247,15 @@ impl TextAnalysis {
         let words: Vec<&str> = text.split_whitespace().collect();
         let word_count = words.len();
         let char_count = text.len();
-        let char_no_spaces = text.chars().filter(|c| !c.is_whitespace()).count();
 
-        let sentence_count = text.chars()
-            .filter(|c| *c == '.' || *c == '!' || *c == '?')
-            .count()
-            .max(1);
+        // Single pass over characters for non-space count and sentence count
+        let (char_no_spaces, raw_sentences) = text.chars().fold((0usize, 0usize), |(ns, sc), c| {
+            (
+                ns + usize::from(!c.is_whitespace()),
+                sc + usize::from(matches!(c, '.' | '!' | '?')),
+            )
+        });
+        let sentence_count = raw_sentences.max(1);
 
         let paragraph_count = text.split("\n\n")
             .filter(|p| !p.trim().is_empty())
@@ -413,10 +416,11 @@ impl ReadabilityMetrics {
             .count()
             .max(1);
 
-        // Syllable analysis
-        let syllable_counts: Vec<usize> = words.iter().map(|w| count_syllables(w)).collect();
-        let total_syllables: usize = syllable_counts.iter().sum();
-        let complex_word_count = syllable_counts.iter().filter(|&&s| s >= 3).count();
+        // Syllable analysis — single pass, no intermediate Vec
+        let (total_syllables, complex_word_count) = words.iter().fold((0usize, 0usize), |(total, complex), w| {
+            let s = count_syllables(w);
+            (total + s, complex + usize::from(s >= 3))
+        });
 
         let avg_syllables_per_word = total_syllables as f64 / word_count as f64;
         let words_per_sentence = word_count as f64 / sentence_count as f64;
