@@ -67,9 +67,10 @@ pub enum ToolbarMenu {
 #[derive(Debug, Clone, PartialEq)]
 pub enum SettingsTab {
     General,
+    Editor,
     Appearance,
-    Accessibility,
-    Avalon,
+    Compile,
+    Shortcuts,
 }
 
 /// Application state
