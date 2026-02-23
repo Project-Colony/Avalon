@@ -68,7 +68,9 @@ pub fn decode_html_entities(text: &str) -> String {
                         break;
                     }
                     Some(_) => {
-                        entity.push(chars.next().unwrap());
+                        if let Some(c) = chars.next() {
+                            entity.push(c);
+                        }
                     }
                     None => break,
                 }
