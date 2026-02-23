@@ -1,4 +1,4 @@
-use iced::widget::{button, container, mouse_area, row, text, column, Space};
+use iced::widget::{button, container, mouse_area, row, text, column, stack, Space};
 use iced::{Border, Element, Length, Padding};
 
 use crate::gui::app::{BottomPanel, Message, ToolbarMenu, ViewMode};
@@ -64,16 +64,18 @@ pub fn dropdown_overlay(
         dropdown_content,
     ];
 
-    // Full-screen overlay: a mouse_area covering everything so clicking
-    // anywhere outside the dropdown closes the menu.
-    // The dropdown sits at the top-left; the rest is empty click-away space.
-    let overlay = mouse_area(
-        column![
-            positioned_dropdown,
-            Space::new(Length::Fill, Length::Fill),
-        ]
+    // Full-screen click-away layer (behind the dropdown)
+    let click_away = mouse_area(
+        Space::new(Length::Fill, Length::Fill)
     )
     .on_press(Message::CloseToolbarMenu);
+
+    // Stack: click-away fills the whole screen, dropdown floats on top
+    // at its natural width
+    let overlay = stack![
+        click_away,
+        positioned_dropdown,
+    ];
 
     Some(
         container(overlay)
