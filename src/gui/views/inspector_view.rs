@@ -182,13 +182,17 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
                 .color(Theme::TEXT_ACCENT),
             Space::with_width(Length::Fill),
             button(
-                text(bookmark_icon).size(13).color(
-                    if data.is_bookmarked { Theme::WARNING } else { Theme::TEXT_MUTED }
-                ),
+                container(
+                    text(bookmark_icon).size(12).color(
+                        if data.is_bookmarked { Theme::WARNING } else { Theme::TEXT_MUTED }
+                    ),
+                )
+                .center_x(Length::Shrink)
+                .center_y(Length::Shrink),
             )
             .on_press(Message::ToggleBookmark(id))
             .style(theme::inspector_bookmark_style(data.is_bookmarked))
-            .padding(Padding::from([3, 8])),
+            .padding(Padding::from([4, 8])),
         ]
         .align_y(iced::Alignment::Center)
     )
