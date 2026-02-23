@@ -71,7 +71,7 @@ impl Document {
     /// Get sentence count (approximate)
     pub fn sentence_count(&self) -> usize {
         self.content.chars()
-            .filter(|c| *c == '.' || *c == '!' || *c == '?')
+            .filter(|c| matches!(c, '.' | '!' | '?'))
             .count()
             .max(if self.content.is_empty() { 0 } else { 1 })
     }
@@ -99,15 +99,21 @@ impl Document {
         self.word_count() as f64 / 150.0
     }
 
+    /// Clean a word by keeping only alphanumeric chars and apostrophes, then lowercasing.
+    fn clean_word(word: &str) -> String {
+        word.chars()
+            .filter(|c| c.is_alphanumeric() || *c == '\'')
+            .flat_map(char::to_lowercase)
+            .collect()
+    }
+
     /// Unique word count
     pub fn unique_word_count(&self) -> usize {
         let mut seen = std::collections::HashSet::new();
         for word in self.content.split_whitespace() {
-            let clean: String = word.chars()
-                .filter(|c| c.is_alphanumeric() || *c == '\'')
-                .collect();
+            let clean = Self::clean_word(word);
             if !clean.is_empty() {
-                seen.insert(clean.to_lowercase());
+                seen.insert(clean);
             }
         }
         seen.len()
@@ -115,14 +121,14 @@ impl Document {
 
     /// Average word length in characters
     pub fn avg_word_length(&self) -> f64 {
-        let words: Vec<&str> = self.content.split_whitespace().collect();
-        if words.is_empty() {
+        let word_count = self.word_count();
+        if word_count == 0 {
             return 0.0;
         }
-        let total_chars: usize = words.iter()
+        let total_chars: usize = self.content.split_whitespace()
             .map(|w| w.chars().filter(|c| c.is_alphanumeric()).count())
             .sum();
-        total_chars as f64 / words.len() as f64
+        total_chars as f64 / word_count as f64
     }
 
     /// Average sentence length in words (approximate)
@@ -157,32 +163,35 @@ impl Document {
         count.max(1)
     }
 
-    /// Flesch-Kincaid readability grade level
-    /// Higher = more difficult reading; typical novel is 7-9
-    pub fn readability_grade(&self) -> f64 {
+    /// Returns (words, sentences, syllables) as f64 values, or None if text is empty.
+    fn readability_stats(&self) -> Option<(f64, f64, f64)> {
         let words = self.word_count() as f64;
         let sentences = self.sentence_count() as f64;
         if words == 0.0 || sentences == 0.0 {
-            return 0.0;
+            return None;
         }
-        let syllables: usize = self.content.split_whitespace()
-            .map(|w| Self::count_syllables(w))
+        let syllables: f64 = self.content.split_whitespace()
+            .map(|w| Self::count_syllables(w) as f64)
             .sum();
+        Some((words, sentences, syllables))
+    }
+
+    /// Flesch-Kincaid readability grade level
+    /// Higher = more difficult reading; typical novel is 7-9
+    pub fn readability_grade(&self) -> f64 {
+        let Some((words, sentences, syllables)) = self.readability_stats() else {
+            return 0.0;
+        };
         // Flesch-Kincaid Grade Level formula
-        0.39 * (words / sentences) + 11.8 * (syllables as f64 / words) - 15.59
+        0.39 * (words / sentences) + 11.8 * (syllables / words) - 15.59
     }
 
     /// Flesch Reading Ease score (0-100, higher = easier to read)
     pub fn reading_ease(&self) -> f64 {
-        let words = self.word_count() as f64;
-        let sentences = self.sentence_count() as f64;
-        if words == 0.0 || sentences == 0.0 {
+        let Some((words, sentences, syllables)) = self.readability_stats() else {
             return 0.0;
-        }
-        let syllables: usize = self.content.split_whitespace()
-            .map(|w| Self::count_syllables(w))
-            .sum();
-        206.835 - 1.015 * (words / sentences) - 84.6 * (syllables as f64 / words)
+        };
+        206.835 - 1.015 * (words / sentences) - 84.6 * (syllables / words)
     }
 
     /// Update content and refresh modification time
@@ -207,31 +216,23 @@ impl Document {
             self.modified_at = Utc::now();
         }
     }
-}
 
-impl Document {
     /// Get all unique words in the document
     pub fn unique_words(&self) -> Vec<String> {
-        let mut words: Vec<String> = self.content.split_whitespace()
-            .map(|w| w.chars().filter(|c| c.is_alphanumeric() || *c == '\'').collect::<String>())
+        let set: std::collections::BTreeSet<String> = self.content.split_whitespace()
+            .map(|w| Self::clean_word(w))
             .filter(|w| !w.is_empty())
-            .map(|w| w.to_lowercase())
             .collect();
-        words.sort();
-        words.dedup();
-        words
+        set.into_iter().collect()
     }
 
     /// Get word frequency map (word -> count)
     pub fn word_frequency(&self) -> std::collections::HashMap<String, usize> {
         let mut freq = std::collections::HashMap::new();
         for word in self.content.split_whitespace() {
-            let clean: String = word.chars()
-                .filter(|c| c.is_alphanumeric() || *c == '\'')
-                .collect::<String>()
-                .to_lowercase();
+            let clean = Self::clean_word(word);
             if !clean.is_empty() {
-                *freq.entry(clean).or_insert(0) += 1;
+                *freq.entry(clean).or_default() += 1;
             }
         }
         freq
@@ -248,14 +249,9 @@ impl Document {
 
     /// Count occurrences of a word (case-insensitive)
     pub fn count_word(&self, word: &str) -> usize {
-        let lower = word.to_lowercase();
+        let target = Self::clean_word(word);
         self.content.split_whitespace()
-            .filter(|w| {
-                w.chars()
-                    .filter(|c| c.is_alphanumeric() || *c == '\'')
-                    .collect::<String>()
-                    .to_lowercase() == lower
-            })
+            .filter(|w| Self::clean_word(w) == target)
             .count()
     }
 
@@ -349,17 +345,14 @@ impl Document {
     /// Get bigrams (two-word phrases) and their frequencies
     pub fn bigrams(&self) -> Vec<(String, usize)> {
         let words: Vec<String> = self.content.split_whitespace()
-            .map(|w| w.chars()
-                .filter(|c| c.is_alphanumeric() || *c == '\'')
-                .collect::<String>()
-                .to_lowercase())
+            .map(|w| Self::clean_word(w))
             .filter(|w| !w.is_empty())
             .collect();
 
         let mut freq = std::collections::HashMap::new();
         for pair in words.windows(2) {
             let bigram = format!("{} {}", pair[0], pair[1]);
-            *freq.entry(bigram).or_insert(0usize) += 1;
+            *freq.entry(bigram).or_default() += 1;
         }
 
         let mut pairs: Vec<(String, usize)> = freq.into_iter().collect();
@@ -376,23 +369,21 @@ impl Document {
 
     /// Analyze sentence length variety (standard deviation of sentence lengths)
     pub fn sentence_length_variety(&self) -> f64 {
-        let sentences: Vec<&str> = self.content
-            .split(|c: char| c == '.' || c == '!' || c == '?')
+        let lengths: Vec<f64> = self.content
+            .split(|c: char| matches!(c, '.' | '!' | '?'))
             .filter(|s| !s.trim().is_empty())
-            .collect();
-
-        if sentences.len() <= 1 {
-            return 0.0;
-        }
-
-        let lengths: Vec<f64> = sentences.iter()
             .map(|s| s.split_whitespace().count() as f64)
             .collect();
 
-        let mean = lengths.iter().sum::<f64>() / lengths.len() as f64;
+        if lengths.len() <= 1 {
+            return 0.0;
+        }
+
+        let n = lengths.len() as f64;
+        let mean = lengths.iter().sum::<f64>() / n;
         let variance = lengths.iter()
             .map(|l| (l - mean).powi(2))
-            .sum::<f64>() / lengths.len() as f64;
+            .sum::<f64>() / n;
 
         variance.sqrt()
     }
@@ -400,12 +391,7 @@ impl Document {
     /// Count lines of dialogue (lines starting with quotes or containing dialogue markers)
     pub fn dialogue_line_count(&self) -> usize {
         self.content.lines()
-            .filter(|line| {
-                let trimmed = line.trim();
-                trimmed.starts_with('"')
-                    || trimmed.starts_with('\u{201C}') // left double quote
-                    || trimmed.starts_with('\u{2018}') // left single quote
-            })
+            .filter(|line| matches!(line.trim().chars().next(), Some('"' | '\u{201C}' | '\u{2018}')))
             .count()
     }
 
@@ -424,7 +410,7 @@ impl Document {
         for para in self.content.split("\n\n") {
             if let Some(first_word) = para.trim().split_whitespace().next() {
                 let clean = first_word.to_lowercase();
-                *starts.entry(clean).or_insert(0usize) += 1;
+                *starts.entry(clean).or_default() += 1;
             }
         }
         let mut repeated: Vec<(String, usize)> = starts.into_iter()
@@ -436,23 +422,15 @@ impl Document {
 
     /// Get a human-readable reading difficulty label based on Flesch Reading Ease.
     pub fn reading_difficulty_label(&self) -> &str {
-        let ease = self.reading_ease();
-        if ease >= 90.0 {
-            "Very Easy"
-        } else if ease >= 80.0 {
-            "Easy"
-        } else if ease >= 70.0 {
-            "Fairly Easy"
-        } else if ease >= 60.0 {
-            "Standard"
-        } else if ease >= 50.0 {
-            "Fairly Difficult"
-        } else if ease >= 30.0 {
-            "Difficult"
-        } else if ease > 0.0 {
-            "Very Difficult"
-        } else {
-            "N/A"
+        match self.reading_ease() {
+            e if e >= 90.0 => "Very Easy",
+            e if e >= 80.0 => "Easy",
+            e if e >= 70.0 => "Fairly Easy",
+            e if e >= 60.0 => "Standard",
+            e if e >= 50.0 => "Fairly Difficult",
+            e if e >= 30.0 => "Difficult",
+            e if e > 0.0 => "Very Difficult",
+            _ => "N/A",
         }
     }
 
@@ -470,7 +448,7 @@ impl Document {
         let mut freq: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
         for window in words.windows(min_words) {
             let phrase = window.join(" ");
-            *freq.entry(phrase).or_insert(0) += 1;
+            *freq.entry(phrase).or_default() += 1;
         }
         let mut repeated: Vec<(String, usize)> = freq.into_iter()
             .filter(|(_, c)| *c > 1)
@@ -482,10 +460,10 @@ impl Document {
     /// Find exact duplicate sentences.
     pub fn duplicate_sentences(&self) -> Vec<(String, usize)> {
         let mut freq: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
-        for sentence in self.content.split(|c: char| c == '.' || c == '!' || c == '?') {
+        for sentence in self.content.split(|c: char| matches!(c, '.' | '!' | '?')) {
             let trimmed = sentence.trim().to_lowercase();
             if !trimmed.is_empty() && trimmed.split_whitespace().count() >= 3 {
-                *freq.entry(trimmed).or_insert(0) += 1;
+                *freq.entry(trimmed).or_default() += 1;
             }
         }
         let mut dupes: Vec<(String, usize)> = freq.into_iter()
@@ -501,7 +479,7 @@ impl Document {
         let mut short = 0;
         let mut medium = 0;
         let mut long = 0;
-        for sentence in self.content.split(|c: char| c == '.' || c == '!' || c == '?') {
+        for sentence in self.content.split(|c: char| matches!(c, '.' | '!' | '?')) {
             let wc = sentence.split_whitespace().count();
             if wc == 0 { continue; }
             if wc <= 8 {

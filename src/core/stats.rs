@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use super::binder::Binder;
 
 /// Aggregated statistics for the project or a selection
@@ -50,97 +51,6 @@ impl Statistics {
         stats
     }
 
-    /// Compute statistics for a single text content
-    pub fn from_text(text: &str) -> Self {
-        Statistics {
-            word_count: text.split_whitespace().count(),
-            char_count: text.len(),
-            char_count_no_spaces: text.chars().filter(|c| !c.is_whitespace()).count(),
-            paragraph_count: text.split("\n\n").filter(|p| !p.trim().is_empty()).count(),
-            sentence_count: text.chars()
-                .filter(|c| *c == '.' || *c == '!' || *c == '?')
-                .count()
-                .max(if text.is_empty() { 0 } else { 1 }),
-            line_count: if text.is_empty() { 0 } else { text.lines().count() },
-            page_count: text.split_whitespace().count() as f64 / 250.0,
-            document_count: 1,
-            folder_count: 0,
-            average_words_per_document: text.split_whitespace().count() as f64,
-        }
-    }
-
-    /// Format word count with target progress
-    pub fn progress_string(&self, target: Option<usize>) -> String {
-        match target {
-            Some(target) => {
-                let pct = (self.word_count as f64 / target as f64 * 100.0).min(100.0);
-                format!("{} / {} words ({:.1}%)", self.word_count, target, pct)
-            }
-            None => format!("{} words", self.word_count),
-        }
-    }
-}
-
-/// Session statistics for tracking writing sessions
-#[derive(Debug, Clone)]
-pub struct SessionStats {
-    pub words_written: i64, // Can be negative if deleting
-    pub time_elapsed_seconds: u64,
-    pub words_per_minute: f64,
-}
-
-impl SessionStats {
-    pub fn new() -> Self {
-        Self {
-            words_written: 0,
-            time_elapsed_seconds: 0,
-            words_per_minute: 0.0,
-        }
-    }
-
-    pub fn update(&mut self, word_delta: i64, elapsed_seconds: u64) {
-        self.words_written = word_delta;
-        self.time_elapsed_seconds = elapsed_seconds;
-        if elapsed_seconds > 0 {
-            self.words_per_minute = self.words_written as f64 / (elapsed_seconds as f64 / 60.0);
-        }
-    }
-
-    /// Format elapsed time as human-readable string
-    pub fn elapsed_display(&self) -> String {
-        let hours = self.time_elapsed_seconds / 3600;
-        let mins = (self.time_elapsed_seconds % 3600) / 60;
-        let secs = self.time_elapsed_seconds % 60;
-        if hours > 0 {
-            format!("{}h {}m {}s", hours, mins, secs)
-        } else if mins > 0 {
-            format!("{}m {}s", mins, secs)
-        } else {
-            format!("{}s", secs)
-        }
-    }
-
-    /// Get net word change as a formatted string with sign
-    pub fn words_display(&self) -> String {
-        if self.words_written > 0 {
-            format!("+{}", self.words_written)
-        } else {
-            format!("{}", self.words_written)
-        }
-    }
-
-    /// Estimated pages written this session
-    pub fn pages_written(&self) -> f64 {
-        self.words_written.max(0) as f64 / 250.0
-    }
-
-    /// Check if the session is active (has time recorded)
-    pub fn is_active(&self) -> bool {
-        self.time_elapsed_seconds > 0
-    }
-}
-
-impl Statistics {
     /// Get a summary string
     pub fn summary(&self) -> String {
         format!(
@@ -218,6 +128,96 @@ impl Statistics {
             _ => "Epic / Tome",
         }
     }
+
+    /// Compute statistics for a single text content
+    pub fn from_text(text: &str) -> Self {
+        let word_count = text.split_whitespace().count();
+        Statistics {
+            word_count,
+            char_count: text.len(),
+            char_count_no_spaces: text.chars().filter(|c| !c.is_whitespace()).count(),
+            paragraph_count: text.split("\n\n").filter(|p| !p.trim().is_empty()).count(),
+            sentence_count: text.chars()
+                .filter(|c| *c == '.' || *c == '!' || *c == '?')
+                .count()
+                .max(if text.is_empty() { 0 } else { 1 }),
+            line_count: if text.is_empty() { 0 } else { text.lines().count() },
+            page_count: word_count as f64 / 250.0,
+            document_count: 1,
+            folder_count: 0,
+            average_words_per_document: word_count as f64,
+        }
+    }
+
+    /// Format word count with target progress
+    pub fn progress_string(&self, target: Option<usize>) -> String {
+        match target {
+            Some(target) => {
+                let pct = (self.word_count as f64 / target as f64 * 100.0).min(100.0);
+                format!("{} / {} words ({:.1}%)", self.word_count, target, pct)
+            }
+            None => format!("{} words", self.word_count),
+        }
+    }
+}
+
+/// Session statistics for tracking writing sessions
+#[derive(Debug, Clone)]
+pub struct SessionStats {
+    pub words_written: i64, // Can be negative if deleting
+    pub time_elapsed_seconds: u64,
+    pub words_per_minute: f64,
+}
+
+impl SessionStats {
+    pub fn new() -> Self {
+        Self {
+            words_written: 0,
+            time_elapsed_seconds: 0,
+            words_per_minute: 0.0,
+        }
+    }
+
+    pub fn update(&mut self, word_delta: i64, elapsed_seconds: u64) {
+        self.words_written = word_delta;
+        self.time_elapsed_seconds = elapsed_seconds;
+        if elapsed_seconds > 0 {
+            self.words_per_minute = self.words_written as f64 / (elapsed_seconds as f64 / 60.0);
+        }
+    }
+
+    /// Format elapsed time as human-readable string
+    pub fn elapsed_display(&self) -> String {
+        let hours = self.time_elapsed_seconds / 3600;
+        let mins = (self.time_elapsed_seconds % 3600) / 60;
+        let secs = self.time_elapsed_seconds % 60;
+        if hours > 0 {
+            format!("{}h {}m {}s", hours, mins, secs)
+        } else if mins > 0 {
+            format!("{}m {}s", mins, secs)
+        } else {
+            format!("{}s", secs)
+        }
+    }
+
+    /// Get net word change as a formatted string with sign
+    pub fn words_display(&self) -> String {
+        if self.words_written > 0 {
+            format!("+{}", self.words_written)
+        } else {
+            format!("{}", self.words_written)
+        }
+    }
+
+    /// Estimated pages written this session
+    pub fn pages_written(&self) -> f64 {
+        self.words_written.max(0) as f64 / 250.0
+    }
+
+    /// Check if the session is active (has time recorded)
+    pub fn is_active(&self) -> bool {
+        self.time_elapsed_seconds > 0
+    }
 }
 
 /// Detailed text analysis for the text statistics panel
@@ -260,7 +260,7 @@ impl TextAnalysis {
             .max(1);
 
         // Unique words
-        let mut word_freq = std::collections::HashMap::new();
+        let mut word_freq = HashMap::new();
         for word in &words {
             let lower = word.to_lowercase()
                 .trim_matches(|c: char| !c.is_alphanumeric())
@@ -273,7 +273,7 @@ impl TextAnalysis {
 
         // Most common words (exclude short words)
         let mut word_list: Vec<(String, usize)> = word_freq.into_iter()
-            .filter(|(w, _)| w.len() > 3)
+            .filter(|(w, _): &(String, usize)| w.len() > 3)
             .collect();
         word_list.sort_by(|a, b| b.1.cmp(&a.1));
         word_list.truncate(20);
@@ -539,7 +539,7 @@ impl WordFrequencyAnalysis {
         let total_count = words.len();
 
         // Word frequencies
-        let mut freq_map = std::collections::HashMap::new();
+        let mut freq_map = HashMap::new();
         for word in &words {
             *freq_map.entry(word.clone()).or_insert(0usize) += 1;
         }
@@ -551,7 +551,7 @@ impl WordFrequencyAnalysis {
         frequencies.sort_by(|a, b| b.1.cmp(&a.1));
 
         // Bigrams
-        let mut bigram_map = std::collections::HashMap::new();
+        let mut bigram_map = HashMap::new();
         for window in words.windows(2) {
             let bigram = format!("{} {}", window[0], window[1]);
             *bigram_map.entry(bigram).or_insert(0usize) += 1;
