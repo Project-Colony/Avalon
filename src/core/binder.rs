@@ -536,22 +536,27 @@ impl BinderItem {
 impl Binder {
     /// Count total folders in the binder
     pub fn folder_count(&self) -> usize {
-        self.all_items().iter()
-            .filter(|i| i.kind == BinderItemKind::Folder)
-            .count()
+        let mut count = 0;
+        self.for_each_item(|i| if i.kind == BinderItemKind::Folder { count += 1; });
+        count
     }
 
     /// Count total characters across all documents
     pub fn total_char_count(&self) -> usize {
-        self.all_items().iter()
-            .filter_map(|i| i.document.as_ref())
-            .map(|d| d.char_count())
-            .sum()
+        let mut total = 0;
+        self.for_each_item(|i| {
+            if let Some(d) = &i.document {
+                total += d.char_count();
+            }
+        });
+        total
     }
 
     /// Total number of items (documents + folders) in the entire binder
     pub fn item_count(&self) -> usize {
-        self.all_items().len()
+        let mut count = 0;
+        self.for_each_item(|_| count += 1);
+        count
     }
 
     /// Get all text items (documents only)

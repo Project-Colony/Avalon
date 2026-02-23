@@ -749,9 +749,13 @@ impl Project {
     pub fn structure_analysis(&self) -> (usize, f64, usize) {
         let max_depth = self.binder.max_nesting_depth();
         let total = self.binder.item_count();
-        let (folder_count, total_children) = self.binder.all_items().into_iter()
-            .filter(|i| !i.children.is_empty())
-            .fold((0usize, 0usize), |(count, sum), i| (count + 1, sum + i.child_count()));
+        let (mut folder_count, mut total_children) = (0usize, 0usize);
+        self.binder.for_each_item(|i| {
+            if !i.children.is_empty() {
+                folder_count += 1;
+                total_children += i.child_count();
+            }
+        });
         let avg_children = if folder_count == 0 {
             0.0
         } else {
@@ -772,38 +776,39 @@ impl Project {
 
     /// Get the longest and shortest documents by word count.
     pub fn word_count_extremes(&self) -> (Option<(String, usize)>, Option<(String, usize)>) {
-        let mut longest: Option<(&str, usize)> = None;
-        let mut shortest: Option<(&str, usize)> = None;
+        let mut longest: Option<(String, usize)> = None;
+        let mut shortest: Option<(String, usize)> = None;
 
-        for item in self.binder.all_items() {
-            if item.kind != super::binder::BinderItemKind::Text { continue; }
+        self.binder.for_each_item(|item| {
+            if item.kind != super::binder::BinderItemKind::Text { return; }
             let wc = match item.document.as_ref() {
                 Some(d) => d.word_count(),
-                None => continue,
+                None => return,
             };
-            if wc == 0 { continue; }
+            if wc == 0 { return; }
 
-            if longest.is_none_or(|(_, best)| wc > best) {
-                longest = Some((item.title.as_str(), wc));
+            if longest.as_ref().map_or(true, |(_, best)| wc > *best) {
+                longest = Some((item.title.clone(), wc));
             }
-            if shortest.is_none_or(|(_, best)| wc < best) {
-                shortest = Some((item.title.as_str(), wc));
+            if shortest.as_ref().map_or(true, |(_, best)| wc < *best) {
+                shortest = Some((item.title.clone(), wc));
             }
-        }
+        });
 
-        (
-            longest.map(|(t, wc)| (t.to_string(), wc)),
-            shortest.map(|(t, wc)| (t.to_string(), wc)),
-        )
+        (longest, shortest)
     }
 
     /// Average document word count across all text items with content.
     pub fn avg_document_word_count(&self) -> f64 {
-        let (count, total) = self.binder.all_items().into_iter()
-            .filter(|i| i.kind == super::binder::BinderItemKind::Text)
-            .filter_map(|i| i.document.as_ref().map(|d| d.word_count()))
-            .filter(|wc| *wc > 0)
-            .fold((0usize, 0usize), |(n, sum), wc| (n + 1, sum + wc));
+        let (mut count, mut total) = (0usize, 0usize);
+        self.binder.for_each_item(|i| {
+            if i.kind == super::binder::BinderItemKind::Text {
+                if let Some(wc) = i.document.as_ref().map(|d| d.word_count()).filter(|wc| *wc > 0) {
+                    count += 1;
+                    total += wc;
+                }
+            }
+        });
         if count == 0 {
             return 0.0;
         }

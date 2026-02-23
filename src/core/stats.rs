@@ -21,10 +21,9 @@ impl Statistics {
     pub fn from_binder(binder: &Binder) -> Self {
         use super::binder::BinderItemKind;
 
-        let items = binder.all_items();
         let mut stats = Statistics::default();
 
-        for item in &items {
+        binder.for_each_item(|item| {
             match item.kind {
                 BinderItemKind::Text => stats.document_count += 1,
                 BinderItemKind::Folder => stats.folder_count += 1,
@@ -39,7 +38,7 @@ impl Statistics {
                 stats.sentence_count += doc.sentence_count();
                 stats.line_count += doc.line_count();
             }
-        }
+        });
 
         stats.page_count = stats.word_count as f64 / 250.0;
         stats.average_words_per_document = if stats.document_count > 0 {
