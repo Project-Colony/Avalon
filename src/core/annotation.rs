@@ -160,7 +160,7 @@ impl Annotation {
         let truncated = if self.text.len() > 30 {
             format!("{}...", &self.text[..30])
         } else {
-            self.text.clone()
+            self.text.to_string()
         };
         format!("[{}|{}] {}", status, self.color.label(), truncated)
     }

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use std::path::PathBuf;
@@ -162,7 +163,7 @@ impl RecentProjects {
     pub fn unique_paths(&self) -> usize {
         self.projects.iter()
             .map(|p| &p.path)
-            .collect::<std::collections::HashSet<_>>()
+            .collect::<HashSet<_>>()
             .len()
     }
 

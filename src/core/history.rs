@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use chrono::{NaiveDate, Utc};
 
@@ -154,7 +155,6 @@ impl WritingHistory {
     /// Most productive day of the week (0=Mon, 6=Sun)
     pub fn most_productive_weekday(&self) -> Option<chrono::Weekday> {
         use chrono::Datelike;
-        use std::collections::HashMap;
         let mut totals: HashMap<chrono::Weekday, i64> = HashMap::new();
         for entry in &self.entries {
             *totals.entry(entry.date.weekday()).or_insert(0) += entry.words_written.max(0);

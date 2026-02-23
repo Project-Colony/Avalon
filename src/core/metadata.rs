@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
 /// Metadata associated with a binder item
@@ -516,7 +517,7 @@ pub struct AppPreferences {
     pub custom_dictionary: Vec<String>,
     /// Keyboard shortcut overrides
     #[serde(default)]
-    pub shortcut_overrides: std::collections::HashMap<String, String>,
+    pub shortcut_overrides: HashMap<String, String>,
 }
 
 impl Default for AppPreferences {
@@ -535,7 +536,7 @@ impl Default for AppPreferences {
             max_recent_projects: 10,
             default_compile_author: String::new(),
             custom_dictionary: Vec::new(),
-            shortcut_overrides: std::collections::HashMap::new(),
+            shortcut_overrides: HashMap::new(),
         }
     }
 }

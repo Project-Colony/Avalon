@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -168,7 +169,7 @@ impl Collection {
 
     /// Remove duplicate item IDs (preserving first occurrence)
     pub fn dedup(&mut self) {
-        let mut seen = std::collections::HashSet::new();
+        let mut seen = HashSet::new();
         self.item_ids.retain(|id| seen.insert(*id));
     }
 
@@ -179,13 +180,13 @@ impl Collection {
 
     /// Get intersection of items with another collection
     pub fn intersection(&self, other: &Collection) -> Vec<Uuid> {
-        let other_set: std::collections::HashSet<&Uuid> = other.item_ids.iter().collect();
+        let other_set: HashSet<&Uuid> = other.item_ids.iter().collect();
         self.item_ids.iter().filter(|id| other_set.contains(id)).copied().collect()
     }
 
     /// Get union of items with another collection (no duplicates)
     pub fn union(&self, other: &Collection) -> Vec<Uuid> {
-        let mut seen = std::collections::HashSet::new();
+        let mut seen = HashSet::new();
         let mut result = Vec::new();
         for id in self.item_ids.iter().chain(other.item_ids.iter()) {
             if seen.insert(*id) {
@@ -197,7 +198,7 @@ impl Collection {
 
     /// Get items in this collection but not in the other
     pub fn difference(&self, other: &Collection) -> Vec<Uuid> {
-        let other_set: std::collections::HashSet<&Uuid> = other.item_ids.iter().collect();
+        let other_set: HashSet<&Uuid> = other.item_ids.iter().collect();
         self.item_ids.iter().filter(|id| !other_set.contains(id)).copied().collect()
     }
 }
@@ -282,7 +283,7 @@ impl CollectionManager {
 
     /// Unique items across all collections
     pub fn unique_items(&self) -> usize {
-        let all: std::collections::HashSet<Uuid> = self.collections.iter()
+        let all: HashSet<Uuid> = self.collections.iter()
             .flat_map(|c| c.item_ids.iter().copied())
             .collect();
         all.len()

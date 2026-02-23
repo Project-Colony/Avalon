@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use uuid::Uuid;
 use super::binder::{Binder, BinderItem};
 
@@ -147,7 +148,7 @@ pub fn link_health_summary(binder: &Binder) -> LinkHealthSummary {
 
     // Find orphan documents (no incoming links)
     let all_items = binder.all_items();
-    let linked_ids: std::collections::HashSet<Uuid> = validations.iter()
+    let linked_ids: HashSet<Uuid> = validations.iter()
         .filter_map(|v| match &v.status {
             LinkStatus::Valid(id) => Some(*id),
             _ => None,

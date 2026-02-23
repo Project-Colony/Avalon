@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use crate::core::document::Document;
 
 /// The state of the text editor
@@ -191,8 +192,8 @@ impl EditorState {
                 content: self.document.content.clone(),
                 cursor: self.cursor,
             });
-            self.document.content = entry.content.clone();
             self.content = iced::widget::text_editor::Content::with_text(&entry.content);
+            self.document.content = entry.content;
             self.cursor = entry.cursor;
             self.dirty = true;
             true
@@ -208,8 +209,8 @@ impl EditorState {
                 content: self.document.content.clone(),
                 cursor: self.cursor,
             });
-            self.document.content = entry.content.clone();
             self.content = iced::widget::text_editor::Content::with_text(&entry.content);
+            self.document.content = entry.content;
             self.cursor = entry.cursor;
             self.dirty = true;
             true
@@ -515,7 +516,7 @@ impl EditorState {
             return;
         }
         self.push_undo();
-        let mut seen = std::collections::HashSet::new();
+        let mut seen = HashSet::new();
         let unique: Vec<&str> = lines.into_iter()
             .filter(|line| seen.insert(*line))
             .collect();
@@ -905,8 +906,8 @@ impl EditorState {
     }
 
     /// Get word frequency map (case-insensitive)
-    pub fn word_frequency(&self) -> std::collections::HashMap<String, usize> {
-        let mut freq = std::collections::HashMap::new();
+    pub fn word_frequency(&self) -> HashMap<String, usize> {
+        let mut freq = HashMap::new();
         for word in self.document.content.split_whitespace() {
             let lower = word
                 .trim_matches(|c: char| !c.is_alphanumeric())

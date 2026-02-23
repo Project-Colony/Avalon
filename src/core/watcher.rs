@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -96,7 +97,7 @@ impl ProjectWatcher {
         }
 
         // Deduplicate: only keep the last event per path
-        let mut seen = std::collections::HashSet::new();
+        let mut seen = HashSet::new();
         events.retain(|e| {
             let path = match e {
                 WatchEvent::FileModified(p)

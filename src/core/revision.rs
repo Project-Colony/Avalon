@@ -5,7 +5,7 @@ use uuid::Uuid;
 /// Colors for revision passes (Scrivener uses 5 distinct colors).
 /// Each pass through the document is assigned a color so the writer
 /// can visually distinguish which edits belong to which editing round.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RevisionColor {
     Red,      // Pass 1
     Blue,     // Pass 2
@@ -198,7 +198,7 @@ impl RevisionTracker {
         self.passes
             .iter()
             .find(|p| &p.id == active_id)
-            .map(|p| p.color.clone())
+            .map(|p| p.color)
     }
 
     /// Add a revision mark (tracked change) to the currently active pass.

@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use uuid::Uuid;
 use regex::Regex;
 
@@ -409,7 +410,7 @@ pub fn extract_matches(content: &str, options: &SearchOptions) -> Vec<String> {
         Ok(r) => r,
         Err(_) => return Vec::new(),
     };
-    let mut seen = std::collections::HashSet::new();
+    let mut seen = HashSet::new();
     let mut results = Vec::new();
     for m in regex.find_iter(content) {
         let s = m.as_str().to_string();

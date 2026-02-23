@@ -1,3 +1,4 @@
+use std::collections::{BTreeSet, HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
@@ -109,7 +110,7 @@ impl Document {
 
     /// Unique word count
     pub fn unique_word_count(&self) -> usize {
-        let mut seen = std::collections::HashSet::new();
+        let mut seen = HashSet::new();
         for word in self.content.split_whitespace() {
             let clean = Self::clean_word(word);
             if !clean.is_empty() {
@@ -219,7 +220,7 @@ impl Document {
 
     /// Get all unique words in the document
     pub fn unique_words(&self) -> Vec<String> {
-        let set: std::collections::BTreeSet<String> = self.content.split_whitespace()
+        let set: BTreeSet<String> = self.content.split_whitespace()
             .map(|w| Self::clean_word(w))
             .filter(|w| !w.is_empty())
             .collect();
@@ -227,8 +228,8 @@ impl Document {
     }
 
     /// Get word frequency map (word -> count)
-    pub fn word_frequency(&self) -> std::collections::HashMap<String, usize> {
-        let mut freq = std::collections::HashMap::new();
+    pub fn word_frequency(&self) -> HashMap<String, usize> {
+        let mut freq = HashMap::new();
         for word in self.content.split_whitespace() {
             let clean = Self::clean_word(word);
             if !clean.is_empty() {
@@ -349,7 +350,7 @@ impl Document {
             .filter(|w| !w.is_empty())
             .collect();
 
-        let mut freq = std::collections::HashMap::new();
+        let mut freq = HashMap::new();
         for pair in words.windows(2) {
             let bigram = format!("{} {}", pair[0], pair[1]);
             *freq.entry(bigram).or_default() += 1;
@@ -406,7 +407,7 @@ impl Document {
 
     /// Count the number of paragraphs starting with the same word
     pub fn repeated_paragraph_starts(&self) -> Vec<(String, usize)> {
-        let mut starts = std::collections::HashMap::new();
+        let mut starts = HashMap::new();
         for para in self.content.split("\n\n") {
             if let Some(first_word) = para.trim().split_whitespace().next() {
                 let clean = first_word.to_lowercase();
@@ -445,7 +446,7 @@ impl Document {
         if words.len() < min_words {
             return Vec::new();
         }
-        let mut freq: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        let mut freq: HashMap<String, usize> = HashMap::new();
         for window in words.windows(min_words) {
             let phrase = window.join(" ");
             *freq.entry(phrase).or_default() += 1;
@@ -459,7 +460,7 @@ impl Document {
 
     /// Find exact duplicate sentences.
     pub fn duplicate_sentences(&self) -> Vec<(String, usize)> {
-        let mut freq: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+        let mut freq: HashMap<String, usize> = HashMap::new();
         for sentence in self.content.split(|c: char| matches!(c, '.' | '!' | '?')) {
             let trimmed = sentence.trim().to_lowercase();
             if !trimmed.is_empty() && trimmed.split_whitespace().count() >= 3 {

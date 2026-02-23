@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -257,8 +258,6 @@ pub fn detect_repetitions(
     min_length: usize,
     max_distance: usize,
 ) -> Vec<RepetitionWarning> {
-    use std::collections::HashMap;
-
     // Common English words that are naturally repeated and should be ignored.
     const STOP_WORDS: &[&str] = &[
         "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",

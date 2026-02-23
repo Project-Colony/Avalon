@@ -31,7 +31,7 @@ pub struct DocMeta {
     pub word_count: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum IndexField {
     Title,
     Content,
@@ -110,7 +110,7 @@ impl SearchIndex {
                 .push(IndexEntry {
                     doc_id,
                     positions,
-                    field: field.clone(),
+                    field,
                 });
         }
     }
@@ -168,7 +168,7 @@ impl SearchIndex {
             // Exact match
             if let Some(entries) = self.index.get(term) {
                 for entry in entries {
-                    let key = (entry.doc_id, entry.field.clone());
+                    let key = (entry.doc_id, entry.field);
                     let (score, positions) = doc_scores.entry(key).or_insert((0.0, Vec::new()));
                     // TF-IDF-like scoring
                     let tf = entry.positions.len() as f64;
@@ -190,7 +190,7 @@ impl SearchIndex {
                 for (indexed_term, entries) in &self.index {
                     if indexed_term.starts_with(term) && indexed_term != term {
                         for entry in entries {
-                            let key = (entry.doc_id, entry.field.clone());
+                            let key = (entry.doc_id, entry.field);
                             let (score, positions) = doc_scores.entry(key).or_insert((0.0, Vec::new()));
                             let tf = entry.positions.len() as f64;
                             let field_boost = match entry.field {
@@ -389,8 +389,8 @@ fn generate_snippet(text: &str, query: &str) -> String {
         };
 
         let mut snippet = text[start..end].to_string();
-        if start > 0 { snippet = format!("...{}", snippet); }
-        if end < text.len() { snippet = format!("{}...", snippet); }
+        if start > 0 { snippet.insert_str(0, "..."); }
+        if end < text.len() { snippet.push_str("..."); }
         snippet
     } else {
         // No direct match, return first 120 chars
