@@ -332,8 +332,8 @@ pub fn word_frequencies(text: &str) -> Vec<WordFrequency> {
     }
 
     let mut freq_map: HashMap<String, usize> = HashMap::new();
-    for w in &words {
-        *freq_map.entry(w.clone()).or_insert(0) += 1;
+    for w in words {
+        *freq_map.entry(w).or_insert(0) += 1;
     }
 
     let mut freqs: Vec<WordFrequency> = freq_map
@@ -454,16 +454,16 @@ pub fn vocabulary_metrics(text: &str) -> VocabularyMetrics {
         return VocabularyMetrics::default();
     }
 
+    let total_char_len: usize = words.iter().map(|w| w.len()).sum();
+
     let mut freq_map: HashMap<String, usize> = HashMap::new();
-    for w in &words {
-        *freq_map.entry(w.clone()).or_insert(0) += 1;
+    for w in words {
+        *freq_map.entry(w).or_insert(0) += 1;
     }
 
     let unique_word_count = freq_map.len();
     let hapax_legomena = freq_map.values().filter(|&&c| c == 1).count();
     let type_token_ratio = unique_word_count as f64 / total as f64;
-
-    let total_char_len: usize = words.iter().map(|w| w.len()).sum();
     let average_word_length = total_char_len as f64 / total as f64;
 
     VocabularyMetrics {

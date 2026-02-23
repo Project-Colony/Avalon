@@ -96,9 +96,9 @@ impl SearchIndex {
         let terms = tokenize(text);
         let mut positions_map: HashMap<String, Vec<usize>> = HashMap::new();
 
-        for (pos, term) in terms.iter().enumerate() {
+        for (pos, term) in terms.into_iter().enumerate() {
             positions_map
-                .entry(term.clone())
+                .entry(term)
                 .or_default()
                 .push(pos);
         }

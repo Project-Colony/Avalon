@@ -73,7 +73,7 @@ pub fn search_binder(binder: &Binder, options: &SearchOptions) -> Vec<SearchResu
                     line_number: 0,
                     start: m.start(),
                     end: m.end(),
-                    context: format!("[Title] {}", item.title.clone()),
+                    context: format!("[Title] {}", item.title),
                 });
             }
         }
@@ -101,7 +101,7 @@ pub fn search_binder(binder: &Binder, options: &SearchOptions) -> Vec<SearchResu
                     line_number: 0,
                     start: m.start(),
                     end: m.end(),
-                    context: format!("[Synopsis] {}", item.synopsis.clone()),
+                    context: format!("[Synopsis] {}", item.synopsis),
                 });
             }
         }

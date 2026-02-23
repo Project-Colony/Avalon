@@ -1394,11 +1394,9 @@ impl ScrineverApp {
 
             // ========== Settings dialog ==========
             Message::ShowSettings | Message::OpenSettingsWindow => {
-                if self.settings_window.is_some() {
+                if let Some(id) = self.settings_window {
                     // Already open — focus it
-                    if let Some(id) = self.settings_window {
-                        return window::gain_focus(id);
-                    }
+                    return window::gain_focus(id);
                 }
                 let (id, open_task) = window::open(window::Settings {
                     size: iced::Size::new(780.0, 680.0),
@@ -1411,11 +1409,9 @@ impl ScrineverApp {
             Message::HideSettings | Message::CloseSettingsWindow => {
                 // Persist settings by saving the project
                 if let Some(ref mut project) = self.project {
-                    if let Some(path) = project.path.clone() {
-                        if let Some(parent) = path.parent() {
-                            if let Err(e) = project.save(parent) {
-                                self.notification = Some(format!("Settings save failed: {}", e));
-                            }
+                    if let Some(parent) = project.path.as_deref().and_then(|p| p.parent()).map(|p| p.to_path_buf()) {
+                        if let Err(e) = project.save(&parent) {
+                            self.notification = Some(format!("Settings save failed: {}", e));
                         }
                     }
                 }
@@ -1425,10 +1421,9 @@ impl ScrineverApp {
             }
 
             Message::OpenAboutWindow => {
-                if self.about_window.is_some() {
-                    if let Some(id) = self.about_window {
-                        return window::gain_focus(id);
-                    }
+                if let Some(id) = self.about_window {
+                    // Already open — focus it
+                    return window::gain_focus(id);
                 }
                 let (id, open_task) = window::open(window::Settings {
                     size: iced::Size::new(420.0, 380.0),

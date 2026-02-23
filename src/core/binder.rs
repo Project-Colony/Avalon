@@ -76,11 +76,7 @@ impl Binder {
 
     /// Move an item to trash
     pub fn move_to_trash(&mut self, id: &Uuid) -> bool {
-        if let Some(item) = self.draft.remove_child(id) {
-            self.trash.children.push(item);
-            return true;
-        }
-        if let Some(item) = self.research.remove_child(id) {
+        if let Some(item) = self.draft.remove_child(id).or_else(|| self.research.remove_child(id)) {
             self.trash.children.push(item);
             return true;
         }

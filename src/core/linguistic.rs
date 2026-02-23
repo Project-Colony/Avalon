@@ -287,11 +287,11 @@ pub fn detect_repetitions(
 
     // Group positions by word
     let mut word_map: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
-    for (word, pos, idx) in &word_entries {
+    for (word, pos, idx) in word_entries {
         word_map
-            .entry(word.clone())
+            .entry(word)
             .or_default()
-            .push((*pos, *idx));
+            .push((pos, idx));
     }
 
     let mut warnings = Vec::new();
