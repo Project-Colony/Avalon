@@ -79,10 +79,11 @@ pub fn parse_fountain(input: &str) -> Vec<(String, String)> {
         // Scene headings: INT., EXT., or lines starting with .
         if is_scene_heading(trimmed) {
             if !current_content.trim().is_empty() || !sections.is_empty() {
-                sections.push((current_title.clone(), current_content.clone()));
-                current_content.clear();
+                let title = std::mem::replace(&mut current_title, trimmed.to_string());
+                sections.push((title, std::mem::take(&mut current_content)));
+            } else {
+                current_title = trimmed.to_string();
             }
-            current_title = trimmed.to_string();
         }
 
         current_content.push_str(line);

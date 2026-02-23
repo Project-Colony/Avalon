@@ -114,7 +114,7 @@ pub fn search_binder(binder: &Binder, options: &SearchOptions) -> Vec<SearchResu
                         line_number: 0,
                         start: m.start(),
                         end: m.end(),
-                        context: format!("[Notes] {}", doc.notes.clone()),
+                        context: format!("[Notes] {}", doc.notes),
                     });
                 }
             }
@@ -413,9 +413,9 @@ pub fn extract_matches(content: &str, options: &SearchOptions) -> Vec<String> {
     let mut seen = HashSet::new();
     let mut results = Vec::new();
     for m in regex.find_iter(content) {
-        let s = m.as_str().to_string();
-        if seen.insert(s.clone()) {
-            results.push(s);
+        let s = m.as_str();
+        if seen.insert(s.to_string()) {
+            results.push(s.to_string());
         }
     }
     results

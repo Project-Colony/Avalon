@@ -40,11 +40,12 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
             // Flush previous chapter
             if !current_chapter_html.is_empty() {
                 let filename = format!("chapter{}.xhtml", chapter_idx);
-                chapters.push((filename, current_chapter_title.clone(), current_chapter_html.clone()));
+                let title = std::mem::replace(&mut current_chapter_title, content.title.clone());
+                chapters.push((filename, title, std::mem::take(&mut current_chapter_html)));
                 chapter_idx += 1;
-                current_chapter_html.clear();
+            } else {
+                current_chapter_title = content.title.clone();
             }
-            current_chapter_title = content.title.clone();
             let level = (content.depth + 1).min(6);
             current_chapter_html.push_str(&format!(
                 "<h{}>{}</h{}>\n",
