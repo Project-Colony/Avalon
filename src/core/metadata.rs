@@ -228,7 +228,7 @@ impl CustomFieldValue {
     pub fn display(&self) -> String {
         match self {
             CustomFieldValue::Text(s) => s.clone(),
-            CustomFieldValue::Number(n) => format!("{}", n),
+            CustomFieldValue::Number(n) => n.to_string(),
             CustomFieldValue::Checkbox(b) => if *b { "Yes" } else { "No" }.to_string(),
             CustomFieldValue::Date(d) => d.clone(),
             CustomFieldValue::List(items) => items.join(", "),
