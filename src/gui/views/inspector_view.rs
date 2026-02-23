@@ -110,42 +110,113 @@ impl InspectorData {
     }
 }
 
+// ── Helper widgets ──────────────────────────────────────────────────
+
+/// Thin horizontal separator line
+fn separator() -> Element<'static, Message> {
+    container(Space::with_height(0))
+        .width(Length::Fill)
+        .height(1)
+        .style(theme::inspector_separator_style)
+        .into()
+}
+
+/// Section header with icon and label
+fn section_header(icon: &str, label: &str) -> Element<'static, Message> {
+    text(format!("{}  {}", icon, label))
+        .size(10)
+        .color(Theme::TEXT_ACCENT)
+        .into()
+}
+
+/// Field label (smaller, muted)
+fn field_label(label: &str) -> Element<'static, Message> {
+    text(label.to_string())
+        .size(10)
+        .color(Theme::TEXT_MUTED)
+        .into()
+}
+
+/// Statistic row with label and value
+fn stat_row(label: &str, value: String) -> Element<'static, Message> {
+    row![
+        text(label.to_string())
+            .size(11)
+            .color(Theme::TEXT_MUTED)
+            .width(Length::FillPortion(3)),
+        text(value)
+            .size(11)
+            .color(Theme::TEXT_PRIMARY)
+            .width(Length::FillPortion(2)),
+    ]
+    .align_y(iced::Alignment::Center)
+    .into()
+}
+
+/// Wrap content in a section card container
+fn section_card(content: impl Into<Element<'static, Message>>) -> Element<'static, Message> {
+    container(content)
+        .width(Length::Fill)
+        .padding(Padding::from([8, 10]))
+        .style(theme::inspector_section_style)
+        .into()
+}
+
+// ── Main view ───────────────────────────────────────────────────────
+
 /// Render the inspector panel (right sidebar)
 pub fn view(data: InspectorData) -> Element<'static, Message> {
     let id = data.id;
 
-    let bookmark_label = if data.is_bookmarked { "Unbookmark" } else { "Bookmark" };
-    let bookmark_color = if data.is_bookmarked { Theme::WARNING } else { Theme::TEXT_MUTED };
+    // ── Header ──────────────────────────────────────────────────
+    let bookmark_icon = if data.is_bookmarked {
+        Icons::STAR
+    } else {
+        Icons::STAR_O
+    };
 
     let header = container(
         row![
-            text("INSPECTOR").size(11).color(Theme::TEXT_SECONDARY),
+            text(format!("{}  INSPECTOR", Icons::INFO_CIRCLE))
+                .size(11)
+                .color(Theme::TEXT_ACCENT),
             Space::with_width(Length::Fill),
             button(
-                text(bookmark_label).size(10).color(bookmark_color),
+                text(bookmark_icon).size(13).color(
+                    if data.is_bookmarked { Theme::WARNING } else { Theme::TEXT_MUTED }
+                ),
             )
             .on_press(Message::ToggleBookmark(id))
-            .padding(Padding::from([2, 6])),
+            .style(theme::inspector_bookmark_style(data.is_bookmarked))
+            .padding(Padding::from([3, 8])),
         ]
+        .align_y(iced::Alignment::Center)
     )
-    .padding(Padding::from([8, 12]));
+    .width(Length::Fill)
+    .padding(Padding::from([10, 14]))
+    .style(theme::inspector_header_style);
 
-    // Title
-    let title_label = text("Title").size(11).color(Theme::TEXT_MUTED);
+    // ── Document info (Title + Synopsis) ────────────────────────
     let title_input = text_input("Title...", &data.title)
         .on_input(move |val| Message::RenameItem(id, val))
         .size(14)
         .padding(6);
 
-    // Synopsis
-    let synopsis_label = text("Synopsis").size(11).color(Theme::TEXT_MUTED);
     let synopsis_input = text_input("Synopsis...", &data.synopsis)
         .on_input(move |val| Message::UpdateSynopsis(id, val))
-        .size(13)
+        .size(12)
         .padding(6);
 
-    // Status picker
-    let status_label = text("Status").size(11).color(Theme::TEXT_MUTED);
+    let doc_info_section = column![
+        field_label("Title"),
+        title_input,
+        Space::with_height(6),
+        field_label("Synopsis"),
+        synopsis_input,
+    ]
+    .spacing(2);
+
+    // ── Metadata section (Status, Label, Compile) ───────────────
     let status_picker = pick_list(
         data.available_statuses,
         Some(data.status),
@@ -153,8 +224,6 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
     )
     .width(Length::Fill);
 
-    // Label picker
-    let label_label = text("Label").size(11).color(Theme::TEXT_MUTED);
     let label_picker = pick_list(
         data.available_labels,
         Some(data.label),
@@ -162,20 +231,26 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
     )
     .width(Length::Fill);
 
-    // Include in compile toggle
     let compile_toggle = toggler(data.include_in_compile)
         .label("Include in Compile")
         .on_toggle(move |_| Message::ToggleIncludeInCompile(id));
 
-    // Notes
-    let notes_label = text("Notes").size(11).color(Theme::TEXT_MUTED);
-    let notes_input = text_input("Document notes...", &data.notes)
-        .on_input(|val| Message::NotesChanged(val))
-        .size(12)
-        .padding(6);
+    let metadata_section = section_card(
+        column![
+            section_header(Icons::TAG, "METADATA"),
+            Space::with_height(6),
+            field_label("Status"),
+            status_picker,
+            Space::with_height(6),
+            field_label("Label"),
+            label_picker,
+            Space::with_height(8),
+            compile_toggle,
+        ]
+        .spacing(2)
+    );
 
-    // Target word count
-    let target_label = text("Target Words").size(11).color(Theme::TEXT_MUTED);
+    // ── Target & Progress ───────────────────────────────────────
     let target_value = data.target_word_count
         .map(|t| t.to_string())
         .unwrap_or_default();
@@ -184,203 +259,259 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
         .size(12)
         .padding(6);
 
-    // Progress bar (if target set)
     let progress_row: Element<'static, Message> = if let (Some(target), true) = (data.target_word_count, data.is_document) {
         let words: usize = data.word_count.parse().unwrap_or(0);
         let pct = (words as f64 / target as f64 * 100.0).min(100.0);
-        let bar = format!("{:.1}% ({}/{})", pct, words, target);
-        text(bar).size(11).color(Theme::SUCCESS).into()
+        let progress_color = Theme::progress_color(pct);
+        let bar_text = theme::progress_bar_text(pct, 18);
+
+        column![
+            Space::with_height(4),
+            text(bar_text).size(10).color(progress_color),
+            text(format!("{:.1}%  ({}/{})", pct, words, target))
+                .size(10)
+                .color(Theme::TEXT_MUTED),
+        ]
+        .spacing(2)
+        .into()
     } else {
         Space::with_height(0).into()
     };
 
-    // Statistics
-    let stats_header = text("Statistics").size(11).color(Theme::TEXT_MUTED);
-
-    let stats_content = if data.is_document {
+    let target_section = section_card(
         column![
-            stat_row("Words", data.word_count),
+            section_header(Icons::BOLT, "TARGET"),
+            Space::with_height(6),
+            field_label("Word Count Goal"),
+            target_input,
+            progress_row,
+        ]
+        .spacing(2)
+    );
+
+    // ── Statistics ──────────────────────────────────────────────
+    let stats_content: Element<'static, Message> = if data.is_document {
+        let mut stats = column![
+            stat_row("Words", data.word_count.clone()),
             stat_row("Characters", data.char_count),
             stat_row("Paragraphs", data.paragraph_count),
             stat_row("Sentences", data.sentence_count),
             stat_row("Pages (est.)", data.page_count),
         ]
-        .spacing(2)
+        .spacing(3);
+
+        if data.footnote_count > 0 || data.reference_count > 0 {
+            stats = stats.push(Space::with_height(2));
+            if data.footnote_count > 0 {
+                stats = stats.push(stat_row("Footnotes", format!("{}", data.footnote_count)));
+            }
+            if data.reference_count > 0 {
+                stats = stats.push(stat_row("References", format!("{}", data.reference_count)));
+            }
+        }
+
+        stats.into()
     } else {
         column![
             stat_row("Total Words", data.total_word_count),
             stat_row("Children", data.children_count),
         ]
-        .spacing(2)
+        .spacing(3)
+        .into()
     };
 
-    // Keywords editing
-    let keywords_label = text("Keywords").size(11).color(Theme::TEXT_MUTED);
+    let stats_section = section_card(
+        column![
+            section_header(Icons::BARS, "STATISTICS"),
+            Space::with_height(6),
+            stats_content,
+        ]
+        .spacing(0)
+    );
+
+    // ── Notes & Keywords ────────────────────────────────────────
+    let notes_input = text_input("Document notes...", &data.notes)
+        .on_input(|val| Message::NotesChanged(val))
+        .size(12)
+        .padding(6);
+
     let keywords_text = data.keywords.join(", ");
     let keywords_input = text_input("keyword1, keyword2...", &keywords_text)
         .on_input(move |val| Message::SetItemKeywords(id, val))
         .size(11)
-        .padding(4);
+        .padding(5);
 
-    // Convert to folder/text buttons
-    let convert_row: Element<'static, Message> = if data.is_document {
-        button(
-            text("Convert to Folder").size(10).color(Theme::TEXT_MUTED),
-        )
-        .on_press(Message::ConvertToFolder(id))
-        .padding(Padding::from([2, 6]))
-        .into()
-    } else {
+    let notes_section = column![
+        field_label(&format!("{}  Notes", Icons::PENCIL)),
+        notes_input,
+        Space::with_height(8),
+        field_label(&format!("{}  Keywords", Icons::TAG)),
+        keywords_input,
+    ]
+    .spacing(2);
+
+    // ── Custom Metadata ─────────────────────────────────────────
+    let mut custom_inner = column![].spacing(4);
+    custom_inner = custom_inner.push(
         row![
-            button(
-                text("Merge Children").size(10).color(Theme::TEXT_MUTED),
-            )
-            .on_press(Message::MergeIntoParent)
-            .padding(Padding::from([2, 6])),
-        ]
-        .into()
-    };
-
-    // Split button (only for documents)
-    let split_btn: Element<'static, Message> = if data.is_document {
-        button(
-            text("Split at Midpoint").size(10).color(Theme::TEXT_MUTED),
-        )
-        .on_press(Message::SplitDocument)
-        .padding(Padding::from([2, 6]))
-        .into()
-    } else {
-        Space::with_height(0).into()
-    };
-
-    // Snapshots
-    let snapshots_header = text("Snapshots").size(11).color(Theme::TEXT_MUTED);
-    let snapshots_row = row![
-        text(data.snapshot_count).size(12).color(Theme::TEXT_SECONDARY),
-        Space::with_width(Length::Fill),
-        button(
-            text("Take").size(11).color(Theme::TEXT_ACCENT),
-        )
-        .on_press(Message::CreateSnapshot)
-        .padding(Padding::from([2, 8])),
-    ];
-
-    // Additional info (footnotes, refs)
-    let extra_info: Element<'static, Message> = if data.footnote_count > 0 || data.reference_count > 0 {
-        column![
-            stat_row("Footnotes", format!("{}", data.footnote_count)),
-            stat_row("References", format!("{}", data.reference_count)),
-        ]
-        .spacing(2)
-        .into()
-    } else {
-        Space::with_height(0).into()
-    };
-
-    // Custom metadata — editable fields with add/remove
-    let mut custom_col = column![].spacing(2);
-    custom_col = custom_col.push(
-        row![
-            text("Custom Metadata").size(11).color(Theme::TEXT_MUTED),
+            section_header(Icons::PENCIL_SQUARE, "CUSTOM METADATA"),
             Space::with_width(Length::Fill),
             button(
-                text("+Field").size(9).color(Theme::TEXT_ACCENT),
+                text(format!("{} Add", Icons::PLUS)).size(9).color(Theme::TEXT_ACCENT),
             )
             .on_press(Message::AddCustomField(id, "New Field".to_string()))
-            .padding(Padding::from([1, 4])),
+            .style(theme::inspector_inline_btn_style)
+            .padding(Padding::from([2, 6])),
         ]
+        .align_y(iced::Alignment::Center)
     );
     for (name, value) in &data.custom_fields {
         let field_name = name.clone();
         let field_name2 = name.clone();
         let field_val = value.clone();
-        custom_col = custom_col.push(
+        custom_inner = custom_inner.push(
             row![
-                text(field_name.clone()).size(10).color(Theme::TEXT_MUTED).width(Length::FillPortion(2)),
+                text(field_name.clone())
+                    .size(10)
+                    .color(Theme::TEXT_MUTED)
+                    .width(Length::FillPortion(2)),
                 text_input("value...", &field_val)
                     .on_input(move |val| Message::UpdateCustomField(id, field_name.clone(), val))
                     .size(10)
-                    .padding(2)
+                    .padding(3)
                     .width(Length::FillPortion(3)),
                 button(
-                    text("x").size(9).color(Theme::ERROR),
+                    text(Icons::TIMES).size(9).color(Theme::ERROR),
                 )
                 .on_press(Message::RemoveCustomField(id, field_name2))
-                .padding(Padding::from([1, 3])),
+                .style(theme::inspector_danger_btn_style)
+                .padding(Padding::from([2, 4])),
             ]
-            .spacing(2)
+            .spacing(4)
             .align_y(iced::Alignment::Center)
         );
     }
 
-    // Quick ref button
+    let custom_section = section_card(custom_inner);
+
+    // ── Snapshots ───────────────────────────────────────────────
+    let snapshots_section = section_card(
+        column![
+            section_header(Icons::CAMERA, "SNAPSHOTS"),
+            Space::with_height(6),
+            row![
+                text(data.snapshot_count.clone())
+                    .size(11)
+                    .color(Theme::TEXT_SECONDARY),
+                Space::with_width(Length::Fill),
+                button(
+                    text(format!("{} Take", Icons::CAMERA)).size(10),
+                )
+                .on_press(Message::CreateSnapshot)
+                .style(theme::inspector_accent_btn_style)
+                .padding(Padding::from([4, 10])),
+            ]
+            .align_y(iced::Alignment::Center),
+        ]
+        .spacing(0)
+    );
+
+    // ── Actions ─────────────────────────────────────────────────
     let quick_ref_btn = button(
-        text("Quick Reference").size(10).color(Theme::TEXT_ACCENT),
+        text(format!("{} Quick Reference", Icons::BOOK)).size(10),
     )
     .on_press(Message::ShowQuickRef(id))
-    .padding(Padding::from([2, 6]));
+    .style(theme::inspector_accent_btn_style)
+    .padding(Padding::from([5, 10]))
+    .width(Length::Fill);
 
-    // Split editor button
     let split_editor_btn = button(
-        text("Open in Split").size(10).color(Theme::TEXT_SECONDARY),
+        text(format!("{} Open in Split", Icons::ARROWS_H)).size(10),
     )
     .on_press(Message::OpenInSplitEditor(id))
-    .padding(Padding::from([2, 6]));
+    .style(theme::inspector_btn_style)
+    .padding(Padding::from([5, 10]))
+    .width(Length::Fill);
 
-    let content = column![
-        header,
-        Space::with_height(4),
-        title_label,
-        title_input,
+    let convert_btn: Element<'static, Message> = if data.is_document {
+        button(
+            text(format!("{} Convert to Folder", Icons::FOLDER)).size(10),
+        )
+        .on_press(Message::ConvertToFolder(id))
+        .style(theme::inspector_btn_style)
+        .padding(Padding::from([5, 10]))
+        .width(Length::Fill)
+        .into()
+    } else {
+        button(
+            text(format!("{} Merge Children", Icons::FILE_TEXT)).size(10),
+        )
+        .on_press(Message::MergeIntoParent)
+        .style(theme::inspector_btn_style)
+        .padding(Padding::from([5, 10]))
+        .width(Length::Fill)
+        .into()
+    };
+
+    let split_btn: Element<'static, Message> = if data.is_document {
+        button(
+            text(format!("{} Split at Midpoint", Icons::ARROWS_H)).size(10),
+        )
+        .on_press(Message::SplitDocument)
+        .style(theme::inspector_btn_style)
+        .padding(Padding::from([5, 10]))
+        .width(Length::Fill)
+        .into()
+    } else {
+        Space::with_height(0).into()
+    };
+
+    let actions_section = column![
+        section_header(Icons::BOLT, "ACTIONS"),
         Space::with_height(6),
-        synopsis_label,
-        synopsis_input,
-        Space::with_height(8),
-        status_label,
-        status_picker,
-        Space::with_height(6),
-        label_label,
-        label_picker,
-        Space::with_height(8),
-        compile_toggle,
-        Space::with_height(8),
-        notes_label,
-        notes_input,
-        Space::with_height(8),
-        target_label,
-        target_input,
-        progress_row,
-        Space::with_height(12),
-        stats_header,
-        stats_content,
-        extra_info,
-        Space::with_height(8),
-        keywords_label,
-        keywords_input,
-        Space::with_height(8),
-        custom_col,
-        Space::with_height(12),
-        snapshots_header,
-        snapshots_row,
-        Space::with_height(8),
-        row![quick_ref_btn, Space::with_width(4), split_editor_btn].spacing(2),
-        Space::with_height(4),
-        convert_row,
+        quick_ref_btn,
+        split_editor_btn,
+        convert_btn,
         split_btn,
     ]
-    .padding(12)
+    .spacing(4);
+
+    // ── Assemble all sections ───────────────────────────────────
+    let content = column![
+        header,
+        Space::with_height(10),
+        doc_info_section,
+        Space::with_height(8),
+        separator(),
+        Space::with_height(8),
+        metadata_section,
+        Space::with_height(8),
+        separator(),
+        Space::with_height(8),
+        target_section,
+        Space::with_height(6),
+        stats_section,
+        Space::with_height(8),
+        separator(),
+        Space::with_height(8),
+        notes_section,
+        Space::with_height(8),
+        separator(),
+        Space::with_height(8),
+        custom_section,
+        Space::with_height(6),
+        snapshots_section,
+        Space::with_height(8),
+        separator(),
+        Space::with_height(8),
+        actions_section,
+        Space::with_height(16),
+    ]
+    .padding(Padding { top: 0.0, right: 12.0, bottom: 12.0, left: 12.0 })
     .width(Length::Fixed(240.0));
 
     container(scrollable(content))
         .style(theme::sidebar_style)
         .height(Length::Fill)
         .into()
-}
-
-fn stat_row(label: &str, value: String) -> Element<'static, Message> {
-    row![
-        text(label.to_string()).size(11).color(Theme::TEXT_MUTED).width(Length::FillPortion(1)),
-        text(value).size(11).color(Theme::TEXT_PRIMARY).width(Length::FillPortion(1)),
-    ]
-    .into()
 }

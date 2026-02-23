@@ -630,6 +630,166 @@ pub fn binder_indent_guide_style(_theme: &iced::Theme) -> container::Style {
     }
 }
 
+// ── Inspector-specific styles ───────────────────────────────────────
+
+/// Style for the inspector header bar
+pub fn inspector_header_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Color::from_rgb(0.13, 0.14, 0.17))),
+        border: Border {
+            color: Color::from_rgba(0.30, 0.60, 0.90, 0.25),
+            width: 0.0,
+            radius: 0.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for inspector section cards (subtle grouped containers)
+pub fn inspector_section_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.025))),
+        border: Border {
+            color: Color::from_rgba(1.0, 1.0, 1.0, 0.06),
+            width: 1.0,
+            radius: 6.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for inspector separator lines
+pub fn inspector_separator_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.06))),
+        ..Default::default()
+    }
+}
+
+/// Button style for inspector action buttons
+pub fn inspector_btn_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+    let bg = match status {
+        button::Status::Hovered => Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.10))),
+        button::Status::Pressed => Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.14))),
+        _ => Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.04))),
+    };
+    button::Style {
+        background: bg,
+        text_color: Theme::TEXT_SECONDARY,
+        border: Border {
+            color: Color::from_rgba(1.0, 1.0, 1.0, 0.08),
+            width: 1.0,
+            radius: 5.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Button style for inspector accent/primary action buttons
+pub fn inspector_accent_btn_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+    let bg = match status {
+        button::Status::Hovered => Some(Background::Color(Color::from_rgba(0.30, 0.60, 0.90, 0.25))),
+        button::Status::Pressed => Some(Background::Color(Color::from_rgba(0.30, 0.60, 0.90, 0.35))),
+        _ => Some(Background::Color(Color::from_rgba(0.30, 0.60, 0.90, 0.12))),
+    };
+    button::Style {
+        background: bg,
+        text_color: Theme::TEXT_ACCENT,
+        border: Border {
+            color: Color::from_rgba(0.30, 0.60, 0.90, 0.30),
+            width: 1.0,
+            radius: 5.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Button style for the inspector bookmark toggle
+pub fn inspector_bookmark_style(is_active: bool) -> impl Fn(&iced::Theme, button::Status) -> button::Style {
+    move |_theme: &iced::Theme, status: button::Status| {
+        let base = if is_active { Theme::WARNING } else { Theme::TEXT_MUTED };
+        let bg = match status {
+            button::Status::Hovered => Some(Background::Color(Color::from_rgba(base.r, base.g, base.b, 0.15))),
+            button::Status::Pressed => Some(Background::Color(Color::from_rgba(base.r, base.g, base.b, 0.25))),
+            _ => None,
+        };
+        button::Style {
+            background: bg,
+            text_color: base,
+            border: Border {
+                color: Color::TRANSPARENT,
+                width: 0.0,
+                radius: 4.0.into(),
+            },
+            ..Default::default()
+        }
+    }
+}
+
+/// Button style for small inline buttons (+Field, x remove)
+pub fn inspector_inline_btn_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+    let bg = match status {
+        button::Status::Hovered => Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.08))),
+        button::Status::Pressed => Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.12))),
+        _ => None,
+    };
+    button::Style {
+        background: bg,
+        text_color: Theme::TEXT_ACCENT,
+        border: Border {
+            color: Color::TRANSPARENT,
+            width: 0.0,
+            radius: 3.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Button style for small danger inline buttons (remove field)
+pub fn inspector_danger_btn_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+    let bg = match status {
+        button::Status::Hovered => Some(Background::Color(Color::from_rgba(0.90, 0.30, 0.30, 0.15))),
+        button::Status::Pressed => Some(Background::Color(Color::from_rgba(0.90, 0.30, 0.30, 0.25))),
+        _ => None,
+    };
+    button::Style {
+        background: bg,
+        text_color: Theme::ERROR,
+        border: Border {
+            color: Color::TRANSPARENT,
+            width: 0.0,
+            radius: 3.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for progress bar background track
+pub fn inspector_progress_bg_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.06))),
+        border: Border {
+            color: Color::TRANSPARENT,
+            width: 0.0,
+            radius: 3.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for progress bar fill with dynamic color
+pub fn inspector_progress_fill_style(color: Color) -> impl Fn(&iced::Theme) -> container::Style {
+    move |_theme: &iced::Theme| container::Style {
+        background: Some(Background::Color(Color::from_rgba(color.r, color.g, color.b, 0.75))),
+        border: Border {
+            color: Color::TRANSPARENT,
+            width: 0.0,
+            radius: 3.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
 // ── Shared Utility Functions ────────────────────────────────────────
 
 /// Format a number with abbreviated suffixes (1.2k, 3.5M)
