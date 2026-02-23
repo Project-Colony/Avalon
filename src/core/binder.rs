@@ -69,7 +69,9 @@ impl Binder {
 
     /// Find an item by title
     pub fn find_item_by_title(&self, title: &str) -> Option<&BinderItem> {
-        self.all_items().into_iter().find(|item| item.title == title)
+        self.draft.find_by_title(title)
+            .or_else(|| self.research.find_by_title(title))
+            .or_else(|| self.trash.find_by_title(title))
     }
 
     /// Move an item to trash
@@ -238,6 +240,19 @@ impl BinderItem {
         None
     }
 
+    /// Find an item by title recursively
+    pub fn find_by_title(&self, title: &str) -> Option<&BinderItem> {
+        if self.title == title {
+            return Some(self);
+        }
+        for child in &self.children {
+            if let Some(found) = child.find_by_title(title) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
     /// Find a mutable item by ID recursively
     pub fn find_mut(&mut self, id: &Uuid) -> Option<&mut BinderItem> {
         if &self.id == id {
@@ -300,9 +315,7 @@ impl BinderItem {
 
     /// Get the total word count for this item and all children
     pub fn total_word_count(&self) -> usize {
-        let own_count = self.document.as_ref()
-            .map(|d| d.word_count())
-            .unwrap_or(0);
+        let own_count = self.document.as_ref().map_or(0, |d| d.word_count());
         let children_count: usize = self.children.iter()
             .map(|c| c.total_word_count())
             .sum();
@@ -482,7 +495,10 @@ impl BinderItem {
                 if !merged.is_empty() {
                     merged.push_str("\n\n---\n\n");
                 }
-                merged.push_str(&format!("## {}\n\n{}", child.title, doc.content));
+                merged.push_str("## ");
+                merged.push_str(&child.title);
+                merged.push_str("\n\n");
+                merged.push_str(&doc.content);
             }
         }
         merged
@@ -521,7 +537,7 @@ impl Binder {
     pub fn longest_document(&self) -> Option<&BinderItem> {
         self.all_items().into_iter()
             .filter(|i| i.kind == BinderItemKind::Text)
-            .max_by_key(|i| i.document.as_ref().map(|d| d.word_count()).unwrap_or(0))
+            .max_by_key(|i| i.document.as_ref().map_or(0, |d| d.word_count()))
     }
 
     /// Get the depth of an item in the binder (across all root sections).
@@ -549,10 +565,9 @@ impl Binder {
 
     /// Get the maximum nesting depth across the entire binder.
     pub fn max_nesting_depth(&self) -> usize {
-        let d = self.draft.max_depth();
-        let r = self.research.max_depth();
-        let t = self.trash.max_depth();
-        d.max(r).max(t)
+        self.draft.max_depth()
+            .max(self.research.max_depth())
+            .max(self.trash.max_depth())
     }
 
     /// Get all leaf documents (items with no children that are text type).
