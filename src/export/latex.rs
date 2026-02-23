@@ -289,12 +289,7 @@ fn find_closing(chars: &[char], start: usize, c1: char, c2: char) -> Option<usiz
 
 /// Find closing single-char delimiter (e.g. *)
 fn find_closing_single(chars: &[char], start: usize, c: char) -> Option<usize> {
-    for i in start..chars.len() {
-        if chars[i] == c {
-            return Some(i);
-        }
-    }
-    None
+    (start..chars.len()).find(|&i| chars[i] == c)
 }
 
 /// Count total words across all content sections

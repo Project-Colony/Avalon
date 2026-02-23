@@ -122,18 +122,12 @@ fn parse_binder_items(xml: &str) -> Result<Vec<ScrivNode>> {
     let mut nodes = Vec::new();
     let mut search_from = 0;
 
-    loop {
-        // Find the next <BinderItem opening tag.
-        let tag_start = match xml[search_from..].find("<BinderItem ") {
-            Some(pos) => search_from + pos,
-            None => break,
-        };
+    while let Some(pos) = xml[search_from..].find("<BinderItem ") {
+        let tag_start = search_from + pos;
 
         // Locate the end of the opening tag.
-        let tag_close = match xml[tag_start..].find('>') {
-            Some(pos) => tag_start + pos,
-            None => break,
-        };
+        let Some(close_offset) = xml[tag_start..].find('>') else { break; };
+        let tag_close = tag_start + close_offset;
         let opening_tag = &xml[tag_start..=tag_close];
 
         // Extract attributes from the opening tag.
@@ -148,13 +142,10 @@ fn parse_binder_items(xml: &str) -> Result<Vec<ScrivNode>> {
 
         // Find the matching </BinderItem> by counting nesting depth.
         let after_open = tag_close + 1;
-        let close_pos = find_matching_close(xml, after_open, "BinderItem");
-        let close_end = match close_pos {
-            Some(pos) => pos + "</BinderItem>".len(),
-            None => break,
-        };
+        let Some(close_start) = find_matching_close(xml, after_open, "BinderItem") else { break; };
+        let close_end = close_start + "</BinderItem>".len();
 
-        let inner_xml = &xml[after_open..close_pos.unwrap_or(close_end)];
+        let inner_xml = &xml[after_open..close_start];
 
         // Extract <Title> text.
         let title = extract_element_text(inner_xml, "Title")

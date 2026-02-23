@@ -38,18 +38,12 @@ fn extract_wt_texts(xml: &str) -> Vec<String> {
     let mut results = Vec::new();
     let mut search_from = 0;
 
-    loop {
-        // Find the start of a <w:t> or <w:t ...> tag.
-        let tag_start = match xml[search_from..].find("<w:t") {
-            Some(pos) => search_from + pos,
-            None => break,
-        };
+    while let Some(pos) = xml[search_from..].find("<w:t") {
+        let tag_start = search_from + pos;
 
         // Locate the closing `>` of the opening tag.
-        let content_start = match xml[tag_start..].find('>') {
-            Some(pos) => tag_start + pos + 1,
-            None => break,
-        };
+        let Some(close_pos) = xml[tag_start..].find('>') else { break; };
+        let content_start = tag_start + close_pos + 1;
 
         // Check for self-closing tag `/>` — content_start is 1 past '>',
         // so the slice includes '>' and we check if '/' precedes it.
@@ -59,10 +53,8 @@ fn extract_wt_texts(xml: &str) -> Vec<String> {
         }
 
         // Find the matching `</w:t>`.
-        let content_end = match xml[content_start..].find("</w:t>") {
-            Some(pos) => content_start + pos,
-            None => break,
-        };
+        let Some(end_pos) = xml[content_start..].find("</w:t>") else { break; };
+        let content_end = content_start + end_pos;
 
         let text = &xml[content_start..content_end];
         results.push(text.to_string());
@@ -134,18 +126,12 @@ fn parse_paragraphs(xml: &str) -> Vec<DocxParagraph> {
     let mut paragraphs = Vec::new();
     let mut search_from = 0;
 
-    loop {
-        // Find the start of a <w:p> or <w:p ...> tag.
-        let p_start = match find_tag_start(&xml[search_from..], "w:p") {
-            Some(pos) => search_from + pos,
-            None => break,
-        };
+    while let Some(pos) = find_tag_start(&xml[search_from..], "w:p") {
+        let p_start = search_from + pos;
 
         // Find the matching </w:p>.
-        let p_end = match xml[p_start..].find("</w:p>") {
-            Some(pos) => p_start + pos + "</w:p>".len(),
-            None => break,
-        };
+        let Some(end_pos) = xml[p_start..].find("</w:p>") else { break; };
+        let p_end = p_start + end_pos + "</w:p>".len();
 
         let paragraph_xml = &xml[p_start..p_end];
 

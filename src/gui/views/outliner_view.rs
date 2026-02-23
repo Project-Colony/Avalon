@@ -112,7 +112,7 @@ fn collect_outline_rows(
 
     // Build section number
     let section_num = if depth > 0 {
-        counter.last_mut().map(|c| *c += 1);
+        if let Some(c) = counter.last_mut() { *c += 1; }
         let nums: Vec<String> = counter.iter().map(|c| c.to_string()).collect();
         nums.join(".")
     } else {

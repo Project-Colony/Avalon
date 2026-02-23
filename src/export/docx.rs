@@ -257,12 +257,7 @@ fn find_closing_double(chars: &[char], start: usize, c: char) -> Option<usize> {
 }
 
 fn find_closing_single(chars: &[char], start: usize, c: char) -> Option<usize> {
-    for i in start..chars.len() {
-        if chars[i] == c {
-            return Some(i);
-        }
-    }
-    None
+    (start..chars.len()).find(|&i| chars[i] == c)
 }
 
 /// Estimate page count from word count

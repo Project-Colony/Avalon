@@ -220,7 +220,7 @@ impl OutlinerState {
     }
 
     /// Apply the current sort settings to a vec of rows
-    pub fn apply_sort(&self, rows: &mut Vec<OutlinerRow>) {
+    pub fn apply_sort(&self, rows: &mut [OutlinerRow]) {
         if let Some(ref col) = self.settings.sort_column {
             let col = *col;
             let ascending = self.settings.sort_ascending;

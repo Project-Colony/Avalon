@@ -254,7 +254,7 @@ pub struct RepetitionWarning {
 ///
 /// - `min_length`: ignore words shorter than this many characters.
 /// - `max_distance`: maximum number of words apart two occurrences can be
-///    to count as a close repetition.
+///   to count as a close repetition.
 pub fn detect_repetitions(
     text: &str,
     min_length: usize,

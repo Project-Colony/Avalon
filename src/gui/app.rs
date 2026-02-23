@@ -223,7 +223,7 @@ pub enum Message {
     NewFromTemplate(String),
     OpenProject,
     SaveProject,
-    ProjectLoaded(Option<Project>),
+    ProjectLoaded(Box<Option<Project>>),
 
     // Binder operations
     SelectBinderItem(Uuid),
@@ -767,7 +767,7 @@ impl ScrineverApp {
             }
 
             Message::ProjectLoaded(project) => {
-                if let Some(p) = project {
+                if let Some(p) = *project {
                     self.compile_options.title = p.title.clone();
                     self.project_notes_text = p.project_notes.clone();
                     self.compile_presets = p.compile_presets.clone();
@@ -2432,7 +2432,7 @@ impl ScrineverApp {
                     "Revision 3" => Some(crate::core::script::RevisionLevel::Third),
                     "Revision 4" => Some(crate::core::script::RevisionLevel::Fourth),
                     "Revision 5" => Some(crate::core::script::RevisionLevel::Fifth),
-                    "None" | _ => None,
+                    _ => None,
                 };
             }
 
@@ -2856,8 +2856,7 @@ impl ScrineverApp {
                                 is_folder: false,
                                 depth: 0,
                             }];
-                            let mut opts = CompileOptions::default();
-                            opts.title = item.title.clone();
+                            let opts = CompileOptions { title: item.title.clone(), ..CompileOptions::default() };
                             let home = dirs::home_dir().unwrap_or_default();
                             let print_path = home.join("Scrinever Projects").join("print.pdf");
                             if let Some(parent) = print_path.parent() {
