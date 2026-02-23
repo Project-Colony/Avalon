@@ -22,6 +22,13 @@ pub struct EditorState {
     pub content: iced::widget::text_editor::Content,
 }
 
+/// An entry in the undo/redo stack
+#[derive(Debug, Clone)]
+pub struct UndoEntry {
+    pub content: String,
+    pub cursor: usize,
+}
+
 impl EditorState {
     pub fn new() -> Self {
         Self {
@@ -218,9 +225,7 @@ impl EditorState {
             false
         }
     }
-}
 
-impl EditorState {
     /// Get the current line text
     pub fn current_line_text(&self) -> String {
         let text = self.text();
@@ -302,16 +307,7 @@ impl EditorState {
         self.undo_stack.clear();
         self.redo_stack.clear();
     }
-}
 
-/// An entry in the undo/redo stack
-#[derive(Debug, Clone)]
-pub struct UndoEntry {
-    pub content: String,
-    pub cursor: usize,
-}
-
-impl EditorState {
     /// Find all occurrences of a query in the document text
     pub fn find_all(&self, query: &str, case_sensitive: bool) -> Vec<(usize, usize)> {
         let text = self.text();
@@ -460,9 +456,7 @@ impl EditorState {
             self.redo_depth(),
         )
     }
-}
 
-impl EditorState {
     /// Transpose the two characters around the cursor
     pub fn transpose_chars(&mut self) {
         let text = self.document.content.clone();
@@ -806,9 +800,7 @@ impl EditorState {
         self.content = iced::widget::text_editor::Content::with_text(&new_content);
         self.dirty = true;
     }
-}
 
-impl EditorState {
     /// Reverse the order of all lines in the document
     pub fn reverse_lines(&mut self) {
         let text = self.document.content.clone();
