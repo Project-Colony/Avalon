@@ -207,6 +207,28 @@ impl LinkHealthSummary {
         }
         parts.join(", ")
     }
+
+    /// Health score as a percentage (0-100)
+    pub fn health_score(&self) -> f64 {
+        if self.total_links == 0 {
+            return 100.0;
+        }
+        (self.valid_links as f64 / self.total_links as f64) * 100.0
+    }
+
+    /// Health grade label
+    pub fn health_grade(&self) -> &str {
+        let score = self.health_score();
+        if score >= 100.0 { "Excellent" }
+        else if score >= 80.0 { "Good" }
+        else if score >= 50.0 { "Needs Work" }
+        else { "Poor" }
+    }
+
+    /// Whether there are broken links that need fixing
+    pub fn needs_attention(&self) -> bool {
+        self.broken_links > 0 || self.ambiguous_links > 0
+    }
 }
 
 /// A broken link that needs attention
@@ -305,30 +327,6 @@ impl LinkValidation {
     /// Convenience: is the link broken?
     pub fn is_broken(&self) -> bool {
         self.status.is_broken()
-    }
-}
-
-impl LinkHealthSummary {
-    /// Health score as a percentage (0-100)
-    pub fn health_score(&self) -> f64 {
-        if self.total_links == 0 {
-            return 100.0;
-        }
-        (self.valid_links as f64 / self.total_links as f64) * 100.0
-    }
-
-    /// Health grade label
-    pub fn health_grade(&self) -> &str {
-        let score = self.health_score();
-        if score >= 100.0 { "Excellent" }
-        else if score >= 80.0 { "Good" }
-        else if score >= 50.0 { "Needs Work" }
-        else { "Poor" }
-    }
-
-    /// Whether there are broken links that need fixing
-    pub fn needs_attention(&self) -> bool {
-        self.broken_links > 0 || self.ambiguous_links > 0
     }
 }
 

@@ -104,12 +104,18 @@ impl Binder {
 
     /// Get all text content concatenated (for readability analysis)
     pub fn all_text(&self) -> String {
-        self.all_items().iter()
-            .filter_map(|i| i.document.as_ref())
-            .filter(|d| !d.content.trim().is_empty())
-            .map(|d| d.content.as_str())
-            .collect::<Vec<_>>()
-            .join("\n\n")
+        let mut result = String::new();
+        for item in self.all_items() {
+            if let Some(ref doc) = item.document {
+                if !doc.content.trim().is_empty() {
+                    if !result.is_empty() {
+                        result.push_str("\n\n");
+                    }
+                    result.push_str(&doc.content);
+                }
+            }
+        }
+        result
     }
 
     /// Move an item up in its parent's children list
@@ -133,13 +139,8 @@ impl Binder {
 
     /// Duplicate an item (creates a copy next to the original)
     pub fn duplicate_item(&mut self, id: &Uuid) -> Option<Uuid> {
-        if let Some(new_id) = self.draft.duplicate_child(id) {
-            return Some(new_id);
-        }
-        if let Some(new_id) = self.research.duplicate_child(id) {
-            return Some(new_id);
-        }
-        None
+        self.draft.duplicate_child(id)
+            .or_else(|| self.research.duplicate_child(id))
     }
 
     /// Convert a text item into a folder (keeps content as a child document)
@@ -358,11 +359,15 @@ impl BinderItem {
     /// Collect all descendant IDs (children, grandchildren, etc.) recursively.
     pub fn descendant_ids(&self) -> Vec<Uuid> {
         let mut ids = Vec::new();
+        self.collect_descendant_ids(&mut ids);
+        ids
+    }
+
+    fn collect_descendant_ids(&self, ids: &mut Vec<Uuid>) {
         for child in &self.children {
             ids.push(child.id);
-            ids.extend(child.descendant_ids());
+            child.collect_descendant_ids(ids);
         }
-        ids
     }
 
     /// Check if a target item is a descendant of this node.
@@ -378,13 +383,17 @@ impl BinderItem {
     /// Get all leaf (text/document) items under this node.
     pub fn leaf_items(&self) -> Vec<&BinderItem> {
         let mut leaves = Vec::new();
+        self.collect_leaf_items(&mut leaves);
+        leaves
+    }
+
+    fn collect_leaf_items<'a>(&'a self, leaves: &mut Vec<&'a BinderItem>) {
         if self.children.is_empty() && self.kind == BinderItemKind::Text {
             leaves.push(self);
         }
         for child in &self.children {
-            leaves.extend(child.leaf_items());
+            child.collect_leaf_items(leaves);
         }
-        leaves
     }
 
     /// Count total descendants (not including self).
@@ -398,9 +407,6 @@ impl BinderItem {
 
     /// Get the maximum nesting depth under this node.
     pub fn max_depth(&self) -> usize {
-        if self.children.is_empty() {
-            return 0;
-        }
         self.children.iter()
             .map(|c| 1 + c.max_depth())
             .max()
@@ -556,11 +562,7 @@ impl Binder {
 
     /// Get all descendant IDs under a given item.
     pub fn descendants_of(&self, id: &Uuid) -> Vec<Uuid> {
-        if let Some(item) = self.find_item(id) {
-            item.descendant_ids()
-        } else {
-            Vec::new()
-        }
+        self.find_item(id).map_or_else(Vec::new, |item| item.descendant_ids())
     }
 
     /// Get the maximum nesting depth across the entire binder.
@@ -799,10 +801,10 @@ impl Binder {
             return new_ids;
         }
 
-        for (i, section) in sections.iter().enumerate() {
+        for (i, section) in sections.into_iter().enumerate() {
             let mut new_item = BinderItem::new_text(&format!("{} - Part {}", title, i + 1));
             if let Some(ref mut doc) = new_item.document {
-                doc.content = section.clone();
+                doc.content = section;
             }
             new_ids.push(new_item.id);
             self.draft.add_child(new_item);
@@ -841,15 +843,8 @@ impl Binder {
             return None;
         }
 
-        // Try in draft first
-        if let Some(id) = self.draft.group_children(item_ids, folder_title) {
-            return Some(id);
-        }
-        // Try in research
-        if let Some(id) = self.research.group_children(item_ids, folder_title) {
-            return Some(id);
-        }
-        None
+        self.draft.group_children(item_ids, folder_title)
+            .or_else(|| self.research.group_children(item_ids, folder_title))
     }
 }
 
@@ -908,8 +903,8 @@ impl BinderItem {
         }
 
         // Remove items (in reverse order to preserve indices)
-        let mut sorted_positions = positions.clone();
-        sorted_positions.sort();
+        let mut sorted_positions = positions;
+        sorted_positions.sort_unstable();
         sorted_positions.reverse();
 
         let mut items_to_group = Vec::new();
