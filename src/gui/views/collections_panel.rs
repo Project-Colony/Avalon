@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use iced::widget::{button, column, container, row, scrollable, text, text_input, Space};
 use iced::{Element, Length, Padding};
 use uuid::Uuid;
@@ -29,7 +30,7 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
 
     // Count unique items across all collections
     let unique_items: usize = {
-        let all: std::collections::HashSet<Uuid> = data.collections.iter()
+        let all: HashSet<Uuid> = data.collections.iter()
             .flat_map(|c| c.item_ids.iter().copied())
             .collect();
         all.len()

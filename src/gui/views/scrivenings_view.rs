@@ -79,13 +79,11 @@ pub fn view<'a>(
 
         for (i, item) in items.iter().enumerate() {
             let words = item.document.as_ref()
-                .map(|d| d.word_count())
-                .unwrap_or(0);
+                .map_or(0, |d| d.word_count());
             cumulative_words += words;
 
             let chars = item.document.as_ref()
-                .map(|d| d.char_count())
-                .unwrap_or(0);
+                .map_or(0, |d| d.char_count());
 
             // Progress through the composite document
             let progress_pct = if total_words > 0 {
@@ -96,16 +94,13 @@ pub fn view<'a>(
 
             // Document title header with section number, status, and label
             let status_text = item.metadata.status.as_ref()
-                .map(|s| format!(" [{}]", s.name))
-                .unwrap_or_default();
+                .map_or_else(String::new, |s| format!(" [{}]", s.name));
 
             let label_indicator = item.metadata.label.as_ref()
-                .map(|l| format!(" \u{f111} {}", l.name))
-                .unwrap_or_default();
+                .map_or_else(String::new, |l| format!(" \u{f111} {}", l.name));
 
             let label_color = item.metadata.label.as_ref()
-                .map(|l| l.color.to_iced_color())
-                .unwrap_or(Theme::TEXT_ACCENT);
+                .map_or(Theme::TEXT_ACCENT, |l| l.color.to_iced_color());
 
             // Section marker
             let section_marker = format!("\u{2503} {}.", i + 1);
@@ -170,8 +165,7 @@ pub fn view<'a>(
 
             // Document content
             let doc_content = item.document.as_ref()
-                .map(|d| d.content.as_str())
-                .unwrap_or("");
+                .map_or("", |d| d.content.as_str());
 
             let doc_text = container(
                 text(doc_content.to_string())

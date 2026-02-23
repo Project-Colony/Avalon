@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use iced::keyboard;
 use iced::widget::{column, container, row, stack, text, text_editor, Space};
 use iced::{Element, Length, Padding, Subscription, Task as IcedTask};
@@ -124,7 +125,7 @@ pub struct ScrineverApp {
     pub notes_text: String,
 
     // === Target word count per item ===
-    pub item_targets: std::collections::HashMap<Uuid, usize>,
+    pub item_targets: HashMap<Uuid, usize>,
 
     // === Notification ===
     pub notification: Option<String>,
@@ -588,7 +589,7 @@ impl ScrineverApp {
             thesaurus_query: String::new(),
             thesaurus_results: Vec::new(),
             notes_text: String::new(),
-            item_targets: std::collections::HashMap::new(),
+            item_targets: HashMap::new(),
             notification: None,
             notification_timer: 0,
             auto_save_counter: 0,
@@ -665,8 +666,7 @@ impl ScrineverApp {
     /// Get the current total word count for session tracking
     fn current_word_count(&self) -> usize {
         self.project.as_ref()
-            .map(|p| p.binder.total_word_count())
-            .unwrap_or(0)
+            .map_or(0, |p| p.binder.total_word_count())
     }
 
     /// Insert markdown-style wrapping markup (e.g., ** for bold)
@@ -720,7 +720,7 @@ impl ScrineverApp {
                     if let Ok(entries) = std::fs::read_dir(&projects_dir) {
                         for entry in entries.flatten() {
                             let path = entry.path();
-                            if path.is_dir() && path.extension().map(|e| e == "scriv").unwrap_or(false) {
+                            if path.is_dir() && path.extension().map_or(false, |e| e == "scriv") {
                                 match Project::load(&path) {
                                     Ok(p) => {
                                         self.compile_options.title = p.title.clone();
@@ -971,8 +971,7 @@ impl ScrineverApp {
                     if let Some(content) = split_content {
                         let mid = content.len() / 2;
                         let split_pos = content[mid..].find("\n\n")
-                            .map(|p| p + mid)
-                            .unwrap_or(mid);
+                            .map_or(mid, |p| p + mid);
 
                         if split_pos > 0 && split_pos < content.len() {
                             let first_half = content[..split_pos].to_string();
@@ -1914,8 +1913,7 @@ impl ScrineverApp {
             Message::ToggleBookmark(item_id) => {
                 if let Some(ref mut project) = self.project {
                     let name = project.binder.find_item(&item_id)
-                        .map(|i| i.title.clone())
-                        .unwrap_or_default();
+                        .map_or_else(String::new, |i| i.title.clone());
                     project.bookmarks.toggle(item_id, &name);
                 }
             }

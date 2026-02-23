@@ -89,11 +89,9 @@ impl InspectorData {
             keywords: item.metadata.keywords.clone(),
             is_bookmarked,
             footnote_count: item.document.as_ref()
-                .map(|d| d.footnotes.len())
-                .unwrap_or(0),
+                .map_or(0, |d| d.footnotes.len()),
             reference_count: item.document.as_ref()
-                .map(|d| d.references.len())
-                .unwrap_or(0),
+                .map_or(0, |d| d.references.len()),
             custom_fields: item.metadata.custom_metadata.iter()
                 .map(|f| {
                     let val = match &f.value {
