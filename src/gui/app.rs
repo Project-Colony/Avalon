@@ -63,12 +63,22 @@ pub enum ToolbarMenu {
     Tools,
 }
 
+/// Active tab in the Settings window
+#[derive(Debug, Clone, PartialEq)]
+pub enum SettingsTab {
+    General,
+    Appearance,
+    Accessibility,
+    Avalon,
+}
+
 /// Application state
 pub struct ScrineverApp {
     // === Windows ===
     pub main_window: window::Id,
     pub settings_window: Option<window::Id>,
     pub about_window: Option<window::Id>,
+    pub settings_active_tab: SettingsTab,
 
     // === Project ===
     pub project: Option<Project>,
@@ -284,9 +294,10 @@ pub enum Message {
     WindowClosed(window::Id),
     MainWindowClosed,
 
-    // Settings dialog (legacy kept for compatibility)
+    // Settings
     ShowSettings,
     HideSettings,
+    SettingsChangeTab(SettingsTab),
     SettingsSetProjectTitle(String),
     SettingsSetFont(String),
     SettingsSetFontSize(String),
@@ -295,6 +306,23 @@ pub enum Message {
     SettingsSetTarget(String),
     SettingsSetAutoSave(String),
     SettingsToggleWordCount(bool),
+    SettingsSetLineSpacing(String),
+    SettingsSetLineSpacingPreset(String),
+    SettingsSetEditorWidth(String),
+    SettingsToggleSpellCheck(bool),
+    SettingsToggleTypewriterScroll(bool),
+    SettingsToggleShowParagraphMarks(bool),
+    SettingsToggleHighContrast(bool),
+    SettingsToggleLargeUI(bool),
+    SettingsToggleReduceMotion(bool),
+    SettingsToggleScreenReaderHints(bool),
+    SettingsSetUIScale(String),
+    SettingsToggleAutoBackup(bool),
+    SettingsSetBackupInterval(String),
+    SettingsToggleSmartPunctuation(bool),
+    SettingsSetDefaultDocType(String),
+    SettingsToggleShowSynopsis(bool),
+    SettingsToggleAutoNumbering(bool),
 
     // Writing session
     SessionToggle,
@@ -528,6 +556,7 @@ impl ScrineverApp {
             main_window: main_id,
             settings_window: None,
             about_window: None,
+            settings_active_tab: SettingsTab::General,
             project: None,
             selected_item: None,
             editor: EditorState::new(),
@@ -1357,7 +1386,7 @@ impl ScrineverApp {
                     }
                 }
                 let (id, open_task) = window::open(window::Settings {
-                    size: iced::Size::new(520.0, 650.0),
+                    size: iced::Size::new(780.0, 680.0),
                     ..window::Settings::default()
                 });
                 self.settings_window = Some(id);
@@ -1491,6 +1520,135 @@ impl ScrineverApp {
             Message::SettingsToggleWordCount(val) => {
                 if let Some(ref mut project) = self.project {
                     project.settings.show_word_count = val;
+                }
+            }
+
+            Message::SettingsChangeTab(tab) => {
+                self.settings_active_tab = tab;
+            }
+
+            Message::SettingsSetLineSpacing(val) => {
+                if let Ok(spacing) = val.parse::<f32>() {
+                    if (0.5..=4.0).contains(&spacing) {
+                        if let Some(ref mut project) = self.project {
+                            project.settings.line_spacing = spacing;
+                        }
+                    }
+                }
+            }
+
+            Message::SettingsSetLineSpacingPreset(preset) => {
+                let spacing = match preset.as_str() {
+                    "Single" => 1.0,
+                    "1.15" => 1.15,
+                    "1.5" => 1.5,
+                    "Double" => 2.0,
+                    _ => 1.5,
+                };
+                if let Some(ref mut project) = self.project {
+                    project.settings.line_spacing = spacing;
+                }
+            }
+
+            Message::SettingsSetEditorWidth(val) => {
+                if let Ok(w) = val.parse::<f32>() {
+                    if (30.0..=100.0).contains(&w) {
+                        if let Some(ref mut project) = self.project {
+                            project.settings.editor_width = w;
+                        }
+                    }
+                }
+            }
+
+            Message::SettingsToggleSpellCheck(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.spell_check_enabled = val;
+                }
+            }
+
+            Message::SettingsToggleTypewriterScroll(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.typewriter_scroll = val;
+                }
+            }
+
+            Message::SettingsToggleShowParagraphMarks(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.show_paragraph_marks = val;
+                }
+            }
+
+            Message::SettingsToggleHighContrast(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.high_contrast = val;
+                }
+            }
+
+            Message::SettingsToggleLargeUI(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.large_ui = val;
+                }
+            }
+
+            Message::SettingsToggleReduceMotion(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.reduce_motion = val;
+                }
+            }
+
+            Message::SettingsToggleScreenReaderHints(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.screen_reader_hints = val;
+                }
+            }
+
+            Message::SettingsSetUIScale(val) => {
+                if let Ok(scale) = val.parse::<f32>() {
+                    if (0.5..=3.0).contains(&scale) {
+                        if let Some(ref mut project) = self.project {
+                            project.settings.ui_scale = scale;
+                        }
+                    }
+                }
+            }
+
+            Message::SettingsToggleAutoBackup(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.auto_backup = val;
+                }
+            }
+
+            Message::SettingsSetBackupInterval(val) => {
+                if let Ok(n) = val.parse::<u32>() {
+                    if n > 0 && n <= 100 {
+                        if let Some(ref mut project) = self.project {
+                            project.settings.backup_interval_saves = n;
+                        }
+                    }
+                }
+            }
+
+            Message::SettingsToggleSmartPunctuation(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.smart_punctuation = val;
+                }
+            }
+
+            Message::SettingsSetDefaultDocType(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.default_doc_type = val;
+                }
+            }
+
+            Message::SettingsToggleShowSynopsis(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.show_synopsis_in_binder = val;
+                }
+            }
+
+            Message::SettingsToggleAutoNumbering(val) => {
+                if let Some(ref mut project) = self.project {
+                    project.settings.auto_numbering = val;
                 }
             }
 
@@ -3363,6 +3521,7 @@ impl ScrineverApp {
                     &project.title,
                     self.script_mode,
                     &self.auto_correction,
+                    &self.settings_active_tab,
                 );
             }
             // No project open — show placeholder

@@ -290,6 +290,44 @@ pub struct ProjectSettings {
     pub composition_bg_color: Option<String>,
     #[serde(default = "default_line_spacing")]
     pub line_spacing: f32,
+
+    // --- Appearance ---
+    #[serde(default = "default_editor_width")]
+    pub editor_width: f32,
+
+    // --- Editor behavior ---
+    #[serde(default)]
+    pub typewriter_scroll: bool,
+    #[serde(default)]
+    pub show_paragraph_marks: bool,
+    #[serde(default = "default_true")]
+    pub spell_check_enabled: bool,
+    #[serde(default = "default_true")]
+    pub smart_punctuation: bool,
+    #[serde(default)]
+    pub default_doc_type: String,
+    #[serde(default = "default_true")]
+    pub show_synopsis_in_binder: bool,
+    #[serde(default)]
+    pub auto_numbering: bool,
+
+    // --- Accessibility ---
+    #[serde(default)]
+    pub high_contrast: bool,
+    #[serde(default)]
+    pub large_ui: bool,
+    #[serde(default)]
+    pub reduce_motion: bool,
+    #[serde(default)]
+    pub screen_reader_hints: bool,
+    #[serde(default = "default_ui_scale")]
+    pub ui_scale: f32,
+
+    // --- Backup ---
+    #[serde(default = "default_true")]
+    pub auto_backup: bool,
+    #[serde(default = "default_backup_interval")]
+    pub backup_interval_saves: u32,
 }
 
 fn default_fullscreen_bg() -> String {
@@ -302,6 +340,22 @@ fn default_fullscreen_width() -> f32 {
 
 fn default_line_spacing() -> f32 {
     1.5
+}
+
+fn default_editor_width() -> f32 {
+    80.0
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_ui_scale() -> f32 {
+    1.0
+}
+
+fn default_backup_interval() -> u32 {
+    10
 }
 
 impl Default for ProjectSettings {
@@ -327,6 +381,21 @@ impl Default for ProjectSettings {
             fullscreen_text_width: default_fullscreen_width(),
             composition_bg_color: None,
             line_spacing: default_line_spacing(),
+            editor_width: default_editor_width(),
+            typewriter_scroll: false,
+            show_paragraph_marks: false,
+            spell_check_enabled: true,
+            smart_punctuation: true,
+            default_doc_type: String::new(),
+            show_synopsis_in_binder: true,
+            auto_numbering: false,
+            high_contrast: false,
+            large_ui: false,
+            reduce_motion: false,
+            screen_reader_hints: false,
+            ui_scale: default_ui_scale(),
+            auto_backup: true,
+            backup_interval_saves: default_backup_interval(),
         }
     }
 }
