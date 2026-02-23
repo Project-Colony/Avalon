@@ -1,10 +1,15 @@
 use iced::widget::{button, column, container, row, scrollable, text, Space};
-use iced::{Element, Length, Padding};
+use iced::{Color, Element, Length, Padding};
 use uuid::Uuid;
 
 use crate::core::binder::{BinderItem, BinderItemKind};
 use crate::gui::app::Message;
 use crate::gui::theme::{self, Icons, Theme};
+
+/// Section accent colors
+const DRAFT_ACCENT: Color = Color::from_rgb(0.35, 0.65, 0.95);
+const RESEARCH_ACCENT: Color = Color::from_rgb(0.55, 0.78, 0.45);
+const TRASH_ACCENT: Color = Color::from_rgb(0.75, 0.45, 0.45);
 
 /// Render the binder sidebar
 pub fn view(
@@ -13,91 +18,99 @@ pub fn view(
     trash: &BinderItem,
     selected_id: Option<Uuid>,
 ) -> Element<'static, Message> {
+    // ── Header ──────────────────────────────────────────
     let header = container(
         row![
-            text(Icons::BOOK).size(12).color(Theme::TEXT_ACCENT),
-            Space::with_width(6),
-            text("BINDER")
-                .size(11)
+            text(Icons::BOOK).size(13).color(Theme::TEXT_ACCENT),
+            Space::with_width(8),
+            text("Binder")
+                .size(12)
                 .color(Theme::TEXT_SECONDARY),
         ]
         .align_y(iced::Alignment::Center),
     )
     .style(theme::panel_header_style)
-    .padding(Padding::from([8, 12]))
+    .padding(Padding::from([10, 14]))
     .width(Length::Fill);
 
-    let draft_tree = render_section("Draft", draft, selected_id, 0);
-    let research_tree = render_section("Research", research, selected_id, 0);
-    let trash_tree = render_section("Trash", trash, selected_id, 0);
+    // ── Section trees ───────────────────────────────────
+    let draft_tree = render_section(
+        "Draft",
+        Icons::PENCIL_SQUARE,
+        DRAFT_ACCENT,
+        draft,
+        selected_id,
+    );
+    let research_tree = render_section(
+        "Research",
+        Icons::SEARCH,
+        RESEARCH_ACCENT,
+        research,
+        selected_id,
+    );
+    let trash_tree = render_section(
+        "Trash",
+        Icons::BAN,
+        TRASH_ACCENT,
+        trash,
+        selected_id,
+    );
 
-    // Action buttons row
-    let add_doc_btn = small_action_btn("+Doc", Message::NewDocument);
-    let add_folder_btn = small_action_btn("+Folder", Message::NewFolder);
-
-    let action_row = row![
-        add_doc_btn,
-        Space::with_width(4),
-        add_folder_btn,
-    ]
-    .spacing(2);
-
-    // Selected item actions
-    let selected_actions: Element<'static, Message> = if let Some(sel_id) = selected_id {
-        let move_up_btn = small_action_btn("Up", Message::MoveItemUp(sel_id));
-        let move_down_btn = small_action_btn("Dn", Message::MoveItemDown(sel_id));
-        let delete_btn = small_action_btn("Del", Message::DeleteItem(sel_id));
-        let dup_btn = small_action_btn("Dup", Message::DuplicateItem(sel_id));
-
-        row![
-            move_up_btn,
-            move_down_btn,
-            delete_btn,
-            dup_btn,
-        ]
-        .spacing(2)
-        .into()
-    } else {
-        Space::with_height(0).into()
-    };
-
-    // Empty trash button (only if trash has items)
+    // ── Empty trash button ──────────────────────────────
     let trash_actions: Element<'static, Message> = if !trash.children.is_empty() {
-        button(
-            text("Empty Trash").size(11).color(Theme::ERROR),
+        let trash_count = trash.children.len();
+        container(
+            button(
+                row![
+                    text(Icons::TIMES).size(11).color(Theme::ERROR),
+                    Space::with_width(6),
+                    text(format!("Empty Trash ({})", trash_count))
+                        .size(11),
+                ]
+                .align_y(iced::Alignment::Center),
+            )
+            .on_press(Message::EmptyTrash)
+            .style(theme::binder_danger_btn_style)
+            .padding(Padding::from([5, 10]))
+            .width(Length::Fill),
         )
-        .on_press(Message::EmptyTrash)
-        .padding(Padding::from([3, 8]))
-        .width(Length::Fill)
+        .padding(Padding { top: 0.0, right: 8.0, bottom: 4.0, left: 8.0 })
         .into()
     } else {
         Space::with_height(0).into()
     };
+
+    // ── Separator helper ────────────────────────────────
+    let sep = || -> Element<'static, Message> {
+        container(Space::with_height(0))
+            .style(theme::binder_separator_style)
+            .height(1)
+            .width(Length::Fill)
+            .padding(Padding::from([0, 10]))
+            .into()
+    };
+
+    // ── Main scrollable content ─────────────────────────
+    let tree_content = column![
+        draft_tree,
+        sep(),
+        research_tree,
+        sep(),
+        trash_tree,
+        trash_actions,
+        Space::with_height(8),
+    ]
+    .width(Length::Fill);
+
+    // ── Bottom action bar ───────────────────────────────
+    let action_bar = build_action_bar(selected_id);
 
     let content = column![
         header,
-        scrollable(
-            column![
-                draft_tree,
-                Space::with_height(8),
-                research_tree,
-                Space::with_height(8),
-                trash_tree,
-                trash_actions,
-            ]
-            .width(Length::Fill)
-        )
-        .height(Length::Fill),
-        container(
-            column![
-                action_row,
-                selected_actions,
-            ]
-            .spacing(4)
-        )
-        .padding(8),
+        scrollable(tree_content).height(Length::Fill),
+        action_bar,
     ]
-    .width(Length::Fixed(240.0));
+    .width(Length::Fixed(250.0));
 
     container(content)
         .style(theme::sidebar_style)
@@ -108,68 +121,89 @@ pub fn view(
 /// Render a top-level section (Draft, Research, Trash)
 fn render_section(
     label: &str,
+    icon: &str,
+    accent: Color,
     item: &BinderItem,
     selected_id: Option<Uuid>,
-    depth: usize,
 ) -> Element<'static, Message> {
     let mut col = column![];
 
-    // Section header with item counts
-    let icon = if item.expanded { "\u{f0d7} " } else { "\u{f0da} " };
+    // ── Section header ──────────────────────────────────
+    let chevron = if item.expanded {
+        Icons::CARET_DOWN
+    } else {
+        Icons::CARET_RIGHT
+    };
+
     let doc_count = count_docs(item);
-    let folder_count = count_folders(item);
     let total_words = item.total_word_count();
-    let count_info = if doc_count > 0 || folder_count > 0 {
-        let mut parts = Vec::new();
-        if doc_count > 0 { parts.push(format!("{}d", doc_count)); }
-        if folder_count > 0 { parts.push(format!("{}f", folder_count)); }
-        if total_words > 0 {
+
+    // Badge with count info
+    let badge: Element<'static, Message> = if doc_count > 0 || total_words > 0 {
+        let badge_text = if total_words > 0 {
             let word_label = if total_words >= 1000 {
                 format!("{:.1}k", total_words as f64 / 1000.0)
             } else {
                 total_words.to_string()
             };
-            parts.push(format!("{}w", word_label));
-        }
-        format!(" ({})", parts.join(" "))
+            format!("{} {} w", doc_count, word_label)
+        } else {
+            format!("{}", doc_count)
+        };
+
+        container(
+            text(badge_text).size(9).color(Theme::TEXT_MUTED),
+        )
+        .style(theme::binder_badge_style)
+        .padding(Padding::from([2, 6]))
+        .into()
     } else {
-        String::new()
+        Space::with_width(0).into()
     };
-    let header_text = format!("{}{}{}", icon, label.to_uppercase(), count_info);
 
-    let header_btn = button(
-        text(header_text)
-            .size(12)
-            .color(Theme::TEXT_SECONDARY),
-    )
-    .on_press(Message::ToggleBinderItem(item.id))
-    .padding(Padding::from([4, 12]))
-    .width(Length::Fill);
+    let icon_owned = icon.to_string();
+    let label_owned = label.to_string();
 
-    col = col.push(header_btn);
+    let header_row = row![
+        text(chevron).size(10).color(Theme::TEXT_MUTED),
+        Space::with_width(6),
+        text(icon_owned).size(13).color(accent),
+        Space::with_width(6),
+        text(label_owned).size(12).color(Theme::TEXT_PRIMARY),
+        Space::with_width(Length::Fill),
+        badge,
+    ]
+    .align_y(iced::Alignment::Center);
 
-    // Children (if expanded)
+    let header_btn = button(header_row)
+        .on_press(Message::ToggleBinderItem(item.id))
+        .style(theme::binder_section_btn_style)
+        .padding(Padding::from([7, 12]))
+        .width(Length::Fill);
+
+    let section_header = container(header_btn)
+        .style(theme::binder_section_header_style(accent))
+        .padding(Padding::from([4, 6]))
+        .width(Length::Fill);
+
+    col = col.push(section_header);
+
+    // ── Children (if expanded) ──────────────────────────
     if item.expanded {
+        let mut items_col = column![].spacing(1).padding(Padding::from([2, 0]));
         for child in &item.children {
-            col = col.push(render_item(child, selected_id, depth + 1));
+            items_col = items_col.push(render_item(child, selected_id, 1));
         }
+        col = col.push(items_col);
     }
 
-    col.into()
+    col.spacing(2).into()
 }
 
 /// Count documents in a binder section (recursive)
 fn count_docs(item: &BinderItem) -> usize {
     let self_count = if item.kind == BinderItemKind::Text { 1 } else { 0 };
     self_count + item.children.iter().map(|c| count_docs(c)).sum::<usize>()
-}
-
-/// Count folders in a binder section (recursive, excluding root)
-fn count_folders(item: &BinderItem) -> usize {
-    item.children.iter().map(|c| {
-        let self_count = if c.kind == BinderItemKind::Folder { 1 } else { 0 };
-        self_count + count_folders(c)
-    }).sum::<usize>()
 }
 
 /// Render a single binder item and its children
@@ -181,39 +215,29 @@ fn render_item(
     let mut col = column![];
 
     let is_selected = selected_id == Some(item.id);
-    let indent = depth as u16 * 16;
+    let indent = (depth as u16).saturating_sub(1) * 14 + 8;
 
-    let icon = match item.kind {
+    // ── Icon ────────────────────────────────────────────
+    let (icon_str, icon_color) = match item.kind {
         BinderItemKind::Folder => {
-            if item.expanded { "\u{f07c} " } else { "\u{f07b} " }
+            let ic = if item.expanded { Icons::FOLDER_OPEN } else { Icons::FOLDER };
+            (ic, Color::from_rgb(0.75, 0.65, 0.40))
         }
-        BinderItemKind::Text => "\u{f15c} ",
-        BinderItemKind::Image => "\u{f1c5} ",
-        BinderItemKind::Pdf => "\u{f1c1} ",
-        BinderItemKind::WebPage => "\u{f0ac} ",
+        BinderItemKind::Text => (Icons::FILE_TEXT, Color::from_rgb(0.55, 0.70, 0.85)),
+        BinderItemKind::Image => (Icons::FILE_IMAGE, Color::from_rgb(0.70, 0.55, 0.80)),
+        BinderItemKind::Pdf => (Icons::FILE_PDF, Color::from_rgb(0.85, 0.45, 0.40)),
+        BinderItemKind::WebPage => (Icons::GLOBE, Color::from_rgb(0.45, 0.75, 0.65)),
     };
 
-    // Compile indicator
-    let compile_icon = if item.include_in_compile { "" } else { "\u{f05e}" }; // circled minus for excluded
-
-    // Show word count for documents
-    let word_info = if item.kind == BinderItemKind::Text {
-        item.document.as_ref()
-            .map(|d| {
-                let wc = d.word_count();
-                if wc > 0 { format!(" ({})", wc) } else { String::new() }
-            })
-            .unwrap_or_default()
-    } else if item.kind == BinderItemKind::Folder && !item.children.is_empty() {
-        let total = item.total_word_count();
-        if total > 0 { format!(" [{}]", total) } else { String::new() }
+    // ── Folder chevron ──────────────────────────────────
+    let chevron: Element<'static, Message> = if item.kind == BinderItemKind::Folder {
+        let ch = if item.expanded { Icons::CARET_DOWN } else { Icons::CARET_RIGHT };
+        text(ch).size(9).color(Theme::TEXT_MUTED).into()
     } else {
-        String::new()
+        Space::with_width(9).into()
     };
 
-    let label = format!("{}{}{}", icon, item.title, word_info);
-
-    // Apply label color if present
+    // ── Label color ─────────────────────────────────────
     let label_color = if is_selected {
         Theme::TEXT_PRIMARY
     } else if let Some(ref lbl) = item.metadata.label {
@@ -222,10 +246,42 @@ fn render_item(
         Theme::TEXT_SECONDARY
     };
 
-    let item_text = text(label).size(14).color(label_color);
+    // ── Title text ──────────────────────────────────────
+    let title_text = text(item.title.clone()).size(13).color(label_color);
 
-    // Status indicator
-    let status_indicator: Element<'static, Message> = if let Some(ref status) = item.metadata.status {
+    // ── Word count (subtle, right-aligned) ──────────────
+    let word_info: Element<'static, Message> = if item.kind == BinderItemKind::Text {
+        if let Some(ref d) = item.document {
+            let wc = d.word_count();
+            if wc > 0 {
+                text(format!("{}", wc))
+                    .size(9)
+                    .color(Theme::TEXT_MUTED)
+                    .into()
+            } else {
+                Space::with_width(0).into()
+            }
+        } else {
+            Space::with_width(0).into()
+        }
+    } else if item.kind == BinderItemKind::Folder && !item.children.is_empty() {
+        let total = item.total_word_count();
+        if total > 0 {
+            let label = if total >= 1000 {
+                format!("{:.1}k", total as f64 / 1000.0)
+            } else {
+                total.to_string()
+            };
+            text(label).size(9).color(Theme::TEXT_MUTED).into()
+        } else {
+            Space::with_width(0).into()
+        }
+    } else {
+        Space::with_width(0).into()
+    };
+
+    // ── Status dot ──────────────────────────────────────
+    let status_dot: Element<'static, Message> = if let Some(ref status) = item.metadata.status {
         let status_color = match status.name.as_str() {
             "Done" | "Final Draft" => Theme::SUCCESS,
             "Revised Draft" => Theme::TEXT_ACCENT,
@@ -233,51 +289,166 @@ fn render_item(
             "To Do" => Theme::TEXT_MUTED,
             _ => Theme::TEXT_SECONDARY,
         };
-        text("*").size(12).color(status_color).into()
+        text(Icons::CIRCLE).size(6).color(status_color).into()
     } else {
         Space::with_width(0).into()
     };
 
-    let compile_indicator: Element<'static, Message> = if !compile_icon.is_empty() {
-        text(compile_icon).size(10).color(Theme::TEXT_MUTED).into()
+    // ── Compile exclusion indicator ─────────────────────
+    let compile_indicator: Element<'static, Message> = if !item.include_in_compile {
+        text(Icons::BAN).size(8).color(Theme::TEXT_MUTED).into()
     } else {
         Space::with_width(0).into()
     };
 
-    let item_btn = button(
-        row![
-            Space::with_width(indent),
-            item_text,
-            Space::with_width(Length::Fill),
-            compile_indicator,
-            status_indicator,
-        ]
-    )
-    .on_press(if item.kind == BinderItemKind::Folder {
-        Message::ToggleBinderItem(item.id)
+    // ── Assemble item row ───────────────────────────────
+    let item_row = row![
+        Space::with_width(indent),
+        chevron,
+        Space::with_width(4),
+        text(icon_str).size(12).color(if is_selected {
+            Theme::lighten(icon_color, 0.15)
+        } else {
+            icon_color
+        }),
+        Space::with_width(6),
+        title_text,
+        Space::with_width(Length::Fill),
+        compile_indicator,
+        Space::with_width(2),
+        status_dot,
+        Space::with_width(4),
+        word_info,
+        Space::with_width(4),
+    ]
+    .align_y(iced::Alignment::Center);
+
+    let btn_style = if is_selected {
+        theme::binder_item_selected_btn_style as fn(&iced::Theme, button::Status) -> button::Style
     } else {
-        Message::SelectBinderItem(item.id)
-    })
-    .padding(Padding::from([3, 8]))
-    .width(Length::Fill);
+        theme::binder_item_btn_style
+    };
 
-    col = col.push(item_btn);
+    let item_btn = button(item_row)
+        .on_press(if item.kind == BinderItemKind::Folder {
+            Message::ToggleBinderItem(item.id)
+        } else {
+            Message::SelectBinderItem(item.id)
+        })
+        .style(btn_style)
+        .padding(Padding::from([4, 4]))
+        .width(Length::Fill);
 
-    // Render children if expanded
+    col = col.push(
+        container(item_btn)
+            .padding(Padding::from([0, 4]))
+    );
+
+    // ── Render children if expanded ─────────────────────
     if item.expanded && !item.children.is_empty() {
+        let mut children_col = column![].spacing(1);
         for child in &item.children {
-            col = col.push(render_item(child, selected_id, depth + 1));
+            children_col = children_col.push(render_item(child, selected_id, depth + 1));
         }
+
+        // Wrap children with a left indent guide
+        let children_with_guide = row![
+            Space::with_width(indent + 6),
+            container(Space::with_width(0))
+                .style(theme::binder_indent_guide_style)
+                .width(1)
+                .height(Length::Fill),
+            Space::with_width(3),
+            children_col.width(Length::Fill),
+        ];
+
+        col = col.push(children_with_guide);
     }
 
     col.into()
 }
 
-fn small_action_btn(label: &str, message: Message) -> Element<'static, Message> {
+/// Build the bottom action bar
+fn build_action_bar(selected_id: Option<Uuid>) -> Element<'static, Message> {
+    // Primary actions (always visible)
+    let add_doc = action_btn(Icons::FILE_TEXT, "New Doc", Message::NewDocument);
+    let add_folder = action_btn(Icons::FOLDER, "New Folder", Message::NewFolder);
+
+    let primary_row = row![
+        add_doc,
+        Space::with_width(4),
+        add_folder,
+    ];
+
+    // Context actions (only if item selected)
+    let context_row: Element<'static, Message> = if let Some(sel_id) = selected_id {
+        let move_up = icon_btn(Icons::ARROW_UP, Message::MoveItemUp(sel_id));
+        let move_down = icon_btn(Icons::ARROW_DOWN, Message::MoveItemDown(sel_id));
+        let duplicate = icon_btn(Icons::CLIPBOARD, Message::DuplicateItem(sel_id));
+        let delete = danger_icon_btn(Icons::TIMES, Message::DeleteItem(sel_id));
+
+        row![
+            move_up,
+            Space::with_width(2),
+            move_down,
+            Space::with_width(6),
+            duplicate,
+            Space::with_width(Length::Fill),
+            delete,
+        ]
+        .align_y(iced::Alignment::Center)
+        .into()
+    } else {
+        Space::with_height(0).into()
+    };
+
+    container(
+        column![
+            primary_row,
+            context_row,
+        ]
+        .spacing(4),
+    )
+    .style(theme::binder_action_bar_style)
+    .padding(Padding::from([8, 10]))
+    .width(Length::Fill)
+    .into()
+}
+
+/// Action button with icon + label
+fn action_btn(icon: &str, label: &str, message: Message) -> Element<'static, Message> {
     button(
-        text(label.to_string()).size(11).color(Theme::TEXT_SECONDARY),
+        row![
+            text(icon.to_string()).size(11).color(Theme::TEXT_ACCENT),
+            Space::with_width(5),
+            text(label.to_string()).size(11).color(Theme::TEXT_SECONDARY),
+        ]
+        .align_y(iced::Alignment::Center),
     )
     .on_press(message)
+    .style(theme::binder_action_btn_style)
     .padding(Padding::from([4, 8]))
+    .into()
+}
+
+/// Small icon-only button
+fn icon_btn(icon: &str, message: Message) -> Element<'static, Message> {
+    button(
+        text(icon.to_string()).size(12).color(Theme::TEXT_SECONDARY),
+    )
+    .on_press(message)
+    .style(theme::binder_action_btn_style)
+    .padding(Padding::from([4, 7]))
+    .into()
+}
+
+/// Small icon-only button (danger variant)
+fn danger_icon_btn(icon: &str, message: Message) -> Element<'static, Message> {
+    button(
+        text(icon.to_string()).size(12).color(Theme::ERROR),
+    )
+    .on_press(message)
+    .style(theme::binder_danger_btn_style)
+    .padding(Padding::from([4, 7]))
     .into()
 }

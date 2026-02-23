@@ -1,4 +1,4 @@
-use iced::widget::container;
+use iced::widget::{button, container};
 use iced::{Background, Border, Color, Shadow, Vector};
 
 /// Nerd Font icon constants (JetBrains Mono Nerd Font)
@@ -470,6 +470,162 @@ pub fn footer_style(_theme: &iced::Theme) -> container::Style {
             width: 1.0,
             radius: 6.0.into(),
         },
+        ..Default::default()
+    }
+}
+
+// ── Binder-specific styles ──────────────────────────────────────────
+
+/// Style for binder section headers (Draft, Research, Trash)
+pub fn binder_section_header_style(accent: Color) -> impl Fn(&iced::Theme) -> container::Style {
+    move |_theme: &iced::Theme| container::Style {
+        background: Some(Background::Color(Color::from_rgba(
+            accent.r * 0.15,
+            accent.g * 0.15,
+            accent.b * 0.15,
+            0.6,
+        ))),
+        border: Border {
+            color: Color::from_rgba(accent.r, accent.g, accent.b, 0.25),
+            width: 0.0,
+            radius: 5.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Style for the binder item count badge
+pub fn binder_badge_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.07))),
+        border: Border {
+            color: Color::TRANSPARENT,
+            width: 0.0,
+            radius: 8.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Button style for binder section headers
+pub fn binder_section_btn_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+    let bg = match status {
+        button::Status::Hovered => Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.05))),
+        button::Status::Pressed => Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.08))),
+        _ => None,
+    };
+    button::Style {
+        background: bg,
+        text_color: Theme::TEXT_PRIMARY,
+        border: Border {
+            color: Color::TRANSPARENT,
+            width: 0.0,
+            radius: 5.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Button style for a binder tree item (not selected)
+pub fn binder_item_btn_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+    let bg = match status {
+        button::Status::Hovered => Some(Background::Color(Theme::SIDEBAR_ITEM_HOVER)),
+        button::Status::Pressed => Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.10))),
+        _ => None,
+    };
+    button::Style {
+        background: bg,
+        text_color: Theme::TEXT_SECONDARY,
+        border: Border {
+            color: Color::TRANSPARENT,
+            width: 0.0,
+            radius: 4.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Button style for a selected binder tree item
+pub fn binder_item_selected_btn_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+    let bg_color = match status {
+        button::Status::Hovered => Color::from_rgba(0.22, 0.35, 0.55, 0.50),
+        _ => Color::from_rgba(0.20, 0.32, 0.50, 0.40),
+    };
+    button::Style {
+        background: Some(Background::Color(bg_color)),
+        text_color: Theme::TEXT_PRIMARY,
+        border: Border {
+            color: Color::from_rgba(0.35, 0.60, 0.90, 0.40),
+            width: 1.0,
+            radius: 4.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Button style for binder action buttons (bottom toolbar)
+pub fn binder_action_btn_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+    let bg = match status {
+        button::Status::Hovered => Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.10))),
+        button::Status::Pressed => Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.15))),
+        _ => Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.04))),
+    };
+    button::Style {
+        background: bg,
+        text_color: Theme::TEXT_SECONDARY,
+        border: Border {
+            color: Color::from_rgba(1.0, 1.0, 1.0, 0.08),
+            width: 1.0,
+            radius: 4.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Button style for destructive actions (empty trash, delete)
+pub fn binder_danger_btn_style(_theme: &iced::Theme, status: button::Status) -> button::Style {
+    let bg = match status {
+        button::Status::Hovered => Some(Background::Color(Color::from_rgba(0.90, 0.30, 0.30, 0.20))),
+        button::Status::Pressed => Some(Background::Color(Color::from_rgba(0.90, 0.30, 0.30, 0.30))),
+        _ => Some(Background::Color(Color::from_rgba(0.90, 0.30, 0.30, 0.08))),
+    };
+    button::Style {
+        background: bg,
+        text_color: Theme::ERROR,
+        border: Border {
+            color: Color::from_rgba(0.90, 0.30, 0.30, 0.20),
+            width: 1.0,
+            radius: 4.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Container style for the binder bottom action bar
+pub fn binder_action_bar_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Color::from_rgb(0.14, 0.15, 0.18))),
+        border: Border {
+            color: Theme::BORDER_SUBTLE,
+            width: 1.0,
+            radius: 0.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+/// Thin horizontal separator for between binder sections
+pub fn binder_separator_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.06))),
+        ..Default::default()
+    }
+}
+
+/// Style for the indentation guide line
+pub fn binder_indent_guide_style(_theme: &iced::Theme) -> container::Style {
+    container::Style {
+        background: Some(Background::Color(Color::from_rgba(1.0, 1.0, 1.0, 0.06))),
         ..Default::default()
     }
 }
