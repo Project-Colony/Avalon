@@ -1,3 +1,9 @@
+// Well-known directory names (relative to the user's home directory)
+pub const PROJECTS_DIR_NAME: &str = "Scrinever Projects";
+pub const OUTPUT_DIR_NAME: &str = "Scrinever Output";
+pub const IMPORT_DIR_NAME: &str = "Scrinever Import";
+pub const BACKUPS_DIR_NAME: &str = "Scrinever Backups";
+
 // Core data structures
 pub mod project;
 pub mod binder;

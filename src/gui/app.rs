@@ -8,6 +8,7 @@ use iced::window;
 use uuid::Uuid;
 use chrono;
 
+use crate::core::{PROJECTS_DIR_NAME, OUTPUT_DIR_NAME, IMPORT_DIR_NAME};
 use crate::core::binder::{BinderItem, BinderItemKind};
 use crate::core::document::Document;
 use crate::core::project::Project;
@@ -729,7 +730,7 @@ impl ScrineverApp {
 
             Message::OpenProject => {
                 let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-                let projects_dir = home.join("Scrinever Projects");
+                let projects_dir = home.join(PROJECTS_DIR_NAME);
                 if projects_dir.exists() {
                     if let Ok(entries) = std::fs::read_dir(&projects_dir) {
                         for entry in entries.flatten() {
@@ -753,7 +754,7 @@ impl ScrineverApp {
                             }
                         }
                     }
-                    self.notification = Some("No .scriv projects found in ~/Scrinever Projects/".to_string());
+                    self.notification = Some(format!("No .scriv projects found in ~/{}/", PROJECTS_DIR_NAME));
                 } else {
                     self.notification = Some("No projects directory found. Create a project first.".to_string());
                 }
@@ -763,7 +764,7 @@ impl ScrineverApp {
                 self.sync_editor_to_project();
                 if let Some(ref mut project) = self.project {
                     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-                    let save_dir = home.join("Scrinever Projects");
+                    let save_dir = home.join(PROJECTS_DIR_NAME);
                     match project.save(&save_dir) {
                         Ok(_) => {
                             self.editor.mark_clean();
@@ -1169,7 +1170,7 @@ impl ScrineverApp {
                     use crate::export::compiler::Compiler;
 
                     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-                    let output_dir = home.join("Scrinever Output");
+                    let output_dir = home.join(OUTPUT_DIR_NAME);
                     if let Err(e) = std::fs::create_dir_all(&output_dir) {
                         self.notification = Some(format!("Failed to create output dir: {}", e));
                     }
@@ -1742,7 +1743,7 @@ impl ScrineverApp {
             Message::ImportFiles => {
                 if let Some(ref mut project) = self.project {
                     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-                    let import_dir = home.join("Scrinever Import");
+                    let import_dir = home.join(IMPORT_DIR_NAME);
                     if import_dir.exists() {
                         let mut count = 0;
                         if let Ok(entries) = std::fs::read_dir(&import_dir) {
@@ -1857,13 +1858,13 @@ impl ScrineverApp {
                             }
                         }
                         if count > 0 {
-                            self.notification = Some(format!("Imported {} file(s) from ~/Scrinever Import/", count));
+                            self.notification = Some(format!("Imported {} file(s) from ~/{}/", count, IMPORT_DIR_NAME));
                         } else {
-                            self.notification = Some("No importable files found in ~/Scrinever Import/. Supported: txt, md, html, tex, fountain, opml".to_string());
+                            self.notification = Some(format!("No importable files found in ~/{}/. Supported: txt, md, html, tex, fountain, opml", IMPORT_DIR_NAME));
                         }
                     } else {
                         match std::fs::create_dir_all(&import_dir) {
-                            Ok(_) => self.notification = Some("Created ~/Scrinever Import/ — place files there and import again.".to_string()),
+                            Ok(_) => self.notification = Some(format!("Created ~/{0}/ — place files there and import again.", IMPORT_DIR_NAME)),
                             Err(e) => self.notification = Some(format!("Failed to create import dir: {}", e)),
                         }
                     }
@@ -2734,7 +2735,7 @@ impl ScrineverApp {
             Message::ImportOpml => {
                 if let Some(ref mut project) = self.project {
                     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-                    let import_dir = home.join("Scrinever Import");
+                    let import_dir = home.join(IMPORT_DIR_NAME);
                     if import_dir.exists() {
                         let mut count = 0;
                         if let Ok(entries) = std::fs::read_dir(&import_dir) {
@@ -2793,11 +2794,11 @@ impl ScrineverApp {
                         if count > 0 {
                             self.notification = Some(format!("Imported {} item(s)", count));
                         } else {
-                            self.notification = Some("No importable files found in ~/Scrinever Import/".to_string());
+                            self.notification = Some(format!("No importable files found in ~/{}/", IMPORT_DIR_NAME));
                         }
                     } else {
                         match std::fs::create_dir_all(&import_dir) {
-                            Ok(_) => self.notification = Some("Created ~/Scrinever Import/ — place files there and import again.".to_string()),
+                            Ok(_) => self.notification = Some(format!("Created ~/{0}/ — place files there and import again.", IMPORT_DIR_NAME)),
                             Err(e) => self.notification = Some(format!("Failed to create import dir: {}", e)),
                         }
                     }
@@ -2837,7 +2838,7 @@ impl ScrineverApp {
                 self.sync_editor_to_project();
                 if let Some(ref project) = self.project {
                     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-                    let output_dir = home.join("Scrinever Output");
+                    let output_dir = home.join(OUTPUT_DIR_NAME);
                     if let Err(e) = std::fs::create_dir_all(&output_dir) {
                         log::warn!("Failed to create output directory: {}", e);
                     }
@@ -2877,7 +2878,7 @@ impl ScrineverApp {
                             }];
                             let opts = CompileOptions { title: item.title.clone(), ..CompileOptions::default() };
                             let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-                            let print_path = home.join("Scrinever Projects").join("print.pdf");
+                            let print_path = home.join(PROJECTS_DIR_NAME).join("print.pdf");
                             if let Some(parent) = print_path.parent() {
                                 if let Err(e) = std::fs::create_dir_all(parent) {
                                     log::warn!("Failed to create print directory: {}", e);
@@ -2902,7 +2903,7 @@ impl ScrineverApp {
                     let mut opts = self.compile_options.clone();
                     opts.format = crate::export::compiler::OutputFormat::Pdf;
                     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-                    let print_path = home.join("Scrinever Projects").join(format!("{}_print.pdf", project.title));
+                    let print_path = home.join(PROJECTS_DIR_NAME).join(format!("{}_print.pdf", project.title));
                     if let Some(parent) = print_path.parent() {
                         if let Err(e) = std::fs::create_dir_all(parent) {
                             log::warn!("Failed to create print directory: {}", e);
@@ -3458,7 +3459,7 @@ impl ScrineverApp {
                         self.sync_editor_to_project();
                         if let Some(ref mut project) = self.project {
                             let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-                            let save_dir = home.join("Scrinever Projects");
+                            let save_dir = home.join(PROJECTS_DIR_NAME);
                             if project.save(&save_dir).is_ok() {
                                 self.editor.mark_clean();
                                 // Auto-backup on save (every 10th auto-save)

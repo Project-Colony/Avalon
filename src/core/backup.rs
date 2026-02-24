@@ -90,7 +90,7 @@ impl BackupManager {
     fn backup_directory() -> Result<PathBuf> {
         let home = dirs::home_dir()
             .context("Could not determine home directory")?;
-        Ok(home.join("Scrinever Backups"))
+        Ok(home.join(super::BACKUPS_DIR_NAME))
     }
 
     /// Remove old backups, keeping only the most recent `keep` backups
