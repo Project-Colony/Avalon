@@ -155,10 +155,13 @@ impl RecentProjects {
                 return;
             }
         }
-        if let Ok(json) = serde_json::to_string_pretty(self) {
-            if let Err(e) = std::fs::write(&path, json) {
-                log::warn!("Failed to save recent files: {}", e);
+        match serde_json::to_string_pretty(self) {
+            Ok(json) => {
+                if let Err(e) = std::fs::write(&path, json) {
+                    log::warn!("Failed to save recent files: {}", e);
+                }
             }
+            Err(e) => log::warn!("Failed to serialize recent files: {}", e),
         }
     }
 

@@ -36,11 +36,14 @@ impl ProjectWatcher {
         let project_dir = project_path.to_path_buf();
 
         let mut watcher = notify::recommended_watcher(move |result: Result<Event, notify::Error>| {
-            if let Ok(event) = result {
-                let watch_events = Self::translate_event(&event, &project_dir);
-                for we in watch_events {
-                    let _ = sender.send(we);
+            match result {
+                Ok(event) => {
+                    let watch_events = Self::translate_event(&event, &project_dir);
+                    for we in watch_events {
+                        let _ = sender.send(we);
+                    }
                 }
+                Err(e) => log::warn!("File watcher error: {}", e),
             }
         })?;
 

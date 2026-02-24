@@ -53,32 +53,32 @@ impl BackupManager {
         }
 
         let prefix = format!("{}_", project_name);
-        if let Ok(dir_entries) = fs::read_dir(&backup_dir) {
-            for entry in dir_entries.flatten() {
-                let path = entry.path();
-                let name = path.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("")
-                    .to_string();
+        let dir_entries = fs::read_dir(&backup_dir)
+            .context("Failed to read backup directory")?;
+        for entry in dir_entries.flatten() {
+            let path = entry.path();
+            let name = path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string();
 
-                if name.starts_with(&prefix) && name.ends_with(".backup.json") {
-                    let size = fs::metadata(&path)
-                        .map(|m| m.len())
-                        .unwrap_or(0);
+            if name.starts_with(&prefix) && name.ends_with(".backup.json") {
+                let size = fs::metadata(&path)
+                    .map(|m| m.len())
+                    .unwrap_or(0);
 
-                    // Parse timestamp from filename
-                    let timestamp_str = name
-                        .strip_prefix(&prefix)
-                        .and_then(|s| s.strip_suffix(".backup.json"))
-                        .unwrap_or("");
+                // Parse timestamp from filename
+                let timestamp_str = name
+                    .strip_prefix(&prefix)
+                    .and_then(|s| s.strip_suffix(".backup.json"))
+                    .unwrap_or("");
 
-                    entries.push(BackupEntry {
-                        path: path.clone(),
-                        name: name.clone(),
-                        timestamp: timestamp_str.to_string(),
-                        size_bytes: size,
-                    });
-                }
+                entries.push(BackupEntry {
+                    path: path.clone(),
+                    name: name.clone(),
+                    timestamp: timestamp_str.to_string(),
+                    size_bytes: size,
+                });
             }
         }
 
