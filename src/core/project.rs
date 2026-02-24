@@ -96,9 +96,14 @@ impl Project {
 
         // Save compile presets (if any)
         let presets_path = project_dir.join("compile_presets.json");
-        if let Ok(json) = serde_json::to_string_pretty(&self.compile_presets) {
-            if let Err(e) = fs::write(&presets_path, json) {
-                log::warn!("Failed to save compile presets: {}", e);
+        match serde_json::to_string_pretty(&self.compile_presets) {
+            Ok(json) => {
+                if let Err(e) = fs::write(&presets_path, json) {
+                    log::warn!("Failed to write compile presets: {}", e);
+                }
+            }
+            Err(e) => {
+                log::warn!("Failed to serialize compile presets: {}", e);
             }
         }
 
@@ -129,10 +134,12 @@ impl Project {
         // Load compile presets
         let presets_path = project_dir.join("compile_presets.json");
         if presets_path.exists() {
-            if let Ok(json) = fs::read_to_string(&presets_path) {
-                if let Ok(presets) = serde_json::from_str(&json) {
-                    project.compile_presets = presets;
-                }
+            match fs::read_to_string(&presets_path) {
+                Ok(json) => match serde_json::from_str(&json) {
+                    Ok(presets) => project.compile_presets = presets,
+                    Err(e) => log::warn!("Failed to parse compile presets: {}", e),
+                },
+                Err(e) => log::warn!("Failed to read compile presets: {}", e),
             }
         }
 
