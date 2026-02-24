@@ -6,7 +6,7 @@ use iced::widget::{column, container, row, stack, text, text_editor, Space};
 use iced::{Element, Length, Padding, Subscription, Task as IcedTask};
 use iced::window;
 use uuid::Uuid;
-use chrono;
+use chrono::{NaiveDate, Utc};
 
 use crate::core::{PROJECTS_DIR_NAME, OUTPUT_DIR_NAME, IMPORT_DIR_NAME};
 use crate::core::binder::{BinderItem, BinderItemKind};
@@ -3699,16 +3699,16 @@ impl ScrineverApp {
                 target_words: project.settings.target_word_count,
                 deadline: project.settings.target_deadline.clone(),
                 days_remaining: project.settings.target_deadline.as_ref()
-                    .and_then(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+                    .and_then(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
                     .map(|target_date| {
-                        let today = chrono::Utc::now().date_naive();
+                        let today = Utc::now().date_naive();
                         (target_date - today).num_days()
                     }),
                 words_per_day_needed: {
                     let days_remaining = project.settings.target_deadline.as_ref()
-                        .and_then(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+                        .and_then(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
                         .map(|target_date| {
-                            let today = chrono::Utc::now().date_naive();
+                            let today = Utc::now().date_naive();
                             (target_date - today).num_days()
                         });
                     match (project.settings.target_word_count, days_remaining) {
@@ -3939,9 +3939,9 @@ impl ScrineverApp {
                 let current_words = project.binder.total_word_count();
                 let deadline = project.settings.target_deadline.clone().unwrap_or_default();
                 let days_remaining = project.settings.target_deadline.as_ref()
-                    .and_then(|d| chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+                    .and_then(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
                     .map(|target_date| {
-                        let today = chrono::Utc::now().date_naive();
+                        let today = Utc::now().date_naive();
                         (target_date - today).num_days()
                     });
                 let words_per_day_needed = match (project.settings.target_word_count, days_remaining) {
@@ -3990,7 +3990,7 @@ impl ScrineverApp {
                     self.session_stats.words_written
                 } else {
                     project.writing_history.entries.last()
-                        .filter(|e| e.date == chrono::Utc::now().date_naive())
+                        .filter(|e| e.date == Utc::now().date_naive())
                         .map(|e| e.words_written)
                         .unwrap_or(0)
                 };
