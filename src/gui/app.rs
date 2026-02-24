@@ -3464,7 +3464,9 @@ impl ScrineverApp {
                                 self.editor.mark_clean();
                                 // Auto-backup on save (every 10th auto-save)
                                 if let Some(ref path) = project.path {
-                                    let _ = crate::core::backup::BackupManager::create_backup(path);
+                                    if let Err(e) = crate::core::backup::BackupManager::create_backup(path) {
+                                        log::warn!("Auto-backup failed: {}", e);
+                                    }
                                 }
                             }
                         }

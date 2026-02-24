@@ -186,17 +186,7 @@ pub fn estimate_output_size(contents: &[CompileContent], options: &CompileOption
 
 /// Strip HTML tags from a string, returning plain text
 pub fn strip_html_tags(html: &str) -> String {
-    let mut result = String::with_capacity(html.len());
-    let mut in_tag = false;
-    for ch in html.chars() {
-        match ch {
-            '<' => in_tag = true,
-            '>' => in_tag = false,
-            _ if !in_tag => result.push(ch),
-            _ => {}
-        }
-    }
-    result
+    super::web_import::strip_html_tags(html)
 }
 
 /// Extract all heading texts from the compiled content
