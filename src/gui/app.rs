@@ -68,6 +68,7 @@ pub enum BottomPanel {
     Timer,
     Validation,
     Templates,
+    WritingPrompts,
 }
 
 /// Which toolbar dropdown menu is open
@@ -229,6 +230,9 @@ pub struct ScrineverApp {
 
     // === Word count milestone tracking ===
     pub last_milestone: usize,
+
+    // === Writing prompts ===
+    pub writing_prompts_data: views::writing_prompts_panel::WritingPromptsData,
 }
 
 /// Messages for the application
@@ -557,6 +561,13 @@ pub enum Message {
     // Project validation
     ShowValidation,
 
+    // Writing prompts
+    GenerateWritingPrompt,
+    GenerateWritingPromptCategory(String),
+    GenerateCharacter,
+    GeneratePlotSeed,
+    GenerateWritingNames,
+
     // Toolbar menus
     ToggleToolbarMenu(ToolbarMenu),
     CloseToolbarMenu,
@@ -650,6 +661,7 @@ impl ScrineverApp {
             writing_timer: crate::core::timer::WritingTimer::new(),
             validation_result: None,
             last_milestone: 0,
+            writing_prompts_data: views::writing_prompts_panel::WritingPromptsData::new(),
         };
 
         (app, open_main.map(Message::WindowOpened))
@@ -3422,6 +3434,36 @@ impl ScrineverApp {
                 }
             }
 
+            // ========== Writing prompts ==========
+            Message::GenerateWritingPrompt => {
+                self.writing_prompts_data.generate_prompt(None);
+                self.bottom_panel = BottomPanel::WritingPrompts;
+            }
+            Message::GenerateWritingPromptCategory(cat_name) => {
+                use crate::core::writing_prompts::PromptCategory;
+                let category = PromptCategory::all().iter()
+                    .find(|c| c.label() == cat_name)
+                    .copied();
+                if let Some(cat) = category {
+                    self.writing_prompts_data.generate_prompt(Some(cat));
+                } else {
+                    self.writing_prompts_data.generate_prompt(None);
+                }
+                self.bottom_panel = BottomPanel::WritingPrompts;
+            }
+            Message::GenerateCharacter => {
+                self.writing_prompts_data.generate_character();
+                self.bottom_panel = BottomPanel::WritingPrompts;
+            }
+            Message::GeneratePlotSeed => {
+                self.writing_prompts_data.generate_plot();
+                self.bottom_panel = BottomPanel::WritingPrompts;
+            }
+            Message::GenerateWritingNames => {
+                self.writing_prompts_data.generate_names();
+                self.bottom_panel = BottomPanel::WritingPrompts;
+            }
+
             // ========== Misc ==========
             Message::Tick => {
                 // Auto-save
@@ -4090,6 +4132,9 @@ impl ScrineverApp {
             BottomPanel::Templates => {
                 let templates = crate::core::doc_templates::builtin_templates();
                 Some(views::templates_panel::view(&templates))
+            }
+            BottomPanel::WritingPrompts => {
+                Some(views::writing_prompts_panel::view(&self.writing_prompts_data))
             }
             BottomPanel::None => None,
         };
