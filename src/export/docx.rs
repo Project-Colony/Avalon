@@ -2,7 +2,7 @@ use std::path::Path;
 use anyhow::Result;
 use docx_rs::*;
 
-use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
+use super::compiler::{CompileContent, CompileOptions, SeparatorType};
 
 pub fn save_docx(contents: &[CompileContent], options: &CompileOptions, path: &Path) -> Result<()> {
     let mut docx = Docx::new();

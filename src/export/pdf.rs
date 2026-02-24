@@ -2,7 +2,7 @@ use std::path::Path;
 use anyhow::Result;
 use printpdf::*;
 
-use super::compiler::{self, CompileContent, CompileOptions};
+use super::compiler::{CompileContent, CompileOptions};
 #[cfg(test)]
 use super::compiler::SeparatorType;
 

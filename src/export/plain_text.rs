@@ -1,6 +1,6 @@
 use std::fmt::Write;
 use anyhow::Result;
-use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
+use super::compiler::{CompileContent, CompileOptions, SeparatorType};
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
     let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 20).sum();

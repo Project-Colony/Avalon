@@ -1,6 +1,6 @@
 use std::fmt::Write;
 use anyhow::Result;
-use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
+use super::compiler::{CompileContent, CompileOptions, SeparatorType};
 
 /// Compile to RTF (Rich Text Format)
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
