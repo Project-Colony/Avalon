@@ -1,7 +1,7 @@
 use iced::widget::{button, column, container, row, scrollable, text, Space};
 use iced::{Element, Length, Padding};
 
-use crate::core::snapshot::{DiffChunk, Snapshot};
+use crate::core::snapshot::{DiffChunk, DiffStats, Snapshot, format_unified_diff, inline_diff};
 use crate::gui::app::Message;
 use crate::gui::theme::{self, Theme};
 
@@ -43,19 +43,7 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
 
     for (i, snapshot) in snapshots.iter().enumerate().rev() {
         let date = snapshot.created_at.format("%Y-%m-%d %H:%M").to_string();
-
-        // Calculate age
-        let age = {
-            let duration = chrono::Utc::now().signed_duration_since(snapshot.created_at);
-            let hours = duration.num_hours();
-            if hours < 1 {
-                format!("{}m ago", duration.num_minutes().max(1))
-            } else if hours < 24 {
-                format!("{}h ago", hours)
-            } else {
-                format!("{}d ago", duration.num_days())
-            }
-        };
+        let age = snapshot.age_string();
 
         let words = format!("{} words", snapshot.word_count);
         // Calculate similarity to current content
@@ -127,9 +115,7 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
     let diff_view: Element<'static, Message> = if let Some(idx) = selected_snapshot {
         if let Some(snapshot) = snapshots.get(idx) {
             let diff = snapshot.diff_with(current_content);
-            let mut added = 0usize;
-            let mut removed = 0usize;
-            let mut unchanged = 0usize;
+            let stats = DiffStats::from_chunks(&diff);
             let current_words = current_content.split_whitespace().count();
 
             let mut diff_col = column![
@@ -148,15 +134,25 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
             ]
             .spacing(1);
 
+            // Show unified diff header
+            let unified = format_unified_diff(&diff, &snapshot.title, "Current");
+            for line in unified.lines().take(3) {
+                diff_col = diff_col.push(
+                    text(line.to_string()).size(9).color(Theme::TEXT_MUTED),
+                );
+            }
+
             let total_chunks = diff.len();
             let mut shown_equal = 0;
+
+            // Collect removed lines for inline diff pairing
+            let mut pending_removed: Option<String> = None;
 
             for chunk in &diff {
                 match chunk {
                     DiffChunk::Equal(line) => {
-                        unchanged += 1;
+                        pending_removed = None;
                         shown_equal += 1;
-                        // Show first few and last few context lines
                         if shown_equal <= 2 || total_chunks <= 30 {
                             diff_col = diff_col.push(
                                 text(format!("  {}", line))
@@ -172,51 +168,59 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
                         }
                     }
                     DiffChunk::Added(line) => {
-                        added += 1;
                         shown_equal = 0;
-                        diff_col = diff_col.push(
-                            text(format!("+ {}", line))
-                                .size(10)
-                                .color(Theme::SUCCESS),
-                        );
+                        // Show inline diff if we have a paired removed line
+                        if let Some(ref old_line) = pending_removed {
+                            let inline_chunks = inline_diff(old_line, line);
+                            let marked: String = inline_chunks.iter()
+                                .map(|c| c.to_marked_string())
+                                .collect();
+                            diff_col = diff_col.push(
+                                text(format!("~ {}", marked))
+                                    .size(10)
+                                    .color(Theme::WARNING),
+                            );
+                            pending_removed = None;
+                        } else {
+                            diff_col = diff_col.push(
+                                text(format!("+ {}", line))
+                                    .size(10)
+                                    .color(Theme::SUCCESS),
+                            );
+                        }
                     }
                     DiffChunk::Removed(line) => {
-                        removed += 1;
                         shown_equal = 0;
-                        diff_col = diff_col.push(
-                            text(format!("- {}", line))
-                                .size(10)
-                                .color(Theme::ERROR),
-                        );
+                        // If we already have a pending removed, flush it
+                        if let Some(ref old) = pending_removed {
+                            diff_col = diff_col.push(
+                                text(format!("- {}", old))
+                                    .size(10)
+                                    .color(Theme::ERROR),
+                            );
+                        }
+                        pending_removed = Some(line.clone());
                     }
                 }
             }
-
-            let net_change = added as i64 - removed as i64;
-            let net_text = if net_change > 0 {
-                format!("+{}", net_change)
-            } else {
-                net_change.to_string()
-            };
-
-            // Compute word count difference
-            let word_diff = current_words as i64 - snapshot.word_count as i64;
-            let word_diff_text = if word_diff > 0 {
-                format!("+{} words", word_diff)
-            } else if word_diff < 0 {
-                format!("{} words", word_diff)
-            } else {
-                "same word count".to_string()
-            };
+            // Flush any remaining pending removed line
+            if let Some(ref old) = pending_removed {
+                diff_col = diff_col.push(
+                    text(format!("- {}", old))
+                        .size(10)
+                        .color(Theme::ERROR),
+                );
+            }
 
             diff_col = diff_col.push(
                 row![
-                    text(format!(
-                        "Summary: +{} added, -{} removed, {} unchanged ({} net lines, {})",
-                        added, removed, unchanged, net_text, word_diff_text
-                    ))
-                    .size(10)
-                    .color(Theme::TEXT_SECONDARY),
+                    text(stats.summary())
+                        .size(10)
+                        .color(Theme::TEXT_SECONDARY),
+                    Space::with_width(8),
+                    text(format!("{:.0}% changed", stats.change_percentage()))
+                        .size(10)
+                        .color(if stats.change_percentage() > 50.0 { Theme::WARNING } else { Theme::TEXT_MUTED }),
                 ],
             );
 
