@@ -168,13 +168,19 @@ pub struct SessionStats {
     pub words_per_minute: f64,
 }
 
-impl SessionStats {
-    pub fn new() -> Self {
+impl Default for SessionStats {
+    fn default() -> Self {
         Self {
             words_written: 0,
             time_elapsed_seconds: 0,
             words_per_minute: 0.0,
         }
+    }
+}
+
+impl SessionStats {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn update(&mut self, word_delta: i64, elapsed_seconds: u64) {

@@ -3551,7 +3551,7 @@ impl ScrineverApp {
                     }
 
                 // Auto-refresh smart collections every 30 seconds when collections panel is open
-                if self.bottom_panel == BottomPanel::Collections && self.auto_save_counter %COLLECTION_REFRESH_INTERVAL) {
+                if self.bottom_panel == BottomPanel::Collections && self.auto_save_counter % COLLECTION_REFRESH_INTERVAL == 0 {
                     if let Some(ref mut project) = self.project {
                         for coll in &mut project.collections {
                             if let crate::core::collection::CollectionKind::Search { ref query, case_sensitive, whole_word } = coll.kind {

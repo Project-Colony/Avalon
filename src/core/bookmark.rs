@@ -79,7 +79,7 @@ pub struct BookmarkList {
 
 impl BookmarkList {
     pub fn new() -> Self {
-        Self { bookmarks: Vec::new() }
+        Self::default()
     }
 
     pub fn add(&mut self, item_id: Uuid, name: &str) {

@@ -68,7 +68,7 @@ pub struct RecentProjects {
 
 impl RecentProjects {
     pub fn new() -> Self {
-        Self { projects: Vec::new() }
+        Self::default()
     }
 
     pub fn add(&mut self, title: &str, path: PathBuf) {

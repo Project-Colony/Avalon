@@ -19,9 +19,7 @@ pub struct DailyEntry {
 
 impl WritingHistory {
     pub fn new() -> Self {
-        Self {
-            entries: Vec::new(),
-        }
+        Self::default()
     }
 
     /// Record word count for today

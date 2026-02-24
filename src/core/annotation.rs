@@ -190,7 +190,7 @@ pub struct AnnotationSet {
 
 impl AnnotationSet {
     pub fn new() -> Self {
-        Self { annotations: Vec::new() }
+        Self::default()
     }
 
     /// Add an annotation

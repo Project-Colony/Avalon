@@ -285,12 +285,18 @@ pub enum SaveKind {
     PreClose,
 }
 
-impl SaveQueue {
-    pub fn new() -> Self {
+impl Default for SaveQueue {
+    fn default() -> Self {
         Self {
             pending: VecDeque::new(),
             max_queue_size: 5,
         }
+    }
+}
+
+impl SaveQueue {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Add a save operation to the queue
