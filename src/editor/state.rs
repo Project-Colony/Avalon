@@ -242,7 +242,7 @@ impl EditorState {
 
         // Find paragraph start
         let mut start = pos;
-        while start > 1 {
+        while start > 0 {
             if text[..start].ends_with("\n\n") {
                 break;
             }
