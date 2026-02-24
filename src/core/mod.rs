@@ -7,6 +7,9 @@ pub const BACKUPS_DIR_NAME: &str = "Scrinever Backups";
 /// File extension for project directories.
 pub const PROJECT_EXTENSION: &str = "scriv";
 
+/// ISO 8601 date format used for serialization and display.
+pub const DATE_FORMAT: &str = "%Y-%m-%d";
+
 // Standard typographical constants
 /// Average words per page (standard manuscript page).
 /// Used for page-count estimation and reading-time calculations.

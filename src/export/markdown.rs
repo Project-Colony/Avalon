@@ -13,7 +13,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
         if !options.author.is_empty() {
             let _ = writeln!(output,"author: \"{}\"", escape_yaml(&options.author));
         }
-        let _ = writeln!(output,"date: \"{}\"", chrono::Local::now().format("%Y-%m-%d"));
+        let _ = writeln!(output,"date: \"{}\"", chrono::Local::now().format(crate::core::DATE_FORMAT));
 
         // Word count metadata
         let total_words = compiler::total_word_count(contents);

@@ -411,7 +411,7 @@ impl DateTimeFormat {
     pub fn format_now(&self) -> String {
         let now = chrono::Local::now();
         match self {
-            DateTimeFormat::DateOnly => now.format("%Y-%m-%d").to_string(),
+            DateTimeFormat::DateOnly => now.format(crate::core::DATE_FORMAT).to_string(),
             DateTimeFormat::TimeOnly => now.format("%H:%M").to_string(),
             DateTimeFormat::DateTime => now.format("%Y-%m-%d %H:%M").to_string(),
             DateTimeFormat::Iso8601 => now.format("%Y-%m-%dT%H:%M:%S%z").to_string(),

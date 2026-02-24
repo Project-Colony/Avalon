@@ -152,7 +152,7 @@ impl DocumentTargets {
         let words_remaining = target.word_count as i64 - current_words as i64;
 
         let days_remaining = target.deadline.as_ref().and_then(|d| {
-            chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d")
+            chrono::NaiveDate::parse_from_str(d, super::DATE_FORMAT)
                 .ok()
                 .map(|deadline| {
                     let today = chrono::Utc::now().date_naive();

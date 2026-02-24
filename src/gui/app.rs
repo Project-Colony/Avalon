@@ -3699,14 +3699,14 @@ impl ScrineverApp {
                 target_words: project.settings.target_word_count,
                 deadline: project.settings.target_deadline.clone(),
                 days_remaining: project.settings.target_deadline.as_ref()
-                    .and_then(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+                    .and_then(|d| NaiveDate::parse_from_str(d, crate::core::DATE_FORMAT).ok())
                     .map(|target_date| {
                         let today = Utc::now().date_naive();
                         (target_date - today).num_days()
                     }),
                 words_per_day_needed: {
                     let days_remaining = project.settings.target_deadline.as_ref()
-                        .and_then(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+                        .and_then(|d| NaiveDate::parse_from_str(d, crate::core::DATE_FORMAT).ok())
                         .map(|target_date| {
                             let today = Utc::now().date_naive();
                             (target_date - today).num_days()
@@ -3939,7 +3939,7 @@ impl ScrineverApp {
                 let current_words = project.binder.total_word_count();
                 let deadline = project.settings.target_deadline.clone().unwrap_or_default();
                 let days_remaining = project.settings.target_deadline.as_ref()
-                    .and_then(|d| NaiveDate::parse_from_str(d, "%Y-%m-%d").ok())
+                    .and_then(|d| NaiveDate::parse_from_str(d, crate::core::DATE_FORMAT).ok())
                     .map(|target_date| {
                         let today = Utc::now().date_naive();
                         (target_date - today).num_days()

@@ -8,7 +8,7 @@ pub fn replace_placeholders(text: &str, context: &PlaceholderContext) -> String 
 
     // Date/time placeholders
     let now = Utc::now();
-    result = result.replace("<$date>", &now.format("%Y-%m-%d").to_string());
+    result = result.replace("<$date>", &now.format(crate::core::DATE_FORMAT).to_string());
     result = result.replace("<$longdate>", &now.format("%B %d, %Y").to_string());
     result = result.replace("<$shortdate>", &now.format("%m/%d/%y").to_string());
     result = result.replace("<$time>", &now.format("%H:%M").to_string());

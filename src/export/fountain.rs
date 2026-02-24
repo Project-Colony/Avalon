@@ -14,7 +14,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
         if !options.author.is_empty() {
             let _ = writeln!(output,"Author: {}", options.author);
         }
-        let _ = writeln!(output,"Draft date: {}", chrono::Utc::now().format("%Y-%m-%d"));
+        let _ = writeln!(output,"Draft date: {}", chrono::Utc::now().format(crate::core::DATE_FORMAT));
         output.push_str("Contact:\n");
         output.push('\n');
     }

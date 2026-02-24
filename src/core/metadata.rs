@@ -432,7 +432,7 @@ impl ProjectSettings {
     /// Days remaining until deadline (None if no deadline set)
     pub fn days_to_deadline(&self) -> Option<i64> {
         self.target_deadline.as_ref().and_then(|d| {
-            chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d")
+            chrono::NaiveDate::parse_from_str(d, super::DATE_FORMAT)
                 .ok()
                 .map(|deadline| {
                     let today = chrono::Utc::now().date_naive();
