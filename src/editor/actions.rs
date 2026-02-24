@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 /// Actions that can be performed in the editor
 #[derive(Debug, Clone)]
 pub enum EditorAction {

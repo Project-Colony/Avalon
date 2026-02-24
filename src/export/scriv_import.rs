@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Scrivener `.scriv` project import.
 //!
 //! A `.scriv` package is a directory (macOS "package") that contains a

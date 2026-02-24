@@ -94,12 +94,17 @@ pub fn view(result: Option<&ProjectValidation>) -> Element<'static, Message> {
                         .color(Theme::TEXT_MUTED)
                 );
 
-                // Auto-fix hint
+                // Auto-fix button (not just a hint)
                 let autofix_hint: Element<'static, Message> = if validation.has_auto_fixable() {
-                    text(format!("{} issue(s) can be auto-fixed", validation.auto_fixable_count()))
-                        .size(10)
-                        .color(Theme::TEXT_ACCENT)
-                        .into()
+                    row![
+                        button(
+                            text(format!("Auto-fix {} issue(s)", validation.auto_fixable_count()))
+                                .size(10)
+                                .color(Theme::TEXT_ACCENT),
+                        )
+                        .on_press(Message::AutoFixValidation)
+                        .padding(Padding::from([3, 8])),
+                    ].into()
                 } else {
                     Space::with_height(0).into()
                 };

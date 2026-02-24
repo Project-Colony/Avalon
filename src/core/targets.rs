@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::collections::HashMap;
 use std::fmt::Write;
 use uuid::Uuid;

@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::collections::{HashMap, HashSet};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

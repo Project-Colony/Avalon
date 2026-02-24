@@ -10,7 +10,9 @@ use chrono::{NaiveDate, Utc};
 
 use crate::core::{PROJECTS_DIR_NAME, OUTPUT_DIR_NAME, IMPORT_DIR_NAME};
 use crate::core::binder::{BinderItem, BinderItemKind};
+use crate::core::comments::Comment;
 use crate::core::find_replace::{self, FindReplaceOptions, FindReplaceSession};
+use crate::core::integrations::ProjectState;
 use crate::core::project::Project;
 use crate::core::search::{self, SearchOptions};
 use crate::core::stats::{SessionStats, Statistics};
@@ -234,9 +236,11 @@ pub struct ScrineverApp {
     // === Writing prompts ===
     pub writing_prompts_data: views::writing_prompts_panel::WritingPromptsData,
 
-    // === Integration managers (wires together subsystems) ===
-    pub managers: crate::core::integrations::Managers,
-    pub managers_warmed_up: bool,
+    // === Project subsystem state (comments, revision, corkboard, outliner, search index, targets, etc.) ===
+    pub project_state: ProjectState,
+
+    // === Linguistic analysis (on-demand, cached) ===
+    pub linguistic_result: Option<crate::core::linguistic::WritingAnalysis>,
 }
 
 /// Messages for the application
@@ -576,6 +580,50 @@ pub enum Message {
     ToggleToolbarMenu(ToolbarMenu),
     CloseToolbarMenu,
 
+    // Comments
+    AddComment(Uuid, String),
+    DeleteComment(Uuid, Uuid),
+    ResolveComment(Uuid, Uuid),
+    UnresolveComment(Uuid, Uuid),
+    EditComment(Uuid, Uuid, String),
+    ReplyToComment(Uuid, Uuid, String),
+
+    // Revision tracking
+    ToggleRevisionMode,
+    StartRevisionPass(String),
+    AcceptRevisionMark(Uuid),
+    RejectRevisionMark(Uuid),
+    AcceptAllRevisions,
+
+    // Corkboard interactions
+    CorkboardMoveCard(Uuid, f32, f32),
+    CorkboardPinCard(Uuid, bool),
+    CorkboardArrangeGrid,
+
+    // Outliner interactions
+    OutlinerToggleExpand(Uuid),
+    OutlinerExpandAll,
+    OutlinerCollapseAll,
+    OutlinerSortBy(String),
+
+    // Validation auto-fix
+    AutoFixValidation,
+
+    // Linguistic analysis
+    RunLinguisticAnalysis,
+
+    // Search index
+    RebuildSearchIndex,
+
+    // Document targets (per-doc with full target)
+    SetDocTarget(Uuid, String),
+    RemoveDocTarget(Uuid),
+
+    // Import specific formats
+    ImportDocx,
+    ImportScriv,
+    ImportMedia,
+
     // Misc
     Tick,
     DismissNotification,
@@ -666,8 +714,8 @@ impl ScrineverApp {
             validation_result: None,
             last_milestone: 0,
             writing_prompts_data: views::writing_prompts_panel::WritingPromptsData::new(),
-            managers: crate::core::integrations::Managers::new(),
-            managers_warmed_up: false,
+            project_state: ProjectState::new(),
+            linguistic_result: None,
         };
 
         (app, open_main.map(Message::WindowOpened))
@@ -732,6 +780,8 @@ impl ScrineverApp {
                 self.project_notes_text.clear();
                 self.generated_names.clear();
                 self.last_milestone = 0;
+                self.project_state = ProjectState::new();
+                self.linguistic_result = None;
                 if let Some(ref p) = self.project {
                     self.compile_options.title = p.title.clone();
                 }
@@ -743,6 +793,8 @@ impl ScrineverApp {
                 self.editor = EditorState::new();
                 self.project_notes_text.clear();
                 self.generated_names.clear();
+                self.project_state = ProjectState::new();
+                self.linguistic_result = None;
                 if let Some(ref p) = self.project {
                     self.compile_options.title = p.title.clone();
                 }
@@ -814,9 +866,16 @@ impl ScrineverApp {
                         .find(|&&m| total_words >= m)
                         .copied()
                         .unwrap_or(0);
+                    // Initialize project subsystems (search index, file watcher)
+                    self.project_state = ProjectState::new();
+                    self.project_state.on_project_load(
+                        &p.binder,
+                        p.path.as_deref(),
+                    );
                     self.project = Some(p);
                     self.selected_item = None;
                     self.editor = EditorState::new();
+                    self.linguistic_result = None;
                 }
             }
 
@@ -1077,12 +1136,14 @@ impl ScrineverApp {
                 self.editor.content.perform(action);
                 if is_edit {
                     self.editor.mark_dirty();
-                    // Shift annotation positions when text is edited
-                    let new_len = self.editor.content.text().len();
+                    let new_text = self.editor.content.text().to_string();
+                    let new_len = new_text.len();
                     let delta = new_len as i64 - old_len as i64;
-                    if delta != 0 {
-                        if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
-                            if let Some(item) = project.binder.find_item_mut(&item_id) {
+
+                    if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                        if let Some(item) = project.binder.find_item_mut(&item_id) {
+                            // Shift annotation positions when text is edited
+                            if delta != 0 {
                                 if let Some(ref mut doc) = item.document {
                                     for ann in &mut doc.annotations {
                                         if ann.start >= cursor_before {
@@ -1091,14 +1152,48 @@ impl ScrineverApp {
                                     }
                                 }
                             }
+
+                            // Shift comment anchors for this document
+                            if delta != 0 {
+                                let mgr = self.project_state.comments_for(item_id);
+                                mgr.shift_after(cursor_before, delta);
+                            }
+
+                            // Record revision marks when revision mode is active
+                            if delta > 0 {
+                                self.project_state.record_insertion(
+                                    cursor_before, cursor_before + delta as usize, &new_text[cursor_before..cursor_before + delta as usize],
+                                );
+                            } else if delta < 0 {
+                                self.project_state.record_deletion(
+                                    cursor_before, cursor_before + (-delta) as usize, "",
+                                );
+                            }
+
+                            // Update search index for this document
+                            let title = item.title.clone();
+                            let content = item.document.as_ref().map_or("", |d| d.content.as_str()).to_string();
+                            let notes = item.document.as_ref().map_or("", |d| d.notes.as_str()).to_string();
+                            let synopsis = item.synopsis.clone();
+                            self.project_state.on_document_edit(item_id, &title, &content, &notes, &synopsis);
                         }
                     }
                 }
             }
 
             // ========== View operations ==========
-            Message::SwitchView(mode) => {
-                self.view_mode = mode;
+            Message::SwitchView(ref mode) => {
+                // Set up corkboard layout when switching to corkboard view
+                if *mode == ViewMode::Corkboard {
+                    if let Some(ref project) = self.project {
+                        let parent = self.selected_item
+                            .and_then(|id| project.binder.find_item(&id))
+                            .unwrap_or(&project.binder.draft);
+                        let item_ids: Vec<Uuid> = parent.children.iter().map(|c| c.id).collect();
+                        self.project_state.arrange_corkboard_grid(&item_ids);
+                    }
+                }
+                self.view_mode = mode.clone();
             }
 
             Message::ToggleInspector => {
@@ -1190,32 +1285,18 @@ impl ScrineverApp {
                     use crate::export::compiler::Compiler;
                     use crate::export::integrations;
 
-                    // Generate compile stats and manifest via integration module
+                    // Generate compile stats for logging
                     let compile_result = integrations::compile_with_stats(
                         &project.binder,
                         &self.compile_options,
                     );
                     log::info!(
-                        "Compile stats: {} | Manifest: {} | Settings: {} | Issues: {} | Preview: {} chars",
-                        compile_result.statistics.summary(),
-                        compile_result.manifest.summary(),
-                        compile_result.settings_summary,
+                        "Compile: {} words, {} sections, {} validation issues",
+                        compile_result.statistics.total_words,
+                        compile_result.manifest.sections.len(),
                         compile_result.validation_issues.len(),
-                        compile_result.assembled_preview.len(),
                     );
 
-                    // Log available formats with full details
-                    let formats = integrations::supported_export_formats();
-                    for fi in &formats {
-                        log::debug!(
-                            "Format: {} ext={} cat={} mime={} bin={} toc={} fm={} fmt={:?}",
-                            fi.display_name, fi.extension, fi.category, fi.mime_type,
-                            fi.is_binary, fi.supports_toc, fi.supports_front_matter, fi.format,
-                        );
-                    }
-                    let _caps = integrations::format_capabilities_summary();
-
-                    // Detect format from output path
                     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                     let output_dir = home.join(OUTPUT_DIR_NAME);
                     if let Err(e) = std::fs::create_dir_all(&output_dir) {
@@ -1227,7 +1308,6 @@ impl ScrineverApp {
                         self.compile_options.format.extension()
                     );
                     let output_path = output_dir.join(&filename);
-                    let _ = integrations::detect_format(&output_path);
 
                     match Compiler::save_to_file(&project.binder, &self.compile_options, &output_path) {
                         Ok(_) => {
@@ -1294,6 +1374,10 @@ impl ScrineverApp {
 
             Message::DoSearch => {
                 if let Some(ref project) = self.project {
+                    // Record search in history
+                    if !self.search_query.is_empty() {
+                        self.project_state.record_search(&self.search_query);
+                    }
                     let options = SearchOptions {
                         query: self.search_query.clone(),
                         case_sensitive: self.search_case_sensitive,
@@ -1409,8 +1493,11 @@ impl ScrineverApp {
             Message::SetItemTarget(id, target_str) => {
                 if let Ok(target) = target_str.parse::<usize>() {
                     self.item_targets.insert(id, target);
+                    // Also set in the proper targets system
+                    self.project_state.set_target(id, target);
                 } else if target_str.is_empty() {
                     self.item_targets.remove(&id);
+                    self.project_state.set_target(id, 0);
                 }
             }
 
@@ -2892,19 +2979,6 @@ impl ScrineverApp {
                     if let Some(item) = project.binder.find_item(&item_id) {
                         if let Some(ref doc) = item.document {
                             use crate::export::compiler::{CompileContent, CompileOptions};
-                            use crate::export::integrations;
-
-                            // Exercise print config and FDX/Fountain/MOBI analysis
-                            let print_cfg = integrations::print_config_summary(None);
-                            let _print_opts = integrations::default_print_options();
-                            log::info!(
-                                "Print config: {} | area={:?} | issues={} | sizes={} | dims={:?}",
-                                print_cfg.summary,
-                                print_cfg.content_area,
-                                print_cfg.validation_issues.len(),
-                                print_cfg.available_paper_sizes.len(),
-                                print_cfg.paper_dimensions,
-                            );
 
                             let contents = vec![CompileContent {
                                 title: item.title.clone(),
@@ -2913,42 +2987,11 @@ impl ScrineverApp {
                                 depth: 0,
                             }];
 
-                            // Exercise FDX analysis on the content
-                            let compile_opts = CompileOptions { title: item.title.clone(), ..CompileOptions::default() };
-                            let fdx = integrations::fdx_analysis(&contents, &compile_opts);
-                            log::debug!(
-                                "FDX: paras={} scenes={} dialogue={} transitions={} types={}",
-                                fdx.paragraph_count, fdx.scene_heading_count,
-                                fdx.dialogue_count, fdx.transition_count,
-                                fdx.paragraph_type_labels.len(),
-                            );
-
-                            // Exercise Fountain analysis
-                            let ftn = integrations::fountain_analysis(&doc.content);
-                            log::debug!(
-                                "Fountain: sections={} scenes={} chars={:?} dialogue={} trans={} pages={} meta={} summary={}",
-                                ftn.section_count, ftn.scene_count,
-                                ftn.character_names, ftn.dialogue_count,
-                                ftn.transition_count, ftn.estimated_pages,
-                                ftn.title_page_metadata.len(), ftn.screenplay_summary,
-                            );
-
-                            // Exercise MOBI export summary
-                            let mobi = integrations::mobi_export_summary(&contents, &compile_opts);
-                            log::debug!(
-                                "MOBI: chapters={} toc={} opf={} ncx={} title={} author={}",
-                                mobi.chapter_count, mobi.toc_html.len(),
-                                mobi.opf_document.len(), mobi.ncx_document.len(),
-                                mobi.metadata_title, mobi.metadata_author,
-                            );
-
                             let opts = CompileOptions { title: item.title.clone(), ..CompileOptions::default() };
                             let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                             let print_path = home.join(PROJECTS_DIR_NAME).join("print.pdf");
                             if let Some(parent) = print_path.parent() {
-                                if let Err(e) = std::fs::create_dir_all(parent) {
-                                    log::warn!("Failed to create print directory: {}", e);
-                                }
+                                let _ = std::fs::create_dir_all(parent);
                             }
                             match crate::export::pdf::save_pdf(&contents, &opts, &print_path) {
                                 Ok(_) => {
@@ -2966,44 +3009,12 @@ impl ScrineverApp {
             Message::PrintProject => {
                 self.sync_editor_to_project();
                 if let Some(ref project) = self.project {
-                    use crate::export::integrations;
-
-                    // Exercise import integration functions with full field reads
-                    let md_summary = integrations::import_markdown_content("# Test\nContent.", "preview.md");
-                    log::debug!(
-                        "MD import: fm={} body={} plain={} structured={} flat={}",
-                        md_summary.front_matter.is_some(),
-                        md_summary.body_text.len(),
-                        md_summary.plain_text.len(),
-                        md_summary.structured_items.len(),
-                        md_summary.flat_items.len(),
-                    );
-
-                    let web_summary = integrations::import_web_content("<h1>Title</h1><p>Preview</p>", "https://example.com");
-                    log::debug!(
-                        "Web import: title={:?} headings={} preview={} items={}",
-                        web_summary.title,
-                        web_summary.headings.len(),
-                        web_summary.plain_text_preview.len(),
-                        web_summary.binder_items.len(),
-                    );
-
-                    let import_result = integrations::import_with_metadata("# Test", "test.md");
-                    log::debug!(
-                        "Import: format={} items={} meta={}",
-                        import_result.source_format,
-                        import_result.items.len(),
-                        import_result.metadata_summary,
-                    );
-
                     let mut opts = self.compile_options.clone();
                     opts.format = crate::export::compiler::OutputFormat::Pdf;
                     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                     let print_path = home.join(PROJECTS_DIR_NAME).join(format!("{}_print.pdf", project.title));
                     if let Some(parent) = print_path.parent() {
-                        if let Err(e) = std::fs::create_dir_all(parent) {
-                            log::warn!("Failed to create print directory: {}", e);
-                        }
+                        let _ = std::fs::create_dir_all(parent);
                     }
                     match crate::export::compiler::Compiler::save_to_file(&project.binder, &opts, &print_path) {
                         Ok(_) => {
@@ -3524,18 +3535,8 @@ impl ScrineverApp {
             Message::ShowValidation => {
                 self.sync_editor_to_project();
                 if let Some(ref project) = self.project {
-                    let mut result = crate::core::validation::validate_project(&project.binder);
-                    // Also include link health in validation
-                    // Add orphan document info (broken links already handled by validation)
-                    let link_health = crate::core::links::link_health_summary(&project.binder);
-                    if link_health.orphan_documents > 0 {
-                        result.issues.push(crate::core::validation::ValidationIssue {
-                            severity: crate::core::validation::Severity::Info,
-                            kind: crate::core::validation::IssueKind::Orphan,
-                            message: format!("{} orphan document(s) with no incoming links", link_health.orphan_documents),
-                            item_id: None,
-                        });
-                    }
+                    // Use ProjectState for comprehensive validation (includes link health)
+                    let result = ProjectState::validate_project(&project.binder);
                     self.notification = Some(result.display());
                     self.validation_result = Some(result);
                     self.bottom_panel = BottomPanel::Validation;
@@ -3570,6 +3571,276 @@ impl ScrineverApp {
             Message::GenerateWritingNames => {
                 self.writing_prompts_data.generate_names();
                 self.bottom_panel = BottomPanel::WritingPrompts;
+            }
+
+            // ========== Comments ==========
+            Message::AddComment(doc_id, comment_text) => {
+                let mgr = self.project_state.comments_for(doc_id);
+                let comment = Comment::new(
+                    self.editor.cursor,
+                    self.editor.cursor + 1,
+                    &comment_text,
+                    "Author",
+                );
+                mgr.add_comment(comment);
+                self.notification = Some("Comment added".to_string());
+            }
+
+            Message::DeleteComment(doc_id, comment_id) => {
+                let mgr = self.project_state.comments_for(doc_id);
+                mgr.remove_comment(comment_id);
+            }
+
+            Message::ResolveComment(doc_id, comment_id) => {
+                let mgr = self.project_state.comments_for(doc_id);
+                if let Some(comment) = mgr.get_mut(comment_id) {
+                    comment.resolve("Author");
+                }
+            }
+
+            Message::UnresolveComment(doc_id, comment_id) => {
+                let mgr = self.project_state.comments_for(doc_id);
+                if let Some(comment) = mgr.get_mut(comment_id) {
+                    comment.unresolve();
+                }
+            }
+
+            Message::EditComment(doc_id, comment_id, new_text) => {
+                let mgr = self.project_state.comments_for(doc_id);
+                if let Some(comment) = mgr.get_mut(comment_id) {
+                    comment.edit_text(&new_text);
+                }
+            }
+
+            Message::ReplyToComment(doc_id, comment_id, reply_text) => {
+                let mgr = self.project_state.comments_for(doc_id);
+                if let Some(comment) = mgr.get_mut(comment_id) {
+                    comment.add_reply("Author", &reply_text);
+                }
+            }
+
+            // ========== Revision tracking ==========
+            Message::ToggleRevisionMode => {
+                self.project_state.revision_tracker.toggle_revision_mode();
+                let active = self.project_state.revision_tracker.is_active();
+                if active {
+                    // Start a new revision pass if none exists
+                    if self.project_state.revision_tracker.pass_count() == 0 {
+                        self.project_state.revision_tracker.start_new_pass("Revision 1");
+                    }
+                    self.notification = Some("Revision tracking enabled".to_string());
+                } else {
+                    self.notification = Some("Revision tracking disabled".to_string());
+                }
+            }
+
+            Message::StartRevisionPass(label) => {
+                self.project_state.revision_tracker.start_new_pass(&label);
+                self.notification = Some(format!("Started revision pass: {}", label));
+            }
+
+            Message::AcceptRevisionMark(mark_id) => {
+                self.project_state.revision_tracker.accept_mark(&mark_id);
+            }
+
+            Message::RejectRevisionMark(mark_id) => {
+                self.project_state.revision_tracker.reject_mark(&mark_id);
+            }
+
+            Message::AcceptAllRevisions => {
+                let stats = self.project_state.revision_tracker.statistics();
+                let count = stats.mark_count;
+                // Accept all marks in all passes
+                let pass_ids: Vec<Uuid> = self.project_state.revision_tracker.passes
+                    .iter().map(|p| p.id).collect();
+                for pid in pass_ids {
+                    self.project_state.revision_tracker.accept_all_in_pass(&pid);
+                }
+                self.notification = Some(format!("Accepted {} revision marks", count));
+            }
+
+            // ========== Corkboard interactions ==========
+            Message::CorkboardMoveCard(card_id, x, y) => {
+                let _ = self.project_state.corkboard.move_card(card_id, x, y);
+            }
+
+            Message::CorkboardPinCard(card_id, pinned) => {
+                let _ = self.project_state.corkboard.pin_card(card_id, pinned);
+            }
+
+            Message::CorkboardArrangeGrid => {
+                if let Some(ref project) = self.project {
+                    let parent = self.selected_item
+                        .and_then(|id| project.binder.find_item(&id))
+                        .unwrap_or(&project.binder.draft);
+                    let item_ids: Vec<Uuid> = parent.children.iter().map(|c| c.id).collect();
+                    self.project_state.arrange_corkboard_grid(&item_ids);
+                }
+            }
+
+            // ========== Outliner interactions ==========
+            Message::OutlinerToggleExpand(item_id) => {
+                self.project_state.outliner.toggle_expand(item_id);
+            }
+
+            Message::OutlinerExpandAll => {
+                if let Some(ref project) = self.project {
+                    let items = ProjectState::build_outliner_items(
+                        &project.binder.draft.children,
+                        &self.project_state.targets,
+                    );
+                    self.project_state.outliner.expand_all(&items);
+                }
+            }
+
+            Message::OutlinerCollapseAll => {
+                self.project_state.outliner.collapse_all();
+            }
+
+            Message::OutlinerSortBy(column_name) => {
+                use crate::core::outliner::OutlinerColumn;
+                let col = match column_name.as_str() {
+                    "Title" => OutlinerColumn::Title,
+                    "Words" => OutlinerColumn::WordCount,
+                    "Status" => OutlinerColumn::Status,
+                    "Label" => OutlinerColumn::Label,
+                    "Target" => OutlinerColumn::TargetWordCount,
+                    "Progress" => OutlinerColumn::TargetProgress,
+                    _ => OutlinerColumn::Title,
+                };
+                let ascending = self.project_state.outliner.settings.sort_column
+                    .as_ref()
+                    .map_or(true, |c| c != &col || !self.project_state.outliner.settings.sort_ascending);
+                self.project_state.outliner.sort_by(col, ascending);
+            }
+
+            // ========== Validation auto-fix ==========
+            Message::AutoFixValidation => {
+                if let Some(ref mut project) = self.project {
+                    let result = ProjectState::auto_fix(&mut project.binder);
+                    self.notification = Some(result.summary());
+                    // Re-run validation to update the panel
+                    let validation = ProjectState::validate_project(&project.binder);
+                    self.validation_result = Some(validation);
+                }
+            }
+
+            // ========== Linguistic analysis ==========
+            Message::RunLinguisticAnalysis => {
+                self.sync_editor_to_project();
+                if let (Some(ref project), Some(item_id)) = (&self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item(&item_id) {
+                        if let Some(ref doc) = item.document {
+                            self.linguistic_result = Some(ProjectState::analyze_writing(&doc.content));
+                            self.notification = Some("Linguistic analysis complete".to_string());
+                        }
+                    }
+                }
+            }
+
+            // ========== Search index ==========
+            Message::RebuildSearchIndex => {
+                if let Some(ref project) = self.project {
+                    self.project_state.search_index.build_from_binder(&project.binder);
+                    let terms = self.project_state.search_index.unique_terms();
+                    self.notification = Some(format!("Search index rebuilt: {} unique terms", terms));
+                }
+            }
+
+            // ========== Document targets ==========
+            Message::SetDocTarget(doc_id, target_str) => {
+                if let Ok(target) = target_str.parse::<usize>() {
+                    self.project_state.set_target(doc_id, target);
+                    self.item_targets.insert(doc_id, target);
+                } else if target_str.is_empty() {
+                    self.project_state.set_target(doc_id, 0);
+                    self.item_targets.remove(&doc_id);
+                }
+            }
+
+            Message::RemoveDocTarget(doc_id) => {
+                self.project_state.set_target(doc_id, 0);
+                self.item_targets.remove(&doc_id);
+            }
+
+            // ========== Import formats ==========
+            Message::ImportDocx => {
+                let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                let import_dir = home.join(IMPORT_DIR_NAME);
+                if let Ok(entries) = std::fs::read_dir(&import_dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.extension().map_or(false, |e| e == "docx") {
+                            if let Some(ref mut project) = self.project {
+                                match crate::export::docx_import::import_docx(&path) {
+                                    Ok(items) => {
+                                        for item in items {
+                                            project.binder.draft.add_child(item);
+                                        }
+                                        self.notification = Some(format!("Imported {:?}", path.file_name().unwrap_or_default()));
+                                    }
+                                    Err(e) => {
+                                        self.notification = Some(format!("DOCX import error: {}", e));
+                                    }
+                                }
+                            }
+                            break; // Import first .docx found
+                        }
+                    }
+                }
+            }
+
+            Message::ImportScriv => {
+                let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                let import_dir = home.join(IMPORT_DIR_NAME);
+                if let Ok(entries) = std::fs::read_dir(&import_dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.extension().map_or(false, |e| e == "scriv") {
+                            if let Some(ref mut project) = self.project {
+                                match crate::export::scriv_import::import_scriv(&path) {
+                                    Ok((_info, items)) => {
+                                        for item in items {
+                                            project.binder.draft.add_child(item);
+                                        }
+                                        self.notification = Some(format!("Imported Scrivener project from {:?}", path.file_name().unwrap_or_default()));
+                                    }
+                                    Err(e) => {
+                                        self.notification = Some(format!("Scriv import error: {}", e));
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            Message::ImportMedia => {
+                let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                let import_dir = home.join(IMPORT_DIR_NAME);
+                if let Ok(entries) = std::fs::read_dir(&import_dir) {
+                    let mut imported = 0;
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if crate::core::media_import::is_supported_media(&path) {
+                            if let Some(ref mut project) = self.project {
+                                match crate::core::media_import::import_media_file(&path) {
+                                    Ok(item) => {
+                                        project.binder.research.add_child(item);
+                                        imported += 1;
+                                    }
+                                    Err(e) => {
+                                        log::warn!("Media import failed for {:?}: {}", path, e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if imported > 0 {
+                        self.notification = Some(format!("Imported {} media file(s)", imported));
+                    }
+                }
             }
 
             // ========== Misc ==========
@@ -3702,15 +3973,12 @@ impl ScrineverApp {
                     }
                 }
 
-                // Warm up integration managers on first tick with a project
-                if !self.managers_warmed_up {
-                    if let Some(ref project) = self.project {
-                        crate::core::integrations::warm_up(&mut self.managers, &project.binder);
-                        let _ = crate::core::integrations::build_search_index(&project.binder);
-                        let _ = crate::core::integrations::search_analysis(&project.binder);
-                        let _ = crate::core::integrations::project_analysis(&project.binder);
-                        self.managers_warmed_up = true;
-                    }
+                // Poll file watcher for external changes
+                if self.project_state.poll_external_changes() {
+                    self.notification = Some(
+                        "External changes detected. Consider reloading.".to_string()
+                    );
+                    self.project_state.clear_external_changes();
                 }
 
                 // Auto-dismiss notification after 8 seconds
@@ -3948,7 +4216,7 @@ impl ScrineverApp {
                 views::corkboard_view::view(&items, &parent_title)
             }
             ViewMode::Outliner => {
-                views::outliner_view::view(&project.binder.draft, &self.item_targets)
+                views::outliner_view::view(&project.binder.draft, &self.item_targets, &self.project_state.outliner.expanded)
             }
             ViewMode::Scrivenings => {
                 let (items, parent_title) = if let Some(id) = self.selected_item {
@@ -4089,6 +4357,16 @@ impl ScrineverApp {
                     }
                     _ => None,
                 };
+                // Build per-document target progress
+                let word_counts = crate::core::integrations::ProjectState::word_count_map(&project.binder);
+                let doc_progress: Vec<(String, _)> = self.project_state.targets
+                    .all_progress(&word_counts)
+                    .into_iter()
+                    .filter_map(|p| {
+                        project.binder.find_item(&p.doc_id)
+                            .map(|item| (item.title.clone(), p))
+                    })
+                    .collect();
                 let data = views::targets_panel::TargetsData {
                     project_target: project.settings.target_word_count,
                     current_words,
@@ -4097,6 +4375,7 @@ impl ScrineverApp {
                     session_words: self.session_stats.words_written,
                     days_remaining,
                     words_per_day_needed,
+                    doc_progress,
                 };
                 Some(views::targets_panel::view(&data))
             }

@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use crate::core::binder::BinderItem;
 #[cfg(test)]
 use crate::core::binder::BinderItemKind;

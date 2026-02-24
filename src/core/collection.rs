@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

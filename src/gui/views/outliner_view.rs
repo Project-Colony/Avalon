@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 use iced::widget::{button, column, container, row, scrollable, text, Space};
 use iced::{Element, Length, Padding};
 use uuid::Uuid;
@@ -7,8 +8,9 @@ use crate::core::binder::{BinderItem, BinderItemKind};
 use crate::gui::app::Message;
 use crate::gui::theme::Theme;
 
-/// Render the outliner view — a hierarchical table with section numbering
-pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>) -> Element<'static, Message> {
+/// Render the outliner view — a hierarchical table with section numbering.
+/// `expanded_ids` comes from the OutlinerState and tracks which folders are expanded.
+pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>, expanded_ids: &HashSet<Uuid>) -> Element<'static, Message> {
     let total_words = draft.total_word_count();
     let doc_count = count_text_items(draft);
 
@@ -42,7 +44,7 @@ pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>) -> Element<'stat
 
     let mut row_elements: Vec<Element<'static, Message>> = Vec::new();
     let mut counter = vec![0usize];
-    collect_outline_rows(draft, 0, targets, &mut row_elements, &mut counter);
+    collect_outline_rows(draft, 0, targets, expanded_ids, &mut row_elements, &mut counter);
 
     let mut rows = column![].spacing(1);
     for elem in row_elements {
@@ -104,6 +106,7 @@ fn collect_outline_rows(
     item: &BinderItem,
     depth: usize,
     targets: &HashMap<Uuid, usize>,
+    expanded_ids: &HashSet<Uuid>,
     rows: &mut Vec<Element<'static, Message>>,
     counter: &mut Vec<usize>,
 ) {
@@ -118,8 +121,9 @@ fn collect_outline_rows(
         String::new()
     };
 
+    let is_expanded = expanded_ids.contains(&item.id) || (depth == 0);
     let icon = match item.kind {
-        BinderItemKind::Folder => if item.expanded { "\u{f0d7} " } else { "\u{f0da} " },
+        BinderItemKind::Folder => if is_expanded { "\u{f0d7} " } else { "\u{f0da} " },
         BinderItemKind::Text => "\u{2022} ",
         _ => "  ",
     };
@@ -174,13 +178,19 @@ fn collect_outline_rows(
     };
 
     let id = item.id;
+    // Folders toggle expand/collapse; text items navigate to the document
+    let click_msg = if item.kind == BinderItemKind::Folder {
+        Message::OutlinerToggleExpand(id)
+    } else {
+        Message::SelectBinderItem(id)
+    };
     let title_btn = button(
         row![
             Space::with_width(indent),
             text(title_text).size(13).color(Theme::TEXT_PRIMARY),
         ]
     )
-    .on_press(Message::SelectBinderItem(id))
+    .on_press(click_msg)
     .padding(0)
     .width(Length::FillPortion(4));
 
@@ -220,10 +230,10 @@ fn collect_outline_rows(
 
     rows.push(row_container.into());
 
-    if item.expanded {
+    if is_expanded {
         counter.push(0);
         for child in &item.children {
-            collect_outline_rows(child, depth + 1, targets, rows, counter);
+            collect_outline_rows(child, depth + 1, targets, expanded_ids, rows, counter);
         }
         counter.pop();
     }

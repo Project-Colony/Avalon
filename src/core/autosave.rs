@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};

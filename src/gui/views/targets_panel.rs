@@ -1,6 +1,7 @@
-use iced::widget::{column, container, row, text, text_input, Space};
+use iced::widget::{column, container, row, scrollable, text, text_input, Space};
 use iced::{Element, Length, Padding};
 
+use crate::core::targets::TargetProgress;
 use crate::gui::app::Message;
 use crate::gui::theme::{self, Theme};
 
@@ -13,6 +14,8 @@ pub struct TargetsData {
     pub session_words: i64,
     pub days_remaining: Option<i64>,
     pub words_per_day_needed: Option<usize>,
+    /// Per-document target progress from the DocumentTargets system.
+    pub doc_progress: Vec<(String, TargetProgress)>,
 }
 
 /// Render the project targets panel (bottom panel)
@@ -187,6 +190,36 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
     ]
     .align_y(iced::Alignment::Center);
 
+    // Per-document target progress
+    let doc_targets_section: Element<'static, Message> = if !data.doc_progress.is_empty() {
+        let mut doc_list = column![
+            text("DOCUMENT TARGETS").size(10).color(Theme::TEXT_MUTED),
+        ].spacing(2);
+
+        for (title, progress) in &data.doc_progress {
+            let status_color = if progress.status.is_complete() {
+                Theme::SUCCESS
+            } else if progress.status.needs_attention() {
+                Theme::WARNING
+            } else {
+                Theme::TEXT_SECONDARY
+            };
+            let bar = progress.progress_bar();
+            doc_list = doc_list.push(
+                row![
+                    text(title.clone()).size(10).color(Theme::TEXT_PRIMARY).width(Length::Fixed(120.0)),
+                    Space::with_width(4),
+                    text(bar).size(10).color(status_color),
+                    Space::with_width(4),
+                    text(progress.compact_display()).size(10).color(Theme::TEXT_MUTED),
+                ]
+            );
+        }
+        scrollable(doc_list).height(Length::Fixed(80.0)).into()
+    } else {
+        Space::with_height(0).into()
+    };
+
     let content = column![
         header,
         Space::with_height(4),
@@ -197,6 +230,8 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
         deadline_info,
         Space::with_height(4),
         deadline_input_row,
+        Space::with_height(6),
+        doc_targets_section,
     ]
     .padding(Padding::from([8, 12]));
 

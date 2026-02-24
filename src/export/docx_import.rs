@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::io::{Cursor, Read};
 use std::path::Path;
 
