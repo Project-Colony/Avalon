@@ -130,10 +130,14 @@ impl RecentProjects {
             return Self::default();
         };
         if path.exists() {
-            if let Ok(data) = std::fs::read_to_string(&path) {
-                if let Ok(recent) = serde_json::from_str(&data) {
-                    return recent;
+            match std::fs::read_to_string(&path) {
+                Ok(data) => {
+                    match serde_json::from_str(&data) {
+                        Ok(recent) => return recent,
+                        Err(e) => log::warn!("Failed to parse recent projects file: {}", e),
+                    }
                 }
+                Err(e) => log::warn!("Failed to read recent projects file: {}", e),
             }
         }
         Self::new()
