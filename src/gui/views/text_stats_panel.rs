@@ -2,11 +2,13 @@ use iced::widget::{column, container, row, scrollable, text, Space};
 use iced::{Element, Length, Padding};
 
 use crate::core::stats::TextAnalysis;
+use crate::core::text_analysis as advanced_analysis;
+use crate::core::linguistic;
 use crate::gui::app::Message;
 use crate::gui::theme::{self, Theme};
 
 /// Render the text statistics panel (bottom panel)
-pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
+pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message> {
     let header = text("TEXT STATISTICS")
         .size(11)
         .color(Theme::TEXT_SECONDARY);
@@ -30,10 +32,11 @@ pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
     ]
     .spacing(16);
 
-    // Readability
-    let readability_color = if analysis.readability_score >= 60.0 {
+    // Advanced readability from text_analysis module (6 formulas)
+    let advanced = advanced_analysis::compute_readability(raw_text);
+    let readability_color = if advanced.flesch_reading_ease >= 60.0 {
         Theme::SUCCESS
-    } else if analysis.readability_score >= 30.0 {
+    } else if advanced.flesch_reading_ease >= 30.0 {
         Theme::WARNING
     } else {
         Theme::ERROR
@@ -42,46 +45,131 @@ pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
     let readability = row![
         text("Readability:").size(11).color(Theme::TEXT_MUTED),
         Space::with_width(4),
-        text(format!("{:.1}", analysis.readability_score)).size(12).color(readability_color),
-        Space::with_width(4),
-        text(format!("({})", analysis.readability_label())).size(11).color(Theme::TEXT_SECONDARY),
-        Space::with_width(16),
+        text(format!("Flesch: {:.1}", advanced.flesch_reading_ease)).size(11).color(readability_color),
+        Space::with_width(8),
+        text(format!("FK Grade: {:.1}", advanced.flesch_kincaid_grade)).size(11).color(Theme::TEXT_SECONDARY),
+        Space::with_width(8),
+        text(format!("Fog: {:.1}", advanced.gunning_fog)).size(11).color(Theme::TEXT_SECONDARY),
+        Space::with_width(8),
         text(format!("Reading: {:.0} min", analysis.reading_time_minutes)).size(11).color(Theme::TEXT_MUTED),
         Space::with_width(8),
         text(format!("Speaking: {:.0} min", analysis.speaking_time_minutes)).size(11).color(Theme::TEXT_MUTED),
     ]
     .align_y(iced::Alignment::Center);
 
-    // Most common words
+    // Additional readability formulas
+    let readability_extra = row![
+        text("Coleman-Liau:").size(10).color(Theme::TEXT_MUTED),
+        Space::with_width(4),
+        text(format!("{:.1}", advanced.coleman_liau)).size(10).color(Theme::TEXT_SECONDARY),
+        Space::with_width(12),
+        text("ARI:").size(10).color(Theme::TEXT_MUTED),
+        Space::with_width(4),
+        text(format!("{:.1}", advanced.ari)).size(10).color(Theme::TEXT_SECONDARY),
+        Space::with_width(12),
+        text("SMOG:").size(10).color(Theme::TEXT_MUTED),
+        Space::with_width(4),
+        text(format!("{:.1}", advanced.smog)).size(10).color(Theme::TEXT_SECONDARY),
+    ]
+    .align_y(iced::Alignment::Center);
+
+    // Vocabulary metrics from text_analysis module
+    let vocab = advanced_analysis::vocabulary_metrics(raw_text);
+    let vocab_row = row![
+        text("Vocabulary:").size(11).color(Theme::TEXT_MUTED),
+        Space::with_width(4),
+        text(format!("TTR: {:.1}%", vocab.type_token_ratio * 100.0))
+            .size(11)
+            .color(if vocab.type_token_ratio >= 0.7 { Theme::SUCCESS }
+                else if vocab.type_token_ratio >= 0.5 { Theme::WARNING }
+                else { Theme::ERROR }),
+        Space::with_width(8),
+        text(format!("Hapax: {}", vocab.hapax_legomena)).size(10).color(Theme::TEXT_SECONDARY),
+        Space::with_width(8),
+        text(format!("Pages: {:.1}", analysis.word_count as f64 / crate::core::WORDS_PER_PAGE as f64))
+            .size(11).color(Theme::TEXT_MUTED),
+    ]
+    .align_y(iced::Alignment::Center);
+
+    // Linguistic analysis (passive voice, clichés, adverbs, etc.)
+    let writing = linguistic::analyze_text(raw_text);
+    let linguistic_level = writing.readability.level();
+
+    let mut linguistic_row = row![
+        text("Style:").size(11).color(Theme::TEXT_MUTED),
+        Space::with_width(4),
+        text(format!("Level: {}", linguistic_level.label()))
+            .size(11)
+            .color(Theme::TEXT_SECONDARY),
+        Space::with_width(8),
+    ]
+    .spacing(4);
+
+    if !writing.passive_voice.is_empty() {
+        linguistic_row = linguistic_row.push(
+            text(format!("{} passive", writing.passive_voice.len()))
+                .size(10)
+                .color(Theme::WARNING),
+        );
+        linguistic_row = linguistic_row.push(Space::with_width(8));
+    }
+    if !writing.adverbs.is_empty() {
+        linguistic_row = linguistic_row.push(
+            text(format!("{} adverbs", writing.adverbs.len()))
+                .size(10)
+                .color(Theme::WARNING),
+        );
+        linguistic_row = linguistic_row.push(Space::with_width(8));
+    }
+    if !writing.cliches.is_empty() {
+        linguistic_row = linguistic_row.push(
+            text(format!("{} clichés", writing.cliches.len()))
+                .size(10)
+                .color(Theme::ERROR),
+        );
+        linguistic_row = linguistic_row.push(Space::with_width(8));
+    }
+    if !writing.long_sentences.is_empty() {
+        linguistic_row = linguistic_row.push(
+            text(format!("{} long sentences", writing.long_sentences.len()))
+                .size(10)
+                .color(Theme::WARNING),
+        );
+        linguistic_row = linguistic_row.push(Space::with_width(8));
+    }
+    if !writing.dialog_tags.is_empty() {
+        linguistic_row = linguistic_row.push(
+            text(format!("{} dialog tags", writing.dialog_tags.len()))
+                .size(10)
+                .color(Theme::TEXT_MUTED),
+        );
+    }
+
+    // Writing analysis summary
+    let summary_text = writing.summary();
+    let summary_row = text(summary_text).size(10).color(Theme::TEXT_SECONDARY);
+
+    // Top words from text_analysis module
+    let top_words = advanced_analysis::top_n_words(raw_text, 10);
     let mut common_words = row![
         text("Top words: ").size(11).color(Theme::TEXT_MUTED),
     ]
     .spacing(4);
-    for (word, count) in analysis.most_common_words.iter().take(10) {
+    for wf in &top_words {
         common_words = common_words.push(
-            text(format!("{}({})", word, count)).size(10).color(Theme::TEXT_SECONDARY)
+            text(format!("{}({})", wf.word, wf.count)).size(10).color(Theme::TEXT_SECONDARY)
         );
     }
 
-    // Overused words (words appearing much more than average)
-    let avg_freq = if !analysis.most_common_words.is_empty() {
-        analysis.most_common_words.iter().map(|(_, c)| *c).sum::<usize>() as f64
-            / analysis.most_common_words.len() as f64
-    } else {
-        1.0
-    };
-    let overused: Vec<&(String, usize)> = analysis.most_common_words.iter()
-        .filter(|(_, c)| *c as f64 > avg_freq * 2.0)
-        .take(5)
-        .collect();
-
-    let overused_row: Element<'static, Message> = if !overused.is_empty() {
+    // Overused words from text_analysis module
+    let overused_words = advanced_analysis::overused_words(raw_text, 5);
+    let overused_row: Element<'static, Message> = if !overused_words.is_empty() {
         let mut r = row![
             text("Overused: ").size(11).color(Theme::WARNING),
         ].spacing(4);
-        for (word, count) in overused {
+        for wf in &overused_words {
             r = r.push(
-                text(format!("{}({}x)", word, count)).size(10).color(Theme::WARNING)
+                text(format!("{}({}x)", wf.word, wf.count)).size(10).color(Theme::WARNING)
             );
         }
         r.into()
@@ -89,55 +177,46 @@ pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
         Space::with_height(0).into()
     };
 
-    // Vocabulary richness (type-token ratio)
-    let ttr = if analysis.word_count > 0 {
-        analysis.unique_words as f64 / analysis.word_count as f64 * 100.0
-    } else {
-        0.0
-    };
-    let ttr_label = if ttr >= 70.0 { "Rich" }
-    else if ttr >= 50.0 { "Moderate" }
-    else { "Repetitive" };
-    let ttr_color = if ttr >= 70.0 { Theme::SUCCESS }
-    else if ttr >= 50.0 { Theme::WARNING }
-    else { Theme::ERROR };
-
-    let vocab_row = row![
-        text("Vocabulary:").size(11).color(Theme::TEXT_MUTED),
+    // Sentence analysis
+    let longest = advanced_analysis::longest_sentences(raw_text, 3);
+    let avg_len = advanced_analysis::average_sentence_length(raw_text);
+    let sentence_row = row![
+        text("Sentences:").size(11).color(Theme::TEXT_MUTED),
         Space::with_width(4),
-        text(format!("{:.1}% unique", ttr)).size(11).color(ttr_color),
-        Space::with_width(4),
-        text(format!("({})", ttr_label)).size(11).color(Theme::TEXT_SECONDARY),
-        Space::with_width(16),
-        text(format!("Pages: {:.1}", analysis.word_count as f64 / crate::core::WORDS_PER_PAGE as f64))
-            .size(11).color(Theme::TEXT_MUTED),
-    ]
-    .align_y(iced::Alignment::Center);
-
-    // Syllable and word length distribution estimate
-    let long_words: usize = analysis.most_common_words.iter()
-        .filter(|(w, _)| w.len() > 8)
-        .count();
-    let short_words: usize = analysis.most_common_words.iter()
-        .filter(|(w, _)| w.len() <= 4)
-        .count();
-    let total_common = analysis.most_common_words.len().max(1);
-
-    let complexity_row = row![
-        text("Complexity:").size(11).color(Theme::TEXT_MUTED),
-        Space::with_width(4),
-        text(format!("{}% short", short_words * 100 / total_common)).size(10).color(Theme::SUCCESS),
+        text(format!("Avg: {:.1} words", avg_len)).size(10).color(Theme::TEXT_SECONDARY),
         Space::with_width(8),
-        text(format!("{}% long", long_words * 100 / total_common)).size(10).color(Theme::WARNING),
-        Space::with_width(16),
-        text(format!("Syllables/word: ~{:.1}", analysis.avg_word_length * 0.6))
-            .size(10).color(Theme::TEXT_MUTED),
+        text(format!("Longest: {} words",
+            longest.first().map_or(0, |s| s.word_count)
+        )).size(10).color(
+            if longest.first().map_or(false, |s| s.word_count > 40) { Theme::WARNING }
+            else { Theme::TEXT_SECONDARY }
+        ),
     ]
     .align_y(iced::Alignment::Center);
 
-    // Grade level estimation (from Flesch reading ease)
-    // Approximate grade: (100 - score) / 6.67, clamped
-    let est_grade = ((100.0 - analysis.readability_score) / 6.67).clamp(0.0, 20.0);
+    // Paragraph analysis
+    let paragraphs = advanced_analysis::paragraph_analysis(raw_text);
+    let density_row = row![
+        text("Density:").size(11).color(Theme::TEXT_MUTED),
+        Space::with_width(4),
+        text(format!("{} paragraphs", paragraphs.len())).size(10).color(Theme::TEXT_SECONDARY),
+        Space::with_width(8),
+        text(format!("Avg: {:.1} words/para",
+            if !paragraphs.is_empty() {
+                paragraphs.iter().map(|p| p.word_count).sum::<usize>() as f64 / paragraphs.len() as f64
+            } else { 0.0 }
+        )).size(10).color(Theme::TEXT_SECONDARY),
+        Space::with_width(8),
+        text(format!("Avg: {:.1} sentences/para",
+            if !paragraphs.is_empty() {
+                paragraphs.iter().map(|p| p.sentence_count).sum::<usize>() as f64 / paragraphs.len() as f64
+            } else { 0.0 }
+        )).size(10).color(Theme::TEXT_SECONDARY),
+    ]
+    .align_y(iced::Alignment::Center);
+
+    // Grade level estimation using advanced readability
+    let est_grade = advanced.flesch_kincaid_grade.clamp(0.0, 20.0);
     let est_audience = if est_grade <= 6.0 { "Children / General Public" }
     else if est_grade <= 9.0 { "Young Adults" }
     else if est_grade <= 13.0 { "General Adults" }
@@ -156,33 +235,6 @@ pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
     ]
     .align_y(iced::Alignment::Center);
 
-    // Writing density metrics
-    let words_per_paragraph = if analysis.paragraph_count > 0 {
-        analysis.word_count as f64 / analysis.paragraph_count as f64
-    } else {
-        0.0
-    };
-    let chars_per_word = if analysis.word_count > 0 {
-        analysis.char_no_spaces as f64 / analysis.word_count as f64
-    } else {
-        0.0
-    };
-
-    let density_row = row![
-        text("Density:").size(11).color(Theme::TEXT_MUTED),
-        Space::with_width(4),
-        text(format!("{:.1} words/paragraph", words_per_paragraph)).size(10).color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
-        text(format!("{:.1} chars/word", chars_per_word)).size(10).color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
-        text(format!("{:.1} sentences/paragraph",
-            if analysis.paragraph_count > 0 {
-                analysis.sentence_count as f64 / analysis.paragraph_count as f64
-            } else { 0.0 }
-        )).size(10).color(Theme::TEXT_SECONDARY),
-    ]
-    .align_y(iced::Alignment::Center);
-
     let content = column![
         header,
         Space::with_height(4),
@@ -191,14 +243,20 @@ pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
         avg_stats,
         Space::with_height(4),
         readability,
+        Space::with_height(2),
+        readability_extra,
         Space::with_height(4),
         grade_row,
         Space::with_height(4),
         vocab_row,
         Space::with_height(4),
+        sentence_row,
+        Space::with_height(4),
         density_row,
         Space::with_height(4),
-        complexity_row,
+        linguistic_row,
+        Space::with_height(2),
+        summary_row,
         Space::with_height(4),
         scrollable(common_words),
         overused_row,

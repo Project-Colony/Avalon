@@ -33,3 +33,4 @@ pub mod timer_panel;
 pub mod validation_panel;
 pub mod templates_panel;
 pub mod about_dialog;
+pub mod writing_prompts_panel;

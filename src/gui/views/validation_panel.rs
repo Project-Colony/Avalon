@@ -21,26 +21,31 @@ pub fn view(result: Option<&ProjectValidation>) -> Element<'static, Message> {
 
     let body: Element<'static, Message> = match result {
         Some(validation) => {
-            if validation.issues.is_empty() {
-                let health_label = if validation.trash_items == 0 {
-                    "Excellent project health"
-                } else if validation.trash_items <= 5 {
-                    "Good project health"
-                } else {
-                    "Consider emptying trash"
-                };
+            // Health score and grade
+            let health = validation.health_score();
+            let grade = validation.health_grade();
+            let grade_color = if health >= 90.0 { Theme::SUCCESS }
+                else if health >= 70.0 { Theme::WARNING }
+                else { Theme::ERROR };
 
+            if validation.issues.is_empty() {
                 column![
-                    text(format!("Project is clean ({} items)", validation.total_items))
-                        .size(13)
-                        .color(Theme::SUCCESS),
+                    row![
+                        text(format!("Project is clean ({} items)", validation.total_items))
+                            .size(13)
+                            .color(Theme::SUCCESS),
+                        Space::with_width(12),
+                        text(format!("Health: {} ({:.0}%)", grade, health))
+                            .size(12)
+                            .color(grade_color),
+                    ],
                     Space::with_height(4),
                     row![
                         text(format!("{} items in trash", validation.trash_items))
                             .size(10)
                             .color(Theme::TEXT_MUTED),
                         Space::with_width(12),
-                        text(health_label)
+                        text("No issues found")
                             .size(10)
                             .color(Theme::SUCCESS),
                     ],
@@ -53,44 +58,80 @@ pub fn view(result: Option<&ProjectValidation>) -> Element<'static, Message> {
                 let warnings = validation.warning_count();
                 let infos = validation.info_count();
 
-                let summary = row![
-                    if errors > 0 {
+                let mut summary_row = row![
+                    text(format!("Health: {} ({:.0}%)", grade, health))
+                        .size(12)
+                        .color(grade_color),
+                    Space::with_width(12),
+                ];
+                if errors > 0 {
+                    summary_row = summary_row.push(
                         text(format!("{} errors", errors)).size(12).color(Theme::ERROR)
-                    } else {
+                    );
+                } else {
+                    summary_row = summary_row.push(
                         text("0 errors").size(12).color(Theme::TEXT_MUTED)
-                    },
-                    Space::with_width(12),
-                    if warnings > 0 {
+                    );
+                }
+                summary_row = summary_row.push(Space::with_width(12));
+                if warnings > 0 {
+                    summary_row = summary_row.push(
                         text(format!("{} warnings", warnings)).size(12).color(Theme::WARNING)
-                    } else {
+                    );
+                } else {
+                    summary_row = summary_row.push(
                         text("0 warnings").size(12).color(Theme::TEXT_MUTED)
-                    },
-                    Space::with_width(12),
-                    text(format!("{} info", infos)).size(12).color(Theme::TEXT_MUTED),
-                    Space::with_width(12),
+                    );
+                }
+                summary_row = summary_row.push(Space::with_width(12));
+                summary_row = summary_row.push(
+                    text(format!("{} info", infos)).size(12).color(Theme::TEXT_MUTED)
+                );
+                summary_row = summary_row.push(Space::with_width(12));
+                summary_row = summary_row.push(
                     text(format!("({} total items)", validation.total_items))
                         .size(10)
-                        .color(Theme::TEXT_MUTED),
-                ];
+                        .color(Theme::TEXT_MUTED)
+                );
 
-                // Issue list
+                // Auto-fix button (not just a hint)
+                let autofix_hint: Element<'static, Message> = if validation.has_auto_fixable() {
+                    row![
+                        button(
+                            text(format!("Auto-fix {} issue(s)", validation.auto_fixable_count()))
+                                .size(10)
+                                .color(Theme::TEXT_ACCENT),
+                        )
+                        .on_press(Message::AutoFixValidation)
+                        .padding(Padding::from([3, 8])),
+                    ].into()
+                } else {
+                    Space::with_height(0).into()
+                };
+
+                // Sorted issue list
                 let mut issue_list = column![].spacing(2);
-                for issue in &validation.issues {
+                for issue in validation.sorted_issues() {
                     let severity_color = match issue.severity {
                         Severity::Error => Theme::ERROR,
                         Severity::Warning => Theme::WARNING,
                         Severity::Info => Theme::TEXT_MUTED,
                     };
-                    let severity_icon = match issue.severity {
-                        Severity::Error => "E",
-                        Severity::Warning => "W",
-                        Severity::Info => "I",
+                    let kind_icon = issue.severity.icon();
+                    let kind_label = issue.kind.label();
+
+                    let fix_hint = if issue.is_auto_fixable() {
+                        " [auto-fixable]"
+                    } else {
+                        ""
                     };
 
                     let inner_row = row![
-                        text(severity_icon.to_string()).size(10).color(severity_color),
-                        Space::with_width(6),
-                        text(issue.message.clone()).size(11).color(Theme::TEXT_SECONDARY),
+                        text(kind_icon.to_string()).size(10).color(severity_color),
+                        Space::with_width(4),
+                        text(format!("[{}]", kind_label)).size(9).color(Theme::TEXT_MUTED),
+                        Space::with_width(4),
+                        text(format!("{}{}", issue.message, fix_hint)).size(11).color(Theme::TEXT_SECONDARY),
                     ];
                     let issue_row: Element<'static, Message> = if let Some(item_id) = issue.item_id {
                         button(inner_row)
@@ -105,7 +146,8 @@ pub fn view(result: Option<&ProjectValidation>) -> Element<'static, Message> {
                 }
 
                 column![
-                    summary,
+                    summary_row,
+                    autofix_hint,
                     Space::with_height(6),
                     scrollable(issue_list).height(Length::Fixed(120.0)),
                 ]

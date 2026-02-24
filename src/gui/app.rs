@@ -10,6 +10,9 @@ use chrono::{NaiveDate, Utc};
 
 use crate::core::{PROJECTS_DIR_NAME, OUTPUT_DIR_NAME, IMPORT_DIR_NAME};
 use crate::core::binder::{BinderItem, BinderItemKind};
+use crate::core::comments::Comment;
+use crate::core::find_replace::{self, FindReplaceOptions, FindReplaceSession};
+use crate::core::integrations::ProjectState;
 use crate::core::project::Project;
 use crate::core::search::{self, SearchOptions};
 use crate::core::stats::{SessionStats, Statistics};
@@ -67,6 +70,7 @@ pub enum BottomPanel {
     Timer,
     Validation,
     Templates,
+    WritingPrompts,
 }
 
 /// Which toolbar dropdown menu is open
@@ -185,6 +189,7 @@ pub struct ScrineverApp {
     pub doc_find_match_count: usize,
     pub doc_find_current_match: usize,
     pub doc_find_positions: Vec<usize>,
+    pub find_replace_session: Option<FindReplaceSession>,
 
     // === Quick reference ===
     pub quick_ref_item: Option<Uuid>,
@@ -227,6 +232,15 @@ pub struct ScrineverApp {
 
     // === Word count milestone tracking ===
     pub last_milestone: usize,
+
+    // === Writing prompts ===
+    pub writing_prompts_data: views::writing_prompts_panel::WritingPromptsData,
+
+    // === Project subsystem state (comments, revision, corkboard, outliner, search index, targets, etc.) ===
+    pub project_state: ProjectState,
+
+    // === Linguistic analysis (on-demand, cached) ===
+    pub linguistic_result: Option<crate::core::linguistic::WritingAnalysis>,
 }
 
 /// Messages for the application
@@ -555,9 +569,60 @@ pub enum Message {
     // Project validation
     ShowValidation,
 
+    // Writing prompts
+    GenerateWritingPrompt,
+    GenerateWritingPromptCategory(String),
+    GenerateCharacter,
+    GeneratePlotSeed,
+    GenerateWritingNames,
+
     // Toolbar menus
     ToggleToolbarMenu(ToolbarMenu),
     CloseToolbarMenu,
+
+    // Comments
+    AddComment(Uuid, String),
+    DeleteComment(Uuid, Uuid),
+    ResolveComment(Uuid, Uuid),
+    UnresolveComment(Uuid, Uuid),
+    EditComment(Uuid, Uuid, String),
+    ReplyToComment(Uuid, Uuid, String),
+
+    // Revision tracking
+    ToggleRevisionMode,
+    StartRevisionPass(String),
+    AcceptRevisionMark(Uuid),
+    RejectRevisionMark(Uuid),
+    AcceptAllRevisions,
+
+    // Corkboard interactions
+    CorkboardMoveCard(Uuid, f32, f32),
+    CorkboardPinCard(Uuid, bool),
+    CorkboardArrangeGrid,
+
+    // Outliner interactions
+    OutlinerToggleExpand(Uuid),
+    OutlinerExpandAll,
+    OutlinerCollapseAll,
+    OutlinerSortBy(String),
+
+    // Validation auto-fix
+    AutoFixValidation,
+
+    // Linguistic analysis
+    RunLinguisticAnalysis,
+
+    // Search index
+    RebuildSearchIndex,
+
+    // Document targets (per-doc with full target)
+    SetDocTarget(Uuid, String),
+    RemoveDocTarget(Uuid),
+
+    // Import specific formats
+    ImportDocx,
+    ImportScriv,
+    ImportMedia,
 
     // Misc
     Tick,
@@ -629,6 +694,7 @@ impl ScrineverApp {
             doc_find_match_count: 0,
             doc_find_current_match: 0,
             doc_find_positions: Vec::new(),
+            find_replace_session: None,
             quick_ref_item: None,
             script_mode: false,
             current_script_element: None,
@@ -647,6 +713,9 @@ impl ScrineverApp {
             writing_timer: crate::core::timer::WritingTimer::new(),
             validation_result: None,
             last_milestone: 0,
+            writing_prompts_data: views::writing_prompts_panel::WritingPromptsData::new(),
+            project_state: ProjectState::new(),
+            linguistic_result: None,
         };
 
         (app, open_main.map(Message::WindowOpened))
@@ -711,6 +780,8 @@ impl ScrineverApp {
                 self.project_notes_text.clear();
                 self.generated_names.clear();
                 self.last_milestone = 0;
+                self.project_state = ProjectState::new();
+                self.linguistic_result = None;
                 if let Some(ref p) = self.project {
                     self.compile_options.title = p.title.clone();
                 }
@@ -722,6 +793,8 @@ impl ScrineverApp {
                 self.editor = EditorState::new();
                 self.project_notes_text.clear();
                 self.generated_names.clear();
+                self.project_state = ProjectState::new();
+                self.linguistic_result = None;
                 if let Some(ref p) = self.project {
                     self.compile_options.title = p.title.clone();
                 }
@@ -793,9 +866,16 @@ impl ScrineverApp {
                         .find(|&&m| total_words >= m)
                         .copied()
                         .unwrap_or(0);
+                    // Initialize project subsystems (search index, file watcher)
+                    self.project_state = ProjectState::new();
+                    self.project_state.on_project_load(
+                        &p.binder,
+                        p.path.as_deref(),
+                    );
                     self.project = Some(p);
                     self.selected_item = None;
                     self.editor = EditorState::new();
+                    self.linguistic_result = None;
                 }
             }
 
@@ -1056,12 +1136,14 @@ impl ScrineverApp {
                 self.editor.content.perform(action);
                 if is_edit {
                     self.editor.mark_dirty();
-                    // Shift annotation positions when text is edited
-                    let new_len = self.editor.content.text().len();
+                    let new_text = self.editor.content.text().to_string();
+                    let new_len = new_text.len();
                     let delta = new_len as i64 - old_len as i64;
-                    if delta != 0 {
-                        if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
-                            if let Some(item) = project.binder.find_item_mut(&item_id) {
+
+                    if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
+                        if let Some(item) = project.binder.find_item_mut(&item_id) {
+                            // Shift annotation positions when text is edited
+                            if delta != 0 {
                                 if let Some(ref mut doc) = item.document {
                                     for ann in &mut doc.annotations {
                                         if ann.start >= cursor_before {
@@ -1070,14 +1152,48 @@ impl ScrineverApp {
                                     }
                                 }
                             }
+
+                            // Shift comment anchors for this document
+                            if delta != 0 {
+                                let mgr = self.project_state.comments_for(item_id);
+                                mgr.shift_after(cursor_before, delta);
+                            }
+
+                            // Record revision marks when revision mode is active
+                            if delta > 0 {
+                                self.project_state.record_insertion(
+                                    cursor_before, cursor_before + delta as usize, &new_text[cursor_before..cursor_before + delta as usize],
+                                );
+                            } else if delta < 0 {
+                                self.project_state.record_deletion(
+                                    cursor_before, cursor_before + (-delta) as usize, "",
+                                );
+                            }
+
+                            // Update search index for this document
+                            let title = item.title.clone();
+                            let content = item.document.as_ref().map_or("", |d| d.content.as_str()).to_string();
+                            let notes = item.document.as_ref().map_or("", |d| d.notes.as_str()).to_string();
+                            let synopsis = item.synopsis.clone();
+                            self.project_state.on_document_edit(item_id, &title, &content, &notes, &synopsis);
                         }
                     }
                 }
             }
 
             // ========== View operations ==========
-            Message::SwitchView(mode) => {
-                self.view_mode = mode;
+            Message::SwitchView(ref mode) => {
+                // Set up corkboard layout when switching to corkboard view
+                if *mode == ViewMode::Corkboard {
+                    if let Some(ref project) = self.project {
+                        let parent = self.selected_item
+                            .and_then(|id| project.binder.find_item(&id))
+                            .unwrap_or(&project.binder.draft);
+                        let item_ids: Vec<Uuid> = parent.children.iter().map(|c| c.id).collect();
+                        self.project_state.arrange_corkboard_grid(&item_ids);
+                    }
+                }
+                self.view_mode = mode.clone();
             }
 
             Message::ToggleInspector => {
@@ -1167,6 +1283,19 @@ impl ScrineverApp {
                 self.sync_editor_to_project();
                 if let Some(ref project) = self.project {
                     use crate::export::compiler::Compiler;
+                    use crate::export::integrations;
+
+                    // Generate compile stats for logging
+                    let compile_result = integrations::compile_with_stats(
+                        &project.binder,
+                        &self.compile_options,
+                    );
+                    log::info!(
+                        "Compile: {} words, {} sections, {} validation issues",
+                        compile_result.statistics.total_words,
+                        compile_result.manifest.sections.len(),
+                        compile_result.validation_issues.len(),
+                    );
 
                     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                     let output_dir = home.join(OUTPUT_DIR_NAME);
@@ -1245,6 +1374,10 @@ impl ScrineverApp {
 
             Message::DoSearch => {
                 if let Some(ref project) = self.project {
+                    // Record search in history
+                    if !self.search_query.is_empty() {
+                        self.project_state.record_search(&self.search_query);
+                    }
                     let options = SearchOptions {
                         query: self.search_query.clone(),
                         case_sensitive: self.search_case_sensitive,
@@ -1279,27 +1412,20 @@ impl ScrineverApp {
             Message::DoReplaceAll => {
                 self.sync_editor_to_project();
                 if let Some(ref mut project) = self.project {
-                    let options = SearchOptions {
+                    let options = FindReplaceOptions {
                         query: self.search_query.clone(),
+                        replacement: self.replace_text.clone(),
                         case_sensitive: self.search_case_sensitive,
                         whole_word: self.search_whole_word,
-                        regex: self.search_regex,
-                        search_titles: false,
-                        search_content: true,
-                        search_notes: false,
-                        search_synopsis: false,
+                        use_regex: self.search_regex,
                         ..Default::default()
                     };
 
                     let mut count = 0;
                     for item in project.binder.all_items_mut() {
                         if let Some(ref mut doc) = item.document {
-                            let new_content = search::replace_in_document(
-                                &doc.content,
-                                &options,
-                                &self.replace_text,
-                            );
-                            if new_content != doc.content {
+                            let (new_content, replacements) = find_replace::replace_in_text(&doc.content, &options);
+                            if replacements > 0 {
                                 count += 1;
                                 doc.content = new_content;
                             }
@@ -1367,8 +1493,11 @@ impl ScrineverApp {
             Message::SetItemTarget(id, target_str) => {
                 if let Ok(target) = target_str.parse::<usize>() {
                     self.item_targets.insert(id, target);
+                    // Also set in the proper targets system
+                    self.project_state.set_target(id, target);
                 } else if target_str.is_empty() {
                     self.item_targets.remove(&id);
+                    self.project_state.set_target(id, 0);
                 }
             }
 
@@ -1792,13 +1921,25 @@ impl ScrineverApp {
                                         }
                                         "html" | "htm" => {
                                             if let Ok(content) = std::fs::read_to_string(&path) {
-                                                let plain = strip_html_tags(&content);
-                                                let mut item = BinderItem::new_text(&title);
-                                                if let Some(ref mut doc) = item.document {
-                                                    doc.content = plain;
+                                                // Use structured HTML import (headings -> folders/docs)
+                                                match crate::export::web_import::import_html_content(&content, &title) {
+                                                    Ok(items) if !items.is_empty() => {
+                                                        for item in items {
+                                                            project.binder.draft.add_child(item);
+                                                            count += 1;
+                                                        }
+                                                    }
+                                                    _ => {
+                                                        // Fallback to plain text conversion
+                                                        let plain = crate::export::web_import::html_to_plain_text(&content);
+                                                        let mut item = BinderItem::new_text(&title);
+                                                        if let Some(ref mut doc) = item.document {
+                                                            doc.content = plain;
+                                                        }
+                                                        project.binder.draft.add_child(item);
+                                                        count += 1;
+                                                    }
                                                 }
-                                                project.binder.draft.add_child(item);
-                                                count += 1;
                                             }
                                         }
                                         "tex" | "latex" => {
@@ -1841,14 +1982,47 @@ impl ScrineverApp {
                                             }
                                         }
                                         "docx" => {
-                                            // Import DOCX as plain text (basic extraction)
-                                            if let Ok(content) = std::fs::read_to_string(&path) {
-                                                let mut item = BinderItem::new_text(&title);
-                                                if let Some(ref mut doc) = item.document {
-                                                    doc.content = content;
+                                            // Use structured DOCX import (headings -> folders/docs)
+                                            match crate::export::docx_import::import_docx(&path) {
+                                                Ok(items) => {
+                                                    for item in items {
+                                                        project.binder.draft.add_child(item);
+                                                        count += 1;
+                                                    }
                                                 }
-                                                project.binder.draft.add_child(item);
-                                                count += 1;
+                                                Err(e) => {
+                                                    // Fallback: create a plain text item with error note
+                                                    let mut item = BinderItem::new_text(&title);
+                                                    if let Some(ref mut doc) = item.document {
+                                                        doc.content = String::new();
+                                                        doc.notes = format!("DOCX import failed: {}", e);
+                                                    }
+                                                    project.binder.draft.add_child(item);
+                                                    count += 1;
+                                                    self.notification = Some(format!("DOCX import error for '{}': {}", title, e));
+                                                }
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                } else if path.is_dir() {
+                                    // Handle directory-based formats (e.g. Scrivener .scriv packages)
+                                    let ext = path.extension()
+                                        .and_then(|e| e.to_str())
+                                        .unwrap_or("")
+                                        .to_lowercase();
+                                    match ext.as_str() {
+                                        "scriv" => {
+                                            match crate::export::scriv_import::import_scriv(&path) {
+                                                Ok((_info, items)) => {
+                                                    for item in items {
+                                                        project.binder.draft.add_child(item);
+                                                        count += 1;
+                                                    }
+                                                }
+                                                Err(e) => {
+                                                    self.notification = Some(format!("Scrivener import error: {}", e));
+                                                }
                                             }
                                         }
                                         _ => {}
@@ -1859,7 +2033,7 @@ impl ScrineverApp {
                         if count > 0 {
                             self.notification = Some(format!("Imported {} file(s) from ~/{}/", count, IMPORT_DIR_NAME));
                         } else {
-                            self.notification = Some(format!("No importable files found in ~/{}/. Supported: txt, md, html, tex, fountain, opml", IMPORT_DIR_NAME));
+                            self.notification = Some(format!("No importable files found in ~/{}/. Supported: txt, md, html, docx, tex, fountain, opml, scriv", IMPORT_DIR_NAME));
                         }
                     } else {
                         match std::fs::create_dir_all(&import_dir) {
@@ -2173,41 +2347,21 @@ impl ScrineverApp {
                 self.doc_find_text = query;
                 self.doc_find_positions.clear();
                 self.doc_find_current_match = 0;
-                // Find all match positions in current document
+                // Find all match positions in current document using find_replace module
                 if let (Some(ref project), Some(item_id)) = (&self.project, self.selected_item) {
                     if let Some(item) = project.binder.find_item(&item_id) {
                         if let Some(ref doc) = item.document {
                             if !self.doc_find_text.is_empty() {
-                                if self.doc_find_case_sensitive {
-                                    for (pos, _) in doc.content.match_indices(&self.doc_find_text) {
-                                        self.doc_find_positions.push(pos);
-                                    }
-                                } else {
-                                    // Case-insensitive: match char-by-char to get byte offsets
-                                    // in the *original* string (avoids lowered/original byte mismatch)
-                                    let find_lower: Vec<char> = self.doc_find_text.to_lowercase().chars().collect();
-                                    if !find_lower.is_empty() {
-                                        let content_ci: Vec<(usize, char)> = doc.content.char_indices().collect();
-                                        let mut i = 0;
-                                        while i + find_lower.len() <= content_ci.len() {
-                                            let mut matched = true;
-                                            for (fi, &fc) in find_lower.iter().enumerate() {
-                                                let cc_lower: Vec<char> = content_ci[i + fi].1.to_lowercase().collect();
-                                                if cc_lower.len() != 1 || cc_lower[0] != fc {
-                                                    matched = false;
-                                                    break;
-                                                }
-                                            }
-                                            if matched {
-                                                // Record byte offset of match start in original string
-                                                self.doc_find_positions.push(content_ci[i].0);
-                                                i += find_lower.len();
-                                            } else {
-                                                i += 1;
-                                            }
-                                        }
-                                    }
-                                }
+                                let options = FindReplaceOptions {
+                                    query: self.doc_find_text.clone(),
+                                    replacement: self.doc_replace_text.clone(),
+                                    case_sensitive: self.doc_find_case_sensitive,
+                                    whole_word: self.doc_find_whole_word,
+                                    use_regex: self.doc_find_use_regex,
+                                    ..Default::default()
+                                };
+                                let matches = find_replace::find_in_text(&doc.content, &options);
+                                self.doc_find_positions = matches.iter().map(|m| m.start).collect();
                                 self.doc_find_match_count = self.doc_find_positions.len();
                             } else {
                                 self.doc_find_match_count = 0;
@@ -2258,36 +2412,21 @@ impl ScrineverApp {
                         if let Some(item) = project.binder.find_item_mut(&item_id) {
                             if let Some(ref mut doc) = item.document {
                                 let pos = self.doc_find_positions[self.doc_find_current_match];
-                                // Compute byte length of the matched region in the original string.
-                                // For case-sensitive this equals self.doc_find_text.len();
-                                // for case-insensitive the original chars may differ in byte width.
-                                let find_char_count = self.doc_find_text.chars().count();
-                                let find_len = doc.content[pos..]
-                                    .char_indices()
-                                    .nth(find_char_count)
-                                    .map_or(doc.content.len() - pos, |(byte_off, _)| byte_off);
-                                let end = pos + find_len;
-                                if end <= doc.content.len()
-                                    && doc.content.is_char_boundary(pos)
-                                    && doc.content.is_char_boundary(end)
-                                {
-                                    doc.content = format!(
-                                        "{}{}{}",
-                                        &doc.content[..pos],
-                                        self.doc_replace_text,
-                                        &doc.content[end..]
-                                    );
+                                let options = FindReplaceOptions {
+                                    query: self.doc_find_text.clone(),
+                                    replacement: self.doc_replace_text.clone(),
+                                    case_sensitive: self.doc_find_case_sensitive,
+                                    whole_word: self.doc_find_whole_word,
+                                    use_regex: self.doc_find_use_regex,
+                                    ..Default::default()
+                                };
+                                if let Some((new_text, _loc)) = find_replace::replace_next(&doc.content, &options, pos) {
+                                    doc.content = new_text;
                                     self.editor.load_document(doc);
                                     self.editor.mark_dirty();
-                                    // Recalculate positions
-                                    let len_diff = self.doc_replace_text.len() as i64 - find_len as i64;
-                                    self.doc_find_positions.remove(self.doc_find_current_match);
-                                    // Adjust subsequent positions
-                                    for p in self.doc_find_positions.iter_mut() {
-                                        if *p > pos {
-                                            *p = (*p as i64 + len_diff).max(0) as usize;
-                                        }
-                                    }
+                                    // Re-find all matches in the updated content
+                                    let matches = find_replace::find_in_text(&doc.content, &options);
+                                    self.doc_find_positions = matches.iter().map(|m| m.start).collect();
                                     self.doc_find_match_count = self.doc_find_positions.len();
                                     if self.doc_find_current_match >= self.doc_find_positions.len() && !self.doc_find_positions.is_empty() {
                                         self.doc_find_current_match = 0;
@@ -2309,48 +2448,21 @@ impl ScrineverApp {
                     if let Some(item) = project.binder.find_item_mut(&item_id) {
                         if let Some(ref mut doc) = item.document {
                             if !self.doc_find_text.is_empty() {
-                                if self.doc_find_case_sensitive {
-                                    doc.content = doc.content.replace(&self.doc_find_text, &self.doc_replace_text);
-                                } else {
-                                    // Case-insensitive replace using char-by-char matching
-                                    let find_lower: Vec<char> = self.doc_find_text.to_lowercase().chars().collect();
-                                    if !find_lower.is_empty() {
-                                        let mut result = String::new();
-                                        let content_chars: Vec<(usize, char)> = doc.content.char_indices().collect();
-                                        let mut i = 0;
-                                        while i < content_chars.len() {
-                                            let mut matched = true;
-                                            let mut fi = 0;
-                                            let mut ci = i;
-                                            for &fc in &find_lower {
-                                                if ci >= content_chars.len() {
-                                                    matched = false;
-                                                    break;
-                                                }
-                                                let cc_lower: Vec<char> = content_chars[ci].1.to_lowercase().collect();
-                                                if cc_lower.len() == 1 && cc_lower[0] == fc {
-                                                    ci += 1;
-                                                    fi += 1;
-                                                } else {
-                                                    matched = false;
-                                                    break;
-                                                }
-                                            }
-                                            if matched && fi == find_lower.len() {
-                                                result.push_str(&self.doc_replace_text);
-                                                i = ci;
-                                            } else {
-                                                result.push(content_chars[i].1);
-                                                i += 1;
-                                            }
-                                        }
-                                        doc.content = result;
-                                    }
-                                }
+                                let options = FindReplaceOptions {
+                                    query: self.doc_find_text.clone(),
+                                    replacement: self.doc_replace_text.clone(),
+                                    case_sensitive: self.doc_find_case_sensitive,
+                                    whole_word: self.doc_find_whole_word,
+                                    use_regex: self.doc_find_use_regex,
+                                    ..Default::default()
+                                };
+                                let (new_text, count) = find_replace::replace_in_text(&doc.content, &options);
+                                doc.content = new_text;
                                 self.editor.load_document(doc);
                                 self.editor.mark_dirty();
+                                self.doc_find_positions.clear();
                                 self.doc_find_match_count = 0;
-                                self.notification = Some("All occurrences replaced".to_string());
+                                self.notification = Some(format!("Replaced {} occurrence(s)", count));
                             }
                         }
                     }
@@ -2363,22 +2475,20 @@ impl ScrineverApp {
 
             Message::DocFindToggleCase => {
                 self.doc_find_case_sensitive = !self.doc_find_case_sensitive;
-                // Recount matches
+                // Recount matches using find_replace module
                 if !self.doc_find_text.is_empty() {
                     if let (Some(ref project), Some(item_id)) = (&self.project, self.selected_item) {
                         if let Some(item) = project.binder.find_item(&item_id) {
                             if let Some(ref doc) = item.document {
-                                let content = if self.doc_find_case_sensitive {
-                                    doc.content.clone()
-                                } else {
-                                    doc.content.to_lowercase()
+                                let options = FindReplaceOptions {
+                                    query: self.doc_find_text.clone(),
+                                    replacement: String::new(),
+                                    case_sensitive: self.doc_find_case_sensitive,
+                                    whole_word: self.doc_find_whole_word,
+                                    use_regex: self.doc_find_use_regex,
+                                    ..Default::default()
                                 };
-                                let query = if self.doc_find_case_sensitive {
-                                    self.doc_find_text.clone()
-                                } else {
-                                    self.doc_find_text.to_lowercase()
-                                };
-                                self.doc_find_match_count = content.matches(&query).count();
+                                self.doc_find_match_count = find_replace::count_matches(&doc.content, &options);
                             }
                         }
                     }
@@ -2869,19 +2979,19 @@ impl ScrineverApp {
                     if let Some(item) = project.binder.find_item(&item_id) {
                         if let Some(ref doc) = item.document {
                             use crate::export::compiler::{CompileContent, CompileOptions};
+
                             let contents = vec![CompileContent {
                                 title: item.title.clone(),
                                 text: doc.content.clone(),
                                 is_folder: false,
                                 depth: 0,
                             }];
+
                             let opts = CompileOptions { title: item.title.clone(), ..CompileOptions::default() };
                             let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                             let print_path = home.join(PROJECTS_DIR_NAME).join("print.pdf");
                             if let Some(parent) = print_path.parent() {
-                                if let Err(e) = std::fs::create_dir_all(parent) {
-                                    log::warn!("Failed to create print directory: {}", e);
-                                }
+                                let _ = std::fs::create_dir_all(parent);
                             }
                             match crate::export::pdf::save_pdf(&contents, &opts, &print_path) {
                                 Ok(_) => {
@@ -2904,9 +3014,7 @@ impl ScrineverApp {
                     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                     let print_path = home.join(PROJECTS_DIR_NAME).join(format!("{}_print.pdf", project.title));
                     if let Some(parent) = print_path.parent() {
-                        if let Err(e) = std::fs::create_dir_all(parent) {
-                            log::warn!("Failed to create print directory: {}", e);
-                        }
+                        let _ = std::fs::create_dir_all(parent);
                     }
                     match crate::export::compiler::Compiler::save_to_file(&project.binder, &opts, &print_path) {
                         Ok(_) => {
@@ -3427,21 +3535,311 @@ impl ScrineverApp {
             Message::ShowValidation => {
                 self.sync_editor_to_project();
                 if let Some(ref project) = self.project {
-                    let mut result = crate::core::validation::validate_project(&project.binder);
-                    // Also include link health in validation
-                    // Add orphan document info (broken links already handled by validation)
-                    let link_health = crate::core::links::link_health_summary(&project.binder);
-                    if link_health.orphan_documents > 0 {
-                        result.issues.push(crate::core::validation::ValidationIssue {
-                            severity: crate::core::validation::Severity::Info,
-                            kind: crate::core::validation::IssueKind::Orphan,
-                            message: format!("{} orphan document(s) with no incoming links", link_health.orphan_documents),
-                            item_id: None,
-                        });
-                    }
+                    // Use ProjectState for comprehensive validation (includes link health)
+                    let result = ProjectState::validate_project(&project.binder);
                     self.notification = Some(result.display());
                     self.validation_result = Some(result);
                     self.bottom_panel = BottomPanel::Validation;
+                }
+            }
+
+            // ========== Writing prompts ==========
+            Message::GenerateWritingPrompt => {
+                self.writing_prompts_data.generate_prompt(None);
+                self.bottom_panel = BottomPanel::WritingPrompts;
+            }
+            Message::GenerateWritingPromptCategory(cat_name) => {
+                use crate::core::writing_prompts::PromptCategory;
+                let category = PromptCategory::all().iter()
+                    .find(|c| c.label() == cat_name)
+                    .copied();
+                if let Some(cat) = category {
+                    self.writing_prompts_data.generate_prompt(Some(cat));
+                } else {
+                    self.writing_prompts_data.generate_prompt(None);
+                }
+                self.bottom_panel = BottomPanel::WritingPrompts;
+            }
+            Message::GenerateCharacter => {
+                self.writing_prompts_data.generate_character();
+                self.bottom_panel = BottomPanel::WritingPrompts;
+            }
+            Message::GeneratePlotSeed => {
+                self.writing_prompts_data.generate_plot();
+                self.bottom_panel = BottomPanel::WritingPrompts;
+            }
+            Message::GenerateWritingNames => {
+                self.writing_prompts_data.generate_names();
+                self.bottom_panel = BottomPanel::WritingPrompts;
+            }
+
+            // ========== Comments ==========
+            Message::AddComment(doc_id, comment_text) => {
+                let mgr = self.project_state.comments_for(doc_id);
+                let comment = Comment::new(
+                    self.editor.cursor,
+                    self.editor.cursor + 1,
+                    &comment_text,
+                    "Author",
+                );
+                mgr.add_comment(comment);
+                self.notification = Some("Comment added".to_string());
+            }
+
+            Message::DeleteComment(doc_id, comment_id) => {
+                let mgr = self.project_state.comments_for(doc_id);
+                mgr.remove_comment(comment_id);
+            }
+
+            Message::ResolveComment(doc_id, comment_id) => {
+                let mgr = self.project_state.comments_for(doc_id);
+                if let Some(comment) = mgr.get_mut(comment_id) {
+                    comment.resolve("Author");
+                }
+            }
+
+            Message::UnresolveComment(doc_id, comment_id) => {
+                let mgr = self.project_state.comments_for(doc_id);
+                if let Some(comment) = mgr.get_mut(comment_id) {
+                    comment.unresolve();
+                }
+            }
+
+            Message::EditComment(doc_id, comment_id, new_text) => {
+                let mgr = self.project_state.comments_for(doc_id);
+                if let Some(comment) = mgr.get_mut(comment_id) {
+                    comment.edit_text(&new_text);
+                }
+            }
+
+            Message::ReplyToComment(doc_id, comment_id, reply_text) => {
+                let mgr = self.project_state.comments_for(doc_id);
+                if let Some(comment) = mgr.get_mut(comment_id) {
+                    comment.add_reply("Author", &reply_text);
+                }
+            }
+
+            // ========== Revision tracking ==========
+            Message::ToggleRevisionMode => {
+                self.project_state.revision_tracker.toggle_revision_mode();
+                let active = self.project_state.revision_tracker.is_active();
+                if active {
+                    // Start a new revision pass if none exists
+                    if self.project_state.revision_tracker.pass_count() == 0 {
+                        self.project_state.revision_tracker.start_new_pass("Revision 1");
+                    }
+                    self.notification = Some("Revision tracking enabled".to_string());
+                } else {
+                    self.notification = Some("Revision tracking disabled".to_string());
+                }
+            }
+
+            Message::StartRevisionPass(label) => {
+                self.project_state.revision_tracker.start_new_pass(&label);
+                self.notification = Some(format!("Started revision pass: {}", label));
+            }
+
+            Message::AcceptRevisionMark(mark_id) => {
+                self.project_state.revision_tracker.accept_mark(&mark_id);
+            }
+
+            Message::RejectRevisionMark(mark_id) => {
+                self.project_state.revision_tracker.reject_mark(&mark_id);
+            }
+
+            Message::AcceptAllRevisions => {
+                let stats = self.project_state.revision_tracker.statistics();
+                let count = stats.mark_count;
+                // Accept all marks in all passes
+                let pass_ids: Vec<Uuid> = self.project_state.revision_tracker.passes
+                    .iter().map(|p| p.id).collect();
+                for pid in pass_ids {
+                    self.project_state.revision_tracker.accept_all_in_pass(&pid);
+                }
+                self.notification = Some(format!("Accepted {} revision marks", count));
+            }
+
+            // ========== Corkboard interactions ==========
+            Message::CorkboardMoveCard(card_id, x, y) => {
+                let _ = self.project_state.corkboard.move_card(card_id, x, y);
+            }
+
+            Message::CorkboardPinCard(card_id, pinned) => {
+                let _ = self.project_state.corkboard.pin_card(card_id, pinned);
+            }
+
+            Message::CorkboardArrangeGrid => {
+                if let Some(ref project) = self.project {
+                    let parent = self.selected_item
+                        .and_then(|id| project.binder.find_item(&id))
+                        .unwrap_or(&project.binder.draft);
+                    let item_ids: Vec<Uuid> = parent.children.iter().map(|c| c.id).collect();
+                    self.project_state.arrange_corkboard_grid(&item_ids);
+                }
+            }
+
+            // ========== Outliner interactions ==========
+            Message::OutlinerToggleExpand(item_id) => {
+                self.project_state.outliner.toggle_expand(item_id);
+            }
+
+            Message::OutlinerExpandAll => {
+                if let Some(ref project) = self.project {
+                    let items = ProjectState::build_outliner_items(
+                        &project.binder.draft.children,
+                        &self.project_state.targets,
+                    );
+                    self.project_state.outliner.expand_all(&items);
+                }
+            }
+
+            Message::OutlinerCollapseAll => {
+                self.project_state.outliner.collapse_all();
+            }
+
+            Message::OutlinerSortBy(column_name) => {
+                use crate::core::outliner::OutlinerColumn;
+                let col = match column_name.as_str() {
+                    "Title" => OutlinerColumn::Title,
+                    "Words" => OutlinerColumn::WordCount,
+                    "Status" => OutlinerColumn::Status,
+                    "Label" => OutlinerColumn::Label,
+                    "Target" => OutlinerColumn::TargetWordCount,
+                    "Progress" => OutlinerColumn::TargetProgress,
+                    _ => OutlinerColumn::Title,
+                };
+                let ascending = self.project_state.outliner.settings.sort_column
+                    .as_ref()
+                    .map_or(true, |c| c != &col || !self.project_state.outliner.settings.sort_ascending);
+                self.project_state.outliner.sort_by(col, ascending);
+            }
+
+            // ========== Validation auto-fix ==========
+            Message::AutoFixValidation => {
+                if let Some(ref mut project) = self.project {
+                    let result = ProjectState::auto_fix(&mut project.binder);
+                    self.notification = Some(result.summary());
+                    // Re-run validation to update the panel
+                    let validation = ProjectState::validate_project(&project.binder);
+                    self.validation_result = Some(validation);
+                }
+            }
+
+            // ========== Linguistic analysis ==========
+            Message::RunLinguisticAnalysis => {
+                self.sync_editor_to_project();
+                if let (Some(ref project), Some(item_id)) = (&self.project, self.selected_item) {
+                    if let Some(item) = project.binder.find_item(&item_id) {
+                        if let Some(ref doc) = item.document {
+                            self.linguistic_result = Some(ProjectState::analyze_writing(&doc.content));
+                            self.notification = Some("Linguistic analysis complete".to_string());
+                        }
+                    }
+                }
+            }
+
+            // ========== Search index ==========
+            Message::RebuildSearchIndex => {
+                if let Some(ref project) = self.project {
+                    self.project_state.search_index.build_from_binder(&project.binder);
+                    let terms = self.project_state.search_index.unique_terms();
+                    self.notification = Some(format!("Search index rebuilt: {} unique terms", terms));
+                }
+            }
+
+            // ========== Document targets ==========
+            Message::SetDocTarget(doc_id, target_str) => {
+                if let Ok(target) = target_str.parse::<usize>() {
+                    self.project_state.set_target(doc_id, target);
+                    self.item_targets.insert(doc_id, target);
+                } else if target_str.is_empty() {
+                    self.project_state.set_target(doc_id, 0);
+                    self.item_targets.remove(&doc_id);
+                }
+            }
+
+            Message::RemoveDocTarget(doc_id) => {
+                self.project_state.set_target(doc_id, 0);
+                self.item_targets.remove(&doc_id);
+            }
+
+            // ========== Import formats ==========
+            Message::ImportDocx => {
+                let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                let import_dir = home.join(IMPORT_DIR_NAME);
+                if let Ok(entries) = std::fs::read_dir(&import_dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.extension().map_or(false, |e| e == "docx") {
+                            if let Some(ref mut project) = self.project {
+                                match crate::export::docx_import::import_docx(&path) {
+                                    Ok(items) => {
+                                        for item in items {
+                                            project.binder.draft.add_child(item);
+                                        }
+                                        self.notification = Some(format!("Imported {:?}", path.file_name().unwrap_or_default()));
+                                    }
+                                    Err(e) => {
+                                        self.notification = Some(format!("DOCX import error: {}", e));
+                                    }
+                                }
+                            }
+                            break; // Import first .docx found
+                        }
+                    }
+                }
+            }
+
+            Message::ImportScriv => {
+                let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                let import_dir = home.join(IMPORT_DIR_NAME);
+                if let Ok(entries) = std::fs::read_dir(&import_dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.extension().map_or(false, |e| e == "scriv") {
+                            if let Some(ref mut project) = self.project {
+                                match crate::export::scriv_import::import_scriv(&path) {
+                                    Ok((_info, items)) => {
+                                        for item in items {
+                                            project.binder.draft.add_child(item);
+                                        }
+                                        self.notification = Some(format!("Imported Scrivener project from {:?}", path.file_name().unwrap_or_default()));
+                                    }
+                                    Err(e) => {
+                                        self.notification = Some(format!("Scriv import error: {}", e));
+                                    }
+                                }
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            Message::ImportMedia => {
+                let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                let import_dir = home.join(IMPORT_DIR_NAME);
+                if let Ok(entries) = std::fs::read_dir(&import_dir) {
+                    let mut imported = 0;
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if crate::core::media_import::is_supported_media(&path) {
+                            if let Some(ref mut project) = self.project {
+                                match crate::core::media_import::import_media_file(&path) {
+                                    Ok(item) => {
+                                        project.binder.research.add_child(item);
+                                        imported += 1;
+                                    }
+                                    Err(e) => {
+                                        log::warn!("Media import failed for {:?}: {}", path, e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if imported > 0 {
+                        self.notification = Some(format!("Imported {} media file(s)", imported));
+                    }
                 }
             }
 
@@ -3573,6 +3971,14 @@ impl ScrineverApp {
                             }
                         }
                     }
+                }
+
+                // Poll file watcher for external changes
+                if self.project_state.poll_external_changes() {
+                    self.notification = Some(
+                        "External changes detected. Consider reloading.".to_string()
+                    );
+                    self.project_state.clear_external_changes();
                 }
 
                 // Auto-dismiss notification after 8 seconds
@@ -3810,7 +4216,7 @@ impl ScrineverApp {
                 views::corkboard_view::view(&items, &parent_title)
             }
             ViewMode::Outliner => {
-                views::outliner_view::view(&project.binder.draft, &self.item_targets)
+                views::outliner_view::view(&project.binder.draft, &self.item_targets, &self.project_state.outliner.expanded)
             }
             ViewMode::Scrivenings => {
                 let (items, parent_title) = if let Some(id) = self.selected_item {
@@ -3909,7 +4315,7 @@ impl ScrineverApp {
                     })
                     .unwrap_or("");
                 let analysis = crate::core::stats::TextAnalysis::from_text(text_content);
-                Some(views::text_stats_panel::view(&analysis))
+                Some(views::text_stats_panel::view(&analysis, text_content))
             }
             BottomPanel::NameGen => {
                 Some(views::name_generator_panel::view(&self.generated_names))
@@ -3951,6 +4357,16 @@ impl ScrineverApp {
                     }
                     _ => None,
                 };
+                // Build per-document target progress
+                let word_counts = crate::core::integrations::ProjectState::word_count_map(&project.binder);
+                let doc_progress: Vec<(String, _)> = self.project_state.targets
+                    .all_progress(&word_counts)
+                    .into_iter()
+                    .filter_map(|p| {
+                        project.binder.find_item(&p.doc_id)
+                            .map(|item| (item.title.clone(), p))
+                    })
+                    .collect();
                 let data = views::targets_panel::TargetsData {
                     project_target: project.settings.target_word_count,
                     current_words,
@@ -3959,6 +4375,7 @@ impl ScrineverApp {
                     session_words: self.session_stats.words_written,
                     days_remaining,
                     words_per_day_needed,
+                    doc_progress,
                 };
                 Some(views::targets_panel::view(&data))
             }
@@ -4113,6 +4530,9 @@ impl ScrineverApp {
             BottomPanel::Templates => {
                 let templates = crate::core::doc_templates::builtin_templates();
                 Some(views::templates_panel::view(&templates))
+            }
+            BottomPanel::WritingPrompts => {
+                Some(views::writing_prompts_panel::view(&self.writing_prompts_data))
             }
             BottomPanel::None => None,
         };

@@ -1,7 +1,7 @@
 use iced::widget::{button, column, container, row, scrollable, text, text_input, Space};
 use iced::{Element, Length, Padding};
 
-use crate::core::search::SearchResult;
+use crate::core::search::{self, SearchResult};
 use crate::gui::app::Message;
 use crate::gui::theme::{self, Theme};
 
@@ -70,29 +70,17 @@ pub fn view(
     .spacing(2)
     .align_y(iced::Alignment::Center);
 
-    // Results list
-    let result_count = results.iter().map(|r| r.matches.len()).sum::<usize>();
-    let result_header = text(format!(
-        "{} match(es) in {} document(s)",
-        result_count,
-        results.len()
-    ))
-    .size(11)
-    .color(Theme::TEXT_MUTED);
+    // Results list - use search module summary functions
+    let result_header = text(search::search_summary(results))
+        .size(11)
+        .color(Theme::TEXT_MUTED);
 
     let mut result_list = column![].spacing(2);
     for result in results.iter().take(50) {
         let id = result.item_id;
         let title = result.item_title.clone();
-        let match_count = result.matches.len();
-        let first_context = result.matches.first()
-            .map(|m| {
-                match m.context.char_indices().nth(80) {
-                    Some((byte_idx, _)) => format!("{}...", &m.context[..byte_idx]),
-                    None => m.context.clone(),
-                }
-            })
-            .unwrap_or_default();
+        let match_count = result.match_count();
+        let first_context = result.context_preview(0, 80);
 
         let result_row = button(
             column![
