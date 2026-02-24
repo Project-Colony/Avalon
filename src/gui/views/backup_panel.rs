@@ -93,7 +93,7 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
     let note = row![
         text("\u{f07b}").size(10),
         Space::with_width(4),
-        text("Stored in ~/Scrinever Backups/")
+        text(format!("Stored in ~/{}/", crate::core::BACKUPS_DIR_NAME))
             .size(9)
             .color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),

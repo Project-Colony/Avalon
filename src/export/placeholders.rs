@@ -153,9 +153,9 @@ impl PlaceholderContext {
             .join("")
     }
 
-    /// Estimated reading time in minutes (assuming 200 words/minute)
+    /// Estimated reading time in minutes
     pub fn estimated_reading_time(&self) -> usize {
-        (self.word_count / 200).max(if self.word_count > 0 { 1 } else { 0 })
+        (self.word_count / crate::core::READING_WPM as usize).max(if self.word_count > 0 { 1 } else { 0 })
     }
 
     /// Build context from compile contents

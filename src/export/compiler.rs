@@ -526,7 +526,7 @@ impl CompileStatistics {
             longest_section,
             shortest_section,
             estimated_pages: if total_words == 0 { 0 } else { (total_words / crate::core::WORDS_PER_PAGE).max(1) },
-            estimated_reading_minutes: if total_words == 0 { 0 } else { (total_words / 200).max(1) },
+            estimated_reading_minutes: if total_words == 0 { 0 } else { (total_words / crate::core::READING_WPM as usize).max(1) },
         }
     }
 
