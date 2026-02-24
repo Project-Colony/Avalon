@@ -1,5 +1,6 @@
-use crate::core::binder::{BinderItem, BinderItemKind};
-use crate::core::document::Document;
+use crate::core::binder::BinderItem;
+#[cfg(test)]
+use crate::core::binder::BinderItemKind;
 use anyhow::Result;
 
 /// Import a Markdown file and convert it into a binder tree structure.

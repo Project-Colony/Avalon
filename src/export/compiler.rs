@@ -253,7 +253,7 @@ impl Compiler {
                 author: options.author.clone(),
                 word_count: total_words,
                 char_count: total_chars,
-                page_count: (total_words / 250).max(1),
+                page_count: (total_words / crate::core::WORDS_PER_PAGE).max(1),
             };
             output = super::placeholders::replace_placeholders(&output, &context);
         }
@@ -525,8 +525,8 @@ impl CompileStatistics {
             avg_words_per_section,
             longest_section,
             shortest_section,
-            estimated_pages: if total_words == 0 { 0 } else { (total_words / 250).max(1) },
-            estimated_reading_minutes: if total_words == 0 { 0 } else { (total_words / 200).max(1) },
+            estimated_pages: if total_words == 0 { 0 } else { (total_words / crate::core::WORDS_PER_PAGE).max(1) },
+            estimated_reading_minutes: if total_words == 0 { 0 } else { (total_words / crate::core::READING_WPM as usize).max(1) },
         }
     }
 
@@ -1531,7 +1531,7 @@ mod tests {
         ];
         let stats = CompileStatistics::from_contents(&contents);
         assert_eq!(stats.estimated_pages, 4); // 1000 / 250
-        assert_eq!(stats.estimated_reading_minutes, 5); // 1000 / 200
+        assert_eq!(stats.estimated_reading_minutes, 4); // 1000 / 250
     }
 
     // ---- New: OutputFormat::from_extension / from_path tests ----

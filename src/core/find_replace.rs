@@ -423,7 +423,8 @@ pub fn preserve_case_replace(original: &str, replacement: &str) -> String {
     }
 
     let mut chars = original.chars();
-    let first = chars.next().unwrap();
+    // Safety: original.is_empty() is checked at the start of the function
+    let Some(first) = chars.next() else { return replacement.to_string() };
     let rest_lower = chars.all(|c| !c.is_alphabetic() || c.is_lowercase());
     if first.is_uppercase() && rest_lower {
         // Title Case

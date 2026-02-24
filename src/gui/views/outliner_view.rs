@@ -15,7 +15,7 @@ pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>) -> Element<'stat
     let header_info = container(
         row![
             text(format!("\u{f0ea} Outliner: {} docs | {} words | {:.1} pages",
-                doc_count, total_words, total_words as f64 / 250.0))
+                doc_count, total_words, total_words as f64 / crate::core::WORDS_PER_PAGE as f64))
                 .size(12)
                 .color(Theme::TEXT_SECONDARY),
             Space::with_width(Length::Fill),
@@ -66,7 +66,7 @@ pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>) -> Element<'stat
     let footer = container(
         row![
             text(format!("{} docs | {} words | {:.1} pg | {}/{} targets met | {}/{} compile",
-                doc_count, total_words, total_words as f64 / 250.0,
+                doc_count, total_words, total_words as f64 / crate::core::WORDS_PER_PAGE as f64,
                 completed_targets, targeted_count,
                 compile_count, doc_count))
                 .size(10)
@@ -196,7 +196,7 @@ fn collect_outline_rows(
 
     // Pages estimate
     let pages_text = if word_count > 0 {
-        format!("{:.1}", word_count as f64 / 250.0)
+        format!("{:.1}", word_count as f64 / crate::core::WORDS_PER_PAGE as f64)
     } else {
         "-".to_string()
     };

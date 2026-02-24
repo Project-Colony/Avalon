@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use crate::core::document::Document;
 
 /// The state of the text editor
@@ -11,9 +11,9 @@ pub struct EditorState {
     /// Selection start (if any)
     pub selection_start: Option<usize>,
     /// Undo stack
-    pub undo_stack: Vec<UndoEntry>,
+    pub undo_stack: VecDeque<UndoEntry>,
     /// Redo stack
-    pub redo_stack: Vec<UndoEntry>,
+    pub redo_stack: VecDeque<UndoEntry>,
     /// Whether the document has unsaved changes
     pub dirty: bool,
     /// Scroll offset (in lines)
@@ -35,8 +35,8 @@ impl EditorState {
             document: Document::new(),
             cursor: 0,
             selection_start: None,
-            undo_stack: Vec::new(),
-            redo_stack: Vec::new(),
+            undo_stack: VecDeque::new(),
+            redo_stack: VecDeque::new(),
             dirty: false,
             scroll_offset: 0.0,
             content: iced::widget::text_editor::Content::new(),
@@ -49,8 +49,8 @@ impl EditorState {
             document: doc.clone(),
             cursor: 0,
             selection_start: None,
-            undo_stack: Vec::new(),
-            redo_stack: Vec::new(),
+            undo_stack: VecDeque::new(),
+            redo_stack: VecDeque::new(),
             dirty: false,
             scroll_offset: 0.0,
         }
@@ -180,7 +180,7 @@ impl EditorState {
 
     /// Push current state onto undo stack
     pub fn push_undo(&mut self) {
-        self.undo_stack.push(UndoEntry {
+        self.undo_stack.push_back(UndoEntry {
             content: self.document.content.clone(),
             cursor: self.cursor,
         });
@@ -188,14 +188,14 @@ impl EditorState {
 
         // Limit undo stack size
         if self.undo_stack.len() > 100 {
-            self.undo_stack.remove(0);
+            self.undo_stack.pop_front();
         }
     }
 
     /// Undo the last change
     pub fn undo(&mut self) -> bool {
-        if let Some(entry) = self.undo_stack.pop() {
-            self.redo_stack.push(UndoEntry {
+        if let Some(entry) = self.undo_stack.pop_back() {
+            self.redo_stack.push_back(UndoEntry {
                 content: self.document.content.clone(),
                 cursor: self.cursor,
             });
@@ -211,8 +211,8 @@ impl EditorState {
 
     /// Redo the last undone change
     pub fn redo(&mut self) -> bool {
-        if let Some(entry) = self.redo_stack.pop() {
-            self.undo_stack.push(UndoEntry {
+        if let Some(entry) = self.redo_stack.pop_back() {
+            self.undo_stack.push_back(UndoEntry {
                 content: self.document.content.clone(),
                 cursor: self.cursor,
             });
@@ -242,7 +242,7 @@ impl EditorState {
 
         // Find paragraph start
         let mut start = pos;
-        while start > 1 {
+        while start > 0 {
             if text[..start].ends_with("\n\n") {
                 break;
             }

@@ -134,8 +134,8 @@ impl TimerSession {
     }
 }
 
-impl WritingTimer {
-    pub fn new() -> Self {
+impl Default for WritingTimer {
+    fn default() -> Self {
         Self {
             state: TimerState::Idle,
             duration_secs: TimerPreset::Pomodoro.duration_secs(),
@@ -144,6 +144,12 @@ impl WritingTimer {
             completed_sessions: Vec::new(),
             preset: TimerPreset::Pomodoro,
         }
+    }
+}
+
+impl WritingTimer {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Start the timer with the current preset

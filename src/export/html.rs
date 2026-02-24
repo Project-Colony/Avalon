@@ -162,16 +162,6 @@ pub fn generate_toc(contents: &[CompileContent]) -> String {
     toc
 }
 
-/// Count total words across all content sections
-pub fn word_count(contents: &[CompileContent]) -> usize {
-    compiler::total_word_count(contents)
-}
-
-/// Count total characters across all content sections
-pub fn char_count(contents: &[CompileContent]) -> usize {
-    contents.iter().map(|c| c.text.len()).sum()
-}
-
 /// Estimate the output size in bytes for an HTML compilation
 pub fn estimate_output_size(contents: &[CompileContent], options: &CompileOptions) -> usize {
     // Base HTML boilerplate + CSS is roughly 1500 bytes
@@ -186,17 +176,7 @@ pub fn estimate_output_size(contents: &[CompileContent], options: &CompileOption
 
 /// Strip HTML tags from a string, returning plain text
 pub fn strip_html_tags(html: &str) -> String {
-    let mut result = String::with_capacity(html.len());
-    let mut in_tag = false;
-    for ch in html.chars() {
-        match ch {
-            '<' => in_tag = true,
-            '>' => in_tag = false,
-            _ if !in_tag => result.push(ch),
-            _ => {}
-        }
-    }
-    result
+    super::web_import::strip_html_tags(html)
 }
 
 /// Extract all heading texts from the compiled content
@@ -301,16 +281,6 @@ mod tests {
         assert!(toc.contains("Table of Contents"));
         assert!(toc.contains("Chapter 1"));
         assert!(toc.contains("Chapter 2"));
-    }
-
-    #[test]
-    fn test_word_and_char_count() {
-        let contents = vec![
-            make_content("A", "one two three", false, 0),
-            make_content("B", "four five", false, 0),
-        ];
-        assert_eq!(word_count(&contents), 5);
-        assert!(char_count(&contents) > 0);
     }
 
     #[test]
@@ -448,12 +418,6 @@ mod tests {
     #[test]
     fn test_strip_html_no_tags() {
         assert_eq!(strip_html_tags("plain text"), "plain text");
-    }
-
-    #[test]
-    fn test_word_count_empty() {
-        let contents: Vec<CompileContent> = vec![];
-        assert_eq!(word_count(&contents), 0);
     }
 
     #[test]
@@ -611,18 +575,6 @@ mod tests {
         assert!(toc.contains("Scene 1"));
         // Check indentation
         assert!(toc.contains("  <li>"));
-    }
-
-    #[test]
-    fn test_word_count_multiple_spaces() {
-        let contents = vec![make_content("A", "  one   two   three  ", false, 0)];
-        assert_eq!(word_count(&contents), 3);
-    }
-
-    #[test]
-    fn test_char_count_unicode() {
-        let contents = vec![make_content("A", "café", false, 0)];
-        assert_eq!(char_count(&contents), 5); // bytes, not chars
     }
 
     #[test]

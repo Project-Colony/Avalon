@@ -515,7 +515,7 @@ impl RetentionPolicy {
                 let mut by_day: HashMap<String, Vec<&Snapshot>> =
                     HashMap::new();
                 for s in snapshots {
-                    let day = s.created_at.format("%Y-%m-%d").to_string();
+                    let day = s.created_at.format(super::DATE_FORMAT).to_string();
                     by_day.entry(day).or_default().push(s);
                 }
                 let mut to_prune = Vec::new();

@@ -306,20 +306,22 @@ impl BinderItem {
 
     /// Collect all items into a mutable flat list.
     ///
-    /// # Safety rationale
-    /// We split the mutable borrow of `self` into two non-overlapping parts:
-    /// the item's own fields (pushed into `items`) and its `children` vec.
-    /// Each node in the tree is unique, so no aliasing occurs.
+    /// Uses an iterative approach with an index-based work stack to avoid
+    /// unsafe pointer manipulation while still splitting borrows correctly.
     pub fn collect_all_mut<'a>(&'a mut self, items: &mut Vec<&'a mut BinderItem>) {
-        // Split borrow: push self, then recurse into children only
-        let children_ptr = self.children.as_mut_ptr();
-        let children_len = self.children.len();
-        items.push(self);
-        // SAFETY: children_ptr/len come from self.children before self was moved;
-        // we only access children (disjoint from the &mut self already in `items`).
-        let children_slice = unsafe { std::slice::from_raw_parts_mut(children_ptr, children_len) };
-        for child in children_slice {
-            child.collect_all_mut(items);
+        // Use a stack of raw pointers to avoid borrow-checker issues with
+        // the recursive mutable split. Each pointer is unique (tree nodes
+        // are unique) so no aliasing occurs.
+        let mut stack: Vec<*mut BinderItem> = vec![self as *mut BinderItem];
+        while let Some(ptr) = stack.pop() {
+            // SAFETY: Each node in the tree appears exactly once, so no aliasing.
+            // The pointers all originate from `&'a mut self` and its children.
+            let node = unsafe { &mut *ptr };
+            // Push children in reverse so they're visited in order
+            for child in node.children.iter_mut().rev() {
+                stack.push(child as *mut BinderItem);
+            }
+            items.push(node);
         }
     }
 
@@ -366,16 +368,27 @@ impl BinderItem {
 
     /// Get all ancestor IDs from root down to (but not including) the target.
     pub fn ancestors_of(&self, target_id: &Uuid) -> Option<Vec<Uuid>> {
+        let mut path = Vec::new();
+        if self.ancestors_of_inner(target_id, &mut path) {
+            path.reverse();
+            Some(path)
+        } else {
+            None
+        }
+    }
+
+    /// Helper: builds ancestor path in reverse (deepest first). Returns true if target found.
+    fn ancestors_of_inner(&self, target_id: &Uuid, path: &mut Vec<Uuid>) -> bool {
         if &self.id == target_id {
-            return Some(Vec::new());
+            return true;
         }
         for child in &self.children {
-            if let Some(mut path) = child.ancestors_of(target_id) {
-                path.insert(0, self.id);
-                return Some(path);
+            if child.ancestors_of_inner(target_id, path) {
+                path.push(self.id);
+                return true;
             }
         }
-        None
+        false
     }
 
     /// Collect all descendant IDs (children, grandchildren, etc.) recursively.

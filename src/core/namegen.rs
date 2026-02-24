@@ -310,7 +310,7 @@ impl NameGenerator {
 
     pub fn medieval_name() -> String {
         let seed = Self::rand_index(1000000);
-        let is_female = seed.is_multiple_of(2);
+        let is_female = seed % 2 == 0;
         let name = if is_female {
             Self::MEDIEVAL_NAMES_F[Self::rand_index_seeded(Self::MEDIEVAL_NAMES_F.len(), seed)]
         } else {

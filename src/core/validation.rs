@@ -7,29 +7,23 @@ use super::links;
 pub fn validate_project(binder: &Binder) -> ProjectValidation {
     let mut issues = Vec::new();
 
-    // Check for duplicate IDs
-    check_duplicate_ids(binder, &mut issues);
+    // Collect all items once for checks that need the flat list
+    let all_items = binder.all_items();
 
-    // Check for empty documents
-    check_empty_documents(binder, &mut issues);
+    // Check for duplicate IDs (single-pass using pre-collected items)
+    check_duplicate_ids_fast(&all_items, &mut issues);
 
-    // Check for untitled items
-    check_untitled_items(binder, &mut issues);
+    // Check for empty documents + untitled items + document lengths + metadata (single-pass)
+    check_items_single_pass(&all_items, &mut issues);
 
-    // Check for folders without children
+    // Check for folders without children (uses tree traversal, not flat list)
     check_empty_folders(binder, &mut issues);
 
     // Check for broken internal links
     check_broken_links(binder, &mut issues);
 
-    // Check for very long documents (potential performance issue)
-    check_document_lengths(binder, &mut issues);
-
     // Check for deep nesting (performance/usability concern)
     check_deep_nesting(binder, &mut issues);
-
-    // Check for inconsistent metadata
-    check_missing_metadata(binder, &mut issues);
 
     // Check for orphaned items in trash
     let trash_count = count_items(&binder.trash);
@@ -45,10 +39,9 @@ fn count_items(item: &BinderItem) -> usize {
     1 + item.children.iter().map(count_items).sum::<usize>()
 }
 
-fn check_duplicate_ids(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
-    let all_items = binder.all_items();
+fn check_duplicate_ids_fast(all_items: &[&BinderItem], issues: &mut Vec<ValidationIssue>) {
     let mut seen = HashSet::new();
-    for item in &all_items {
+    for item in all_items {
         if !seen.insert(item.id) {
             issues.push(ValidationIssue {
                 severity: Severity::Error,
@@ -60,9 +53,30 @@ fn check_duplicate_ids(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
     }
 }
 
-fn check_empty_documents(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
-    for item in binder.all_items() {
+/// Single-pass check for empty documents, untitled items, document lengths, and metadata consistency.
+fn check_items_single_pass(all_items: &[&BinderItem], issues: &mut Vec<ValidationIssue>) {
+    let word_limit = 50_000;
+    let mut total_text = 0usize;
+    let mut with_label = 0usize;
+    let mut with_status = 0usize;
+
+    for item in all_items {
+        // Untitled check
+        if item.title.trim().is_empty() {
+            issues.push(ValidationIssue {
+                severity: Severity::Warning,
+                kind: IssueKind::UntitledItem,
+                item_id: Some(item.id),
+                message: format!("Item {} has no title", item.id),
+            });
+        }
+
         if item.kind == BinderItemKind::Text {
+            total_text += 1;
+            if item.metadata.label.is_some() { with_label += 1; }
+            if item.metadata.status.is_some() { with_status += 1; }
+
+            // Empty document / missing document check
             if let Some(ref doc) = item.document {
                 if doc.content.trim().is_empty() {
                     issues.push(ValidationIssue {
@@ -70,6 +84,19 @@ fn check_empty_documents(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
                         kind: IssueKind::EmptyDocument,
                         item_id: Some(item.id),
                         message: format!("Document \"{}\" has no content", item.title),
+                    });
+                }
+                // Large document check
+                let words = doc.content.split_whitespace().count();
+                if words > word_limit {
+                    issues.push(ValidationIssue {
+                        severity: Severity::Warning,
+                        kind: IssueKind::LargeDocument,
+                        item_id: Some(item.id),
+                        message: format!(
+                            "Document \"{}\" has {} words — consider splitting for better performance",
+                            item.title, words
+                        ),
                     });
                 }
             } else {
@@ -82,16 +109,29 @@ fn check_empty_documents(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
             }
         }
     }
-}
 
-fn check_untitled_items(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
-    for item in binder.all_items() {
-        if item.title.trim().is_empty() {
+    // Metadata consistency (only for projects with >= 3 text items)
+    if total_text >= 3 {
+        if with_label > 0 && with_label < total_text / 2 {
             issues.push(ValidationIssue {
-                severity: Severity::Warning,
-                kind: IssueKind::UntitledItem,
-                item_id: Some(item.id),
-                message: format!("Item {} has no title", item.id),
+                severity: Severity::Info,
+                kind: IssueKind::InconsistentMetadata,
+                item_id: None,
+                message: format!(
+                    "Only {}/{} items have labels — consider labeling all items for better organization",
+                    with_label, total_text
+                ),
+            });
+        }
+        if with_status > 0 && with_status < total_text / 2 {
+            issues.push(ValidationIssue {
+                severity: Severity::Info,
+                kind: IssueKind::InconsistentMetadata,
+                item_id: None,
+                message: format!(
+                    "Only {}/{} items have status — consider setting status for all items",
+                    with_status, total_text
+                ),
             });
         }
     }
@@ -138,25 +178,6 @@ fn check_broken_links(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
     }
 }
 
-fn check_document_lengths(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
-    let word_limit = 50_000; // Documents over 50k words might cause performance issues
-    for item in binder.all_items() {
-        if let Some(ref doc) = item.document {
-            let words = doc.content.split_whitespace().count();
-            if words > word_limit {
-                issues.push(ValidationIssue {
-                    severity: Severity::Warning,
-                    kind: IssueKind::LargeDocument,
-                    item_id: Some(item.id),
-                    message: format!(
-                        "Document \"{}\" has {} words — consider splitting for better performance",
-                        item.title, words
-                    ),
-                });
-            }
-        }
-    }
-}
 
 fn check_deep_nesting(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
     let max_depth_limit = 8;
@@ -180,41 +201,6 @@ fn check_deep_nesting(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
     check_depth(&binder.research, 0, max_depth_limit, issues);
 }
 
-fn check_missing_metadata(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
-    let items = binder.all_items();
-    let total_text = items.iter().filter(|i| i.kind == BinderItemKind::Text).count();
-    if total_text < 3 {
-        return; // Don't check small projects
-    }
-
-    // Check if most items have labels but some don't
-    let with_label = items.iter().filter(|i| i.metadata.label.is_some()).count();
-    if with_label > 0 && with_label < total_text / 2 {
-        issues.push(ValidationIssue {
-            severity: Severity::Info,
-            kind: IssueKind::InconsistentMetadata,
-            item_id: None,
-            message: format!(
-                "Only {}/{} items have labels — consider labeling all items for better organization",
-                with_label, total_text
-            ),
-        });
-    }
-
-    // Check if most items have status but some don't
-    let with_status = items.iter().filter(|i| i.metadata.status.is_some()).count();
-    if with_status > 0 && with_status < total_text / 2 {
-        issues.push(ValidationIssue {
-            severity: Severity::Info,
-            kind: IssueKind::InconsistentMetadata,
-            item_id: None,
-            message: format!(
-                "Only {}/{} items have status — consider setting status for all items",
-                with_status, total_text
-            ),
-        });
-    }
-}
 
 /// The result of a project validation pass
 #[derive(Debug, Clone)]

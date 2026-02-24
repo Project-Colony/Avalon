@@ -37,7 +37,7 @@ pub fn view(notes: &str) -> Element<'static, Message> {
         .width(Length::Fill);
 
     // Reading time
-    let reading_min = word_count as f64 / 250.0;
+    let reading_min = word_count as f64 / crate::core::READING_WPM;
     let reading_display = if reading_min < 1.0 {
         "<1m read".to_string()
     } else {

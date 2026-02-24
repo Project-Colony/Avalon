@@ -23,7 +23,7 @@ pub fn view<'a>(
         });
 
     // Reading time
-    let reading_min = total_words as f64 / 250.0;
+    let reading_min = total_words as f64 / crate::core::READING_WPM;
     let reading_display = if reading_min < 1.0 {
         "<1 min".to_string()
     } else if reading_min < 60.0 {
@@ -39,7 +39,7 @@ pub fn view<'a>(
                 .color(Theme::TEXT_SECONDARY),
             Space::with_width(Length::Fill),
             text(format!("{} docs | {} words | {:.1} pg | {}",
-                items.len(), total_words, total_words as f64 / 250.0, reading_display))
+                items.len(), total_words, total_words as f64 / crate::core::WORDS_PER_PAGE as f64, reading_display))
                 .size(11)
                 .color(Theme::TEXT_MUTED),
         ]
@@ -219,7 +219,7 @@ pub fn view<'a>(
         row![
             text(format!("Total: {} words | {} chars | {} sentences | {:.1} pages | {} read",
                 total_words, total_chars, total_sentences,
-                total_words as f64 / 250.0, reading_display))
+                total_words as f64 / crate::core::WORDS_PER_PAGE as f64, reading_display))
                 .size(10)
                 .color(Theme::TEXT_MUTED),
             Space::with_width(Length::Fill),

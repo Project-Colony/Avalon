@@ -72,7 +72,7 @@ impl Project {
 
     /// Save the project to disk
     pub fn save(&mut self, base_path: &Path) -> Result<()> {
-        let project_dir = base_path.join(format!("{}.scriv", self.title));
+        let project_dir = base_path.join(format!("{}.{}", self.title, super::PROJECT_EXTENSION));
         fs::create_dir_all(&project_dir)
             .context("Failed to create project directory")?;
 
@@ -96,9 +96,14 @@ impl Project {
 
         // Save compile presets (if any)
         let presets_path = project_dir.join("compile_presets.json");
-        if let Ok(json) = serde_json::to_string_pretty(&self.compile_presets) {
-            if let Err(e) = fs::write(&presets_path, json) {
-                eprintln!("Warning: failed to save compile presets: {}", e);
+        match serde_json::to_string_pretty(&self.compile_presets) {
+            Ok(json) => {
+                if let Err(e) = fs::write(&presets_path, json) {
+                    log::warn!("Failed to write compile presets: {}", e);
+                }
+            }
+            Err(e) => {
+                log::warn!("Failed to serialize compile presets: {}", e);
             }
         }
 
@@ -129,10 +134,12 @@ impl Project {
         // Load compile presets
         let presets_path = project_dir.join("compile_presets.json");
         if presets_path.exists() {
-            if let Ok(json) = fs::read_to_string(&presets_path) {
-                if let Ok(presets) = serde_json::from_str(&json) {
-                    project.compile_presets = presets;
-                }
+            match fs::read_to_string(&presets_path) {
+                Ok(json) => match serde_json::from_str(&json) {
+                    Ok(presets) => project.compile_presets = presets,
+                    Err(e) => log::warn!("Failed to parse compile presets: {}", e),
+                },
+                Err(e) => log::warn!("Failed to read compile presets: {}", e),
             }
         }
 
@@ -600,10 +607,10 @@ impl Project {
         self.binder.folder_count()
     }
 
-    /// Estimate the total page count (250 words per page)
+    /// Estimate the total page count (standard manuscript page)
     pub fn estimated_pages(&self) -> usize {
         let words = self.total_word_count();
-        if words == 0 { 0 } else { (words / 250).max(1) }
+        if words == 0 { 0 } else { (words / super::WORDS_PER_PAGE).max(1) }
     }
 
     /// Get the project age as a human-readable string
@@ -628,9 +635,9 @@ impl Project {
         self.path.is_some()
     }
 
-    /// Get the project directory name (without .scriv extension)
+    /// Get the project directory name (with extension)
     pub fn directory_name(&self) -> String {
-        format!("{}.scriv", self.title)
+        format!("{}.{}", self.title, super::PROJECT_EXTENSION)
     }
 
     /// Get the number of collections

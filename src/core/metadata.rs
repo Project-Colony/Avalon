@@ -432,7 +432,7 @@ impl ProjectSettings {
     /// Days remaining until deadline (None if no deadline set)
     pub fn days_to_deadline(&self) -> Option<i64> {
         self.target_deadline.as_ref().and_then(|d| {
-            chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d")
+            chrono::NaiveDate::parse_from_str(d, super::DATE_FORMAT)
                 .ok()
                 .map(|deadline| {
                     let today = chrono::Utc::now().date_naive();
@@ -544,7 +544,7 @@ impl Default for AppPreferences {
 impl AppPreferences {
     /// Get the preferences file path
     pub fn file_path() -> std::path::PathBuf {
-        let home = dirs::home_dir().unwrap_or_default();
+        let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
         home.join(".avalon").join("preferences.json")
     }
 

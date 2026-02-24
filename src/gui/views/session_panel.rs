@@ -85,7 +85,7 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
 
     // Estimated pages
     let pages = if data.words_written > 0 {
-        format!("~{:.1} pages", data.words_written as f64 / 250.0)
+        format!("~{:.1} pages", data.words_written as f64 / crate::core::WORDS_PER_PAGE as f64)
     } else {
         String::from("0 pages")
     };

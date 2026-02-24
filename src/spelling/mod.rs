@@ -224,14 +224,20 @@ impl SpellChecker {
     pub fn load_user_dictionary(&mut self) {
         let Some(home) = dirs::home_dir() else { return };
         let dict_path = home.join(".avalon").join("user_dictionary.txt");
-        if let Ok(content) = std::fs::read_to_string(&dict_path) {
-            for word in content.lines() {
-                let trimmed = word.trim().to_lowercase();
-                if !trimmed.is_empty() && !self.user_dictionary.contains(&trimmed) {
-                    self.user_dictionary.push(trimmed.clone());
-                    self.dictionary.insert(trimmed);
+        match std::fs::read_to_string(&dict_path) {
+            Ok(content) => {
+                for word in content.lines() {
+                    let trimmed = word.trim().to_lowercase();
+                    if !trimmed.is_empty() && !self.user_dictionary.contains(&trimmed) {
+                        self.user_dictionary.push(trimmed.clone());
+                        self.dictionary.insert(trimmed);
+                    }
                 }
             }
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+                log::warn!("Failed to read user dictionary: {}", e);
+            }
+            Err(_) => {} // File doesn't exist yet, that's fine
         }
     }
 }

@@ -297,7 +297,13 @@ pub fn open_pdf_viewer(path: &Path) -> Result<()> {
         );
     };
 
-    cmd.spawn().context("Failed to launch PDF viewer")?;
+    let mut child = cmd.spawn().context("Failed to launch PDF viewer")?;
+
+    // Reap the child in a background thread to prevent zombie processes on Unix.
+    // The viewer is expected to outlive our interest in it, so we just wait quietly.
+    std::thread::spawn(move || {
+        let _ = child.wait();
+    });
 
     Ok(())
 }

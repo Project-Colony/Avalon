@@ -9,7 +9,7 @@ use crate::gui::theme::{self, Theme};
 pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Message> {
     let backup_count = backups.len();
     let total_size: u64 = backups.iter().map(|b| b.size_bytes).sum();
-    let total_size_str = format_size(total_size);
+    let total_size_str = crate::core::format_bytes(total_size);
 
     let header = row![
         text("BACKUP MANAGEMENT").size(11).color(Theme::TEXT_SECONDARY),
@@ -93,7 +93,7 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
     let note = row![
         text("\u{f07b}").size(10),
         Space::with_width(4),
-        text("Stored in ~/Scrinever Backups/")
+        text(format!("Stored in ~/{}/", crate::core::BACKUPS_DIR_NAME))
             .size(9)
             .color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
@@ -148,15 +148,3 @@ fn parse_age_from_timestamp(ts: &str) -> String {
     }
 }
 
-/// Format byte size into human-readable string
-fn format_size(bytes: u64) -> String {
-    if bytes < 1024 {
-        format!("{} B", bytes)
-    } else if bytes < 1024 * 1024 {
-        format!("{:.1} KB", bytes as f64 / 1024.0)
-    } else if bytes < 1024 * 1024 * 1024 {
-        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
-    } else {
-        format!("{:.2} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
-    }
-}

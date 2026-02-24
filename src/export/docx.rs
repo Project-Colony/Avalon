@@ -2,7 +2,7 @@ use std::path::Path;
 use anyhow::Result;
 use docx_rs::*;
 
-use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
+use super::compiler::{CompileContent, CompileOptions, SeparatorType};
 
 pub fn save_docx(contents: &[CompileContent], options: &CompileOptions, path: &Path) -> Result<()> {
     let mut docx = Docx::new();
@@ -260,22 +260,6 @@ fn find_closing_single(chars: &[char], start: usize, c: char) -> Option<usize> {
     (start..chars.len()).find(|&i| chars[i] == c)
 }
 
-/// Estimate page count from word count
-pub fn estimate_pages(contents: &[CompileContent]) -> usize {
-    let total_words: usize = contents.iter().map(|c| c.text.split_whitespace().count()).sum();
-    (total_words / 250).max(1)
-}
-
-/// Count total words across all content sections
-pub fn word_count(contents: &[CompileContent]) -> usize {
-    compiler::total_word_count(contents)
-}
-
-/// Count total characters across all content sections
-pub fn char_count(contents: &[CompileContent]) -> usize {
-    contents.iter().map(|c| c.text.len()).sum()
-}
-
 /// Count the number of paragraphs across all content sections
 pub fn paragraph_count(contents: &[CompileContent]) -> usize {
     contents.iter()
@@ -342,27 +326,6 @@ mod tests {
     }
 
     #[test]
-    fn test_estimate_pages() {
-        let contents = vec![make_content("A", &"word ".repeat(500), false, 0)];
-        assert_eq!(estimate_pages(&contents), 2);
-    }
-
-    #[test]
-    fn test_word_count() {
-        let contents = vec![
-            make_content("A", "one two three", false, 0),
-            make_content("B", "four five", false, 0),
-        ];
-        assert_eq!(word_count(&contents), 5);
-    }
-
-    #[test]
-    fn test_char_count() {
-        let contents = vec![make_content("A", "hello", false, 0)];
-        assert_eq!(char_count(&contents), 5);
-    }
-
-    #[test]
     fn test_paragraph_count() {
         let contents = vec![
             make_content("A", "First paragraph.\n\nSecond paragraph.", false, 0),
@@ -396,24 +359,6 @@ mod tests {
     }
 
     #[test]
-    fn test_estimate_pages_empty() {
-        let contents: Vec<CompileContent> = vec![];
-        assert_eq!(estimate_pages(&contents), 1);
-    }
-
-    #[test]
-    fn test_word_count_empty() {
-        let contents: Vec<CompileContent> = vec![];
-        assert_eq!(word_count(&contents), 0);
-    }
-
-    #[test]
-    fn test_char_count_empty() {
-        let contents: Vec<CompileContent> = vec![];
-        assert_eq!(char_count(&contents), 0);
-    }
-
-    #[test]
     fn test_paragraph_count_empty() {
         let contents: Vec<CompileContent> = vec![];
         assert_eq!(paragraph_count(&contents), 0);
@@ -434,14 +379,6 @@ mod tests {
             make_content("B", "P4\n\nP5", false, 0),
         ];
         assert_eq!(paragraph_count(&contents), 5);
-    }
-
-    #[test]
-    fn test_estimate_pages_large() {
-        let contents = vec![
-            make_content("A", &"word ".repeat(1000), false, 0),
-        ];
-        assert_eq!(estimate_pages(&contents), 4);
     }
 
     #[test]

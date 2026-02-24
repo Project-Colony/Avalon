@@ -1,7 +1,5 @@
 use iced::widget::{button, column, container, row, scrollable, text, Space};
 use iced::{Element, Length, Padding};
-use uuid::Uuid;
-
 use crate::core::bookmark::BookmarkList;
 use crate::gui::app::Message;
 use crate::gui::theme::{self, Theme};

@@ -1,6 +1,6 @@
 use std::fmt::Write;
 use anyhow::Result;
-use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
+use super::compiler::{CompileContent, CompileOptions, SeparatorType};
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
     let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 20).sum();
@@ -166,24 +166,6 @@ pub fn word_wrap(text: &str, max_width: usize) -> String {
     result
 }
 
-/// Estimate page count from content
-pub fn estimate_pages(contents: &[CompileContent]) -> usize {
-    let total_words: usize = contents.iter()
-        .map(|c| c.text.split_whitespace().count())
-        .sum();
-    (total_words / 250).max(1)
-}
-
-/// Count total words across all content sections
-pub fn word_count(contents: &[CompileContent]) -> usize {
-    compiler::total_word_count(contents)
-}
-
-/// Count total characters across all content sections
-pub fn char_count(contents: &[CompileContent]) -> usize {
-    contents.iter().map(|c| c.text.len()).sum()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -263,24 +245,6 @@ mod tests {
         for line in wrapped.lines() {
             assert!(line.len() <= 25); // Allow some slack for long words
         }
-    }
-
-    #[test]
-    fn test_word_count_and_char_count() {
-        let contents = vec![
-            make_content("A", "one two three", false, 0),
-            make_content("B", "four five", false, 0),
-        ];
-        assert_eq!(word_count(&contents), 5);
-        assert!(char_count(&contents) > 0);
-    }
-
-    #[test]
-    fn test_estimate_pages() {
-        let contents = vec![
-            make_content("A", &"word ".repeat(500), false, 0),
-        ];
-        assert_eq!(estimate_pages(&contents), 2);
     }
 
     #[test]
@@ -411,24 +375,6 @@ mod tests {
         let text = "hello world";
         let wrapped = word_wrap(text, 11);
         assert_eq!(wrapped, "hello world");
-    }
-
-    #[test]
-    fn test_estimate_pages_empty() {
-        let contents: Vec<CompileContent> = vec![];
-        assert_eq!(estimate_pages(&contents), 1); // Minimum 1 page
-    }
-
-    #[test]
-    fn test_word_count_empty() {
-        let contents: Vec<CompileContent> = vec![];
-        assert_eq!(word_count(&contents), 0);
-    }
-
-    #[test]
-    fn test_char_count_empty() {
-        let contents: Vec<CompileContent> = vec![];
-        assert_eq!(char_count(&contents), 0);
     }
 
     #[test]

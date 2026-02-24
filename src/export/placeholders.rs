@@ -8,7 +8,7 @@ pub fn replace_placeholders(text: &str, context: &PlaceholderContext) -> String 
 
     // Date/time placeholders
     let now = Utc::now();
-    result = result.replace("<$date>", &now.format("%Y-%m-%d").to_string());
+    result = result.replace("<$date>", &now.format(crate::core::DATE_FORMAT).to_string());
     result = result.replace("<$longdate>", &now.format("%B %d, %Y").to_string());
     result = result.replace("<$shortdate>", &now.format("%m/%d/%y").to_string());
     result = result.replace("<$time>", &now.format("%H:%M").to_string());
@@ -153,9 +153,9 @@ impl PlaceholderContext {
             .join("")
     }
 
-    /// Estimated reading time in minutes (assuming 200 words/minute)
+    /// Estimated reading time in minutes
     pub fn estimated_reading_time(&self) -> usize {
-        (self.word_count / 200).max(if self.word_count > 0 { 1 } else { 0 })
+        (self.word_count / crate::core::READING_WPM as usize).max(if self.word_count > 0 { 1 } else { 0 })
     }
 
     /// Build context from compile contents
@@ -171,7 +171,7 @@ impl PlaceholderContext {
             author: author.to_string(),
             word_count,
             char_count,
-            page_count: (word_count / 250).max(if word_count > 0 { 1 } else { 0 }),
+            page_count: (word_count / crate::core::WORDS_PER_PAGE).max(if word_count > 0 { 1 } else { 0 }),
         }
     }
 
@@ -649,7 +649,7 @@ mod tests {
             char_count: 5000,
             page_count: 4,
         };
-        assert_eq!(ctx.estimated_reading_time(), 5); // 1000/200 = 5
+        assert_eq!(ctx.estimated_reading_time(), 4); // 1000/250 = 4
     }
 
     #[test]

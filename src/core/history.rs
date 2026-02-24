@@ -19,9 +19,7 @@ pub struct DailyEntry {
 
 impl WritingHistory {
     pub fn new() -> Self {
-        Self {
-            entries: Vec::new(),
-        }
+        Self::default()
     }
 
     /// Record word count for today
@@ -208,9 +206,9 @@ impl WritingHistory {
             .min_by_key(|e| e.words_written)
     }
 
-    /// Total pages written (assuming 250 words/page)
+    /// Total pages written (standard manuscript page)
     pub fn total_pages(&self) -> f64 {
-        self.total_words_written().max(0) as f64 / 250.0
+        self.total_words_written().max(0) as f64 / super::WORDS_PER_PAGE as f64
     }
 
     /// Variance in daily word counts (for consistency analysis)

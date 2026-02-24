@@ -33,7 +33,7 @@ pub fn view(history: &WritingHistory) -> Element<'static, Message> {
     };
 
     // Estimated pages written
-    let pages = total_words as f64 / 250.0;
+    let pages = total_words as f64 / crate::core::WORDS_PER_PAGE as f64;
 
     let summary = row![
         stat_item("Total", &format_number(total_words as u64)),

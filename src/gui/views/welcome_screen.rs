@@ -1,4 +1,4 @@
-use iced::widget::{button, column, container, horizontal_rule, row, scrollable, text, Space};
+use iced::widget::{button, column, container, row, scrollable, text, Space};
 use iced::{Background, Border, Color, Element, Length, Padding};
 
 use crate::core::recent::RecentProjects;

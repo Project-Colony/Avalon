@@ -142,7 +142,7 @@ impl OutlinerState {
         values.insert(OutlinerColumn::DateModified, CellValue::Date(item.modified));
         values.insert(OutlinerColumn::Section, CellValue::Text(String::new()));
         values.insert(OutlinerColumn::IncludeInCompile, CellValue::Bool(item.include_in_compile));
-        values.insert(OutlinerColumn::PageCount, CellValue::Number(item.word_count as f64 / 250.0));
+        values.insert(OutlinerColumn::PageCount, CellValue::Number(item.word_count as f64 / super::WORDS_PER_PAGE as f64));
         values.insert(OutlinerColumn::ParagraphCount, CellValue::Number(0.0));
         values.insert(OutlinerColumn::WordFrequency, CellValue::None);
 

@@ -33,6 +33,8 @@ pub struct SearchOptions {
     pub search_content: bool,
     pub search_notes: bool,
     pub search_synopsis: bool,
+    /// Maximum number of document results to return (0 = unlimited)
+    pub max_results: usize,
 }
 
 impl Default for SearchOptions {
@@ -46,6 +48,7 @@ impl Default for SearchOptions {
             search_content: true,
             search_notes: false,
             search_synopsis: false,
+            max_results: 0,
         }
     }
 }
@@ -127,6 +130,10 @@ pub fn search_binder(binder: &Binder, options: &SearchOptions) -> Vec<SearchResu
                 item_title: item.title.clone(),
                 matches,
             });
+            // Early termination when max_results is reached
+            if options.max_results > 0 && results.len() >= options.max_results {
+                break;
+            }
         }
     }
 
@@ -247,6 +254,7 @@ impl SearchOptions {
             search_content: true,
             search_notes: false,
             search_synopsis: false,
+            max_results: 0,
         }
     }
 
@@ -261,6 +269,7 @@ impl SearchOptions {
             search_content: true,
             search_notes: false,
             search_synopsis: false,
+            max_results: 0,
         }
     }
 
@@ -275,6 +284,7 @@ impl SearchOptions {
             search_content: true,
             search_notes: false,
             search_synopsis: false,
+            max_results: 0,
         }
     }
 
@@ -289,6 +299,7 @@ impl SearchOptions {
             search_content: true,
             search_notes: false,
             search_synopsis: false,
+            max_results: 0,
         }
     }
 
@@ -303,6 +314,7 @@ impl SearchOptions {
             search_content: true,
             search_notes: true,
             search_synopsis: true,
+            max_results: 0,
         }
     }
 
@@ -335,6 +347,7 @@ impl SearchOptions {
             search_content: true,
             search_notes: false,
             search_synopsis: false,
+            max_results: 0,
         }
     }
 

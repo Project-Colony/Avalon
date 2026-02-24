@@ -109,7 +109,7 @@ pub fn view(analysis: &TextAnalysis) -> Element<'static, Message> {
         Space::with_width(4),
         text(format!("({})", ttr_label)).size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(16),
-        text(format!("Pages: {:.1}", analysis.word_count as f64 / 250.0))
+        text(format!("Pages: {:.1}", analysis.word_count as f64 / crate::core::WORDS_PER_PAGE as f64))
             .size(11).color(Theme::TEXT_MUTED),
     ]
     .align_y(iced::Alignment::Center);

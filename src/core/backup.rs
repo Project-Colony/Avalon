@@ -53,32 +53,32 @@ impl BackupManager {
         }
 
         let prefix = format!("{}_", project_name);
-        if let Ok(dir_entries) = fs::read_dir(&backup_dir) {
-            for entry in dir_entries.flatten() {
-                let path = entry.path();
-                let name = path.file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("")
-                    .to_string();
+        let dir_entries = fs::read_dir(&backup_dir)
+            .context("Failed to read backup directory")?;
+        for entry in dir_entries.flatten() {
+            let path = entry.path();
+            let name = path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string();
 
-                if name.starts_with(&prefix) && name.ends_with(".backup.json") {
-                    let size = fs::metadata(&path)
-                        .map(|m| m.len())
-                        .unwrap_or(0);
+            if name.starts_with(&prefix) && name.ends_with(".backup.json") {
+                let size = fs::metadata(&path)
+                    .map(|m| m.len())
+                    .unwrap_or(0);
 
-                    // Parse timestamp from filename
-                    let timestamp_str = name
-                        .strip_prefix(&prefix)
-                        .and_then(|s| s.strip_suffix(".backup.json"))
-                        .unwrap_or("");
+                // Parse timestamp from filename
+                let timestamp_str = name
+                    .strip_prefix(&prefix)
+                    .and_then(|s| s.strip_suffix(".backup.json"))
+                    .unwrap_or("");
 
-                    entries.push(BackupEntry {
-                        path: path.clone(),
-                        name: name.clone(),
-                        timestamp: timestamp_str.to_string(),
-                        size_bytes: size,
-                    });
-                }
+                entries.push(BackupEntry {
+                    path: path.clone(),
+                    name: name.clone(),
+                    timestamp: timestamp_str.to_string(),
+                    size_bytes: size,
+                });
             }
         }
 
@@ -90,7 +90,7 @@ impl BackupManager {
     fn backup_directory() -> Result<PathBuf> {
         let home = dirs::home_dir()
             .context("Could not determine home directory")?;
-        Ok(home.join("Scrinever Backups"))
+        Ok(home.join(super::BACKUPS_DIR_NAME))
     }
 
     /// Remove old backups, keeping only the most recent `keep` backups
@@ -99,7 +99,9 @@ impl BackupManager {
         if backups.len() > keep {
             let to_remove = backups.split_off(keep);
             for entry in to_remove {
-                let _ = fs::remove_file(&entry.path);
+                if let Err(e) = fs::remove_file(&entry.path) {
+                    log::warn!("Failed to prune old backup {:?}: {}", entry.path, e);
+                }
             }
         }
         Ok(())
@@ -152,15 +154,7 @@ pub struct BackupEntry {
 impl BackupEntry {
     /// Format bytes into human-readable size string
     pub fn format_bytes(bytes: u64) -> String {
-        if bytes < 1024 {
-            format!("{} B", bytes)
-        } else if bytes < 1024 * 1024 {
-            format!("{:.1} KB", bytes as f64 / 1024.0)
-        } else if bytes < 1024 * 1024 * 1024 {
-            format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
-        } else {
-            format!("{:.2} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
-        }
+        super::format_bytes(bytes)
     }
 
     pub fn display_size(&self) -> String {
@@ -266,7 +260,7 @@ mod tests {
     #[test]
     fn test_display_size_bytes() {
         let entry = make_entry("test.backup.json", "20260101_120000", 500);
-        assert_eq!(entry.display_size(), "500 B");
+        assert_eq!(entry.display_size(), "500 bytes");
     }
 
     #[test]
@@ -331,8 +325,8 @@ mod tests {
 
     #[test]
     fn test_format_bytes_static() {
-        assert_eq!(BackupEntry::format_bytes(0), "0 B");
-        assert_eq!(BackupEntry::format_bytes(512), "512 B");
+        assert_eq!(BackupEntry::format_bytes(0), "0 bytes");
+        assert_eq!(BackupEntry::format_bytes(512), "512 bytes");
         assert_eq!(BackupEntry::format_bytes(1024), "1.0 KB");
         assert_eq!(BackupEntry::format_bytes(1024 * 1024), "1.0 MB");
     }
@@ -375,7 +369,7 @@ mod tests {
     #[test]
     fn test_display_size_boundary_kb() {
         let entry = make_entry("test.backup.json", "20260101_120000", 1023);
-        assert!(entry.display_size().contains("B"));
+        assert!(entry.display_size().contains("bytes"));
 
         let entry2 = make_entry("test.backup.json", "20260101_120000", 1024);
         assert!(entry2.display_size().contains("KB"));
@@ -393,7 +387,7 @@ mod tests {
     #[test]
     fn test_display_size_zero() {
         let entry = make_entry("test.backup.json", "20260101_120000", 0);
-        assert_eq!(entry.display_size(), "0 B");
+        assert_eq!(entry.display_size(), "0 bytes");
     }
 
     #[test]
