@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Spell checking module with a built-in common English word list.
 //! Uses Levenshtein distance for spelling suggestions.
 

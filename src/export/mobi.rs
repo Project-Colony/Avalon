@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::fmt::Write;
 use anyhow::Result;
 use pulldown_cmark::{Parser, html::push_html};

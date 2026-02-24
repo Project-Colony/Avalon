@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::collections::{BTreeSet, BinaryHeap, HashMap, HashSet};
 use std::cmp::Reverse;
 use serde::{Deserialize, Serialize};

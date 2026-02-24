@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use crate::core::binder::{BinderItem, BinderItemKind};
 use anyhow::Result;
 use chrono::{DateTime, Utc};

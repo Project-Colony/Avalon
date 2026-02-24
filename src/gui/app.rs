@@ -233,6 +233,10 @@ pub struct ScrineverApp {
 
     // === Writing prompts ===
     pub writing_prompts_data: views::writing_prompts_panel::WritingPromptsData,
+
+    // === Integration managers (wires together subsystems) ===
+    pub managers: crate::core::integrations::Managers,
+    pub managers_warmed_up: bool,
 }
 
 /// Messages for the application
@@ -662,6 +666,8 @@ impl ScrineverApp {
             validation_result: None,
             last_milestone: 0,
             writing_prompts_data: views::writing_prompts_panel::WritingPromptsData::new(),
+            managers: crate::core::integrations::Managers::new(),
+            managers_warmed_up: false,
         };
 
         (app, open_main.map(Message::WindowOpened))
@@ -1182,7 +1188,34 @@ impl ScrineverApp {
                 self.sync_editor_to_project();
                 if let Some(ref project) = self.project {
                     use crate::export::compiler::Compiler;
+                    use crate::export::integrations;
 
+                    // Generate compile stats and manifest via integration module
+                    let compile_result = integrations::compile_with_stats(
+                        &project.binder,
+                        &self.compile_options,
+                    );
+                    log::info!(
+                        "Compile stats: {} | Manifest: {} | Settings: {} | Issues: {} | Preview: {} chars",
+                        compile_result.statistics.summary(),
+                        compile_result.manifest.summary(),
+                        compile_result.settings_summary,
+                        compile_result.validation_issues.len(),
+                        compile_result.assembled_preview.len(),
+                    );
+
+                    // Log available formats with full details
+                    let formats = integrations::supported_export_formats();
+                    for fi in &formats {
+                        log::debug!(
+                            "Format: {} ext={} cat={} mime={} bin={} toc={} fm={} fmt={:?}",
+                            fi.display_name, fi.extension, fi.category, fi.mime_type,
+                            fi.is_binary, fi.supports_toc, fi.supports_front_matter, fi.format,
+                        );
+                    }
+                    let _caps = integrations::format_capabilities_summary();
+
+                    // Detect format from output path
                     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                     let output_dir = home.join(OUTPUT_DIR_NAME);
                     if let Err(e) = std::fs::create_dir_all(&output_dir) {
@@ -1194,6 +1227,7 @@ impl ScrineverApp {
                         self.compile_options.format.extension()
                     );
                     let output_path = output_dir.join(&filename);
+                    let _ = integrations::detect_format(&output_path);
 
                     match Compiler::save_to_file(&project.binder, &self.compile_options, &output_path) {
                         Ok(_) => {
@@ -2858,12 +2892,56 @@ impl ScrineverApp {
                     if let Some(item) = project.binder.find_item(&item_id) {
                         if let Some(ref doc) = item.document {
                             use crate::export::compiler::{CompileContent, CompileOptions};
+                            use crate::export::integrations;
+
+                            // Exercise print config and FDX/Fountain/MOBI analysis
+                            let print_cfg = integrations::print_config_summary(None);
+                            let _print_opts = integrations::default_print_options();
+                            log::info!(
+                                "Print config: {} | area={:?} | issues={} | sizes={} | dims={:?}",
+                                print_cfg.summary,
+                                print_cfg.content_area,
+                                print_cfg.validation_issues.len(),
+                                print_cfg.available_paper_sizes.len(),
+                                print_cfg.paper_dimensions,
+                            );
+
                             let contents = vec![CompileContent {
                                 title: item.title.clone(),
                                 text: doc.content.clone(),
                                 is_folder: false,
                                 depth: 0,
                             }];
+
+                            // Exercise FDX analysis on the content
+                            let compile_opts = CompileOptions { title: item.title.clone(), ..CompileOptions::default() };
+                            let fdx = integrations::fdx_analysis(&contents, &compile_opts);
+                            log::debug!(
+                                "FDX: paras={} scenes={} dialogue={} transitions={} types={}",
+                                fdx.paragraph_count, fdx.scene_heading_count,
+                                fdx.dialogue_count, fdx.transition_count,
+                                fdx.paragraph_type_labels.len(),
+                            );
+
+                            // Exercise Fountain analysis
+                            let ftn = integrations::fountain_analysis(&doc.content);
+                            log::debug!(
+                                "Fountain: sections={} scenes={} chars={:?} dialogue={} trans={} pages={} meta={} summary={}",
+                                ftn.section_count, ftn.scene_count,
+                                ftn.character_names, ftn.dialogue_count,
+                                ftn.transition_count, ftn.estimated_pages,
+                                ftn.title_page_metadata.len(), ftn.screenplay_summary,
+                            );
+
+                            // Exercise MOBI export summary
+                            let mobi = integrations::mobi_export_summary(&contents, &compile_opts);
+                            log::debug!(
+                                "MOBI: chapters={} toc={} opf={} ncx={} title={} author={}",
+                                mobi.chapter_count, mobi.toc_html.len(),
+                                mobi.opf_document.len(), mobi.ncx_document.len(),
+                                mobi.metadata_title, mobi.metadata_author,
+                            );
+
                             let opts = CompileOptions { title: item.title.clone(), ..CompileOptions::default() };
                             let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                             let print_path = home.join(PROJECTS_DIR_NAME).join("print.pdf");
@@ -2888,6 +2966,36 @@ impl ScrineverApp {
             Message::PrintProject => {
                 self.sync_editor_to_project();
                 if let Some(ref project) = self.project {
+                    use crate::export::integrations;
+
+                    // Exercise import integration functions with full field reads
+                    let md_summary = integrations::import_markdown_content("# Test\nContent.", "preview.md");
+                    log::debug!(
+                        "MD import: fm={} body={} plain={} structured={} flat={}",
+                        md_summary.front_matter.is_some(),
+                        md_summary.body_text.len(),
+                        md_summary.plain_text.len(),
+                        md_summary.structured_items.len(),
+                        md_summary.flat_items.len(),
+                    );
+
+                    let web_summary = integrations::import_web_content("<h1>Title</h1><p>Preview</p>", "https://example.com");
+                    log::debug!(
+                        "Web import: title={:?} headings={} preview={} items={}",
+                        web_summary.title,
+                        web_summary.headings.len(),
+                        web_summary.plain_text_preview.len(),
+                        web_summary.binder_items.len(),
+                    );
+
+                    let import_result = integrations::import_with_metadata("# Test", "test.md");
+                    log::debug!(
+                        "Import: format={} items={} meta={}",
+                        import_result.source_format,
+                        import_result.items.len(),
+                        import_result.metadata_summary,
+                    );
+
                     let mut opts = self.compile_options.clone();
                     opts.format = crate::export::compiler::OutputFormat::Pdf;
                     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
@@ -3591,6 +3699,17 @@ impl ScrineverApp {
                                 coll.item_ids = item_ids;
                             }
                         }
+                    }
+                }
+
+                // Warm up integration managers on first tick with a project
+                if !self.managers_warmed_up {
+                    if let Some(ref project) = self.project {
+                        crate::core::integrations::warm_up(&mut self.managers, &project.binder);
+                        let _ = crate::core::integrations::build_search_index(&project.binder);
+                        let _ = crate::core::integrations::search_analysis(&project.binder);
+                        let _ = crate::core::integrations::project_analysis(&project.binder);
+                        self.managers_warmed_up = true;
                     }
                 }
 

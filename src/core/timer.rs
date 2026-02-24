@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::time::{Duration, Instant};
 
 /// A writing focus timer for timed writing sessions

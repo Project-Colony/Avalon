@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::collections::{HashMap, HashSet, VecDeque};
 use crate::core::document::Document;
 

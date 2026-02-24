@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use uuid::Uuid;
 use regex::Regex;
 use chrono::{DateTime, Utc};

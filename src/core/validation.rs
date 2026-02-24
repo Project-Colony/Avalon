@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use uuid::Uuid;
 use std::collections::HashSet;
 use super::binder::{Binder, BinderItem, BinderItemKind};

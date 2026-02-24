@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::fmt::Write as _;
 use chrono::Utc;
 

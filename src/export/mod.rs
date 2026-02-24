@@ -18,3 +18,4 @@ pub mod rtf_import;
 pub mod scriv_import;
 pub mod mobi;
 pub mod web_import;
+pub mod integrations;

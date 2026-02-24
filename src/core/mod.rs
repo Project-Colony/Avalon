@@ -78,3 +78,6 @@ pub mod corkboard;
 pub mod outliner;
 pub mod bookmark;
 pub mod recent;
+
+// Integration module (wires together subsystems)
+pub mod integrations;
