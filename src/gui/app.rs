@@ -728,7 +728,7 @@ impl ScrineverApp {
             }
 
             Message::OpenProject => {
-                let home = dirs::home_dir().unwrap_or_default();
+                let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                 let projects_dir = home.join("Scrinever Projects");
                 if projects_dir.exists() {
                     if let Ok(entries) = std::fs::read_dir(&projects_dir) {
@@ -762,7 +762,7 @@ impl ScrineverApp {
             Message::SaveProject => {
                 self.sync_editor_to_project();
                 if let Some(ref mut project) = self.project {
-                    let home = dirs::home_dir().unwrap_or_default();
+                    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                     let save_dir = home.join("Scrinever Projects");
                     match project.save(&save_dir) {
                         Ok(_) => {
@@ -1168,7 +1168,7 @@ impl ScrineverApp {
                 if let Some(ref project) = self.project {
                     use crate::export::compiler::Compiler;
 
-                    let home = dirs::home_dir().unwrap_or_default();
+                    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                     let output_dir = home.join("Scrinever Output");
                     if let Err(e) = std::fs::create_dir_all(&output_dir) {
                         self.notification = Some(format!("Failed to create output dir: {}", e));
@@ -1741,7 +1741,7 @@ impl ScrineverApp {
             // ========== Import ==========
             Message::ImportFiles => {
                 if let Some(ref mut project) = self.project {
-                    let home = dirs::home_dir().unwrap_or_default();
+                    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                     let import_dir = home.join("Scrinever Import");
                     if import_dir.exists() {
                         let mut count = 0;
@@ -2733,7 +2733,7 @@ impl ScrineverApp {
             // ========== OPML Import ==========
             Message::ImportOpml => {
                 if let Some(ref mut project) = self.project {
-                    let home = dirs::home_dir().unwrap_or_default();
+                    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                     let import_dir = home.join("Scrinever Import");
                     if import_dir.exists() {
                         let mut count = 0;
@@ -3457,7 +3457,7 @@ impl ScrineverApp {
                         self.auto_save_counter = 0;
                         self.sync_editor_to_project();
                         if let Some(ref mut project) = self.project {
-                            let home = dirs::home_dir().unwrap_or_default();
+                            let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                             let save_dir = home.join("Scrinever Projects");
                             if project.save(&save_dir).is_ok() {
                                 self.editor.mark_clean();

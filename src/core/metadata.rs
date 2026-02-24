@@ -544,7 +544,7 @@ impl Default for AppPreferences {
 impl AppPreferences {
     /// Get the preferences file path
     pub fn file_path() -> std::path::PathBuf {
-        let home = dirs::home_dir().unwrap_or_default();
+        let home = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
         home.join(".avalon").join("preferences.json")
     }
 
