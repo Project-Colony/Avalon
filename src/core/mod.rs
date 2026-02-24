@@ -4,6 +4,9 @@ pub const OUTPUT_DIR_NAME: &str = "Scrinever Output";
 pub const IMPORT_DIR_NAME: &str = "Scrinever Import";
 pub const BACKUPS_DIR_NAME: &str = "Scrinever Backups";
 
+/// File extension for project directories.
+pub const PROJECT_EXTENSION: &str = "scriv";
+
 // Standard typographical constants
 /// Average words per page (standard manuscript page).
 /// Used for page-count estimation and reading-time calculations.

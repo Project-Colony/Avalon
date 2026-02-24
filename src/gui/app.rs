@@ -735,7 +735,7 @@ impl ScrineverApp {
                     if let Ok(entries) = std::fs::read_dir(&projects_dir) {
                         for entry in entries.flatten() {
                             let path = entry.path();
-                            if path.is_dir() && path.extension().is_some_and(|e| e == "scriv") {
+                            if path.is_dir() && path.extension().is_some_and(|e| e == crate::core::PROJECT_EXTENSION) {
                                 match Project::load(&path) {
                                     Ok(p) => {
                                         self.compile_options.title = p.title.clone();
@@ -754,7 +754,7 @@ impl ScrineverApp {
                             }
                         }
                     }
-                    self.notification = Some(format!("No .scriv projects found in ~/{}/", PROJECTS_DIR_NAME));
+                    self.notification = Some(format!("No .{} projects found in ~/{}/", crate::core::PROJECT_EXTENSION, PROJECTS_DIR_NAME));
                 } else {
                     self.notification = Some("No projects directory found. Create a project first.".to_string());
                 }

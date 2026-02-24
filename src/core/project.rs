@@ -72,7 +72,7 @@ impl Project {
 
     /// Save the project to disk
     pub fn save(&mut self, base_path: &Path) -> Result<()> {
-        let project_dir = base_path.join(format!("{}.scriv", self.title));
+        let project_dir = base_path.join(format!("{}.{}", self.title, super::PROJECT_EXTENSION));
         fs::create_dir_all(&project_dir)
             .context("Failed to create project directory")?;
 
@@ -635,9 +635,9 @@ impl Project {
         self.path.is_some()
     }
 
-    /// Get the project directory name (without .scriv extension)
+    /// Get the project directory name (with extension)
     pub fn directory_name(&self) -> String {
-        format!("{}.scriv", self.title)
+        format!("{}.{}", self.title, super::PROJECT_EXTENSION)
     }
 
     /// Get the number of collections
