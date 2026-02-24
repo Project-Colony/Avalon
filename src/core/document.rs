@@ -86,19 +86,19 @@ impl Document {
         self.content.lines().count()
     }
 
-    /// Estimate page count (250 words per page)
+    /// Estimate page count (standard manuscript page)
     pub fn page_count(&self) -> f64 {
-        self.word_count() as f64 / 250.0
+        self.word_count() as f64 / super::WORDS_PER_PAGE as f64
     }
 
-    /// Reading time estimate in minutes (250 WPM)
+    /// Reading time estimate in minutes
     pub fn reading_time_minutes(&self) -> f64 {
-        self.word_count() as f64 / 250.0
+        self.word_count() as f64 / super::READING_WPM
     }
 
-    /// Speaking time estimate in minutes (150 WPM)
+    /// Speaking time estimate in minutes
     pub fn speaking_time_minutes(&self) -> f64 {
-        self.word_count() as f64 / 150.0
+        self.word_count() as f64 / super::SPEAKING_WPM
     }
 
     /// Clean a word by keeping only alphanumeric chars and apostrophes, then lowercasing.

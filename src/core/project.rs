@@ -607,10 +607,10 @@ impl Project {
         self.binder.folder_count()
     }
 
-    /// Estimate the total page count (250 words per page)
+    /// Estimate the total page count (standard manuscript page)
     pub fn estimated_pages(&self) -> usize {
         let words = self.total_word_count();
-        if words == 0 { 0 } else { (words / 250).max(1) }
+        if words == 0 { 0 } else { (words / super::WORDS_PER_PAGE).max(1) }
     }
 
     /// Get the project age as a human-readable string

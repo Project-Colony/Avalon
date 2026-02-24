@@ -52,8 +52,8 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
         };
 
         let remaining = target.saturating_sub(data.current_words);
-        let pages_done = data.current_words / 250;
-        let pages_total = target / 250;
+        let pages_done = data.current_words / crate::core::WORDS_PER_PAGE;
+        let pages_total = target / crate::core::WORDS_PER_PAGE;
 
         column![
             row![
@@ -158,7 +158,7 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
                         .size(11)
                         .color(Theme::WARNING),
                     Space::with_width(8),
-                    text(format!("(~{} pages/day)", (wpd / 250).max(1)))
+                    text(format!("(~{} pages/day)", (wpd / crate::core::WORDS_PER_PAGE).max(1)))
                         .size(10)
                         .color(Theme::TEXT_MUTED),
                 ]

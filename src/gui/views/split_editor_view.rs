@@ -15,7 +15,7 @@ pub fn view<'a>(
     // Primary editor (left) - editable
     let primary_words = primary_editor.document.word_count();
     let primary_chars = primary_editor.document.char_count();
-    let primary_pages = primary_words as f64 / 250.0;
+    let primary_pages = primary_words as f64 / crate::core::WORDS_PER_PAGE as f64;
 
     let primary_header = container(
         row![
@@ -97,8 +97,8 @@ pub fn view<'a>(
     .width(Length::Fill)
     .height(Length::Fill);
 
-    let secondary_pages = secondary_words as f64 / 250.0;
-    let reading_min = secondary_words as f64 / 250.0;
+    let secondary_pages = secondary_words as f64 / crate::core::WORDS_PER_PAGE as f64;
+    let reading_min = secondary_words as f64 / crate::core::WORDS_PER_PAGE as f64;
     let reading_display = if reading_min < 1.0 {
         "<1m".to_string()
     } else {

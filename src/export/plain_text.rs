@@ -171,7 +171,7 @@ pub fn estimate_pages(contents: &[CompileContent]) -> usize {
     let total_words: usize = contents.iter()
         .map(|c| c.text.split_whitespace().count())
         .sum();
-    (total_words / 250).max(1)
+    (total_words / crate::core::WORDS_PER_PAGE).max(1)
 }
 
 /// Count total words across all content sections

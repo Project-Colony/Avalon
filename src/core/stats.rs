@@ -40,7 +40,7 @@ impl Statistics {
             }
         });
 
-        stats.page_count = stats.word_count as f64 / 250.0;
+        stats.page_count = stats.word_count as f64 / super::WORDS_PER_PAGE as f64;
         stats.average_words_per_document = if stats.document_count > 0 {
             stats.word_count as f64 / stats.document_count as f64
         } else {
@@ -67,14 +67,14 @@ impl Statistics {
         }
     }
 
-    /// Reading time estimate in minutes (250 WPM)
+    /// Reading time estimate in minutes
     pub fn reading_time_minutes(&self) -> f64 {
-        self.word_count as f64 / 250.0
+        self.word_count as f64 / super::READING_WPM
     }
 
-    /// Speaking time estimate in minutes (150 WPM)
+    /// Speaking time estimate in minutes
     pub fn speaking_time_minutes(&self) -> f64 {
-        self.word_count as f64 / 150.0
+        self.word_count as f64 / super::SPEAKING_WPM
     }
 
     /// Check if the project is empty
@@ -141,7 +141,7 @@ impl Statistics {
                 .count()
                 .max(if text.is_empty() { 0 } else { 1 }),
             line_count: if text.is_empty() { 0 } else { text.lines().count() },
-            page_count: word_count as f64 / 250.0,
+            page_count: word_count as f64 / super::WORDS_PER_PAGE as f64,
             document_count: 1,
             folder_count: 0,
             average_words_per_document: word_count as f64,
@@ -210,7 +210,7 @@ impl SessionStats {
 
     /// Estimated pages written this session
     pub fn pages_written(&self) -> f64 {
-        self.words_written.max(0) as f64 / 250.0
+        self.words_written.max(0) as f64 / super::WORDS_PER_PAGE as f64
     }
 
     /// Check if the session is active (has time recorded)
@@ -299,8 +299,8 @@ impl TextAnalysis {
             0.0
         };
 
-        let reading_time_minutes = word_count as f64 / 250.0;
-        let speaking_time_minutes = word_count as f64 / 150.0;
+        let reading_time_minutes = word_count as f64 / super::READING_WPM;
+        let speaking_time_minutes = word_count as f64 / super::SPEAKING_WPM;
 
         Self {
             word_count,

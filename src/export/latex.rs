@@ -302,7 +302,7 @@ pub fn word_count(contents: &[CompileContent]) -> usize {
 /// Estimate page count (LaTeX with double spacing, A4, 1-inch margins ~ 250 words/page)
 pub fn estimate_pages(contents: &[CompileContent]) -> usize {
     let total_words = word_count(contents);
-    (total_words / 250).max(1)
+    (total_words / crate::core::WORDS_PER_PAGE).max(1)
 }
 
 /// Estimate the output size in bytes for a LaTeX compilation

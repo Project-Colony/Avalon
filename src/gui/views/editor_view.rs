@@ -136,10 +136,10 @@ pub fn view<'a>(
         .height(Length::Fill);
 
     let word_count = editor_state.document.word_count();
-    let page_est = word_count as f64 / 250.0;
+    let page_est = word_count as f64 / crate::core::WORDS_PER_PAGE as f64;
     let para_count = editor_state.document.paragraph_count();
     let sentence_count = editor_state.document.sentence_count();
-    let reading_min = word_count as f64 / 250.0;
+    let reading_min = word_count as f64 / crate::core::READING_WPM;
     let reading_display = if reading_min < 1.0 {
         "<1m".to_string()
     } else if reading_min < 60.0 {
@@ -221,7 +221,7 @@ pub fn view_composition<'a>(editor_state: &'a EditorState, title: &str, word_cou
         .color(iced::Color::from_rgba(1.0, 1.0, 1.0, 0.5));
 
     // Reading time estimate
-    let reading_min = word_count as f64 / 250.0;
+    let reading_min = word_count as f64 / crate::core::READING_WPM;
 
     let header = container(
         row![
@@ -254,7 +254,7 @@ pub fn view_composition<'a>(editor_state: &'a EditorState, title: &str, word_cou
             Space::with_width(Length::Fill),
             text(format!(
                 "{} words  |  {} para  |  ~{:.1} pages  |  ~{:.0} min read{}",
-                word_count, para_count, word_count as f64 / 250.0, reading_min, session_str
+                word_count, para_count, word_count as f64 / crate::core::WORDS_PER_PAGE as f64, reading_min, session_str
             ))
                 .size(11)
                 .color(iced::Color::from_rgba(1.0, 1.0, 1.0, 0.4)),

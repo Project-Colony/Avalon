@@ -171,7 +171,7 @@ impl PlaceholderContext {
             author: author.to_string(),
             word_count,
             char_count,
-            page_count: (word_count / 250).max(if word_count > 0 { 1 } else { 0 }),
+            page_count: (word_count / crate::core::WORDS_PER_PAGE).max(if word_count > 0 { 1 } else { 0 }),
         }
     }
 

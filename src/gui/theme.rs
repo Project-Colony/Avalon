@@ -851,7 +851,7 @@ pub fn format_time(minutes: f64) -> String {
 
 /// Format a reading time estimate from word count
 pub fn reading_time(word_count: usize) -> String {
-    let minutes = word_count as f64 / 250.0;
+    let minutes = word_count as f64 / crate::core::READING_WPM;
     if minutes < 1.0 {
         "<1m read".to_string()
     } else if minutes < 60.0 {

@@ -4,6 +4,17 @@ pub const OUTPUT_DIR_NAME: &str = "Scrinever Output";
 pub const IMPORT_DIR_NAME: &str = "Scrinever Import";
 pub const BACKUPS_DIR_NAME: &str = "Scrinever Backups";
 
+// Standard typographical constants
+/// Average words per page (standard manuscript page).
+/// Used for page-count estimation and reading-time calculations.
+pub const WORDS_PER_PAGE: usize = 250;
+
+/// Average reading speed in words per minute.
+pub const READING_WPM: f64 = 250.0;
+
+/// Average speaking speed in words per minute.
+pub const SPEAKING_WPM: f64 = 150.0;
+
 // Core data structures
 pub mod project;
 pub mod binder;

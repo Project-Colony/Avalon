@@ -35,8 +35,8 @@ pub fn view(
 
     let progress = stats.progress_string(target_words);
 
-    // Reading time estimate (250 wpm average)
-    let reading_min = stats.word_count as f64 / 250.0;
+    // Reading time estimate
+    let reading_min = stats.word_count as f64 / crate::core::READING_WPM;
     let reading_display = if reading_min < 1.0 {
         "<1m read".to_string()
     } else if reading_min < 60.0 {

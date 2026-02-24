@@ -3694,8 +3694,8 @@ impl ScrineverApp {
                     .map(|d| d.words_written)
                     .unwrap_or(0),
                 total_time_hours: project.writing_history.total_time_seconds() as f64 / 3600.0,
-                reading_time_minutes: stats.word_count as f64 / 250.0,
-                speaking_time_minutes: stats.word_count as f64 / 150.0,
+                reading_time_minutes: stats.word_count as f64 / crate::core::READING_WPM,
+                speaking_time_minutes: stats.word_count as f64 / crate::core::SPEAKING_WPM,
                 target_words: project.settings.target_word_count,
                 deadline: project.settings.target_deadline.clone(),
                 days_remaining: project.settings.target_deadline.as_ref()

@@ -38,7 +38,7 @@ impl QuickRefData {
             .map_or(0, |d| d.paragraph_count());
         let modified_at = item.document.as_ref()
             .map_or_else(String::new, |d| d.modified_at.format("%Y-%m-%d %H:%M").to_string());
-        let reading_time = word_count as f64 / 250.0;
+        let reading_time = word_count as f64 / crate::core::READING_WPM;
 
         let status = item.metadata.status.as_ref()
             .map_or_else(String::new, |s| s.name.clone());

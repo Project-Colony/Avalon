@@ -83,7 +83,7 @@ pub fn view(items: &[&BinderItem], parent_title: &str) -> Element<'static, Messa
                 .size(10)
                 .color(Theme::TEXT_MUTED),
             Space::with_width(Length::Fill),
-            text(format!("{:.1} pages", total_words as f64 / 250.0))
+            text(format!("{:.1} pages", total_words as f64 / crate::core::WORDS_PER_PAGE as f64))
                 .size(10)
                 .color(Theme::TEXT_MUTED),
         ]
