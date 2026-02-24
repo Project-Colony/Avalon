@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
@@ -260,7 +261,7 @@ impl SaveKind {
 #[derive(Debug)]
 pub struct SaveQueue {
     /// Pending save operations
-    pending: Vec<SaveOperation>,
+    pending: VecDeque<SaveOperation>,
     /// Maximum queue size before forcing a save
     max_queue_size: usize,
 }
@@ -287,7 +288,7 @@ pub enum SaveKind {
 impl SaveQueue {
     pub fn new() -> Self {
         Self {
-            pending: Vec::new(),
+            pending: VecDeque::new(),
             max_queue_size: 5,
         }
     }
@@ -296,26 +297,21 @@ impl SaveQueue {
     pub fn enqueue(&mut self, path: &Path, kind: SaveKind) {
         // Replace any existing pending save of the same kind
         self.pending.retain(|op| op.kind != kind);
-        self.pending.push(SaveOperation {
+        self.pending.push_back(SaveOperation {
             project_path: path.to_path_buf(),
             timestamp: Instant::now(),
             kind,
         });
 
-        // If queue is too large, keep only the most recent
-        if self.pending.len() > self.max_queue_size {
-            let drain_count = self.pending.len() - self.max_queue_size;
-            self.pending.drain(..drain_count);
+        // If queue is too large, drop oldest entries from the front
+        while self.pending.len() > self.max_queue_size {
+            self.pending.pop_front();
         }
     }
 
-    /// Get the next pending save (FIFO)
+    /// Get the next pending save (FIFO, O(1))
     pub fn dequeue(&mut self) -> Option<SaveOperation> {
-        if self.pending.is_empty() {
-            None
-        } else {
-            Some(self.pending.remove(0))
-        }
+        self.pending.pop_front()
     }
 
     /// Check if there are pending saves
@@ -341,12 +337,14 @@ impl SaveQueue {
     /// Reorder the queue so that priority saves (manual, pre-close, pre-compile)
     /// come before auto-saves
     pub fn prioritize(&mut self) {
-        self.pending.sort_by_key(|op| match op.kind {
+        let mut vec: Vec<_> = self.pending.drain(..).collect();
+        vec.sort_by_key(|op| match op.kind {
             SaveKind::PreClose => 0,
             SaveKind::Manual => 1,
             SaveKind::PreCompile => 2,
             SaveKind::AutoSave => 3,
         });
+        self.pending = vec.into();
     }
 
     /// Get all pending save kinds
