@@ -185,16 +185,6 @@ pub fn estimate_output_size(contents: &[CompileContent], options: &CompileOption
     base + front_matter + content_size
 }
 
-/// Count total words across all content sections
-pub fn word_count(contents: &[CompileContent]) -> usize {
-    compiler::total_word_count(contents)
-}
-
-/// Count total characters across all content sections
-pub fn char_count(contents: &[CompileContent]) -> usize {
-    contents.iter().map(|c| c.text.len()).sum()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -295,24 +285,6 @@ mod tests {
         assert!(separator_rtf(&SeparatorType::SectionBreak).contains("* * *"));
         assert!(separator_rtf(&SeparatorType::None).is_empty());
         assert!(separator_rtf(&SeparatorType::Custom("---".to_string())).contains("---"));
-    }
-
-    #[test]
-    fn test_word_count() {
-        let contents = vec![
-            make_content("Ch1", "one two three", false),
-            make_content("Ch2", "four five", false),
-        ];
-        assert_eq!(word_count(&contents), 5);
-    }
-
-    #[test]
-    fn test_char_count_fn() {
-        let contents = vec![
-            make_content("Ch1", "abc", false),
-            make_content("Ch2", "de", false),
-        ];
-        assert_eq!(char_count(&contents), 5);
     }
 
     #[test]
@@ -433,18 +405,6 @@ mod tests {
     }
 
     #[test]
-    fn test_word_count_empty() {
-        let contents: Vec<CompileContent> = vec![];
-        assert_eq!(word_count(&contents), 0);
-    }
-
-    #[test]
-    fn test_char_count_empty() {
-        let contents: Vec<CompileContent> = vec![];
-        assert_eq!(char_count(&contents), 0);
-    }
-
-    #[test]
     fn test_compile_empty_paragraphs() {
         let options = make_options();
         let contents = vec![make_content("Ch1", "First\n\n\n\nSecond", false)];
@@ -562,15 +522,6 @@ mod tests {
         options.font_family = "Georgia".to_string();
         let result = compile(&[], &options).unwrap();
         assert!(result.contains("Georgia"));
-    }
-
-    #[test]
-    fn test_word_count_with_formatting() {
-        let contents = vec![
-            make_content("Ch1", "**bold** and *italic* words", false),
-        ];
-        // word_count counts raw text split_whitespace, so formatting markers count
-        assert!(word_count(&contents) >= 4);
     }
 
     #[test]

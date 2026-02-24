@@ -294,17 +294,6 @@ fn find_closing_single(chars: &[char], start: usize, c: char) -> Option<usize> {
     (start..chars.len()).find(|&i| chars[i] == c)
 }
 
-/// Count total words across all content sections
-pub fn word_count(contents: &[CompileContent]) -> usize {
-    compiler::total_word_count(contents)
-}
-
-/// Estimate page count (LaTeX with double spacing, A4, 1-inch margins ~ 250 words/page)
-pub fn estimate_pages(contents: &[CompileContent]) -> usize {
-    let total_words = word_count(contents);
-    (total_words / crate::core::WORDS_PER_PAGE).max(1)
-}
-
 /// Estimate the output size in bytes for a LaTeX compilation
 pub fn estimate_output_size(contents: &[CompileContent], options: &CompileOptions) -> usize {
     // LaTeX preamble ~600 bytes
@@ -434,13 +423,6 @@ mod tests {
     }
 
     #[test]
-    fn test_word_count_and_pages() {
-        let contents = vec![make_content("A", &"word ".repeat(500), false, 0)];
-        assert_eq!(word_count(&contents), 500);
-        assert_eq!(estimate_pages(&contents), 2);
-    }
-
-    #[test]
     fn test_required_packages() {
         let pkgs = required_packages();
         assert!(pkgs.contains(&"inputenc"));
@@ -554,18 +536,6 @@ mod tests {
         opts.include_front_matter = false;
         let size_no = estimate_output_size(&contents, &opts);
         assert!(size_fm > size_no);
-    }
-
-    #[test]
-    fn test_word_count_empty() {
-        let contents: Vec<CompileContent> = vec![];
-        assert_eq!(word_count(&contents), 0);
-    }
-
-    #[test]
-    fn test_estimate_pages_empty() {
-        let contents: Vec<CompileContent> = vec![];
-        assert_eq!(estimate_pages(&contents), 1);
     }
 
     #[test]
@@ -765,18 +735,6 @@ mod tests {
         assert!(pkgs.contains(&"graphicx"));
         assert!(pkgs.contains(&"longtable"));
         assert!(pkgs.contains(&"enumitem"));
-    }
-
-    #[test]
-    fn test_word_count_empty_text() {
-        let contents = vec![make_content("A", "", false, 0)];
-        assert_eq!(word_count(&contents), 0);
-    }
-
-    #[test]
-    fn test_estimate_pages_short_text() {
-        let contents = vec![make_content("A", "one two three", false, 0)];
-        assert_eq!(estimate_pages(&contents), 1); // min 1
     }
 
     #[test]

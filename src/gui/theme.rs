@@ -823,27 +823,3 @@ pub fn progress_bar_text(pct: f64, width: usize) -> String {
     )
 }
 
-/// Format minutes into a human-readable time string
-pub fn format_time(minutes: f64) -> String {
-    if minutes < 1.0 {
-        format!("{:.0}s", minutes * 60.0)
-    } else if minutes < 60.0 {
-        format!("{:.0}m", minutes)
-    } else {
-        let hours = (minutes / 60.0).floor();
-        let mins = minutes - hours * 60.0;
-        format!("{:.0}h {:.0}m", hours, mins)
-    }
-}
-
-/// Format a reading time estimate from word count
-pub fn reading_time(word_count: usize) -> String {
-    let minutes = word_count as f64 / crate::core::READING_WPM;
-    if minutes < 1.0 {
-        "<1m read".to_string()
-    } else if minutes < 60.0 {
-        format!("~{:.0}m read", minutes)
-    } else {
-        format!("~{:.1}h read", minutes / 60.0)
-    }
-}

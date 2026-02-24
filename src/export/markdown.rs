@@ -94,24 +94,6 @@ fn escape_yaml(s: &str) -> String {
 
 fn slug(title: &str) -> String { compiler::slug(title) }
 
-/// Count total words across all content sections
-pub fn word_count(contents: &[CompileContent]) -> usize {
-    compiler::total_word_count(contents)
-}
-
-/// Count total characters across all content sections
-pub fn char_count(contents: &[CompileContent]) -> usize {
-    contents.iter().map(|c| c.text.len()).sum()
-}
-
-/// Estimate page count from content
-pub fn estimate_pages(contents: &[CompileContent]) -> usize {
-    let total_words: usize = contents.iter()
-        .map(|c| c.text.split_whitespace().count())
-        .sum();
-    (total_words / crate::core::WORDS_PER_PAGE).max(1)
-}
-
 /// Extract all headings from markdown content for analysis
 pub fn extract_headings(contents: &[CompileContent]) -> Vec<(usize, String)> {
     let mut headings = Vec::new();
@@ -209,15 +191,6 @@ mod tests {
         assert_eq!(escape_yaml("plain"), "plain");
         assert_eq!(escape_yaml("with \"quotes\""), "with \\\"quotes\\\"");
         assert_eq!(escape_yaml("back\\slash"), "back\\\\slash");
-    }
-
-    #[test]
-    fn test_word_count() {
-        let contents = vec![
-            make_content("A", "one two three", false, 0),
-            make_content("B", "four five", false, 0),
-        ];
-        assert_eq!(word_count(&contents), 5);
     }
 
     #[test]
@@ -368,29 +341,6 @@ mod tests {
     }
 
     #[test]
-    fn test_char_count() {
-        let contents = vec![
-            make_content("A", "hello", false, 0),
-            make_content("B", "world", false, 0),
-        ];
-        assert_eq!(char_count(&contents), 10);
-    }
-
-    #[test]
-    fn test_estimate_pages() {
-        let contents = vec![
-            make_content("A", &"word ".repeat(750), false, 0),
-        ];
-        assert_eq!(estimate_pages(&contents), 3);
-    }
-
-    #[test]
-    fn test_estimate_pages_empty() {
-        let contents: Vec<CompileContent> = vec![];
-        assert_eq!(estimate_pages(&contents), 1);
-    }
-
-    #[test]
     fn test_extract_headings_from_inline() {
         let contents = vec![
             make_content("Scene", "# Title\n## Sub\nText\n### Deep", false, 0),
@@ -407,11 +357,5 @@ mod tests {
         let contents: Vec<CompileContent> = vec![];
         let headings = extract_headings(&contents);
         assert!(headings.is_empty());
-    }
-
-    #[test]
-    fn test_word_count_empty() {
-        let contents: Vec<CompileContent> = vec![];
-        assert_eq!(word_count(&contents), 0);
     }
 }

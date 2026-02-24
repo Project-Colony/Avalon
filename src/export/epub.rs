@@ -255,11 +255,6 @@ pub fn estimate_file_size(contents: &[CompileContent], options: &CompileOptions)
     overhead + front_matter + content_size + chapters * 500
 }
 
-/// Count total words across all ePub content
-pub fn word_count(contents: &[CompileContent]) -> usize {
-    compiler::total_word_count(contents)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -330,21 +325,6 @@ mod tests {
         let contents = vec![make_content("A", "some text here", false, 0)];
         let size = estimate_file_size(&contents, &make_opts());
         assert!(size > 3000); // base overhead
-    }
-
-    #[test]
-    fn test_word_count() {
-        let contents = vec![
-            make_content("A", "one two three", false, 0),
-            make_content("B", "four", false, 0),
-        ];
-        assert_eq!(word_count(&contents), 4);
-    }
-
-    #[test]
-    fn test_word_count_empty() {
-        let contents: Vec<CompileContent> = vec![];
-        assert_eq!(word_count(&contents), 0);
     }
 
     #[test]
@@ -429,22 +409,6 @@ mod tests {
     fn test_escape_xml_already_safe() {
         let text = "Hello World 123";
         assert_eq!(escape_xml(text), text);
-    }
-
-    #[test]
-    fn test_word_count_whitespace_only() {
-        let contents = vec![make_content("A", "   \n\t  ", false, 0)];
-        assert_eq!(word_count(&contents), 0);
-    }
-
-    #[test]
-    fn test_word_count_with_folders() {
-        let contents = vec![
-            make_content("Folder", "", true, 0),
-            make_content("Scene", "one two three", false, 1),
-        ];
-        // Folders have no text, only Scene has words
-        assert_eq!(word_count(&contents), 3);
     }
 
     #[test]
