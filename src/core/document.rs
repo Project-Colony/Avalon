@@ -1,4 +1,5 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, BinaryHeap, HashMap, HashSet};
+use std::cmp::Reverse;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
@@ -239,13 +240,25 @@ impl Document {
         freq
     }
 
-    /// Get the N most frequent words
+    /// Get the N most frequent words using a bounded min-heap for O(n log k) instead of O(n log n)
     pub fn most_frequent_words(&self, n: usize) -> Vec<(String, usize)> {
+        if n == 0 {
+            return Vec::new();
+        }
         let freq = self.word_frequency();
-        let mut pairs: Vec<(String, usize)> = freq.into_iter().collect();
-        pairs.sort_by(|a, b| b.1.cmp(&a.1));
-        pairs.truncate(n);
-        pairs
+        // Use a min-heap of size n to find top-N in O(n log k)
+        let mut heap: BinaryHeap<Reverse<(usize, String)>> = BinaryHeap::with_capacity(n + 1);
+        for (word, count) in freq {
+            heap.push(Reverse((count, word)));
+            if heap.len() > n {
+                heap.pop();
+            }
+        }
+        let mut result: Vec<(String, usize)> = heap.into_iter()
+            .map(|Reverse((count, word))| (word, count))
+            .collect();
+        result.sort_by(|a, b| b.1.cmp(&a.1));
+        result
     }
 
     /// Count occurrences of a word (case-insensitive)

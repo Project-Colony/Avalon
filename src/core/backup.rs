@@ -99,7 +99,9 @@ impl BackupManager {
         if backups.len() > keep {
             let to_remove = backups.split_off(keep);
             for entry in to_remove {
-                let _ = fs::remove_file(&entry.path);
+                if let Err(e) = fs::remove_file(&entry.path) {
+                    log::warn!("Failed to prune old backup {:?}: {}", entry.path, e);
+                }
             }
         }
         Ok(())

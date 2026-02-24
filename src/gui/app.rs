@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt::Write;
+use std::path::PathBuf;
 use iced::keyboard;
 use iced::widget::{column, container, row, stack, text, text_editor, Space};
 use iced::{Element, Length, Padding, Subscription, Task as IcedTask};
@@ -19,6 +20,18 @@ use crate::thesaurus::Thesaurus;
 
 use super::theme::Theme;
 use super::views;
+
+// ========== Timing constants ==========
+/// How often (in auto-save ticks) to check word count milestones
+const MILESTONE_CHECK_INTERVAL: u32 = 5;
+/// How often (in seconds) to check daily goal progress
+const DAILY_GOAL_CHECK_INTERVAL: u64 = 10;
+/// How often (in seconds) to record writing history
+const HISTORY_RECORD_INTERVAL: u64 = 60;
+/// How often (in auto-save ticks) to auto-refresh smart collections
+const COLLECTION_REFRESH_INTERVAL: u32 = 30;
+/// Pomodoro break reminder time in seconds (25 minutes)
+const POMODORO_BREAK_SECONDS: u64 = 1500;
 
 /// The active view mode
 #[derive(Debug, Clone, PartialEq)]
@@ -1241,6 +1254,7 @@ impl ScrineverApp {
                         search_content: true,
                         search_notes: true,
                         search_synopsis: true,
+                        ..Default::default()
                     };
                     self.search_results = search::search_binder(&project.binder, &options);
                 }
@@ -1274,6 +1288,7 @@ impl ScrineverApp {
                         search_content: true,
                         search_notes: false,
                         search_synopsis: false,
+                        ..Default::default()
                     };
 
                     let mut count = 0;
@@ -2804,6 +2819,7 @@ impl ScrineverApp {
                             search_content: true,
                             search_notes: false,
                             search_synopsis: true,
+                            ..Default::default()
                         };
                         let results = crate::core::search::search_binder(&project.binder, &options);
                         for result in &results {
@@ -2820,9 +2836,11 @@ impl ScrineverApp {
             Message::ExportOpml => {
                 self.sync_editor_to_project();
                 if let Some(ref project) = self.project {
-                    let home = dirs::home_dir().unwrap_or_default();
+                    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                     let output_dir = home.join("Scrinever Output");
-                    let _ = std::fs::create_dir_all(&output_dir);
+                    if let Err(e) = std::fs::create_dir_all(&output_dir) {
+                        log::warn!("Failed to create output directory: {}", e);
+                    }
                     let filename = format!("{}.opml", project.title.replace(' ', "_"));
                     let output_path = output_dir.join(&filename);
 
@@ -2858,10 +2876,12 @@ impl ScrineverApp {
                                 depth: 0,
                             }];
                             let opts = CompileOptions { title: item.title.clone(), ..CompileOptions::default() };
-                            let home = dirs::home_dir().unwrap_or_default();
+                            let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                             let print_path = home.join("Scrinever Projects").join("print.pdf");
                             if let Some(parent) = print_path.parent() {
-                                let _ = std::fs::create_dir_all(parent);
+                                if let Err(e) = std::fs::create_dir_all(parent) {
+                                    log::warn!("Failed to create print directory: {}", e);
+                                }
                             }
                             match crate::export::pdf::save_pdf(&contents, &opts, &print_path) {
                                 Ok(_) => {
@@ -2881,10 +2901,12 @@ impl ScrineverApp {
                 if let Some(ref project) = self.project {
                     let mut opts = self.compile_options.clone();
                     opts.format = crate::export::compiler::OutputFormat::Pdf;
-                    let home = dirs::home_dir().unwrap_or_default();
+                    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
                     let print_path = home.join("Scrinever Projects").join(format!("{}_print.pdf", project.title));
                     if let Some(parent) = print_path.parent() {
-                        let _ = std::fs::create_dir_all(parent);
+                        if let Err(e) = std::fs::create_dir_all(parent) {
+                            log::warn!("Failed to create print directory: {}", e);
+                        }
                     }
                     match crate::export::compiler::Compiler::save_to_file(&project.binder, &opts, &print_path) {
                         Ok(_) => {
@@ -3075,6 +3097,7 @@ impl ScrineverApp {
                                 search_content: true,
                                 search_notes: false,
                                 search_synopsis: true,
+                                ..Default::default()
                             };
                             let results = crate::core::search::search_binder(&project.binder, &options);
                             let item_ids: Vec<Uuid> = results.iter().map(|r| r.item_id).collect();
@@ -3447,8 +3470,8 @@ impl ScrineverApp {
                     }
                 }
 
-                // Word count milestone detection (every 5 seconds)
-                if self.auto_save_counter.is_multiple_of(5) {
+                // Word count milestone detection
+                if self.auto_save_counter.is_multiple_of(MILESTONE_CHECK_INTERVAL) {
                     if let Some(ref project) = self.project {
                         let total_words = project.binder.total_word_count();
                         let milestones = [1000, 5000, 10000, 25000, 50000, 75000, 100000, 150000, 200000];
@@ -3487,10 +3510,10 @@ impl ScrineverApp {
                     }
 
                     // Check daily goal milestone
-                    if self.daily_goal > 0 && self.session_stats.time_elapsed_seconds.is_multiple_of(10) {
+                    if self.daily_goal > 0 && self.session_stats.time_elapsed_seconds.is_multiple_of(DAILY_GOAL_CHECK_INTERVAL) {
                         let words_today = self.session_stats.words_written;
                         let daily_goal = self.daily_goal as i64;
-                        if words_today >= daily_goal && (words_today - 10) < daily_goal {
+                        if words_today >= daily_goal && (words_today - DAILY_GOAL_CHECK_INTERVAL as i64) < daily_goal {
                             self.notification = Some(format!(
                                 "\u{f00c} Daily goal of {} words reached!",
                                 self.daily_goal
@@ -3498,15 +3521,15 @@ impl ScrineverApp {
                         }
                     }
 
-                    // Record writing history every 60 seconds
-                    if self.session_stats.time_elapsed_seconds.is_multiple_of(60) {
+                    // Record writing history periodically
+                    if self.session_stats.time_elapsed_seconds.is_multiple_of(HISTORY_RECORD_INTERVAL) {
                         if let Some(ref mut project) = self.project {
-                            project.writing_history.record(current_words, 60);
+                            project.writing_history.record(current_words, HISTORY_RECORD_INTERVAL);
                         }
                     }
 
                     // Pomodoro break reminder at 25 min
-                    if self.session_stats.time_elapsed_seconds == 1500 && self.notification.is_none() {
+                    if self.session_stats.time_elapsed_seconds == POMODORO_BREAK_SECONDS && self.notification.is_none() {
                         self.notification = Some(
                             "\u{f0f4} 25 minutes of writing! Consider a short break.".to_string()
                         );
@@ -3527,7 +3550,7 @@ impl ScrineverApp {
                     }
 
                 // Auto-refresh smart collections every 30 seconds when collections panel is open
-                if self.bottom_panel == BottomPanel::Collections && self.auto_save_counter.is_multiple_of(30) {
+                if self.bottom_panel == BottomPanel::Collections && self.auto_save_counter.is_multiple_of(COLLECTION_REFRESH_INTERVAL) {
                     if let Some(ref mut project) = self.project {
                         for coll in &mut project.collections {
                             if let crate::core::collection::CollectionKind::Search { ref query, case_sensitive, whole_word } = coll.kind {
@@ -3540,6 +3563,7 @@ impl ScrineverApp {
                                     search_content: true,
                                     search_notes: false,
                                     search_synopsis: true,
+                                    ..Default::default()
                                 };
                                 let results = crate::core::search::search_binder(&project.binder, &options);
                                 let item_ids: Vec<Uuid> = results.iter().map(|r| r.item_id).collect();

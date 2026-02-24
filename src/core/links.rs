@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 use super::binder::{Binder, BinderItem};
 
@@ -83,10 +83,29 @@ pub fn extract_links(content: &str) -> Vec<DocLink> {
     links
 }
 
+/// Build a title-to-IDs index for O(1) link resolution
+fn build_title_index(all_items: &[&BinderItem]) -> HashMap<String, Vec<Uuid>> {
+    let mut index: HashMap<String, Vec<Uuid>> = HashMap::new();
+    for item in all_items {
+        index.entry(item.title.clone()).or_default().push(item.id);
+    }
+    index
+}
+
 /// Validate all links in a single document against the binder
 pub fn validate_document_links(
     item: &BinderItem,
     binder: &Binder,
+) -> Vec<LinkValidation> {
+    let all_items = binder.all_items();
+    let title_index = build_title_index(&all_items);
+    validate_document_links_with_index(item, &title_index)
+}
+
+/// Validate all links in a single document using a pre-built title index (avoids repeated traversals)
+fn validate_document_links_with_index(
+    item: &BinderItem,
+    title_index: &HashMap<String, Vec<Uuid>>,
 ) -> Vec<LinkValidation> {
     let doc = match &item.document {
         Some(d) => d,
@@ -94,13 +113,12 @@ pub fn validate_document_links(
     };
 
     let links = extract_links(&doc.content);
-    let all_items = binder.all_items();
 
     links.into_iter().map(|link| {
-        let matches: Vec<Uuid> = all_items.iter()
-            .filter(|i| i.title == link.link_text && i.id != item.id)
-            .map(|i| i.id)
-            .collect();
+        let matches: Vec<Uuid> = title_index
+            .get(&link.link_text)
+            .map(|ids| ids.iter().copied().filter(|id| *id != item.id).collect())
+            .unwrap_or_default();
 
         let status = match matches.len() {
             0 => LinkStatus::Broken,
@@ -118,10 +136,12 @@ pub fn validate_document_links(
 
 /// Validate all links across the entire project
 pub fn validate_all_links(binder: &Binder) -> Vec<LinkValidation> {
+    let all_items = binder.all_items();
+    let title_index = build_title_index(&all_items);
     let mut all_validations = Vec::new();
 
-    for item in binder.all_items() {
-        let validations = validate_document_links(item, binder);
+    for item in &all_items {
+        let validations = validate_document_links_with_index(item, &title_index);
         all_validations.extend(validations);
     }
 
@@ -130,14 +150,21 @@ pub fn validate_all_links(binder: &Binder) -> Vec<LinkValidation> {
 
 /// Get a summary of link health for the project
 pub fn link_health_summary(binder: &Binder) -> LinkHealthSummary {
-    let validations = validate_all_links(binder);
+    let all_items = binder.all_items();
+    let title_index = build_title_index(&all_items);
 
-    let total = validations.len();
-    let valid = validations.iter().filter(|v| matches!(v.status, LinkStatus::Valid(_))).count();
-    let ambiguous = validations.iter().filter(|v| matches!(v.status, LinkStatus::Ambiguous(_))).count();
+    let mut all_validations = Vec::new();
+    for item in &all_items {
+        let validations = validate_document_links_with_index(item, &title_index);
+        all_validations.extend(validations);
+    }
+
+    let total = all_validations.len();
+    let valid = all_validations.iter().filter(|v| matches!(v.status, LinkStatus::Valid(_))).count();
+    let ambiguous = all_validations.iter().filter(|v| matches!(v.status, LinkStatus::Ambiguous(_))).count();
 
     // Collect broken links for reporting
-    let broken_links: Vec<BrokenLink> = validations.iter()
+    let broken_links: Vec<BrokenLink> = all_validations.iter()
         .filter(|v| v.status == LinkStatus::Broken)
         .map(|v| BrokenLink {
             source_id: v.source_id,
@@ -146,9 +173,8 @@ pub fn link_health_summary(binder: &Binder) -> LinkHealthSummary {
         })
         .collect();
 
-    // Find orphan documents (no incoming links)
-    let all_items = binder.all_items();
-    let linked_ids: HashSet<Uuid> = validations.iter()
+    // Find orphan documents (no incoming links) — reuse all_items from above
+    let linked_ids: HashSet<Uuid> = all_validations.iter()
         .filter_map(|v| match &v.status {
             LinkStatus::Valid(id) => Some(*id),
             _ => None,
@@ -263,7 +289,9 @@ pub fn suggest_link_targets(broken_title: &str, binder: &Binder) -> Vec<String> 
         })
         .collect();
 
-    suggestions.sort_by_key(|(_, dist)| *dist);
+    // Deduplicate by title (multiple items can share a title)
+    suggestions.sort_by(|(a_title, a_dist), (b_title, b_dist)| a_dist.cmp(b_dist).then(a_title.cmp(b_title)));
+    suggestions.dedup_by(|(a, _), (b, _)| a == b);
     suggestions.into_iter().map(|(t, _)| t).take(5).collect()
 }
 

@@ -126,7 +126,9 @@ impl RecentProjects {
 
     /// Load from config file
     pub fn load() -> Self {
-        let path = Self::config_path();
+        let Some(path) = Self::config_path() else {
+            return Self::default();
+        };
         if path.exists() {
             if let Ok(data) = std::fs::read_to_string(&path) {
                 if let Ok(recent) = serde_json::from_str(&data) {
@@ -139,23 +141,26 @@ impl RecentProjects {
 
     /// Save to config file
     pub fn save(&self) {
-        let path = Self::config_path();
+        let Some(path) = Self::config_path() else {
+            log::warn!("Could not determine config path; skipping recent files save");
+            return;
+        };
         if let Some(parent) = path.parent() {
             if let Err(e) = std::fs::create_dir_all(parent) {
-                eprintln!("Warning: failed to create config dir: {}", e);
+                log::warn!("Failed to create config dir: {}", e);
                 return;
             }
         }
         if let Ok(json) = serde_json::to_string_pretty(self) {
             if let Err(e) = std::fs::write(&path, json) {
-                eprintln!("Warning: failed to save recent files: {}", e);
+                log::warn!("Failed to save recent files: {}", e);
             }
         }
     }
 
-    fn config_path() -> PathBuf {
-        let home = dirs::home_dir().unwrap_or_default();
-        home.join(".config").join("scrinever").join("recent.json")
+    fn config_path() -> Option<PathBuf> {
+        let home = dirs::home_dir()?;
+        Some(home.join(".config").join("scrinever").join("recent.json"))
     }
 
     /// Get projects opened within the last N days

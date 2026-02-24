@@ -98,7 +98,7 @@ impl Project {
         let presets_path = project_dir.join("compile_presets.json");
         if let Ok(json) = serde_json::to_string_pretty(&self.compile_presets) {
             if let Err(e) = fs::write(&presets_path, json) {
-                eprintln!("Warning: failed to save compile presets: {}", e);
+                log::warn!("Failed to save compile presets: {}", e);
             }
         }
 
