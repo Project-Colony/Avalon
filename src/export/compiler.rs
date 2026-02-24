@@ -1531,7 +1531,7 @@ mod tests {
         ];
         let stats = CompileStatistics::from_contents(&contents);
         assert_eq!(stats.estimated_pages, 4); // 1000 / 250
-        assert_eq!(stats.estimated_reading_minutes, 5); // 1000 / 200
+        assert_eq!(stats.estimated_reading_minutes, 4); // 1000 / 250
     }
 
     // ---- New: OutputFormat::from_extension / from_path tests ----

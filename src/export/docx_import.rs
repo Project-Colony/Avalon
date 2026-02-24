@@ -4,8 +4,9 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use zip::ZipArchive;
 
-use crate::core::binder::{BinderItem, BinderItemKind};
-use crate::core::document::Document;
+use crate::core::binder::BinderItem;
+#[cfg(test)]
+use crate::core::binder::BinderItemKind;
 
 // ---------------------------------------------------------------------------
 // Internal XML parsing helpers

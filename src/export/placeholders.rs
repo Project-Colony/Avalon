@@ -649,7 +649,7 @@ mod tests {
             char_count: 5000,
             page_count: 4,
         };
-        assert_eq!(ctx.estimated_reading_time(), 5); // 1000/200 = 5
+        assert_eq!(ctx.estimated_reading_time(), 4); // 1000/250 = 4
     }
 
     #[test]

@@ -260,7 +260,7 @@ mod tests {
     #[test]
     fn test_display_size_bytes() {
         let entry = make_entry("test.backup.json", "20260101_120000", 500);
-        assert_eq!(entry.display_size(), "500 B");
+        assert_eq!(entry.display_size(), "500 bytes");
     }
 
     #[test]
@@ -325,8 +325,8 @@ mod tests {
 
     #[test]
     fn test_format_bytes_static() {
-        assert_eq!(BackupEntry::format_bytes(0), "0 B");
-        assert_eq!(BackupEntry::format_bytes(512), "512 B");
+        assert_eq!(BackupEntry::format_bytes(0), "0 bytes");
+        assert_eq!(BackupEntry::format_bytes(512), "512 bytes");
         assert_eq!(BackupEntry::format_bytes(1024), "1.0 KB");
         assert_eq!(BackupEntry::format_bytes(1024 * 1024), "1.0 MB");
     }
@@ -369,7 +369,7 @@ mod tests {
     #[test]
     fn test_display_size_boundary_kb() {
         let entry = make_entry("test.backup.json", "20260101_120000", 1023);
-        assert!(entry.display_size().contains("B"));
+        assert!(entry.display_size().contains("bytes"));
 
         let entry2 = make_entry("test.backup.json", "20260101_120000", 1024);
         assert!(entry2.display_size().contains("KB"));
@@ -387,7 +387,7 @@ mod tests {
     #[test]
     fn test_display_size_zero() {
         let entry = make_entry("test.backup.json", "20260101_120000", 0);
-        assert_eq!(entry.display_size(), "0 B");
+        assert_eq!(entry.display_size(), "0 bytes");
     }
 
     #[test]

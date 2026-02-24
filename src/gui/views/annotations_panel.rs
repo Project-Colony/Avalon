@@ -1,8 +1,6 @@
 use iced::widget::{button, column, container, row, scrollable, text, text_input, Space};
 use iced::{Element, Length, Padding};
-use uuid::Uuid;
-
-use crate::core::annotation::{Annotation, AnnotationColor};
+use crate::core::annotation::Annotation;
 use crate::gui::app::Message;
 use crate::gui::theme::{self, Theme};
 

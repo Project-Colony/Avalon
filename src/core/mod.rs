@@ -27,7 +27,7 @@ pub fn format_bytes(bytes: u64) -> String {
     const MB: u64 = 1024 * 1024;
     const GB: u64 = 1024 * 1024 * 1024;
     if bytes < KB {
-        format!("{} B", bytes)
+        format!("{} bytes", bytes)
     } else if bytes < MB {
         format!("{:.1} KB", bytes as f64 / KB as f64)
     } else if bytes < GB {

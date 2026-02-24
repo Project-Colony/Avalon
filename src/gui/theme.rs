@@ -823,11 +823,6 @@ pub fn progress_bar_text(pct: f64, width: usize) -> String {
     )
 }
 
-/// Format byte sizes into human-readable strings
-pub fn format_size(bytes: u64) -> String {
-    crate::core::format_bytes(bytes)
-}
-
 /// Format minutes into a human-readable time string
 pub fn format_time(minutes: f64) -> String {
     if minutes < 1.0 {

@@ -9,7 +9,7 @@ use crate::gui::theme::{self, Theme};
 pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Message> {
     let backup_count = backups.len();
     let total_size: u64 = backups.iter().map(|b| b.size_bytes).sum();
-    let total_size_str = format_size(total_size);
+    let total_size_str = crate::core::format_bytes(total_size);
 
     let header = row![
         text("BACKUP MANAGEMENT").size(11).color(Theme::TEXT_SECONDARY),
@@ -148,7 +148,3 @@ fn parse_age_from_timestamp(ts: &str) -> String {
     }
 }
 
-/// Format byte size into human-readable string
-fn format_size(bytes: u64) -> String {
-    crate::core::format_bytes(bytes)
-}

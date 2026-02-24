@@ -2,7 +2,9 @@ use std::path::Path;
 use anyhow::Result;
 use printpdf::*;
 
-use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
+use super::compiler::{self, CompileContent, CompileOptions};
+#[cfg(test)]
+use super::compiler::SeparatorType;
 
 pub fn save_pdf(contents: &[CompileContent], options: &CompileOptions, path: &Path) -> Result<()> {
     let (doc, page1, layer1) = PdfDocument::new(

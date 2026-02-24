@@ -1,7 +1,7 @@
 use std::fmt::Write;
 use anyhow::Result;
 
-use crate::core::binder::{Binder, BinderItem, BinderItemKind};
+use crate::core::binder::{Binder, BinderItem};
 
 /// Export the project binder as OPML (Outline Processor Markup Language)
 pub fn export_opml(binder: &Binder, title: &str) -> Result<String> {
