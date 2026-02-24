@@ -3472,7 +3472,7 @@ impl ScrineverApp {
                 }
 
                 // Word count milestone detection
-                if self.auto_save_counter.is_multiple_of(MILESTONE_CHECK_INTERVAL) {
+                if self.auto_save_counter % MILESTONE_CHECK_INTERVAL == 0 {
                     if let Some(ref project) = self.project {
                         let total_words = project.binder.total_word_count();
                         let milestones = [1000, 5000, 10000, 25000, 50000, 75000, 100000, 150000, 200000];
@@ -3511,7 +3511,7 @@ impl ScrineverApp {
                     }
 
                     // Check daily goal milestone
-                    if self.daily_goal > 0 && self.session_stats.time_elapsed_seconds.is_multiple_of(DAILY_GOAL_CHECK_INTERVAL) {
+                    if self.daily_goal > 0 && self.session_stats.time_elapsed_seconds % DAILY_GOAL_CHECK_INTERVAL == 0 {
                         let words_today = self.session_stats.words_written;
                         let daily_goal = self.daily_goal as i64;
                         if words_today >= daily_goal && (words_today - DAILY_GOAL_CHECK_INTERVAL as i64) < daily_goal {
@@ -3523,7 +3523,7 @@ impl ScrineverApp {
                     }
 
                     // Record writing history periodically
-                    if self.session_stats.time_elapsed_seconds.is_multiple_of(HISTORY_RECORD_INTERVAL) {
+                    if self.session_stats.time_elapsed_seconds % HISTORY_RECORD_INTERVAL == 0 {
                         if let Some(ref mut project) = self.project {
                             project.writing_history.record(current_words, HISTORY_RECORD_INTERVAL);
                         }
@@ -3551,7 +3551,7 @@ impl ScrineverApp {
                     }
 
                 // Auto-refresh smart collections every 30 seconds when collections panel is open
-                if self.bottom_panel == BottomPanel::Collections && self.auto_save_counter.is_multiple_of(COLLECTION_REFRESH_INTERVAL) {
+                if self.bottom_panel == BottomPanel::Collections && self.auto_save_counter %COLLECTION_REFRESH_INTERVAL) {
                     if let Some(ref mut project) = self.project {
                         for coll in &mut project.collections {
                             if let crate::core::collection::CollectionKind::Search { ref query, case_sensitive, whole_word } = coll.kind {
