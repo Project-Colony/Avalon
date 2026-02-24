@@ -214,13 +214,7 @@ pub fn import_multiple(paths: &[&Path]) -> Vec<Result<BinderItem>> {
 pub fn media_item_summary(item: &BinderItem) -> String {
     if let Some(ref doc) = item.document {
         if let Ok(meta) = serde_json::from_str::<MediaMetadata>(&doc.notes) {
-            let size_display = if meta.file_size >= 1_048_576 {
-                format!("{:.1} MB", meta.file_size as f64 / 1_048_576.0)
-            } else if meta.file_size >= 1024 {
-                format!("{:.1} KB", meta.file_size as f64 / 1024.0)
-            } else {
-                format!("{} bytes", meta.file_size)
-            };
+            let size_display = super::format_bytes(meta.file_size);
             return format!(
                 "{} ({}, {})",
                 item.title,

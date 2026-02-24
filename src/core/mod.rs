@@ -15,6 +15,22 @@ pub const READING_WPM: f64 = 250.0;
 /// Average speaking speed in words per minute.
 pub const SPEAKING_WPM: f64 = 150.0;
 
+/// Format a byte count into a human-readable size string (e.g. "1.5 MB").
+pub fn format_bytes(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = 1024 * 1024;
+    const GB: u64 = 1024 * 1024 * 1024;
+    if bytes < KB {
+        format!("{} B", bytes)
+    } else if bytes < MB {
+        format!("{:.1} KB", bytes as f64 / KB as f64)
+    } else if bytes < GB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    }
+}
+
 // Core data structures
 pub mod project;
 pub mod binder;
