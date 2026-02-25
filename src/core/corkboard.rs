@@ -201,13 +201,13 @@ impl CorkboardState {
                     y: spacing + row as f32 * (ch + spacing),
                     width: cw,
                     height: ch,
-                    z_order: i as i32,
+                    z_order: i32::try_from(i).unwrap_or(i32::MAX),
                 }
             })
             .collect();
 
         self.cards = layouts.clone();
-        self.next_z = item_ids.len() as i32;
+        self.next_z = i32::try_from(item_ids.len()).unwrap_or(i32::MAX);
         layouts
     }
 

@@ -130,10 +130,10 @@ impl Thesaurus {
         Ok(())
     }
 
-    /// Look up a word in the thesaurus
-    pub fn lookup(&self, word: &str) -> Vec<ThesaurusEntry> {
+    /// Look up a word in the thesaurus (returns a slice to avoid cloning).
+    pub fn lookup(&self, word: &str) -> &[ThesaurusEntry] {
         let key = word.to_lowercase();
-        self.entries.get(&key).cloned().unwrap_or_default()
+        self.entries.get(&key).map(|v| v.as_slice()).unwrap_or(&[])
     }
 
     /// Check if a word has entries

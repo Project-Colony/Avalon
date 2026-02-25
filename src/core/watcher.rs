@@ -41,7 +41,10 @@ impl ProjectWatcher {
                 Ok(event) => {
                     let watch_events = Self::translate_event(&event, &project_dir);
                     for we in watch_events {
-                        let _ = sender.send(we);
+                        if sender.send(we).is_err() {
+                            log::warn!("File watcher: receiver dropped, event lost");
+                            break;
+                        }
                     }
                 }
                 Err(e) => log::warn!("File watcher error: {}", e),

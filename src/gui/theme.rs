@@ -147,6 +147,33 @@ impl Theme {
     pub const SCRIPT_DIALOGUE: Color = Color::from_rgb(0.90, 0.85, 0.70);
     pub const SCRIPT_TRANSITION: Color = Color::from_rgb(0.60, 0.60, 0.70);
 
+    // ── Layout constants ─────────────────────────────────
+    // Replaces magic numbers scattered across GUI views.
+    pub const FONT_SIZE_TINY: f32 = 9.0;
+    pub const FONT_SIZE_SMALL: f32 = 10.0;
+    pub const FONT_SIZE_LABEL: f32 = 11.0;
+    pub const FONT_SIZE_BODY: f32 = 12.0;
+    pub const FONT_SIZE_SUBTITLE: f32 = 14.0;
+    pub const FONT_SIZE_TITLE: f32 = 16.0;
+    pub const FONT_SIZE_HEADING: f32 = 20.0;
+
+    pub const SPACING_NONE: f32 = 0.0;
+    pub const SPACING_TIGHT: f32 = 2.0;
+    pub const SPACING_SMALL: f32 = 4.0;
+    pub const SPACING_MEDIUM: f32 = 8.0;
+    pub const SPACING_LARGE: f32 = 12.0;
+    pub const SPACING_XLARGE: f32 = 16.0;
+
+    pub const PADDING_INPUT: f32 = 6.0;
+    pub const PADDING_BUTTON: f32 = 5.0;
+    pub const PADDING_SECTION: f32 = 10.0;
+    pub const PADDING_PANEL: f32 = 14.0;
+
+    pub const INSPECTOR_WIDTH: f32 = 240.0;
+    pub const BINDER_WIDTH: f32 = 200.0;
+    pub const BOTTOM_PANEL_HEIGHT: f32 = 220.0;
+    pub const STATUS_BAR_HEIGHT: f32 = 28.0;
+
     /// Parse a hex color string (e.g. "#3498db") to an iced Color
     pub fn from_hex(hex: &str) -> Color {
         let hex = hex.trim_start_matches('#');
