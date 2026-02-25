@@ -288,18 +288,31 @@ impl SearchIndex {
         size
     }
 
-    /// Get the N most common terms across all documents
+    /// Get the N most common terms across all documents.
+    /// Uses a bounded min-heap for O(M log N) instead of O(M log M) full sort.
     pub fn top_terms(&self, n: usize) -> Vec<(String, usize)> {
-        let mut term_counts: Vec<(String, usize)> = self.index
-            .iter()
-            .map(|(term, entries)| {
-                let total: usize = entries.iter().map(|e| e.positions.len()).sum();
-                (term.clone(), total)
-            })
-            .collect();
-        term_counts.sort_by(|a, b| b.1.cmp(&a.1));
-        term_counts.truncate(n);
-        term_counts
+        use std::cmp::Reverse;
+        use std::collections::BinaryHeap;
+
+        if n == 0 || self.index.is_empty() {
+            return Vec::new();
+        }
+
+        let mut heap: BinaryHeap<Reverse<(usize, &str)>> = BinaryHeap::with_capacity(n + 1);
+        for (term, entries) in &self.index {
+            let total: usize = entries.iter().map(|e| e.positions.len()).sum();
+            heap.push(Reverse((total, term.as_str())));
+            if heap.len() > n {
+                heap.pop();
+            }
+        }
+
+        let mut result: Vec<(String, usize)> = Vec::with_capacity(heap.len());
+        while let Some(Reverse((count, term))) = heap.pop() {
+            result.push((term.to_string(), count));
+        }
+        result.reverse();
+        result
     }
 
     /// Get the total number of occurrences of a specific term

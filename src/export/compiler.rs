@@ -484,6 +484,69 @@ fn plain_text_compile(contents: &[CompileContent], options: &CompileOptions) -> 
     super::plain_text::compile(contents, options)
 }
 
+// ── Compile renderer trait for factoring common export logic ──
+
+/// Trait for format-specific rendering. Implement this to add a new export format
+/// without duplicating the common iteration, separator, and page-break logic.
+///
+/// The default `render` method handles the common loop over contents:
+/// front matter → (heading | separator | text)* → finalize.
+pub trait CompileRenderer {
+    /// Render the front matter / title block. Return empty string if not applicable.
+    fn render_front_matter(&self, options: &CompileOptions) -> String;
+
+    /// Render a folder heading at the given depth.
+    fn render_heading(&self, title: &str, depth: usize) -> String;
+
+    /// Render the separator between consecutive text documents.
+    fn render_separator(&self, sep: &SeparatorType) -> String;
+
+    /// Render a page break between top-level sections.
+    fn render_page_break(&self) -> String;
+
+    /// Render document text content (may apply format-specific transforms).
+    fn render_text(&self, text: &str) -> String;
+
+    /// Wrap the assembled body in any required document envelope (e.g., HTML shell).
+    fn finalize(&self, body: String, options: &CompileOptions) -> String {
+        let _ = options;
+        body
+    }
+
+    /// Default rendering pipeline using the trait methods above.
+    fn render(&self, contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
+        let estimated: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 40).sum();
+        let mut body = String::with_capacity(estimated);
+
+        if options.include_front_matter {
+            body.push_str(&self.render_front_matter(options));
+        }
+
+        let mut prev_was_text = false;
+
+        for (i, content) in contents.iter().enumerate() {
+            if content.is_folder {
+                if options.page_break_between_folders && content.depth <= 1 && i > 0 {
+                    body.push_str(&self.render_page_break());
+                }
+                body.push_str(&self.render_heading(&content.title, content.depth));
+                prev_was_text = false;
+            } else if !content.text.is_empty() {
+                if prev_was_text {
+                    body.push_str(&self.render_separator(&options.separator));
+                }
+                body.push_str(&self.render_text(&content.text));
+                if !content.text.ends_with('\n') {
+                    body.push('\n');
+                }
+                prev_was_text = true;
+            }
+        }
+
+        Ok(self.finalize(body, options))
+    }
+}
+
 // ── Shared utility functions used by multiple export modules ──
 
 /// Total word count across all content sections.

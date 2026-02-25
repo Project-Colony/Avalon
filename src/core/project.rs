@@ -161,15 +161,16 @@ impl Project {
 
     /// Load all documents from disk
     fn load_documents(&mut self, docs_dir: &Path) -> Result<()> {
-        for item in self.binder.all_items_mut() {
+        let docs_dir = docs_dir.to_path_buf();
+        self.binder.try_for_each_item_mut(|item| {
             let doc_path = docs_dir.join(format!("{}.json", item.id));
             if doc_path.exists() {
                 let json = fs::read_to_string(&doc_path)?;
                 let doc: Document = serde_json::from_str(&json)?;
                 item.document = Some(doc);
             }
-        }
-        Ok(())
+            Ok(())
+        })
     }
 
     /// Save all snapshots to disk (one file per binder item that has snapshots)
@@ -186,15 +187,16 @@ impl Project {
 
     /// Load all snapshots from disk
     fn load_snapshots(&mut self, snaps_dir: &Path) -> Result<()> {
-        for item in self.binder.all_items_mut() {
+        let snaps_dir = snaps_dir.to_path_buf();
+        self.binder.try_for_each_item_mut(|item| {
             let snap_path = snaps_dir.join(format!("{}.json", item.id));
             if snap_path.exists() {
                 let json = fs::read_to_string(&snap_path)?;
                 let snapshots: Vec<Snapshot> = serde_json::from_str(&json)?;
                 item.snapshots = snapshots;
             }
-        }
-        Ok(())
+            Ok(())
+        })
     }
 
     /// Apply a template to the project structure

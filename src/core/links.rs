@@ -93,7 +93,9 @@ fn build_title_index(all_items: &[&BinderItem]) -> HashMap<String, Vec<Uuid>> {
     index
 }
 
-/// Validate all links in a single document against the binder
+/// Validate all links in a single document against the binder.
+/// Note: Builds a title index each call. For batch validation, prefer
+/// `validate_all_links` which builds the index once.
 pub fn validate_document_links(
     item: &BinderItem,
     binder: &Binder,
@@ -101,6 +103,21 @@ pub fn validate_document_links(
     let all_items = binder.all_items();
     let title_index = build_title_index(&all_items);
     validate_document_links_with_index(item, &title_index)
+}
+
+/// Validate all links in a single document using an externally provided title index.
+/// Use this when validating multiple documents to avoid rebuilding the index each time.
+pub fn validate_document_links_cached(
+    item: &BinderItem,
+    title_index: &HashMap<String, Vec<Uuid>>,
+) -> Vec<LinkValidation> {
+    validate_document_links_with_index(item, title_index)
+}
+
+/// Build a title index suitable for passing to `validate_document_links_cached`.
+pub fn build_title_index_from_binder(binder: &Binder) -> HashMap<String, Vec<Uuid>> {
+    let all_items = binder.all_items();
+    build_title_index(&all_items)
 }
 
 /// Validate all links in a single document using a pre-built title index (avoids repeated traversals)

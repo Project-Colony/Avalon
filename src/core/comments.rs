@@ -177,13 +177,15 @@ impl Comment {
     /// saturate at zero rather than wrapping.
     pub fn shift(&mut self, offset: i64) {
         if offset >= 0 {
-            let off = offset as usize;
-            self.anchor_start += off;
-            self.anchor_end += off;
+            if let Ok(off) = usize::try_from(offset) {
+                self.anchor_start = self.anchor_start.saturating_add(off);
+                self.anchor_end = self.anchor_end.saturating_add(off);
+            }
         } else {
-            let off = (-offset) as usize;
-            self.anchor_start = self.anchor_start.saturating_sub(off);
-            self.anchor_end = self.anchor_end.saturating_sub(off);
+            if let Ok(off) = usize::try_from(offset.saturating_abs()) {
+                self.anchor_start = self.anchor_start.saturating_sub(off);
+                self.anchor_end = self.anchor_end.saturating_sub(off);
+            }
         }
     }
 

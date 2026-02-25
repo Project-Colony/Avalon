@@ -83,6 +83,24 @@ impl Binder {
         self.trash.visit(&mut f);
     }
 
+    /// Visit each item mutably in the binder tree without allocating a Vec.
+    pub fn for_each_item_mut<F: FnMut(&mut BinderItem)>(&mut self, mut f: F) {
+        self.draft.visit_mut(&mut f);
+        self.research.visit_mut(&mut f);
+        self.trash.visit_mut(&mut f);
+    }
+
+    /// Visit each item mutably with early-return on error.
+    pub fn try_for_each_item_mut<E, F>(&mut self, mut f: F) -> std::result::Result<(), E>
+    where
+        F: FnMut(&mut BinderItem) -> std::result::Result<(), E>,
+    {
+        self.draft.try_visit_mut(&mut f)?;
+        self.research.try_visit_mut(&mut f)?;
+        self.trash.try_visit_mut(&mut f)?;
+        Ok(())
+    }
+
     /// Count total words across all documents
     pub fn total_word_count(&self) -> usize {
         let mut total = 0;
@@ -267,6 +285,27 @@ impl BinderItem {
         }
     }
 
+    /// Visit this item and all descendants mutably without allocating a Vec.
+    /// Safe because `f(self)` releases its borrow before we access `self.children`.
+    pub fn visit_mut<F: FnMut(&mut BinderItem)>(&mut self, f: &mut F) {
+        f(self);
+        for child in &mut self.children {
+            child.visit_mut(f);
+        }
+    }
+
+    /// Visit this item and all descendants mutably with early-return on error.
+    pub fn try_visit_mut<E, F>(&mut self, f: &mut F) -> std::result::Result<(), E>
+    where
+        F: FnMut(&mut BinderItem) -> std::result::Result<(), E>,
+    {
+        f(self)?;
+        for child in &mut self.children {
+            child.try_visit_mut(f)?;
+        }
+        Ok(())
+    }
+
     /// Collect all items into a flat list
     pub fn collect_all<'a>(&'a self, items: &mut Vec<&'a BinderItem>) {
         items.push(self);
@@ -277,18 +316,19 @@ impl BinderItem {
 
     /// Collect all items into a mutable flat list.
     ///
-    /// Uses an iterative approach with an index-based work stack to avoid
-    /// unsafe pointer manipulation while still splitting borrows correctly.
+    /// This uses raw pointers because Rust's borrow checker cannot express
+    /// simultaneous `&mut item` and `&mut item.children` across function
+    /// boundaries. Prefer `visit_mut` or `for_each_item_mut` when possible.
+    ///
+    /// # Safety invariant
+    /// Each node in the binder tree appears exactly once (it is a tree, not a DAG),
+    /// so no aliasing occurs between the mutable references produced.
     pub fn collect_all_mut<'a>(&'a mut self, items: &mut Vec<&'a mut BinderItem>) {
-        // Use a stack of raw pointers to avoid borrow-checker issues with
-        // the recursive mutable split. Each pointer is unique (tree nodes
-        // are unique) so no aliasing occurs.
         let mut stack: Vec<*mut BinderItem> = vec![self as *mut BinderItem];
         while let Some(ptr) = stack.pop() {
             // SAFETY: Each node in the tree appears exactly once, so no aliasing.
             // The pointers all originate from `&'a mut self` and its children.
             let node = unsafe { &mut *ptr };
-            // Push children in reverse so they're visited in order
             for child in node.children.iter_mut().rev() {
                 stack.push(child as *mut BinderItem);
             }

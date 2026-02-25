@@ -351,10 +351,60 @@ pub fn word_frequencies(text: &str) -> Vec<WordFrequency> {
 }
 
 /// Return the top N most frequent words in the text.
+/// Uses a bounded min-heap for O(M log N) instead of O(M log M) full sort.
 pub fn top_n_words(text: &str, n: usize) -> Vec<WordFrequency> {
-    let mut freqs = word_frequencies(text);
-    freqs.truncate(n);
-    freqs
+    use std::cmp::Reverse;
+    use std::collections::BinaryHeap;
+
+    let words = extract_words(text);
+    let total = words.len();
+    if total == 0 || n == 0 {
+        return Vec::new();
+    }
+
+    let mut freq_map: HashMap<String, usize> = HashMap::new();
+    for w in words {
+        *freq_map.entry(w).or_insert(0) += 1;
+    }
+
+    // When n >= number of unique words, fall back to full sort
+    if freq_map.len() <= n {
+        let mut freqs = word_frequencies_from_map(freq_map, total);
+        freqs.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.word.cmp(&b.word)));
+        return freqs;
+    }
+
+    // Min-heap of size n: O(M log n) where M = unique words
+    let mut heap: BinaryHeap<Reverse<(usize, String)>> = BinaryHeap::with_capacity(n + 1);
+    for (word, count) in freq_map {
+        heap.push(Reverse((count, word)));
+        if heap.len() > n {
+            heap.pop();
+        }
+    }
+
+    let mut result: Vec<WordFrequency> = Vec::with_capacity(heap.len());
+    while let Some(Reverse((count, word))) = heap.pop() {
+        result.push(WordFrequency {
+            word,
+            count,
+            percentage: count as f64 / total as f64 * 100.0,
+        });
+    }
+    result.reverse(); // heap pops in ascending order, we want descending
+    result
+}
+
+/// Helper: convert a frequency map into WordFrequency vec without sorting.
+fn word_frequencies_from_map(freq_map: HashMap<String, usize>, total: usize) -> Vec<WordFrequency> {
+    freq_map
+        .into_iter()
+        .map(|(word, count)| WordFrequency {
+            word,
+            count,
+            percentage: count as f64 / total as f64 * 100.0,
+        })
+        .collect()
 }
 
 /// Return words used more than `threshold` times.

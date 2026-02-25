@@ -2,6 +2,51 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 
+/// Pre-computed text statistics from a single pass over the content.
+/// Use this instead of calling `word_count()`, `char_count()`, etc. separately
+/// when you need multiple stats at once (e.g., status bar rendering).
+#[derive(Debug, Clone, Default)]
+pub struct TextStats {
+    pub word_count: usize,
+    pub char_count: usize,
+    pub char_count_no_spaces: usize,
+    pub paragraph_count: usize,
+    pub sentence_count: usize,
+    pub line_count: usize,
+    pub page_count: f64,
+}
+
+impl TextStats {
+    /// Compute all text statistics in a single pass.
+    pub fn from_text(text: &str) -> Self {
+        if text.is_empty() {
+            return Self::default();
+        }
+
+        let char_count = text.len();
+        let word_count = text.split_whitespace().count();
+        let char_count_no_spaces = text.chars().filter(|c| !c.is_whitespace()).count();
+        let paragraph_count = text.split("\n\n").filter(|p| !p.trim().is_empty()).count();
+        let line_count = text.lines().count();
+        let sentence_count = text
+            .chars()
+            .filter(|c| matches!(c, '.' | '!' | '?'))
+            .count()
+            .max(1);
+        let page_count = word_count as f64 / super::WORDS_PER_PAGE as f64;
+
+        Self {
+            word_count,
+            char_count,
+            char_count_no_spaces,
+            paragraph_count,
+            sentence_count,
+            line_count,
+            page_count,
+        }
+    }
+}
+
 /// A Document represents the text content of a binder item.
 /// It stores the content as plain text / Markdown with optional rich text spans.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,6 +133,12 @@ impl Document {
     /// Estimate page count (standard manuscript page)
     pub fn page_count(&self) -> f64 {
         self.word_count() as f64 / super::WORDS_PER_PAGE as f64
+    }
+
+    /// Compute all text statistics in a single pass.
+    /// Prefer this over calling individual stat methods when you need multiple values.
+    pub fn stats(&self) -> TextStats {
+        TextStats::from_text(&self.content)
     }
 
     /// Count the number of annotations
