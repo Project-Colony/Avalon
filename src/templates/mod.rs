@@ -232,23 +232,6 @@ pub fn built_in_templates() -> Vec<Template> {
     ]
 }
 
-pub fn wire_unused_templates_items() {
-    let _ = built_in_templates();
-    let _ = find_template("novel");
-    let _ = templates_by_category(&TemplateCategory::Fiction);
-    let _ = template_count();
-
-    let _ = TemplateCategory::all();
-    let cat = TemplateCategory::Fiction;
-    let _ = cat.description();
-    let _ = cat.icon();
-
-    if let Some(template) = find_template("novel") {
-        let _ = template.summary();
-        let _ = template.matches_query("test");
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

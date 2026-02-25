@@ -576,9 +576,3 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("no extension"));
     }
 }
-
-/// Wire unused media_import items for compilation.
-pub fn wire_unused_media_import_items() {
-    // Reference unused function (requires a BinderItem, so we'll just note it)
-    let _ = std::any::type_name::<fn(&BinderItem) -> String>();
-}

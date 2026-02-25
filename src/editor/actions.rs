@@ -945,25 +945,3 @@ mod tests {
         assert!(DateTimeFormat::Iso8601.pattern().contains("T"));
     }
 }
-
-/// Wire unused editor actions items for compilation.
-pub fn wire_unused_editor_actions_items() {
-    // Reference unused EditorAction variants
-    let _ = EditorAction::SelectAll;
-    let _ = EditorAction::ToUppercase;
-    let _ = EditorAction::ToLowercase;
-    let _ = EditorAction::ToTitleCase;
-    let _ = EditorAction::MoveToDocStart;
-    let _ = EditorAction::DeleteLine;
-    let _ = EditorAction::DuplicateLine;
-
-    // Reference unused ListStyle methods
-    let list = ListStyle::Bullet;
-    let _ = list.prefix();
-    let _ = list.continuation_prefix(0);
-
-    // Reference unused DateTimeFormat associated items
-    let _ = DateTimeFormat::label(&DateTimeFormat::DateOnly);
-    let _ = DateTimeFormat::all();
-    let _ = DateTimeFormat::pattern(&DateTimeFormat::DateOnly);
-}

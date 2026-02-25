@@ -318,12 +318,3 @@ impl ProjectState {
         validation::auto_fix(binder)
     }
 }
-
-/// Wire unused integrations items for compilation.
-pub fn wire_unused_integrations_items() {
-    let mut state = ProjectState::new();
-    let doc_id = uuid::Uuid::new_v4();
-    let _ = state.comments_ref(&doc_id);
-    let _ = state.record_replacement(0, 5, "old", "new");
-    let _ = state.search_suggestions("");
-}

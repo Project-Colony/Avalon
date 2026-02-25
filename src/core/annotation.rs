@@ -419,51 +419,6 @@ impl AnnotationColor {
     }
 }
 
-pub fn wire_unused_annotation_items() {
-    // Wire Annotation methods
-    let mut ann = Annotation::new(0, 5, "test");
-    let _ = ann.span_length();
-    let _ = ann.overlaps(0, 10);
-    let _ = ann.text_contains("test");
-    let _ = ann.has_been_edited();
-    let _ = ann.summary();
-    let _ = ann.contains_position(2);
-    ann = ann.with_category("test");
-    let _ = ann.is_in_category("test");
-    let _ = ann.is_older_than_days(1);
-    let _ = ann.label();
-
-    // Wire AnnotationSet methods
-    let mut set = AnnotationSet::new();
-    set.add(ann);
-    set.remove(&uuid::Uuid::new_v4());
-    let _ = set.get(&uuid::Uuid::new_v4());
-    let _ = set.get_mut(&uuid::Uuid::new_v4());
-    let _ = set.count();
-    let _ = set.open_count();
-    let _ = set.resolved_count();
-    let _ = set.used_categories();
-    let _ = set.unique_authors();
-    let _ = set.most_edited();
-    let _ = set.by_category("test");
-    let _ = set.by_color(&AnnotationColor::Red);
-    let _ = set.overlapping(0, 10);
-    let _ = set.at_position(5);
-    let _ = set.search("test");
-    set.resolve_all();
-    let _ = set.export_texts();
-    let _ = set.sorted_by_position();
-    let _ = set.sorted_by_date();
-    let _ = set.by_author("test");
-    let _ = set.open();
-    let _ = set.resolved();
-    let _ = set.stale_open(7);
-    let _ = set.is_empty();
-    set.shift_after(0, 5);
-    let _ = set.summary();
-    let _ = set.older_than_days(1);
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

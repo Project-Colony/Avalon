@@ -466,16 +466,6 @@ impl TargetStatus {
     }
 }
 
-/// Wire all unused methods and fields to eliminate dead code warnings
-pub fn wire_unused_targets_items() {
-    // Wire TargetStatus methods
-    let _ = TargetStatus::all();
-    let _status = TargetStatus::InProgress;
-    let _ = _status.icon();
-    let _ = TargetStatus::Complete.is_complete();
-    let _ = TargetStatus::AlmostDone.needs_attention();
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

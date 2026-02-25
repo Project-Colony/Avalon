@@ -1311,15 +1311,3 @@ mod tests {
         }
     }
 }
-
-/// Wire unused corkboard items for compilation.
-pub fn wire_unused_corkboard_items() {
-    use uuid::Uuid;
-    let settings = CorkboardSettings::default();
-    let mut board = CorkboardState::new(settings);
-    let id = Uuid::new_v4();
-    let _ = board.bring_to_front(id);
-    let _ = board.send_to_back(id);
-    let _ = board.select_cards(&[id]);
-    let _ = board.select_all();
-}

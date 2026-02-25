@@ -1110,32 +1110,3 @@ mod tests {
         assert!(state.selection.contains(&id));
     }
 }
-
-/// Wire unused outliner items for compilation.
-pub fn wire_unused_outliner_items() {
-    // Reference unused OutlinerRow fields
-    let row = OutlinerRow {
-        item_id: uuid::Uuid::new_v4(),
-        depth: 0,
-        expanded: false,
-        values: std::collections::HashMap::new(),
-    };
-    let _ = row.expanded;
-    let _ = row.values;
-
-    // Reference unused OutlinerItem fields
-    let item = OutlinerItem {
-        id: uuid::Uuid::new_v4(),
-        title: String::new(),
-        synopsis: String::new(),
-        label: String::new(),
-        status: String::new(),
-        word_count: 0,
-        target_word_count: None,
-        created: chrono::Utc::now(),
-        modified: chrono::Utc::now(),
-        include_in_compile: true,
-        children: vec![],
-    };
-    let _ = item.synopsis;
-}

@@ -823,22 +823,6 @@ impl Project {
     }
 }
 
-pub fn wire_unused_project_items() {
-    let mut project = Project::new("Test");
-    let test_id = Uuid::new_v4();
-
-    // Wire unused Project methods
-    let _ = project.get_document(&test_id);
-    let _ = project.get_document_mut(&test_id);
-    let _ = project.find_collection_mut("test");
-    let _ = project.set_preset("test", crate::export::compiler::CompileOptions::default());
-    let _ = project.remove_preset("test");
-    let _ = project.structure_analysis();
-    let _ = project.writing_velocity();
-    let _ = project.word_count_extremes();
-    let _ = project.avg_document_word_count();
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

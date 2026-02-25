@@ -1438,9 +1438,3 @@ mod tests {
         assert!(history.entries.is_empty());
     }
 }
-
-/// Wire unused writing_prompts items for compilation.
-pub fn wire_unused_writing_prompts_items() {
-    let difficulty = Difficulty::Beginner;
-    let _ = difficulty.label();
-}
