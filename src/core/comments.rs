@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;

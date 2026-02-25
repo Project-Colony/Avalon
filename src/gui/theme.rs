@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use iced::widget::{button, container};
 use iced::{Background, Border, Color, Shadow, Vector};
 

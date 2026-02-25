@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use uuid::Uuid;
 use std::collections::HashSet;
 use super::binder::{Binder, BinderItem, BinderItemKind};

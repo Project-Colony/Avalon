@@ -10,8 +10,7 @@ use chrono::{NaiveDate, Utc};
 
 use crate::core::{PROJECTS_DIR_NAME, OUTPUT_DIR_NAME, IMPORT_DIR_NAME};
 use crate::core::binder::{BinderItem, BinderItemKind};
-use crate::core::comments::Comment;
-use crate::core::find_replace::{self, FindReplaceOptions, FindReplaceSession};
+use crate::core::find_replace::{self, FindReplaceOptions};
 use crate::core::integrations::ProjectState;
 use crate::core::project::Project;
 use crate::core::search::{self, SearchOptions};
@@ -189,7 +188,6 @@ pub struct ScrineverApp {
     pub doc_find_match_count: usize,
     pub doc_find_current_match: usize,
     pub doc_find_positions: Vec<usize>,
-    pub find_replace_session: Option<FindReplaceSession>,
 
     // === Quick reference ===
     pub quick_ref_item: Option<Uuid>,
@@ -198,9 +196,6 @@ pub struct ScrineverApp {
     pub script_mode: bool,
     pub current_script_element: Option<crate::core::script::ScriptElement>,
     pub auto_correction: crate::core::script::AutoCorrection,
-
-    // === Revision tracking ===
-    pub current_revision: Option<crate::core::script::RevisionLevel>,
 
     // === Compile presets ===
     pub compile_presets: Vec<(String, CompileOptions)>,
@@ -245,6 +240,7 @@ pub struct ScrineverApp {
 
 /// Messages for the application
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // Some variants are dispatched by UI views
 pub enum Message {
     // Project operations
     NewProject,
@@ -443,9 +439,6 @@ pub enum Message {
     ToggleAutoCorrectEmDashes,
     ToggleAutoCorrectEllipsis,
 
-    // Revision level
-    SetRevisionLevel(String),
-
     // Document links
     InsertDocLink(Uuid),
 
@@ -521,15 +514,11 @@ pub enum Message {
     UpdateCustomField(Uuid, String, String),
     RemoveCustomField(Uuid, String),
 
-    // Corkboard card color
-    SetCardColor(Uuid, String),
-
     // Smart collection refresh
     RefreshSmartCollections,
 
     // Composition mode settings
     SettingsSetCompWidth(String),
-    SettingsSetCompBgColor(String),
 
     // Editor text operations
     TransposeChars,
@@ -551,7 +540,6 @@ pub enum Message {
     InsertPageBreak,
     InsertComment,
     InsertDateTime(String),
-    SmartPaste(String),
     InsertLink,
     InsertImage,
 
@@ -580,49 +568,11 @@ pub enum Message {
     ToggleToolbarMenu(ToolbarMenu),
     CloseToolbarMenu,
 
-    // Comments
-    AddComment(Uuid, String),
-    DeleteComment(Uuid, Uuid),
-    ResolveComment(Uuid, Uuid),
-    UnresolveComment(Uuid, Uuid),
-    EditComment(Uuid, Uuid, String),
-    ReplyToComment(Uuid, Uuid, String),
-
-    // Revision tracking
-    ToggleRevisionMode,
-    StartRevisionPass(String),
-    AcceptRevisionMark(Uuid),
-    RejectRevisionMark(Uuid),
-    AcceptAllRevisions,
-
-    // Corkboard interactions
-    CorkboardMoveCard(Uuid, f32, f32),
-    CorkboardPinCard(Uuid, bool),
-    CorkboardArrangeGrid,
-
     // Outliner interactions
     OutlinerToggleExpand(Uuid),
-    OutlinerExpandAll,
-    OutlinerCollapseAll,
-    OutlinerSortBy(String),
 
     // Validation auto-fix
     AutoFixValidation,
-
-    // Linguistic analysis
-    RunLinguisticAnalysis,
-
-    // Search index
-    RebuildSearchIndex,
-
-    // Document targets (per-doc with full target)
-    SetDocTarget(Uuid, String),
-    RemoveDocTarget(Uuid),
-
-    // Import specific formats
-    ImportDocx,
-    ImportScriv,
-    ImportMedia,
 
     // Misc
     Tick,
@@ -694,12 +644,10 @@ impl ScrineverApp {
             doc_find_match_count: 0,
             doc_find_current_match: 0,
             doc_find_positions: Vec::new(),
-            find_replace_session: None,
             quick_ref_item: None,
             script_mode: false,
             current_script_element: None,
             auto_correction: crate::core::script::AutoCorrection::default(),
-            current_revision: None,
             compile_presets: Vec::new(),
             footnote_counter: 0,
             show_project_stats: false,
@@ -2550,18 +2498,6 @@ impl ScrineverApp {
                 self.auto_correction.ellipsis = !self.auto_correction.ellipsis;
             }
 
-            // ========== Revision tracking ==========
-            Message::SetRevisionLevel(level_name) => {
-                self.current_revision = match level_name.as_str() {
-                    "Revision 1" => Some(crate::core::script::RevisionLevel::First),
-                    "Revision 2" => Some(crate::core::script::RevisionLevel::Second),
-                    "Revision 3" => Some(crate::core::script::RevisionLevel::Third),
-                    "Revision 4" => Some(crate::core::script::RevisionLevel::Fourth),
-                    "Revision 5" => Some(crate::core::script::RevisionLevel::Fifth),
-                    _ => None,
-                };
-            }
-
             // ========== Document links ==========
             Message::InsertDocLink(target_id) => {
                 if let Some(ref project) = self.project {
@@ -3165,31 +3101,6 @@ impl ScrineverApp {
                 }
             }
 
-            // ========== Corkboard card color ==========
-            Message::SetCardColor(id, color_name) => {
-                if let Some(ref mut project) = self.project {
-                    if let Some(item) = project.binder.find_item_mut(&id) {
-                        let color = match color_name.as_str() {
-                            "Red" => crate::core::metadata::LabelColor::Red,
-                            "Orange" => crate::core::metadata::LabelColor::Orange,
-                            "Yellow" => crate::core::metadata::LabelColor::Yellow,
-                            "Green" => crate::core::metadata::LabelColor::Green,
-                            "Blue" => crate::core::metadata::LabelColor::Blue,
-                            "Purple" => crate::core::metadata::LabelColor::Purple,
-                            _ => crate::core::metadata::LabelColor::Blue,
-                        };
-                        if let Some(ref mut label) = item.metadata.label {
-                            label.color = color;
-                        } else {
-                            item.metadata.label = Some(crate::core::metadata::Label {
-                                name: color_name,
-                                color,
-                            });
-                        }
-                    }
-                }
-            }
-
             // ========== Smart collection refresh ==========
             Message::RefreshSmartCollections => {
                 if let Some(ref mut project) = self.project {
@@ -3236,12 +3147,6 @@ impl ScrineverApp {
                             project.settings.fullscreen_text_width = w;
                         }
                     }
-                }
-            }
-
-            Message::SettingsSetCompBgColor(color) => {
-                if let Some(ref mut project) = self.project {
-                    project.settings.composition_bg_color = Some(color);
                 }
             }
 
@@ -3418,26 +3323,6 @@ impl ScrineverApp {
                 self.editor.mark_dirty();
             }
 
-            Message::SmartPaste(text) => {
-                // Clean up pasted text: normalize whitespace, fix smart quotes, etc.
-                let cleaned = text
-                    .replace(['\u{201C}', '\u{201D}'], "\"")  // right double quote
-                    .replace(['\u{2018}', '\u{2019}'], "'")   // right single quote
-                    .replace('\u{2013}', "--")  // en dash
-                    .replace('\u{2014}', "---") // em dash
-                    .replace('\u{2026}', "...") // ellipsis
-                    .replace("\r\n", "\n")       // Windows line endings
-                    .replace('\r', "\n");        // Old Mac line endings
-                self.editor.content.perform(
-                    iced::widget::text_editor::Action::Edit(
-                        iced::widget::text_editor::Edit::Paste(
-                            std::sync::Arc::new(cleaned)
-                        )
-                    )
-                );
-                self.editor.mark_dirty();
-            }
-
             Message::InsertLink => {
                 let link_text = "[link text](url)";
                 self.editor.content.perform(
@@ -3573,145 +3458,9 @@ impl ScrineverApp {
                 self.bottom_panel = BottomPanel::WritingPrompts;
             }
 
-            // ========== Comments ==========
-            Message::AddComment(doc_id, comment_text) => {
-                let mgr = self.project_state.comments_for(doc_id);
-                let comment = Comment::new(
-                    self.editor.cursor,
-                    self.editor.cursor + 1,
-                    &comment_text,
-                    "Author",
-                );
-                mgr.add_comment(comment);
-                self.notification = Some("Comment added".to_string());
-            }
-
-            Message::DeleteComment(doc_id, comment_id) => {
-                let mgr = self.project_state.comments_for(doc_id);
-                mgr.remove_comment(comment_id);
-            }
-
-            Message::ResolveComment(doc_id, comment_id) => {
-                let mgr = self.project_state.comments_for(doc_id);
-                if let Some(comment) = mgr.get_mut(comment_id) {
-                    comment.resolve("Author");
-                }
-            }
-
-            Message::UnresolveComment(doc_id, comment_id) => {
-                let mgr = self.project_state.comments_for(doc_id);
-                if let Some(comment) = mgr.get_mut(comment_id) {
-                    comment.unresolve();
-                }
-            }
-
-            Message::EditComment(doc_id, comment_id, new_text) => {
-                let mgr = self.project_state.comments_for(doc_id);
-                if let Some(comment) = mgr.get_mut(comment_id) {
-                    comment.edit_text(&new_text);
-                }
-            }
-
-            Message::ReplyToComment(doc_id, comment_id, reply_text) => {
-                let mgr = self.project_state.comments_for(doc_id);
-                if let Some(comment) = mgr.get_mut(comment_id) {
-                    comment.add_reply("Author", &reply_text);
-                }
-            }
-
-            // ========== Revision tracking ==========
-            Message::ToggleRevisionMode => {
-                self.project_state.revision_tracker.toggle_revision_mode();
-                let active = self.project_state.revision_tracker.is_active();
-                if active {
-                    // Start a new revision pass if none exists
-                    if self.project_state.revision_tracker.pass_count() == 0 {
-                        self.project_state.revision_tracker.start_new_pass("Revision 1");
-                    }
-                    self.notification = Some("Revision tracking enabled".to_string());
-                } else {
-                    self.notification = Some("Revision tracking disabled".to_string());
-                }
-            }
-
-            Message::StartRevisionPass(label) => {
-                self.project_state.revision_tracker.start_new_pass(&label);
-                self.notification = Some(format!("Started revision pass: {}", label));
-            }
-
-            Message::AcceptRevisionMark(mark_id) => {
-                self.project_state.revision_tracker.accept_mark(&mark_id);
-            }
-
-            Message::RejectRevisionMark(mark_id) => {
-                self.project_state.revision_tracker.reject_mark(&mark_id);
-            }
-
-            Message::AcceptAllRevisions => {
-                let stats = self.project_state.revision_tracker.statistics();
-                let count = stats.mark_count;
-                // Accept all marks in all passes
-                let pass_ids: Vec<Uuid> = self.project_state.revision_tracker.passes
-                    .iter().map(|p| p.id).collect();
-                for pid in pass_ids {
-                    self.project_state.revision_tracker.accept_all_in_pass(&pid);
-                }
-                self.notification = Some(format!("Accepted {} revision marks", count));
-            }
-
-            // ========== Corkboard interactions ==========
-            Message::CorkboardMoveCard(card_id, x, y) => {
-                let _ = self.project_state.corkboard.move_card(card_id, x, y);
-            }
-
-            Message::CorkboardPinCard(card_id, pinned) => {
-                let _ = self.project_state.corkboard.pin_card(card_id, pinned);
-            }
-
-            Message::CorkboardArrangeGrid => {
-                if let Some(ref project) = self.project {
-                    let parent = self.selected_item
-                        .and_then(|id| project.binder.find_item(&id))
-                        .unwrap_or(&project.binder.draft);
-                    let item_ids: Vec<Uuid> = parent.children.iter().map(|c| c.id).collect();
-                    self.project_state.arrange_corkboard_grid(&item_ids);
-                }
-            }
-
             // ========== Outliner interactions ==========
             Message::OutlinerToggleExpand(item_id) => {
                 self.project_state.outliner.toggle_expand(item_id);
-            }
-
-            Message::OutlinerExpandAll => {
-                if let Some(ref project) = self.project {
-                    let items = ProjectState::build_outliner_items(
-                        &project.binder.draft.children,
-                        &self.project_state.targets,
-                    );
-                    self.project_state.outliner.expand_all(&items);
-                }
-            }
-
-            Message::OutlinerCollapseAll => {
-                self.project_state.outliner.collapse_all();
-            }
-
-            Message::OutlinerSortBy(column_name) => {
-                use crate::core::outliner::OutlinerColumn;
-                let col = match column_name.as_str() {
-                    "Title" => OutlinerColumn::Title,
-                    "Words" => OutlinerColumn::WordCount,
-                    "Status" => OutlinerColumn::Status,
-                    "Label" => OutlinerColumn::Label,
-                    "Target" => OutlinerColumn::TargetWordCount,
-                    "Progress" => OutlinerColumn::TargetProgress,
-                    _ => OutlinerColumn::Title,
-                };
-                let ascending = self.project_state.outliner.settings.sort_column
-                    .as_ref()
-                    .map_or(true, |c| c != &col || !self.project_state.outliner.settings.sort_ascending);
-                self.project_state.outliner.sort_by(col, ascending);
             }
 
             // ========== Validation auto-fix ==========
@@ -3726,123 +3475,6 @@ impl ScrineverApp {
             }
 
             // ========== Linguistic analysis ==========
-            Message::RunLinguisticAnalysis => {
-                self.sync_editor_to_project();
-                if let (Some(ref project), Some(item_id)) = (&self.project, self.selected_item) {
-                    if let Some(item) = project.binder.find_item(&item_id) {
-                        if let Some(ref doc) = item.document {
-                            self.linguistic_result = Some(ProjectState::analyze_writing(&doc.content));
-                            self.notification = Some("Linguistic analysis complete".to_string());
-                        }
-                    }
-                }
-            }
-
-            // ========== Search index ==========
-            Message::RebuildSearchIndex => {
-                if let Some(ref project) = self.project {
-                    self.project_state.search_index.build_from_binder(&project.binder);
-                    let terms = self.project_state.search_index.unique_terms();
-                    self.notification = Some(format!("Search index rebuilt: {} unique terms", terms));
-                }
-            }
-
-            // ========== Document targets ==========
-            Message::SetDocTarget(doc_id, target_str) => {
-                if let Ok(target) = target_str.parse::<usize>() {
-                    self.project_state.set_target(doc_id, target);
-                    self.item_targets.insert(doc_id, target);
-                } else if target_str.is_empty() {
-                    self.project_state.set_target(doc_id, 0);
-                    self.item_targets.remove(&doc_id);
-                }
-            }
-
-            Message::RemoveDocTarget(doc_id) => {
-                self.project_state.set_target(doc_id, 0);
-                self.item_targets.remove(&doc_id);
-            }
-
-            // ========== Import formats ==========
-            Message::ImportDocx => {
-                let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-                let import_dir = home.join(IMPORT_DIR_NAME);
-                if let Ok(entries) = std::fs::read_dir(&import_dir) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if path.extension().map_or(false, |e| e == "docx") {
-                            if let Some(ref mut project) = self.project {
-                                match crate::export::docx_import::import_docx(&path) {
-                                    Ok(items) => {
-                                        for item in items {
-                                            project.binder.draft.add_child(item);
-                                        }
-                                        self.notification = Some(format!("Imported {:?}", path.file_name().unwrap_or_default()));
-                                    }
-                                    Err(e) => {
-                                        self.notification = Some(format!("DOCX import error: {}", e));
-                                    }
-                                }
-                            }
-                            break; // Import first .docx found
-                        }
-                    }
-                }
-            }
-
-            Message::ImportScriv => {
-                let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-                let import_dir = home.join(IMPORT_DIR_NAME);
-                if let Ok(entries) = std::fs::read_dir(&import_dir) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if path.extension().map_or(false, |e| e == "scriv") {
-                            if let Some(ref mut project) = self.project {
-                                match crate::export::scriv_import::import_scriv(&path) {
-                                    Ok((_info, items)) => {
-                                        for item in items {
-                                            project.binder.draft.add_child(item);
-                                        }
-                                        self.notification = Some(format!("Imported Scrivener project from {:?}", path.file_name().unwrap_or_default()));
-                                    }
-                                    Err(e) => {
-                                        self.notification = Some(format!("Scriv import error: {}", e));
-                                    }
-                                }
-                            }
-                            break;
-                        }
-                    }
-                }
-            }
-
-            Message::ImportMedia => {
-                let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-                let import_dir = home.join(IMPORT_DIR_NAME);
-                if let Ok(entries) = std::fs::read_dir(&import_dir) {
-                    let mut imported = 0;
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if crate::core::media_import::is_supported_media(&path) {
-                            if let Some(ref mut project) = self.project {
-                                match crate::core::media_import::import_media_file(&path) {
-                                    Ok(item) => {
-                                        project.binder.research.add_child(item);
-                                        imported += 1;
-                                    }
-                                    Err(e) => {
-                                        log::warn!("Media import failed for {:?}: {}", path, e);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if imported > 0 {
-                        self.notification = Some(format!("Imported {} media file(s)", imported));
-                    }
-                }
-            }
-
             // ========== Misc ==========
             Message::Tick => {
                 // Auto-save

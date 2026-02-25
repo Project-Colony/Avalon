@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use iced::widget::{button, column, container, row, text, text_input, Space};
 use iced::{Element, Length, Padding};
 

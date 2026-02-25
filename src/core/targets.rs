@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use std::collections::HashMap;
 use std::fmt::Write;
 use uuid::Uuid;

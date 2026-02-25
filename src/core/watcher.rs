@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;

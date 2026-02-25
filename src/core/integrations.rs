@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 //! Integration module: project-level state that aggregates core subsystems.
 //!
 //! `ProjectState` holds the runtime instances of subsystems (comments,
@@ -232,26 +233,12 @@ impl ProjectState {
     /// Build outliner items from a binder item's children.
     pub fn build_outliner_items(
         items: &[super::binder::BinderItem],
-        targets: &DocumentTargets,
+        _targets: &DocumentTargets,
     ) -> Vec<OutlinerItem> {
         items.iter().map(|item| {
-            let word_count = item.document.as_ref().map_or(0, |d| d.word_count());
-            let target = targets.target_words(&item.id);
-            let now = chrono::Utc::now();
             OutlinerItem {
                 id: item.id,
-                title: item.title.clone(),
-                synopsis: item.synopsis.clone(),
-                label: item.metadata.label.as_ref()
-                    .map_or_else(String::new, |l| l.name.clone()),
-                status: item.metadata.status.as_ref()
-                    .map_or_else(String::new, |s| s.name.clone()),
-                word_count,
-                target_word_count: target,
-                created: now, // TODO: store real creation time
-                modified: now,
-                include_in_compile: item.include_in_compile,
-                children: Self::build_outliner_items(&item.children, targets),
+                children: Self::build_outliner_items(&item.children, _targets),
             }
         }).collect()
     }

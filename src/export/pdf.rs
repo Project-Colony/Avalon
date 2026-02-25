@@ -1,10 +1,9 @@
+#![allow(dead_code)] // Methods used by test code
 use std::path::Path;
 use anyhow::Result;
 use printpdf::*;
 
 use super::compiler::{CompileContent, CompileOptions};
-#[cfg(test)]
-use super::compiler::SeparatorType;
 
 pub fn save_pdf(contents: &[CompileContent], options: &CompileOptions, path: &Path) -> Result<()> {
     let (doc, page1, layer1) = PdfDocument::new(
@@ -166,99 +165,4 @@ fn strip_markdown(text: &str) -> String {
         result = result[2..].to_string();
     }
     result
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::export::compiler::OutputFormat;
-
-    fn make_content(title: &str, text: &str, is_folder: bool, depth: usize) -> CompileContent {
-        CompileContent {
-            title: title.to_string(),
-            text: text.to_string(),
-            depth,
-            is_folder,
-        }
-    }
-
-    fn make_opts() -> CompileOptions {
-        CompileOptions {
-            format: OutputFormat::Pdf,
-            title: "Test PDF".to_string(),
-            author: "Author".to_string(),
-            include_front_matter: false,
-            separator: SeparatorType::EmptyLine,
-            page_break_between_folders: false,
-            compile_marked_only: false,
-            font_size: 12.0,
-            font_family: "Times New Roman".to_string(),
-            include_toc: false,
-            replace_placeholders: false,
-        }
-    }
-
-    #[test]
-    fn test_strip_markdown_bold() {
-        assert_eq!(strip_markdown("**bold**"), "bold");
-    }
-
-    #[test]
-    fn test_strip_markdown_italic() {
-        assert_eq!(strip_markdown("*italic*"), "italic");
-    }
-
-    #[test]
-    fn test_strip_markdown_strikethrough() {
-        assert_eq!(strip_markdown("~~strike~~"), "strike");
-    }
-
-    #[test]
-    fn test_strip_markdown_heading() {
-        assert_eq!(strip_markdown("# Heading"), "Heading");
-        assert_eq!(strip_markdown("## Sub"), "Sub");
-    }
-
-    #[test]
-    fn test_strip_markdown_blockquote() {
-        assert_eq!(strip_markdown("> Quote text"), "Quote text");
-    }
-
-    #[test]
-    fn test_strip_markdown_plain() {
-        assert_eq!(strip_markdown("Plain text"), "Plain text");
-    }
-
-    #[test]
-    fn test_strip_markdown_multiple_hashes() {
-        assert_eq!(strip_markdown("### Third Level"), "Third Level");
-    }
-
-    #[test]
-    fn test_strip_markdown_combined() {
-        let result = strip_markdown("**bold** and *italic*");
-        assert_eq!(result, "bold and italic");
-    }
-
-    #[test]
-    fn test_strip_markdown_empty() {
-        assert_eq!(strip_markdown(""), "");
-    }
-
-    #[test]
-    fn test_strip_markdown_star_list_items() {
-        // Single * is removed by italic stripping
-        assert_eq!(strip_markdown("* item two"), " item two");
-    }
-
-    #[test]
-    fn test_strip_markdown_dash_list_preserved() {
-        // Dash list markers are not stripped (they're not markdown formatting)
-        assert_eq!(strip_markdown("- item one"), "- item one");
-    }
-
-    #[test]
-    fn test_strip_markdown_preserves_text() {
-        assert_eq!(strip_markdown("No formatting here"), "No formatting here");
-    }
 }

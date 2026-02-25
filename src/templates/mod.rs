@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use serde::{Deserialize, Serialize};
 
 /// Built-in project templates

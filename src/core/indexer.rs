@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use std::collections::HashMap;
 use uuid::Uuid;
 use serde::{Deserialize, Serialize};
