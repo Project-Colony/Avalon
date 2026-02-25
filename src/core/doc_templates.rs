@@ -155,10 +155,6 @@ pub fn find_template(id: &str) -> Option<DocumentTemplate> {
     builtin_templates().into_iter().find(|t| t.id == id)
 }
 
-/// Get templates by category
-pub fn templates_by_category(category: &TemplateCategory) -> Vec<DocumentTemplate> {
-    builtin_templates().into_iter().filter(|t| &t.category == category).collect()
-}
 
 #[cfg(test)]
 mod tests {
@@ -175,16 +171,6 @@ mod tests {
         assert!(find_template("chapter").is_some());
         assert!(find_template("character_sheet").is_some());
         assert!(find_template("nonexistent").is_none());
-    }
-
-    #[test]
-    fn test_templates_by_category() {
-        let fiction = templates_by_category(&TemplateCategory::Fiction);
-        assert!(!fiction.is_empty());
-        assert!(fiction.iter().all(|t| t.category == TemplateCategory::Fiction));
-
-        let planning = templates_by_category(&TemplateCategory::Planning);
-        assert!(!planning.is_empty());
     }
 
     #[test]
@@ -325,21 +311,6 @@ mod tests {
         let item = t.create_item("Chapter 1");
         let doc = item.document.as_ref().unwrap();
         assert!(doc.content.is_empty());
-    }
-
-    #[test]
-    fn test_templates_by_category_reference() {
-        let ref_templates = templates_by_category(&TemplateCategory::Reference);
-        assert!(!ref_templates.is_empty());
-        for t in &ref_templates {
-            assert_eq!(t.category, TemplateCategory::Reference);
-        }
-    }
-
-    #[test]
-    fn test_templates_by_category_screenplay() {
-        let templates = templates_by_category(&TemplateCategory::Screenplay);
-        assert!(!templates.is_empty());
     }
 
     #[test]

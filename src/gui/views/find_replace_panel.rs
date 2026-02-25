@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use iced::widget::{button, column, container, row, text, text_input, Space};
 use iced::{Element, Length, Padding};
 
@@ -174,12 +175,4 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
         .style(theme::panel_style)
         .width(Length::Fill)
         .into()
-}
-
-/// Wire unused find_replace_panel items for compilation.
-pub fn wire_unused_find_replace_panel_items() {
-    let mut data = FindReplaceData::new();
-    let _ = data.has_query();
-    let _ = data.has_matches();
-    let _ = data.clear();
 }

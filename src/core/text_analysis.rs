@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use std::collections::HashMap;
 
 // ---------------------------------------------------------------------------
@@ -539,26 +540,6 @@ pub fn analyze_text(text: &str) -> TextAnalysis {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
-
-/// Wire all unused methods and fields to eliminate dead code warnings
-pub fn wire_unused_text_analysis_items() {
-    // Wire SentenceInfo fields
-    let _sent = SentenceInfo {
-        text: "test".to_string(),
-        word_count: 1,
-        avg_word_length: 4.0,
-    };
-    let _ = _sent.text;
-    let _ = _sent.avg_word_length;
-
-    // Wire ParagraphInfo fields
-    let _para = ParagraphInfo {
-        text: "test".to_string(),
-        word_count: 1,
-        sentence_count: 1,
-    };
-    let _ = _para.text;
-}
 
 #[cfg(test)]
 mod tests {

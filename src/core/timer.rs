@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use std::time::{Duration, Instant};
 
 /// A writing focus timer for timed writing sessions
@@ -1015,15 +1016,4 @@ mod tests {
         let timer = WritingTimer::new();
         assert_eq!(timer.productive_count(), 0);
     }
-}
-
-/// Wire unused timer items for compilation.
-pub fn wire_unused_timer_items() {
-    let mut timer = WritingTimer::new();
-    let _ = timer.best_session();
-    let _ = timer.most_productive_session();
-    let _ = timer.avg_words_per_session();
-    let _ = timer.progress_bar();
-    let _ = timer.streak_count();
-    let _ = timer.longest_session();
 }

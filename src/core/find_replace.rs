@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use uuid::Uuid;
 use regex::Regex;
 use chrono::{DateTime, Utc};
@@ -66,24 +67,6 @@ pub struct FindResult {
     pub matches: Vec<MatchLocation>,
 }
 
-/// The outcome of replacing text in one document.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ReplaceResult {
-    pub item_id: Uuid,
-    pub original_text: String,
-    pub new_text: String,
-    pub replacements_made: usize,
-}
-
-/// Report produced by a batch replace across multiple documents.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BatchReplaceReport {
-    pub results: Vec<ReplaceResult>,
-    pub total_replacements: usize,
-    pub total_documents_modified: usize,
-    pub errors: Vec<(Uuid, String)>,
-}
-
 /// Record kept for undo support.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ReplacementRecord {
@@ -91,17 +74,6 @@ pub struct ReplacementRecord {
     pub original_text: String,
     pub new_text: String,
     pub timestamp: DateTime<Utc>,
-}
-
-/// An interactive find-and-replace session that tracks navigation state,
-/// current results, and a history of replacements for undo.
-#[derive(Debug, Clone)]
-pub struct FindReplaceSession {
-    pub options: FindReplaceOptions,
-    pub results: Vec<FindResult>,
-    pub current_result_index: usize,
-    pub current_match_index: usize,
-    pub history: Vec<ReplacementRecord>,
 }
 
 // ---------------------------------------------------------------------------
@@ -238,25 +210,6 @@ pub fn find_in_text(text: &str, options: &FindReplaceOptions) -> Vec<MatchLocati
     results
 }
 
-/// Search across multiple documents. Each tuple is (id, title, content).
-pub fn find_in_documents(
-    documents: &[(Uuid, String, String)],
-    options: &FindReplaceOptions,
-) -> Vec<FindResult> {
-    let mut results = Vec::new();
-    for (id, title, content) in documents {
-        let matches = find_in_text(content, options);
-        if !matches.is_empty() {
-            results.push(FindResult {
-                item_id: *id,
-                item_title: title.clone(),
-                matches,
-            });
-        }
-    }
-    results
-}
-
 /// Replace all occurrences in a single text body. Returns the new text and
 /// the number of replacements made.
 pub fn replace_in_text(text: &str, options: &FindReplaceOptions) -> (String, usize) {
@@ -360,49 +313,6 @@ pub fn replace_next(
     Some((new_text, loc))
 }
 
-/// Batch replace across multiple documents. Mutates the content in place.
-pub fn replace_all_in_documents(
-    documents: &mut [(Uuid, String, String)],
-    options: &FindReplaceOptions,
-) -> BatchReplaceReport {
-    let mut report = BatchReplaceReport {
-        results: Vec::new(),
-        total_replacements: 0,
-        total_documents_modified: 0,
-        errors: Vec::new(),
-    };
-
-    for (id, _title, content) in documents.iter_mut() {
-        let (new_text, count) = replace_in_text(content, options);
-        if count > 0 {
-            let original = std::mem::replace(content, new_text);
-            report.results.push(ReplaceResult {
-                item_id: *id,
-                new_text: content.clone(),
-                original_text: original,
-                replacements_made: count,
-            });
-            report.total_replacements += count;
-            report.total_documents_modified += 1;
-        }
-    }
-
-    report
-}
-
-/// Preview what a single replacement would look like.
-pub fn preview_replacement(
-    match_loc: &MatchLocation,
-    replacement: &str,
-    preserve_case: bool,
-) -> String {
-    if preserve_case {
-        preserve_case_replace(&match_loc.matched_text, replacement)
-    } else {
-        replacement.to_string()
-    }
-}
-
 /// Smart case-preserving replacement.
 ///
 /// Rules:
@@ -462,213 +372,6 @@ pub fn count_matches(text: &str, options: &FindReplaceOptions) -> usize {
         Err(_) => return 0,
     };
     regex.find_iter(text).count()
-}
-
-/// Insert highlight markers (tags) around every match in the text.
-///
-/// For example, `highlight_matches(text, matches, "<b>", "</b>")` wraps
-/// each matched span with bold tags.
-pub fn highlight_matches(
-    text: &str,
-    matches: &[MatchLocation],
-    before_tag: &str,
-    after_tag: &str,
-) -> String {
-    if matches.is_empty() {
-        return text.to_string();
-    }
-
-    // Work from back to front so that earlier byte offsets remain valid.
-    let mut sorted: Vec<&MatchLocation> = matches.iter().collect();
-    sorted.sort_by(|a, b| b.start.cmp(&a.start));
-
-    let mut result = text.to_string();
-    for m in sorted {
-        if m.end <= result.len() && m.start <= m.end {
-            result.insert_str(m.end, after_tag);
-            result.insert_str(m.start, before_tag);
-        }
-    }
-    result
-}
-
-// ---------------------------------------------------------------------------
-// FindReplaceSession
-// ---------------------------------------------------------------------------
-
-impl FindReplaceSession {
-    /// Create a new session from the given options. Results are initially
-    /// empty; the caller should populate them via `find_in_documents` or
-    /// similar.
-    pub fn new(options: FindReplaceOptions) -> Self {
-        Self {
-            options,
-            results: Vec::new(),
-            current_result_index: 0,
-            current_match_index: 0,
-            history: Vec::new(),
-        }
-    }
-
-    /// Total number of matches across all result documents.
-    fn total_matches(&self) -> usize {
-        self.results.iter().map(|r| r.matches.len()).sum()
-    }
-
-    /// Flatten index: convert (result_index, match_index) into a single
-    /// linear index.
-    fn flat_index(&self) -> usize {
-        let mut idx = 0;
-        for (ri, r) in self.results.iter().enumerate() {
-            if ri < self.current_result_index {
-                idx += r.matches.len();
-            } else {
-                idx += self.current_match_index;
-                break;
-            }
-        }
-        idx
-    }
-
-    /// Navigate to the next match, wrapping around at the end.
-    pub fn find_next(&mut self) -> Option<&MatchLocation> {
-        if self.results.is_empty() {
-            return None;
-        }
-
-        // Advance
-        let cur_doc = &self.results[self.current_result_index];
-        if self.current_match_index + 1 < cur_doc.matches.len() {
-            self.current_match_index += 1;
-        } else {
-            // Move to next document
-            self.current_result_index = (self.current_result_index + 1) % self.results.len();
-            self.current_match_index = 0;
-        }
-
-        self.results
-            .get(self.current_result_index)
-            .and_then(|r| r.matches.get(self.current_match_index))
-    }
-
-    /// Navigate to the previous match, wrapping around at the beginning.
-    pub fn find_previous(&mut self) -> Option<&MatchLocation> {
-        if self.results.is_empty() {
-            return None;
-        }
-
-        if self.current_match_index > 0 {
-            self.current_match_index -= 1;
-        } else {
-            // Move to previous document
-            if self.current_result_index == 0 {
-                self.current_result_index = self.results.len() - 1;
-            } else {
-                self.current_result_index -= 1;
-            }
-            let doc = &self.results[self.current_result_index];
-            self.current_match_index = doc.matches.len().saturating_sub(1);
-        }
-
-        self.results
-            .get(self.current_result_index)
-            .and_then(|r| r.matches.get(self.current_match_index))
-    }
-
-    /// Replace the current match and record the operation for undo.
-    /// Returns `None` if there is nothing to replace.
-    pub fn replace_current(&mut self) -> Option<ReplacementRecord> {
-        if self.results.is_empty() {
-            return None;
-        }
-
-        let result = self.results.get(self.current_result_index)?;
-        let loc = result.matches.get(self.current_match_index)?;
-
-        let record = ReplacementRecord {
-            item_id: result.item_id,
-            original_text: loc.matched_text.clone(),
-            new_text: loc.preview_replacement.clone(),
-            timestamp: Utc::now(),
-        };
-
-        // Remove the consumed match from the results so the session advances.
-        let result_mut = &mut self.results[self.current_result_index];
-        result_mut.matches.remove(self.current_match_index);
-
-        // If the document has no more matches, remove it entirely.
-        if result_mut.matches.is_empty() {
-            self.results.remove(self.current_result_index);
-            if !self.results.is_empty() {
-                self.current_result_index %= self.results.len();
-            } else {
-                self.current_result_index = 0;
-            }
-            self.current_match_index = 0;
-        } else if self.current_match_index >= result_mut.matches.len() {
-            self.current_match_index = 0;
-        }
-
-        self.history.push(record.clone());
-        Some(record)
-    }
-
-    /// Replace all remaining matches. Returns a `BatchReplaceReport`.
-    pub fn replace_all(&mut self) -> BatchReplaceReport {
-        let mut report = BatchReplaceReport {
-            results: Vec::new(),
-            total_replacements: 0,
-            total_documents_modified: 0,
-            errors: Vec::new(),
-        };
-
-        for result in self.results.drain(..) {
-            let count = result.matches.len();
-            if count > 0 {
-                report.total_replacements += count;
-                report.total_documents_modified += 1;
-
-                let item_id = result.item_id;
-                // Record each replacement for undo, consuming owned strings.
-                for loc in result.matches {
-                    self.history.push(ReplacementRecord {
-                        item_id,
-                        original_text: loc.matched_text,
-                        new_text: loc.preview_replacement,
-                        timestamp: Utc::now(),
-                    });
-                }
-
-                report.results.push(ReplaceResult {
-                    item_id,
-                    original_text: String::new(), // Full text not tracked in session
-                    new_text: String::new(),
-                    replacements_made: count,
-                });
-            }
-        }
-
-        self.current_result_index = 0;
-        self.current_match_index = 0;
-
-        report
-    }
-
-    /// Return (current_flat_index, total_matches). Both are 0 when empty.
-    pub fn current_position(&self) -> (usize, usize) {
-        let total = self.total_matches();
-        if total == 0 {
-            return (0, 0);
-        }
-        (self.flat_index(), total)
-    }
-
-    /// Undo the most recent replacement by popping the last history entry.
-    /// Returns the `ReplacementRecord` so the caller can restore the
-    /// original text in the document.
-    pub fn undo_last(&mut self) -> Option<ReplacementRecord> {
-        self.history.pop()
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -838,40 +541,6 @@ mod tests {
         assert_eq!(count, 2);
     }
 
-    // ---- batch replace tests ----
-
-    #[test]
-    fn test_batch_replace() {
-        let id1 = Uuid::new_v4();
-        let id2 = Uuid::new_v4();
-        let mut docs = vec![
-            (id1, "Doc1".to_string(), "The cat sat.".to_string()),
-            (id2, "Doc2".to_string(), "No match here.".to_string()),
-        ];
-        let o = opts("cat", "dog");
-        let report = replace_all_in_documents(&mut docs, &o);
-        assert_eq!(report.total_replacements, 1);
-        assert_eq!(report.total_documents_modified, 1);
-        assert_eq!(docs[0].2, "The dog sat.");
-        assert_eq!(docs[1].2, "No match here."); // unchanged
-    }
-
-    #[test]
-    fn test_batch_replace_multiple_docs() {
-        let id1 = Uuid::new_v4();
-        let id2 = Uuid::new_v4();
-        let mut docs = vec![
-            (id1, "Doc1".to_string(), "cat cat".to_string()),
-            (id2, "Doc2".to_string(), "cat".to_string()),
-        ];
-        let o = opts("cat", "dog");
-        let report = replace_all_in_documents(&mut docs, &o);
-        assert_eq!(report.total_replacements, 3);
-        assert_eq!(report.total_documents_modified, 2);
-        assert_eq!(docs[0].2, "dog dog");
-        assert_eq!(docs[1].2, "dog");
-    }
-
     // ---- preserve case tests ----
 
     #[test]
@@ -913,159 +582,6 @@ mod tests {
         let (new_text, count) = replace_in_text(text, &o);
         assert_eq!(count, 3);
         assert_eq!(new_text, "World WORLD world");
-    }
-
-    // ---- session navigation tests ----
-
-    #[test]
-    fn test_session_new() {
-        let o = opts("cat", "dog");
-        let session = FindReplaceSession::new(o);
-        assert!(session.results.is_empty());
-        assert_eq!(session.current_result_index, 0);
-        assert_eq!(session.current_match_index, 0);
-        assert!(session.history.is_empty());
-    }
-
-    #[test]
-    fn test_session_find_next() {
-        let o = opts("cat", "dog");
-        let mut session = FindReplaceSession::new(o.clone());
-        let text = "cat dog cat";
-        let matches = find_in_text(text, &o);
-        session.results.push(FindResult {
-            item_id: Uuid::new_v4(),
-            item_title: "Doc".to_string(),
-            matches,
-        });
-
-        // First find_next goes to match index 1
-        let m = session.find_next().unwrap();
-        assert_eq!(m.start, 8); // second "cat"
-
-        // Next wraps back to first
-        let m = session.find_next().unwrap();
-        assert_eq!(m.start, 0);
-    }
-
-    #[test]
-    fn test_session_find_previous() {
-        let o = opts("cat", "dog");
-        let mut session = FindReplaceSession::new(o.clone());
-        let text = "cat dog cat";
-        let matches = find_in_text(text, &o);
-        session.results.push(FindResult {
-            item_id: Uuid::new_v4(),
-            item_title: "Doc".to_string(),
-            matches,
-        });
-
-        // find_previous from index 0 wraps to the last match.
-        let m = session.find_previous().unwrap();
-        assert_eq!(m.start, 8); // last "cat"
-    }
-
-    #[test]
-    fn test_session_find_next_empty() {
-        let o = opts("cat", "dog");
-        let mut session = FindReplaceSession::new(o);
-        assert!(session.find_next().is_none());
-    }
-
-    // ---- session replace / undo tests ----
-
-    #[test]
-    fn test_session_replace_current() {
-        let o = opts("cat", "dog");
-        let mut session = FindReplaceSession::new(o.clone());
-        let text = "cat dog cat";
-        let matches = find_in_text(text, &o);
-        session.results.push(FindResult {
-            item_id: Uuid::new_v4(),
-            item_title: "Doc".to_string(),
-            matches,
-        });
-
-        let record = session.replace_current().unwrap();
-        assert_eq!(record.original_text, "cat");
-        assert_eq!(record.new_text, "dog");
-        assert_eq!(session.history.len(), 1);
-        // One match was removed; one remains.
-        assert_eq!(session.results[0].matches.len(), 1);
-    }
-
-    #[test]
-    fn test_session_replace_current_empty() {
-        let o = opts("cat", "dog");
-        let mut session = FindReplaceSession::new(o);
-        assert!(session.replace_current().is_none());
-    }
-
-    #[test]
-    fn test_session_undo_last() {
-        let o = opts("cat", "dog");
-        let mut session = FindReplaceSession::new(o.clone());
-        let text = "cat";
-        let matches = find_in_text(text, &o);
-        session.results.push(FindResult {
-            item_id: Uuid::new_v4(),
-            item_title: "Doc".to_string(),
-            matches,
-        });
-
-        session.replace_current();
-        let undone = session.undo_last().unwrap();
-        assert_eq!(undone.original_text, "cat");
-        assert_eq!(undone.new_text, "dog");
-        // History should now be empty.
-        assert!(session.undo_last().is_none());
-    }
-
-    #[test]
-    fn test_session_replace_all() {
-        let o = opts("cat", "dog");
-        let mut session = FindReplaceSession::new(o.clone());
-
-        let id1 = Uuid::new_v4();
-        let id2 = Uuid::new_v4();
-        session.results.push(FindResult {
-            item_id: id1,
-            item_title: "Doc1".to_string(),
-            matches: find_in_text("cat cat", &o),
-        });
-        session.results.push(FindResult {
-            item_id: id2,
-            item_title: "Doc2".to_string(),
-            matches: find_in_text("a cat", &o),
-        });
-
-        let report = session.replace_all();
-        assert_eq!(report.total_replacements, 3);
-        assert_eq!(report.total_documents_modified, 2);
-        assert!(session.results.is_empty());
-        assert_eq!(session.history.len(), 3);
-    }
-
-    // ---- current_position tests ----
-
-    #[test]
-    fn test_session_current_position_empty() {
-        let session = FindReplaceSession::new(opts("x", "y"));
-        assert_eq!(session.current_position(), (0, 0));
-    }
-
-    #[test]
-    fn test_session_current_position() {
-        let o = opts("cat", "dog");
-        let mut session = FindReplaceSession::new(o.clone());
-        session.results.push(FindResult {
-            item_id: Uuid::new_v4(),
-            item_title: "Doc".to_string(),
-            matches: find_in_text("cat dog cat", &o),
-        });
-        assert_eq!(session.current_position(), (0, 2));
-        session.find_next();
-        assert_eq!(session.current_position(), (1, 2));
     }
 
     // ---- context extraction tests ----
@@ -1118,33 +634,6 @@ mod tests {
         let matches = find_in_text(text, &o);
         assert_eq!(matches[0].line_number, 2);
         assert_eq!(matches[0].column, 8); // "second " = 7 chars, col 8
-    }
-
-    // ---- highlight tests ----
-
-    #[test]
-    fn test_highlight_matches_basic() {
-        let text = "The cat sat.";
-        let o = opts("cat", "dog");
-        let matches = find_in_text(text, &o);
-        let highlighted = highlight_matches(text, &matches, "<b>", "</b>");
-        assert_eq!(highlighted, "The <b>cat</b> sat.");
-    }
-
-    #[test]
-    fn test_highlight_matches_multiple() {
-        let text = "cat and cat";
-        let o = opts("cat", "x");
-        let matches = find_in_text(text, &o);
-        let highlighted = highlight_matches(text, &matches, "[", "]");
-        assert_eq!(highlighted, "[cat] and [cat]");
-    }
-
-    #[test]
-    fn test_highlight_matches_empty() {
-        let text = "no matches here";
-        let highlighted = highlight_matches(text, &[], "<b>", "</b>");
-        assert_eq!(highlighted, "no matches here");
     }
 
     // ---- replace_next tests ----
@@ -1221,57 +710,6 @@ mod tests {
         assert!(r.is_match("a.b"));
     }
 
-    // ---- preview_replacement tests ----
-
-    #[test]
-    fn test_preview_replacement_plain() {
-        let loc = MatchLocation {
-            start: 0,
-            end: 3,
-            line_number: 1,
-            column: 1,
-            context_before: String::new(),
-            matched_text: "cat".to_string(),
-            context_after: String::new(),
-            preview_replacement: "dog".to_string(),
-        };
-        let preview = preview_replacement(&loc, "dog", false);
-        assert_eq!(preview, "dog");
-    }
-
-    #[test]
-    fn test_preview_replacement_preserve_case() {
-        let loc = MatchLocation {
-            start: 0,
-            end: 3,
-            line_number: 1,
-            column: 1,
-            context_before: String::new(),
-            matched_text: "CAT".to_string(),
-            context_after: String::new(),
-            preview_replacement: String::new(),
-        };
-        let preview = preview_replacement(&loc, "dog", true);
-        assert_eq!(preview, "DOG");
-    }
-
-    // ---- find_in_documents test ----
-
-    #[test]
-    fn test_find_in_documents() {
-        let id1 = Uuid::new_v4();
-        let id2 = Uuid::new_v4();
-        let docs = vec![
-            (id1, "Doc1".to_string(), "The cat sat.".to_string()),
-            (id2, "Doc2".to_string(), "No match here.".to_string()),
-        ];
-        let o = opts("cat", "dog");
-        let results = find_in_documents(&docs, &o);
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].item_id, id1);
-        assert_eq!(results[0].matches.len(), 1);
-    }
-
     // ---- edge case: empty text ----
 
     #[test]
@@ -1298,93 +736,4 @@ mod tests {
         assert_eq!(matches.len(), 3);
     }
 
-    // ---- session navigation across multiple documents ----
-
-    #[test]
-    fn test_session_navigate_across_documents() {
-        let o = opts("cat", "dog");
-        let mut session = FindReplaceSession::new(o.clone());
-
-        session.results.push(FindResult {
-            item_id: Uuid::new_v4(),
-            item_title: "Doc1".to_string(),
-            matches: find_in_text("cat", &o),
-        });
-        session.results.push(FindResult {
-            item_id: Uuid::new_v4(),
-            item_title: "Doc2".to_string(),
-            matches: find_in_text("a cat b", &o),
-        });
-
-        // We start at doc 0, match 0. find_next should advance to doc 1.
-        let matched = session.find_next().unwrap().matched_text.clone();
-        assert_eq!(session.current_result_index, 1);
-        assert_eq!(matched, "cat");
-
-        // find_next again wraps back to doc 0.
-        let matched = session.find_next().unwrap().matched_text.clone();
-        assert_eq!(session.current_result_index, 0);
-        assert_eq!(matched, "cat");
-    }
-
-    // ---- session: replace all then undo ----
-
-    #[test]
-    fn test_session_undo_after_replace_all() {
-        let o = opts("cat", "dog");
-        let mut session = FindReplaceSession::new(o.clone());
-        session.results.push(FindResult {
-            item_id: Uuid::new_v4(),
-            item_title: "Doc".to_string(),
-            matches: find_in_text("cat cat", &o),
-        });
-
-        session.replace_all();
-        assert_eq!(session.history.len(), 2);
-
-        let r1 = session.undo_last().unwrap();
-        assert_eq!(r1.original_text, "cat");
-        let r2 = session.undo_last().unwrap();
-        assert_eq!(r2.original_text, "cat");
-        assert!(session.undo_last().is_none());
-    }
-
-    // ---- session: replace_current removes document when empty ----
-
-    #[test]
-    fn test_session_replace_current_removes_empty_doc() {
-        let o = opts("cat", "dog");
-        let mut session = FindReplaceSession::new(o.clone());
-        session.results.push(FindResult {
-            item_id: Uuid::new_v4(),
-            item_title: "Doc".to_string(),
-            matches: find_in_text("cat", &o), // single match
-        });
-
-        session.replace_current();
-        assert!(session.results.is_empty());
-    }
-}
-
-/// Wire unused find_replace items for compilation.
-pub fn wire_unused_find_replace_items() {
-    // Reference unused FindReplaceOptions field
-    let opts = FindReplaceOptions::default();
-    let _ = &opts.case_sensitive;
-    let _ = opts.whole_word;
-    let _ = opts.use_regex;
-
-    // Reference unused FindReplaceSession methods
-    let mut session = FindReplaceSession {
-        options: FindReplaceOptions::default(),
-        results: vec![],
-        current_result_index: 0,
-        current_match_index: 0,
-        history: vec![],
-    };
-    let _ = session.total_matches();
-    let _ = session.flat_index();
-    let _ = session.current_position();
-    let _ = session.undo_last();
-    let _ = session.options;
 }

@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::fs;
@@ -344,53 +345,6 @@ impl PartOfSpeech {
             PartOfSpeech::Unknown,
         ]
     }
-}
-
-pub fn wire_unused_thesaurus_items() {
-    let mut t = Thesaurus::new();
-
-    // Wire Thesaurus methods
-    let _ = t.synonyms("test");
-    let _ = t.antonyms("test");
-    t.load_builtin();
-    let _ = t.all_words();
-    let _ = t.parts_of_speech_for("test");
-    let _ = t.suggest_variation("test", &[]);
-    let _ = t.word_count();
-    let _ = t.total_entries();
-    let _ = t.contains("test");
-    let _ = t.random_synonym("test");
-    let _ = t.words_with_prefix("te");
-    let _ = t.synonyms_by_pos("test", &PartOfSpeech::Noun);
-    let _ = t.total_unique_synonyms();
-    let _ = t.loaded;
-    let _ = t.load_from_wordnet(std::path::Path::new("/tmp"));
-    let _ = t.has_word("test");
-
-    // Wire PartOfSpeech variants
-    let _ = PartOfSpeech::Noun;
-    let _ = PartOfSpeech::Verb;
-    let _ = PartOfSpeech::Adjective;
-    let _ = PartOfSpeech::Adverb;
-    let _ = PartOfSpeech::Unknown;
-
-    // Wire ThesaurusEntry fields
-    let entry = ThesaurusEntry {
-        part_of_speech: PartOfSpeech::Noun,
-        definition: "test".to_string(),
-        synonyms: vec![],
-        antonyms: vec![],
-    };
-    let _ = entry.total_related();
-    let _ = entry.has_antonyms();
-    let _ = entry.summary();
-    let _ = entry.part_of_speech;
-    let _ = entry.definition;
-    let _ = entry.synonyms;
-    let _ = entry.antonyms;
-
-    // Wire PartOfSpeech::all()
-    let _ = PartOfSpeech::all();
 }
 
 #[cfg(test)]

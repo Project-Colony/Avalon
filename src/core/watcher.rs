@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
@@ -507,14 +508,4 @@ mod tests {
         assert!(tracker.documents_changed.is_empty());
         assert!(!tracker.project_metadata_changed);
     }
-}
-
-/// Wire unused watcher items for compilation.
-pub fn wire_unused_watcher_items() {
-    // Reference the unused ProjectRemoved variant
-    let _ = WatchEvent::ProjectRemoved;
-
-    // Reference unused methods if watcher can be created (they require filesystem)
-    // We'll just reference the types
-    let _ = std::any::type_name::<ProjectWatcher>();
 }

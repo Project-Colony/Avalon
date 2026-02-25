@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use iced::widget::{button, column, container, row, scrollable, text, Space};
 use iced::{Element, Length, Padding};
 use uuid::Uuid;
@@ -169,25 +170,4 @@ pub fn view(data: &QuickRefData) -> Element<'static, Message> {
         .style(theme::panel_style)
         .width(Length::Fill)
         .into()
-}
-
-/// Wire unused quick_reference_panel items for compilation.
-pub fn wire_unused_quick_reference_panel_items() {
-    let data = QuickRefData {
-        title: "Test".to_string(),
-        content: String::new(),
-        synopsis: String::new(),
-        notes: String::new(),
-        word_count: 0,
-        char_count: 0,
-        paragraph_count: 0,
-        item_id: uuid::Uuid::new_v4(),
-        status: String::new(),
-        label: String::new(),
-        label_color: iced::Color::BLACK,
-        keywords: vec![],
-        modified_at: String::new(),
-        reading_time: 0.0,
-    };
-    let _ = data.label_color;
 }

@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use iced::widget::{button, column, container, row, scrollable, text, Space};
 use iced::{Element, Length, Padding};
 use uuid::Uuid;
@@ -218,15 +219,4 @@ pub fn view(
         .style(theme::panel_style)
         .width(Length::Fill)
         .into()
-}
-
-/// Wire unused doc_links_panel items for compilation.
-pub fn wire_unused_doc_links_panel_items() {
-    let link = DocLink {
-        target_title: "Target".to_string(),
-        target_id: uuid::Uuid::new_v4(),
-        link_text: "link".to_string(),
-        display_text: None,
-    };
-    let _ = link.link_text;
 }

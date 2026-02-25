@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use iced::widget::{button, column, container, row, scrollable, text, Space};
 use iced::{Background, Border, Color, Element, Length, Padding};
 
@@ -350,10 +351,4 @@ fn build_footer() -> Element<'static, Message> {
     .padding(Padding::from([10, 16]))
     .width(Length::Fill)
     .into()
-}
-
-/// Wire unused welcome_screen items for compilation.
-pub fn wire_unused_welcome_screen_items() {
-    let theme = iced::Theme::default();
-    let _ = accent_card_style(&theme);
 }

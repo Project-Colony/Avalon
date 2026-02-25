@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use std::collections::HashMap;
 use super::binder::Binder;
 
@@ -885,44 +886,6 @@ impl TrendDirection {
             TrendDirection::Stable => "Stable",
         }
     }
-}
-
-/// Wire all unused methods and fields to eliminate dead code warnings
-pub fn wire_unused_stats_items() {
-    // Wire DailyEntry fields
-    let _daily = DailyEntry::new(
-        chrono::Local::now().date_naive(),
-        100,
-        1000,
-        1100,
-        3600
-    );
-    let _ = _daily.word_count_start;
-    let _ = _daily.word_count_end;
-
-    // Wire WritingTrend fields and methods
-    let mut _history = WritingHistory::new();
-    let _trend = _history.analyze_trend();
-    let _ = _trend.avg_wpm;
-    let _ = _trend.best_day_words;
-    let _ = _trend.longest_streak;
-
-    // Wire TextAnalysis fields
-    let _text_analysis = TextAnalysis::from_text("test text");
-    let _ = _text_analysis.word_count;
-    let _ = _text_analysis.paragraph_count;
-    let _ = _text_analysis.avg_paragraph_length;
-    let _ = _text_analysis.sentence_count;
-
-    // Wire WordFrequencyAnalysis fields
-    let _word_freq = WordFrequencyAnalysis::from_text("test text");
-    let _ = _word_freq.unique_count;
-    let _ = _word_freq.total_count;
-    let _ = _word_freq.hapax_count;
-    let _ = _word_freq.top_bigrams.clone();
-
-    // Wire TrendDirection
-    let _ = TrendDirection::Stable.label();
 }
 
 #[cfg(test)]

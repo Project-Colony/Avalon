@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -1437,10 +1438,4 @@ mod tests {
         let history = PromptHistory::default();
         assert!(history.entries.is_empty());
     }
-}
-
-/// Wire unused writing_prompts items for compilation.
-pub fn wire_unused_writing_prompts_items() {
-    let difficulty = Difficulty::Beginner;
-    let _ = difficulty.label();
 }

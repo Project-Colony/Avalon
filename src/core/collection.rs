@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -368,29 +369,6 @@ impl CollectionManager {
     pub fn largest(&self) -> Option<&Collection> {
         self.collections.iter().max_by_key(|c| c.count())
     }
-}
-
-/// Wire all unused methods and fields to eliminate dead code warnings
-pub fn wire_unused_collection_items() {
-    // Wire Collection methods
-    let mut _coll = Collection::new_manual("Test");
-    let _ = _coll.name.clone();
-    let _ = _coll.id.clone();
-    _coll.remove_item(&uuid::Uuid::new_v4());
-    let _ = _coll.kind.label();
-    let id = uuid::Uuid::new_v4();
-    let _ = _coll.contains(&id);
-    let _ = _coll.count();
-    let _ = _coll.is_smart();
-
-    // Wire CollectionKind methods
-    let _ = CollectionKind::Manual.icon();
-
-    // Wire CollectionManager methods
-    let mut _mgr = CollectionManager::new();
-    let _ = _mgr.add(_coll.clone());
-    let _ = _mgr.remove(&id);
-    let _ = _mgr.get(&id);
 }
 
 #[cfg(test)]

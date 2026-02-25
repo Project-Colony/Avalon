@@ -1,3 +1,4 @@
+#![allow(dead_code)] // Methods used by test code
 use std::collections::HashMap;
 use std::fmt::Write;
 use uuid::Uuid;
@@ -464,16 +465,6 @@ impl TargetStatus {
     pub fn needs_attention(&self) -> bool {
         matches!(self, TargetStatus::AlmostDone | TargetStatus::OverLimit)
     }
-}
-
-/// Wire all unused methods and fields to eliminate dead code warnings
-pub fn wire_unused_targets_items() {
-    // Wire TargetStatus methods
-    let _ = TargetStatus::all();
-    let _status = TargetStatus::InProgress;
-    let _ = _status.icon();
-    let _ = TargetStatus::Complete.is_complete();
-    let _ = TargetStatus::AlmostDone.needs_attention();
 }
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+#![allow(dead_code)] // Methods used by test code
 use serde::{Deserialize, Serialize};
 use chrono::{NaiveDate, Utc};
 
@@ -102,38 +102,15 @@ impl WritingHistory {
         best
     }
 
-    /// Average words per minute across all sessions
-    pub fn average_wpm(&self) -> f64 {
-        let total_time = self.total_time_seconds();
-        if total_time < 60 {
-            return 0.0;
-        }
-        let total_positive: i64 = self.entries.iter()
-            .map(|e| e.words_written.max(0))
-            .sum();
-        total_positive as f64 / (total_time as f64 / 60.0)
-    }
-
     /// Words written in the last 7 days
     pub fn words_this_week(&self) -> i64 {
         let week = self.recent(7);
         week.iter().map(|e| e.words_written).sum()
     }
 
-    /// Get today's entry, if any
-    pub fn today(&self) -> Option<&DailyEntry> {
-        let today = Utc::now().date_naive();
-        self.entries.iter().rev().find(|e| e.date == today)
-    }
-
     /// Number of days with writing activity
     pub fn active_days(&self) -> usize {
         self.entries.iter().filter(|e| e.words_written > 0).count()
-    }
-
-    /// Total number of days tracked
-    pub fn total_days(&self) -> usize {
-        self.entries.len()
     }
 
     /// Activity ratio (fraction of tracked days with positive words)
@@ -142,73 +119,6 @@ impl WritingHistory {
             return 0.0;
         }
         self.active_days() as f64 / self.entries.len() as f64
-    }
-
-    /// Words written in the last 30 days
-    pub fn words_this_month(&self) -> i64 {
-        let month = self.recent(30);
-        month.iter().map(|e| e.words_written).sum()
-    }
-
-    /// Most productive day of the week (0=Mon, 6=Sun)
-    pub fn most_productive_weekday(&self) -> Option<chrono::Weekday> {
-        use chrono::Datelike;
-        let mut totals: HashMap<chrono::Weekday, i64> = HashMap::new();
-        for entry in &self.entries {
-            *totals.entry(entry.date.weekday()).or_insert(0) += entry.words_written.max(0);
-        }
-        totals.into_iter().max_by_key(|(_, v)| *v).map(|(k, _)| k)
-    }
-
-    /// Check if user has written today
-    pub fn wrote_today(&self) -> bool {
-        self.today().is_some_and(|e| e.words_written > 0)
-    }
-
-    /// Average writing time per session in minutes
-    pub fn average_session_minutes(&self) -> f64 {
-        let (count, total) = self.entries.iter()
-            .filter(|e| e.time_spent_seconds > 0)
-            .fold((0usize, 0u64), |(n, sum), e| (n + 1, sum + e.time_spent_seconds));
-        if count == 0 {
-            return 0.0;
-        }
-        (total as f64 / 60.0) / count as f64
-    }
-
-    /// Format total time as a human-readable string
-    pub fn total_time_display(&self) -> String {
-        let secs = self.total_time_seconds();
-        let hours = secs / 3600;
-        let mins = (secs % 3600) / 60;
-        if hours > 0 {
-            format!("{}h {}m", hours, mins)
-        } else {
-            format!("{}m", mins)
-        }
-    }
-
-    /// Get a summary string for display
-    pub fn summary(&self) -> String {
-        format!(
-            "{} words over {} days ({} active), streak: {}",
-            self.total_words_written(),
-            self.total_days(),
-            self.active_days(),
-            self.current_streak()
-        )
-    }
-
-    /// Get the worst day (fewest words written, among active days)
-    pub fn worst_active_day(&self) -> Option<&DailyEntry> {
-        self.entries.iter()
-            .filter(|e| e.words_written > 0)
-            .min_by_key(|e| e.words_written)
-    }
-
-    /// Total pages written (standard manuscript page)
-    pub fn total_pages(&self) -> f64 {
-        self.total_words_written().max(0) as f64 / super::WORDS_PER_PAGE as f64
     }
 
     /// Variance in daily word counts (for consistency analysis)
@@ -323,19 +233,6 @@ impl DailyEntry {
     }
 }
 
-/// Wire all unused methods and fields to eliminate dead code warnings
-pub fn wire_unused_history_items() {
-    // Wire DailyEntry methods
-    let _daily = DailyEntry {
-        date: chrono::Local::now().date_naive(),
-        word_count_start: 1000,
-        word_count_end: 1100,
-        words_written: 100,
-        time_spent_seconds: 3600,
-    };
-    let _ = _daily.wpm();
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -355,7 +252,6 @@ mod tests {
         let history = WritingHistory::new();
         assert!(history.entries.is_empty());
         assert_eq!(history.total_words_written(), 0);
-        assert_eq!(history.total_days(), 0);
         assert_eq!(history.current_streak(), 0);
     }
 
@@ -363,10 +259,10 @@ mod tests {
     fn test_record_words() {
         let mut history = WritingHistory::new();
         history.record(100, 60);
-        assert_eq!(history.total_days(), 1);
+        assert_eq!(history.entries.len(), 1);
         // Record again for the same day
         history.record(200, 60);
-        assert_eq!(history.total_days(), 1);
+        assert_eq!(history.entries.len(), 1);
     }
 
     #[test]
@@ -454,7 +350,6 @@ mod tests {
         history.entries.push(make_entry(
             NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 200, 60));
         assert_eq!(history.active_days(), 2);
-        assert_eq!(history.total_days(), 3);
     }
 
     #[test]
@@ -465,17 +360,6 @@ mod tests {
         history.entries.push(make_entry(
             NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 0, 0));
         assert!((history.activity_ratio() - 0.5).abs() < 0.01);
-    }
-
-    #[test]
-    fn test_total_time_display() {
-        let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 7200));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 1800));
-        let display = history.total_time_display();
-        assert_eq!(display, "2h 30m");
     }
 
     #[test]
@@ -493,58 +377,6 @@ mod tests {
     }
 
     #[test]
-    fn test_summary() {
-        let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 500, 3600));
-        let summary = history.summary();
-        assert!(summary.contains("500 words"));
-        assert!(summary.contains("1 days"));
-    }
-
-    #[test]
-    fn test_wrote_today() {
-        let mut history = WritingHistory::new();
-        assert!(!history.wrote_today());
-
-        // Record something for today
-        history.record(100, 60);
-        // Initially words_written is 0 for the first record (start == end)
-        assert!(!history.wrote_today());
-
-        // Record a word count increase
-        history.record(200, 60);
-        assert!(history.wrote_today());
-    }
-
-    #[test]
-    fn test_today_entry() {
-        let mut history = WritingHistory::new();
-        assert!(history.today().is_none());
-
-        history.record(100, 60);
-        assert!(history.today().is_some());
-    }
-
-    #[test]
-    fn test_average_wpm_short_session() {
-        let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 30));
-        // Less than 60 seconds should return 0
-        assert_eq!(history.average_wpm(), 0.0);
-    }
-
-    #[test]
-    fn test_average_wpm() {
-        let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 300, 600)); // 30 wpm
-        let wpm = history.average_wpm();
-        assert!((wpm - 30.0).abs() < 0.1);
-    }
-
-    #[test]
     fn test_words_this_week() {
         let mut history = WritingHistory::new();
         for i in 1..=7 {
@@ -552,72 +384,6 @@ mod tests {
                 NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
         }
         assert_eq!(history.words_this_week(), 700);
-    }
-
-    #[test]
-    fn test_words_this_month() {
-        let mut history = WritingHistory::new();
-        for i in 1..=10 {
-            history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 50, 60));
-        }
-        assert_eq!(history.words_this_month(), 500);
-    }
-
-    #[test]
-    fn test_most_productive_weekday() {
-        let mut history = WritingHistory::new();
-        // Monday
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
-        // Tuesday
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 500, 120));
-        // Wednesday
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 200, 90));
-
-        let day = history.most_productive_weekday().unwrap();
-        assert_eq!(day, chrono::Weekday::Tue);
-    }
-
-    #[test]
-    fn test_most_productive_weekday_empty() {
-        let history = WritingHistory::new();
-        assert!(history.most_productive_weekday().is_none());
-    }
-
-    #[test]
-    fn test_average_session_minutes() {
-        let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 1800)); // 30 min
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 3600)); // 60 min
-
-        let avg = history.average_session_minutes();
-        assert!((avg - 45.0).abs() < 0.01);
-    }
-
-    #[test]
-    fn test_average_session_minutes_empty() {
-        let history = WritingHistory::new();
-        assert_eq!(history.average_session_minutes(), 0.0);
-    }
-
-    #[test]
-    fn test_average_session_minutes_skip_zero_time() {
-        let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 600));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 0, 0)); // No time
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 200, 600));
-
-        let avg = history.average_session_minutes();
-        // Only 2 active sessions: (600 + 600) / 60 / 2 = 10
-        assert!((avg - 10.0).abs() < 0.01);
     }
 
     #[test]
@@ -632,14 +398,6 @@ mod tests {
         let entry = make_entry(
             NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 300);
         assert_eq!(entry.time_display(), "5m");
-    }
-
-    #[test]
-    fn test_total_time_display_minutes_only() {
-        let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 1800));
-        assert_eq!(history.total_time_display(), "30m");
     }
 
     #[test]
@@ -689,33 +447,6 @@ mod tests {
         }
         assert_eq!(history.current_streak(), 5);
         assert_eq!(history.longest_streak(), 5);
-    }
-
-    #[test]
-    fn test_worst_active_day() {
-        let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 500, 60));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 50, 30));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 200, 60));
-        let worst = history.worst_active_day().unwrap();
-        assert_eq!(worst.words_written, 50);
-    }
-
-    #[test]
-    fn test_worst_active_day_empty() {
-        let history = WritingHistory::new();
-        assert!(history.worst_active_day().is_none());
-    }
-
-    #[test]
-    fn test_total_pages() {
-        let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 500, 60));
-        assert!((history.total_pages() - 2.0).abs() < 0.01);
     }
 
     #[test]
