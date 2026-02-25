@@ -749,7 +749,7 @@ impl ScrineverApp {
             }
 
             Message::OpenProject => {
-                let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                let home = crate::core::home_dir_or_cwd();
                 let projects_dir = home.join(PROJECTS_DIR_NAME);
                 if projects_dir.exists() {
                     if let Ok(entries) = std::fs::read_dir(&projects_dir) {
@@ -783,7 +783,7 @@ impl ScrineverApp {
             Message::SaveProject => {
                 self.sync_editor_to_project();
                 if let Some(ref mut project) = self.project {
-                    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                    let home = crate::core::home_dir_or_cwd();
                     let save_dir = home.join(PROJECTS_DIR_NAME);
                     match project.save(&save_dir) {
                         Ok(_) => {
@@ -1245,7 +1245,7 @@ impl ScrineverApp {
                         compile_result.validation_issues.len(),
                     );
 
-                    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                    let home = crate::core::home_dir_or_cwd();
                     let output_dir = home.join(OUTPUT_DIR_NAME);
                     if let Err(e) = std::fs::create_dir_all(&output_dir) {
                         self.notification = Some(format!("Failed to create output dir: {}", e));
@@ -1818,7 +1818,7 @@ impl ScrineverApp {
             // ========== Import ==========
             Message::ImportFiles => {
                 if let Some(ref mut project) = self.project {
-                    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                    let home = crate::core::home_dir_or_cwd();
                     let import_dir = home.join(IMPORT_DIR_NAME);
                     if import_dir.exists() {
                         let mut count = 0;
@@ -2779,7 +2779,7 @@ impl ScrineverApp {
             // ========== OPML Import ==========
             Message::ImportOpml => {
                 if let Some(ref mut project) = self.project {
-                    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                    let home = crate::core::home_dir_or_cwd();
                     let import_dir = home.join(IMPORT_DIR_NAME);
                     if import_dir.exists() {
                         let mut count = 0;
@@ -2882,7 +2882,7 @@ impl ScrineverApp {
             Message::ExportOpml => {
                 self.sync_editor_to_project();
                 if let Some(ref project) = self.project {
-                    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                    let home = crate::core::home_dir_or_cwd();
                     let output_dir = home.join(OUTPUT_DIR_NAME);
                     if let Err(e) = std::fs::create_dir_all(&output_dir) {
                         log::warn!("Failed to create output directory: {}", e);
@@ -2924,10 +2924,12 @@ impl ScrineverApp {
                             }];
 
                             let opts = CompileOptions { title: item.title.clone(), ..CompileOptions::default() };
-                            let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                            let home = crate::core::home_dir_or_cwd();
                             let print_path = home.join(PROJECTS_DIR_NAME).join("print.pdf");
                             if let Some(parent) = print_path.parent() {
-                                let _ = std::fs::create_dir_all(parent);
+                                if let Err(e) = std::fs::create_dir_all(parent) {
+                                    log::warn!("Failed to create directory {:?}: {}", parent, e);
+                                }
                             }
                             match crate::export::pdf::save_pdf(&contents, &opts, &print_path) {
                                 Ok(_) => {
@@ -2947,10 +2949,12 @@ impl ScrineverApp {
                 if let Some(ref project) = self.project {
                     let mut opts = self.compile_options.clone();
                     opts.format = crate::export::compiler::OutputFormat::Pdf;
-                    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                    let home = crate::core::home_dir_or_cwd();
                     let print_path = home.join(PROJECTS_DIR_NAME).join(format!("{}_print.pdf", project.title));
                     if let Some(parent) = print_path.parent() {
-                        let _ = std::fs::create_dir_all(parent);
+                        if let Err(e) = std::fs::create_dir_all(parent) {
+                                    log::warn!("Failed to create directory {:?}: {}", parent, e);
+                                }
                     }
                     match crate::export::compiler::Compiler::save_to_file(&project.binder, &opts, &print_path) {
                         Ok(_) => {
@@ -3487,7 +3491,7 @@ impl ScrineverApp {
                         self.auto_save_counter = 0;
                         self.sync_editor_to_project();
                         if let Some(ref mut project) = self.project {
-                            let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+                            let home = crate::core::home_dir_or_cwd();
                             let save_dir = home.join(PROJECTS_DIR_NAME);
                             if project.save(&save_dir).is_ok() {
                                 self.editor.mark_clean();
@@ -3694,12 +3698,10 @@ impl ScrineverApp {
 
         // === Main window ===
 
-        // Welcome screen
-        if self.project.is_none() {
+        // Welcome screen (no project loaded)
+        let Some(project) = self.project.as_ref() else {
             return views::welcome_screen::view(&self.recent_projects);
-        }
-
-        let project = self.project.as_ref().unwrap();
+        };
 
         // Compile dialog (overlay)
         if self.show_compile_dialog {

@@ -63,7 +63,13 @@ pub fn search_binder(binder: &Binder, options: &SearchOptions) -> Vec<SearchResu
         Err(_) => return results,
     };
 
-    for item in binder.all_items() {
+    let max = options.max_results;
+    binder.for_each_item(|item| {
+        // Early termination when max_results is reached
+        if max > 0 && results.len() >= max {
+            return;
+        }
+
         let mut matches = Vec::new();
 
         // Search title
@@ -114,12 +120,8 @@ pub fn search_binder(binder: &Binder, options: &SearchOptions) -> Vec<SearchResu
                 item_title: item.title.clone(),
                 matches,
             });
-            // Early termination when max_results is reached
-            if options.max_results > 0 && results.len() >= options.max_results {
-                break;
-            }
         }
-    }
+    });
 
     results
 }

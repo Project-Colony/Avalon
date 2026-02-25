@@ -87,13 +87,15 @@ impl Annotation {
     /// Shift the annotation range by an offset (for text insertions/deletions before it)
     pub fn shift(&mut self, offset: i64) {
         if offset >= 0 {
-            let off = offset as usize;
-            self.start += off;
-            self.end += off;
+            if let Ok(off) = usize::try_from(offset) {
+                self.start = self.start.saturating_add(off);
+                self.end = self.end.saturating_add(off);
+            }
         } else {
-            let off = (-offset) as usize;
-            self.start = self.start.saturating_sub(off);
-            self.end = self.end.saturating_sub(off);
+            if let Ok(off) = usize::try_from(offset.saturating_abs()) {
+                self.start = self.start.saturating_sub(off);
+                self.end = self.end.saturating_sub(off);
+            }
         }
     }
 

@@ -21,6 +21,16 @@ pub const READING_WPM: f64 = 250.0;
 /// Average speaking speed in words per minute.
 pub const SPEAKING_WPM: f64 = 150.0;
 
+/// Get the user's home directory, or fall back to the current directory with a warning.
+/// Centralizes the home directory lookup so all callers handle the failure case
+/// consistently (log + safe fallback) rather than silently using an empty path.
+pub fn home_dir_or_cwd() -> std::path::PathBuf {
+    dirs::home_dir().unwrap_or_else(|| {
+        log::warn!("Could not determine home directory, falling back to current directory");
+        std::path::PathBuf::from(".")
+    })
+}
+
 /// Format a byte count into a human-readable size string (e.g. "1.5 MB").
 pub fn format_bytes(bytes: u64) -> String {
     const KB: u64 = 1024;
@@ -78,6 +88,9 @@ pub mod corkboard;
 pub mod outliner;
 pub mod bookmark;
 pub mod recent;
+
+// Application-level configuration
+pub mod app_config;
 
 // Integration module (wires together subsystems)
 pub mod integrations;
