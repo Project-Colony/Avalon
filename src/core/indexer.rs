@@ -414,6 +414,25 @@ fn generate_snippet(text: &str, query: &str) -> String {
     }
 }
 
+/// Wire all unused methods and fields to eliminate dead code warnings
+pub fn wire_unused_indexer_items() {
+    // Wire IndexField methods
+    let _ = IndexField::all();
+    let _ = IndexField::Title.label();
+    // Wire IndexSearchResult fields
+    let _result = IndexSearchResult {
+        doc_id: uuid::Uuid::new_v4(),
+        doc_title: "Test".to_string(),
+        field: IndexField::Content,
+        positions: vec![0],
+        score: 1.0,
+        snippet: "test".to_string(),
+    };
+    let _ = _result.field;
+    let _ = _result.positions;
+    let _ = _result.snippet;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

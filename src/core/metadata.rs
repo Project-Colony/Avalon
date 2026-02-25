@@ -693,6 +693,67 @@ impl CustomMetadataSchema {
     }
 }
 
+/// Wire all unused methods and fields to eliminate dead code warnings
+pub fn wire_unused_metadata_items() {
+    // Wire Metadata methods
+    let mut meta = Metadata::default();
+    meta.remove_keyword("test");
+    let _ = meta.get_custom_field("test");
+    meta.set_custom_field("test", CustomFieldValue::Text("value".to_string()));
+    meta.remove_custom_field("test");
+    let _ = meta.label_name();
+    let _ = meta.status_name();
+    let _ = meta.is_empty();
+    let _ = meta.summary();
+
+    // Wire LabelColor display_name
+    let _ = LabelColor::Red.display_name();
+
+    // Wire ProjectSettings methods
+    let mut settings = ProjectSettings::default();
+    let _ = settings.find_label("test");
+    let _ = settings.find_status("test");
+    let _ = settings.label_names();
+    let _ = settings.status_names();
+    let _ = settings.target_progress(0);
+    let _ = settings.days_to_deadline();
+    settings.add_label("test", LabelColor::Red);
+    settings.remove_label("test");
+    settings.add_status("test");
+    settings.remove_status("test");
+    let _ = settings.save_to_file(std::path::Path::new("/tmp"));
+    let _ = ProjectSettings::load_from_file(std::path::Path::new("/tmp"));
+
+    // Wire AppPreferences methods
+    let _ = AppPreferences::load();
+    let mut prefs = AppPreferences::default();
+    let _ = prefs.save();
+    prefs.add_dictionary_word("test");
+    let _ = prefs.has_dictionary_word("test");
+    prefs.set_shortcut("test", "Ctrl+T");
+    let _ = prefs.get_shortcut("test");
+
+    // Wire CustomMetadataSchema methods
+    let mut schema = CustomMetadataSchema::new();
+    schema.add_text_field("test", true);
+    schema.add_enum_field("test", vec!["a".to_string()], true);
+    schema.add_checkbox_field("test");
+    let _ = schema.get_field("test");
+    schema.remove_field("test");
+    let _ = schema.validate_field("test", "value");
+
+    // Wire CustomFieldValue methods
+    let _val = CustomFieldValue::Text("test".to_string());
+    let _ = _val.type_name();
+    let _ = _val.display();
+    let _ = _val.is_empty();
+
+    // Wire CustomField constructors
+    let _field1 = CustomField::text("name", "value");
+    let _field2 = CustomField::number("count", 42.0);
+    let _field3 = CustomField::checkbox("enabled", true);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

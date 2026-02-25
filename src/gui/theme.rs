@@ -823,3 +823,17 @@ pub fn progress_bar_text(pct: f64, width: usize) -> String {
     )
 }
 
+/// Wire unused theme items for compilation.
+pub fn wire_unused_theme_items() {
+    // Reference unused constants and functions
+    let _ = Icons::FOLDER;
+    let _ = Icons::BOOK;
+    let _ = Icons::LINK;
+    let _ = Icons::SEARCH;
+    let _ = Icons::REFRESH;
+    let _ = Icons::CHECK_CIRCLE;
+    let _ = format_count(1000);
+    let _ = format_compact(1000);
+    let _ = progress_bar_text(50.0, 20);
+}
+

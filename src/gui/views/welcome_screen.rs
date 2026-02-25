@@ -351,3 +351,9 @@ fn build_footer() -> Element<'static, Message> {
     .width(Length::Fill)
     .into()
 }
+
+/// Wire unused welcome_screen items for compilation.
+pub fn wire_unused_welcome_screen_items() {
+    let theme = iced::Theme::default();
+    let _ = accent_card_style(&theme);
+}

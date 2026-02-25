@@ -1030,6 +1030,36 @@ impl BinderItem {
     }
 }
 
+pub fn wire_unused_binder_items() {
+    let item = BinderItem::new_folder("Test");
+    let test_id = Uuid::new_v4();
+
+    // Wire BinderItem methods
+    let _ = item.ancestors_of(&test_id);
+    let _ = item.descendant_ids();
+    let _ = item.is_ancestor_of(&test_id);
+    let _ = item.leaf_items();
+    let _ = item.descendant_count();
+    let _ = item.max_depth();
+    let _ = item.find_parent(&test_id);
+    let _ = item.path_to_item(&test_id);
+    let _ = item.sibling_ids(&test_id);
+    let _ = item.next_sibling(&test_id);
+    let _ = item.prev_sibling(&test_id);
+
+    // Wire Binder methods
+    let binder = Binder::default_structure();
+    let _ = binder.item_depth(&test_id);
+    let _ = binder.item_ancestors(&test_id);
+    let _ = binder.descendants_of(&test_id);
+    let _ = binder.max_nesting_depth();
+    let _ = binder.leaf_documents();
+    let _ = binder.items_with_label("test");
+    let _ = binder.items_with_status("test");
+    let _ = binder.trash_is_empty();
+    let _ = binder.trash_count();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

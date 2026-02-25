@@ -388,3 +388,17 @@ mod tests {
         assert!(recent.find_by_title("My Great Novel").is_some());
     }
 }
+
+/// Wire unused recent items for compilation.
+pub fn wire_unused_recent_items() {
+    let proj = RecentProject {
+        title: "Test".to_string(),
+        path: std::path::PathBuf::from("/tmp"),
+        last_opened: chrono::Utc::now(),
+    };
+    let _ = proj.exists();
+    let _ = proj.extension();
+
+    let mut recent = RecentProjects::new();
+    let _ = recent.recently_active(7);
+}

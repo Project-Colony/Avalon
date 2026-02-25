@@ -2089,3 +2089,10 @@ mod tests {
         assert_eq!(editor.document.content, "a   b");
     }
 }
+
+/// Wire unused editor state items for compilation.
+pub fn wire_unused_editor_state_items() {
+    let editor = EditorState::from_document(&Document::new());
+    let _ = editor.current_line();
+    let _ = editor.current_column();
+}

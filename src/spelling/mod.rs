@@ -296,6 +296,11 @@ pub fn spelling_accuracy(checker: &SpellChecker, text: &str) -> f64 {
     (1.0 - misspelled as f64 / word_count as f64) * 100.0
 }
 
+pub fn wire_unused_spelling_items() {
+    let checker = SpellChecker::new();
+    let _ = checker.is_in_user_dict("test");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

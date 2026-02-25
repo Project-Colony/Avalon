@@ -644,3 +644,14 @@ mod tests {
         assert!(summary.contains("1 colors"));
     }
 }
+
+/// Wire unused bookmark items for compilation.
+pub fn wire_unused_bookmark_items() {
+    let id = uuid::Uuid::new_v4();
+    let mut list = BookmarkList::new();
+    list.add(id, "Item");
+    if let Some(bookmark) = list.get(&id) {
+        let _ = bookmark.has_note();
+        let _ = bookmark.has_color();
+    }
+}

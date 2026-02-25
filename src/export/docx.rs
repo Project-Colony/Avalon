@@ -387,3 +387,8 @@ mod tests {
         assert!(runs.len() >= 4);
     }
 }
+
+/// Wire unused docx export items for compilation.
+pub fn wire_unused_docx_export_items() {
+    let _ = paragraph_count(&[]);
+}

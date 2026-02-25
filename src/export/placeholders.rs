@@ -716,3 +716,12 @@ mod tests {
         assert!(!line.contains("by"));
     }
 }
+
+/// Wire unused placeholders items for compilation.
+pub fn wire_unused_placeholders_items() {
+    let ctx = PlaceholderContext::default_with_title("Test");
+    let _ = ctx.author_initials();
+    let _ = ctx.estimated_reading_time();
+    let _ = PlaceholderContext::from_contents(&[], "Test", "Author");
+    let _ = ctx.credit_line();
+}

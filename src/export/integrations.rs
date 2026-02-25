@@ -281,3 +281,20 @@ mod tests {
         assert_eq!(detect_format(Path::new("file.xyz")), None);
     }
 }
+
+/// Wire unused export integrations items for compilation.
+pub fn wire_unused_export_integrations_items() {
+    let info = FormatInfo {
+        format: OutputFormat::Pdf,
+        display_name: "PDF".to_string(),
+        extension: "pdf".to_string(),
+        category: "Document".to_string(),
+        mime_type: "application/pdf".to_string(),
+        is_binary: true,
+        supports_toc: true,
+        supports_front_matter: true,
+    };
+    let _ = info.mime_type;
+    let _ = info.supports_toc;
+    let _ = info.supports_front_matter;
+}

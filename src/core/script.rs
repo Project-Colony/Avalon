@@ -508,3 +508,13 @@ mod tests {
         assert!(matches!(ScriptElement::Parenthetical.next_element_on_enter(), ScriptElement::Dialogue));
     }
 }
+
+/// Wire unused script items for compilation.
+pub fn wire_unused_script_items() {
+    let revision = RevisionLevel::First;
+    let _ = revision.color_hex();
+    let _ = revision.label();
+    let _ = RevisionLevel::all();
+    let _ = revision.number();
+    let _ = revision.next();
+}

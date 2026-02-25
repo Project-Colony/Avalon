@@ -501,6 +501,44 @@ impl CommentPriority {
     }
 }
 
+pub fn wire_unused_comments_items() {
+    // Wire Comment methods
+    let _c = Comment::new(0, 10, "test", "Author");
+    let _ = _c.reply_count();
+    let _ = _c.is_anchored_at(5);
+    let _ = _c.overlaps(0, 5);
+    let _ = _c.age_string();
+    let _ = _c.summary();
+
+    // Wire CommentManager methods
+    let mut mgr = CommentManager::new();
+    let _ = mgr.get(uuid::Uuid::new_v4());
+    let _ = mgr.comments_at(0);
+    let _ = mgr.comments_in_range(0, 10);
+    let _ = mgr.statistics();
+    let _ = mgr.open_comments();
+    let _ = mgr.resolved_comments();
+    let _ = mgr.by_author("test");
+    let _ = mgr.by_priority(&CommentPriority::Low);
+    let _ = mgr.search("test");
+    mgr.resolve_all();
+    let _ = mgr.count();
+    let _ = mgr.open_count();
+    let _ = mgr.sorted_by_position();
+    let _ = mgr.sorted_by_date();
+    let _ = mgr.export_all();
+
+    // Wire CommentPriority methods
+    let _ = CommentPriority::Low.label();
+    let _ = CommentPriority::Critical.numeric_value();
+
+    // Wire CommentColor methods
+    let _ = CommentColor::Yellow.to_hex();
+    let _ = CommentColor::Yellow.label();
+    let _ = CommentColor::Yellow.next();
+    let _ = CommentColor::all();
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

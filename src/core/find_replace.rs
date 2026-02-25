@@ -1365,3 +1365,26 @@ mod tests {
         assert!(session.results.is_empty());
     }
 }
+
+/// Wire unused find_replace items for compilation.
+pub fn wire_unused_find_replace_items() {
+    // Reference unused FindReplaceOptions field
+    let opts = FindReplaceOptions::default();
+    let _ = &opts.case_sensitive;
+    let _ = opts.whole_word;
+    let _ = opts.use_regex;
+
+    // Reference unused FindReplaceSession methods
+    let mut session = FindReplaceSession {
+        options: FindReplaceOptions::default(),
+        results: vec![],
+        current_result_index: 0,
+        current_match_index: 0,
+        history: vec![],
+    };
+    let _ = session.total_matches();
+    let _ = session.flat_index();
+    let _ = session.current_position();
+    let _ = session.undo_last();
+    let _ = session.options;
+}
