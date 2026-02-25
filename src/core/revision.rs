@@ -156,8 +156,9 @@ impl RevisionTracker {
         };
         self.active_pass = Some(pass.id);
         self.revision_mode_enabled = true;
+        let idx = self.passes.len();
         self.passes.push(pass);
-        self.passes.last().unwrap()
+        &self.passes[idx]
     }
 
     /// Mark a revision pass as completed by setting its `completed_at`

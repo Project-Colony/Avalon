@@ -22,6 +22,10 @@ use crate::thesaurus::Thesaurus;
 
 use super::theme::Theme;
 use super::views;
+use super::helpers;
+
+// Re-export message types from the extracted module
+pub use super::messages::{Message, ViewMode, BottomPanel, ToolbarMenu, SettingsTab};
 
 // ========== Timing constants ==========
 /// How often (in auto-save ticks) to check word count milestones
@@ -34,71 +38,6 @@ const HISTORY_RECORD_INTERVAL: u64 = 60;
 const COLLECTION_REFRESH_INTERVAL: u32 = 30;
 /// Pomodoro break reminder time in seconds (25 minutes)
 const POMODORO_BREAK_SECONDS: u64 = 1500;
-
-/// The active view mode
-#[derive(Debug, Clone, PartialEq)]
-pub enum ViewMode {
-    Editor,
-    Corkboard,
-    Outliner,
-    Scrivenings,
-}
-
-/// Which bottom panel is visible
-#[derive(Debug, Clone, PartialEq)]
-pub enum BottomPanel {
-    None,
-    Search,
-    Thesaurus,
-    Snapshots,
-    Session,
-    History,
-    TextStats,
-    NameGen,
-    ProjectNotes,
-    Collections,
-    Bookmarks,
-    Annotations,
-    Targets,
-    QuickRef,
-    FindReplace,
-    WritingGoals,
-    DocLinks,
-    Backups,
-    SpellCheck,
-    Timer,
-    Validation,
-    Templates,
-    WritingPrompts,
-}
-
-/// Which toolbar dropdown menu is open
-#[derive(Debug, Clone, PartialEq)]
-pub enum ToolbarMenu {
-    File,
-    View,
-    Panels,
-    Tools,
-}
-
-/// Active tab in the Settings window
-///
-/// Inspired by Scrivener (7 panes), Word (10 categories), Ulysses (7 tabs):
-/// - General: project identity, saving, labels/statuses
-/// - Editor: typing behavior, navigation, composition, script mode
-/// - Corrections: proofing, auto-correct substitutions, spell check
-/// - Appearance: font, layout, display toggles, UI scale
-/// - Backup: auto-backup, frequency, accessibility
-/// - Shortcuts: complete keyboard reference
-#[derive(Debug, Clone, PartialEq)]
-pub enum SettingsTab {
-    General,
-    Editor,
-    Corrections,
-    Appearance,
-    Backup,
-    Shortcuts,
-}
 
 /// Application state
 pub struct ScrineverApp {
@@ -236,348 +175,6 @@ pub struct ScrineverApp {
 
     // === Linguistic analysis (on-demand, cached) ===
     pub linguistic_result: Option<crate::core::linguistic::WritingAnalysis>,
-}
-
-/// Messages for the application
-#[derive(Debug, Clone)]
-#[allow(dead_code)] // Some variants are dispatched by UI views
-pub enum Message {
-    // Project operations
-    NewProject,
-    NewFromTemplate(String),
-    OpenProject,
-    SaveProject,
-    ProjectLoaded(Box<Option<Project>>),
-
-    // Binder operations
-    SelectBinderItem(Uuid),
-    ToggleBinderItem(Uuid),
-    NewDocument,
-    NewFolder,
-    DeleteItem(Uuid),
-    RenameItem(Uuid, String),
-    UpdateSynopsis(Uuid, String),
-    MoveItem { item_id: Uuid, target_id: Uuid, position: usize },
-    MoveItemUp(Uuid),
-    MoveItemDown(Uuid),
-    DuplicateItem(Uuid),
-    EmptyTrash,
-    ConvertToFolder(Uuid),
-    ConvertToText(Uuid),
-    SplitDocument,
-    MergeIntoParent,
-
-    // Editor operations
-    EditorAction(text_editor::Action),
-
-    // View operations
-    SwitchView(ViewMode),
-    ToggleInspector,
-    ToggleFullscreen,
-    ShowBottomPanel(BottomPanel),
-
-    // Compile operations
-    ShowCompileDialog,
-    HideCompileDialog,
-    CompileSetFormat(String),
-    CompileSetTitle(String),
-    CompileSetAuthor(String),
-    CompileSetFrontMatter(bool),
-    CompileSetMarkedOnly(bool),
-    CompileSetPageBreaks(bool),
-    CompileSetFontFamily(String),
-    CompileSetFontSize(String),
-    CompileSetSeparator(String),
-    DoCompile,
-
-    // Snapshot operations
-    CreateSnapshot,
-    RestoreSnapshot(usize),
-
-    // Search operations
-    SearchQueryChanged(String),
-    DoSearch,
-    SearchToggleCaseSensitive,
-    SearchToggleWholeWord,
-    SearchToggleRegex,
-    ReplaceTextChanged(String),
-    DoReplaceAll,
-    GoToSearchResult(Uuid),
-
-    // Thesaurus operations
-    ThesaurusQueryChanged(String),
-    DoThesaurusLookup,
-    InsertSynonym(String),
-
-    // Document notes
-    NotesChanged(String),
-
-    // Target word count
-    SetItemTarget(Uuid, String),
-
-    // Metadata
-    SetItemStatus(Uuid, String),
-    SetItemLabel(Uuid, String),
-    ToggleIncludeInCompile(Uuid),
-
-    // Window management
-    OpenSettingsWindow,
-    CloseSettingsWindow,
-    OpenAboutWindow,
-    CloseAboutWindow,
-    WindowOpened(window::Id),
-    WindowClosed(window::Id),
-    MainWindowClosed,
-
-    // Settings
-    ShowSettings,
-    HideSettings,
-    SettingsChangeTab(SettingsTab),
-    SettingsSetProjectTitle(String),
-    SettingsSetFont(String),
-    SettingsSetFontSize(String),
-    SettingsZoomIn,
-    SettingsZoomOut,
-    SettingsSetTarget(String),
-    SettingsSetAutoSave(String),
-    SettingsToggleWordCount(bool),
-    SettingsSetLineSpacing(String),
-    SettingsSetLineSpacingPreset(String),
-    SettingsSetEditorWidth(String),
-    SettingsToggleSpellCheck(bool),
-    SettingsToggleTypewriterScroll(bool),
-    SettingsToggleShowParagraphMarks(bool),
-    SettingsToggleHighContrast(bool),
-    SettingsToggleLargeUI(bool),
-    SettingsToggleReduceMotion(bool),
-    SettingsToggleScreenReaderHints(bool),
-    SettingsSetUIScale(String),
-    SettingsToggleAutoBackup(bool),
-    SettingsSetBackupInterval(String),
-    SettingsToggleSmartPunctuation(bool),
-    SettingsSetDefaultDocType(String),
-    SettingsToggleShowSynopsis(bool),
-    SettingsToggleAutoNumbering(bool),
-
-    // Writing session
-    SessionToggle,
-    SessionReset,
-    SessionSetGoal(String),
-
-    // Import
-    ImportFiles,
-
-    // Name generator
-    GenerateName(String),
-    GenerateNameBatch,
-
-    // Project notes
-    ProjectNotesChanged(String),
-
-    // Keywords
-    SetItemKeywords(Uuid, String),
-
-    // Collections
-    CollectionNameInput(String),
-    CreateCollection,
-    DeleteCollection(Uuid),
-    SelectCollection(Uuid),
-    AddToCollection(Uuid),
-
-    // Bookmarks
-    ToggleBookmark(Uuid),
-
-    // Annotations
-    AnnotationTextInput(String),
-    AddAnnotation,
-    DeleteAnnotation(Uuid),
-    ToggleAnnotationResolved(Uuid),
-    EditAnnotation(Uuid, String),
-    SetAnnotationColor(Uuid, String),
-    SetAnnotationCategory(Uuid, String),
-    CycleAnnotationColor,
-
-    // Project targets
-    SettingsSetDeadline(String),
-
-    // Text transforms
-    TextToUppercase,
-    TextToLowercase,
-    TextToTitleCase,
-
-    // Undo/Redo
-    Undo,
-    Redo,
-
-    // Recent projects
-    OpenRecentProject(std::path::PathBuf),
-
-    // Split editor
-    OpenInSplitEditor(Uuid),
-    CloseSplitEditor,
-
-    // Document find/replace
-    DocFindChanged(String),
-    DocFindNext,
-    DocFindPrev,
-    DocReplaceCurrent,
-    DocReplaceAll,
-    DocReplaceChanged(String),
-    DocFindToggleCase,
-    DocFindToggleWholeWord,
-    DocFindToggleRegex,
-
-    // Quick reference
-    ShowQuickRef(Uuid),
-
-    // Script mode
-    ToggleScriptMode,
-    SetScriptElement(String),
-
-    // Auto-correction
-    ToggleAutoCorrectSmartQuotes,
-    ToggleAutoCorrectEmDashes,
-    ToggleAutoCorrectEllipsis,
-
-    // Document links
-    InsertDocLink(Uuid),
-
-    // Formatting toolbar
-    InsertBold,
-    InsertItalic,
-    InsertUnderline,
-    InsertStrikethrough,
-    InsertHeading(u8),
-    InsertBlockQuote,
-    InsertFootnote,
-    InsertHRule,
-
-    // Compile presets
-    SaveCompilePreset(String),
-    LoadCompilePreset(String),
-
-    // Project statistics
-    ShowProjectStats,
-    HideProjectStats,
-
-    // Writing goals
-    SetDailyGoal(String),
-    SetWeeklyGoal(String),
-    ResetGoals,
-
-    // Composition mode
-    ToggleCompositionMode,
-
-    // Copy special
-    CopyAsMarkdown,
-    CopyAsHtml,
-    CopyAsPlainText,
-
-    // Search results to collection
-    SaveSearchAsCollection,
-
-    // Backup
-    CreateBackup,
-    RestoreBackup(std::path::PathBuf),
-
-    // OPML import
-    ImportOpml,
-
-    // Smart collection
-    CreateSmartCollection(String),
-
-    // Snapshot comparison
-    SelectSnapshot(usize),
-    CompareSnapshot(usize),
-
-    // Compile options (new)
-    CompileSetToc(bool),
-    CompileSetPlaceholders(bool),
-
-    // Export OPML
-    ExportOpml,
-
-    // Print
-    PrintCurrent,
-    PrintProject,
-
-    // Spell check
-    RunSpellCheck,
-    SpellCheckAddWord(String),
-    SpellCheckReplace(usize, String, String),
-    SpellCheckRemoveWord(String),
-    SpellCheckClearDict,
-    ToggleSpellChecker,
-
-    // Custom metadata fields
-    AddCustomField(Uuid, String),
-    UpdateCustomField(Uuid, String, String),
-    RemoveCustomField(Uuid, String),
-
-    // Smart collection refresh
-    RefreshSmartCollections,
-
-    // Composition mode settings
-    SettingsSetCompWidth(String),
-
-    // Editor text operations
-    TransposeChars,
-    SortLines,
-    RemoveDuplicateLines,
-    JoinLines,
-    MoveLineUp,
-    MoveLineDown,
-    DeleteLine,
-    DuplicateLine,
-    IndentLine,
-    UnindentLine,
-    ToggleComment,
-
-    // Insert operations
-    InsertListItem(String),
-    InsertTable(usize, usize),
-    InsertCodeBlock(String),
-    InsertPageBreak,
-    InsertComment,
-    InsertDateTime(String),
-    InsertLink,
-    InsertImage,
-
-    // Document templates
-    NewDocFromTemplate(String),
-
-    // Writing timer
-    TimerStart,
-    TimerPause,
-    TimerResume,
-    TimerStop,
-    TimerReset,
-    TimerSetPreset(String),
-
-    // Project validation
-    ShowValidation,
-
-    // Writing prompts
-    GenerateWritingPrompt,
-    GenerateWritingPromptCategory(String),
-    GenerateCharacter,
-    GeneratePlotSeed,
-    GenerateWritingNames,
-
-    // Toolbar menus
-    ToggleToolbarMenu(ToolbarMenu),
-    CloseToolbarMenu,
-
-    // Outliner interactions
-    OutlinerToggleExpand(Uuid),
-
-    // Validation auto-fix
-    AutoFixValidation,
-
-    // Misc
-    Tick,
-    DismissNotification,
-    EscapePressed,
 }
 
 impl ScrineverApp {
@@ -749,35 +346,29 @@ impl ScrineverApp {
             }
 
             Message::OpenProject => {
-                let home = crate::core::home_dir_or_cwd();
-                let projects_dir = home.join(PROJECTS_DIR_NAME);
-                if projects_dir.exists() {
-                    if let Ok(entries) = std::fs::read_dir(&projects_dir) {
-                        for entry in entries.flatten() {
-                            let path = entry.path();
-                            if path.is_dir() && path.extension().is_some_and(|e| e == crate::core::PROJECT_EXTENSION) {
-                                match Project::load(&path) {
-                                    Ok(p) => {
-                                        self.compile_options.title = p.title.clone();
-                                        self.project_notes_text = p.project_notes.clone();
-                                        self.generated_names.clear();
-                                        self.project = Some(p);
-                                        self.selected_item = None;
-                                        self.editor = EditorState::new();
-                                        self.notification = Some(format!("Opened project from {:?}", path));
-                                        return IcedTask::none();
-                                    }
-                                    Err(e) => {
-                                        self.notification = Some(format!("Load error: {}", e));
+                // Perform file I/O off the GUI thread to prevent UI freezes
+                self.notification = Some("Opening project...".to_string());
+                return IcedTask::perform(
+                    async {
+                        let home = crate::core::home_dir_or_cwd();
+                        let projects_dir = home.join(PROJECTS_DIR_NAME);
+                        if !projects_dir.exists() {
+                            return Box::new(None);
+                        }
+                        if let Ok(entries) = std::fs::read_dir(&projects_dir) {
+                            for entry in entries.flatten() {
+                                let path = entry.path();
+                                if path.is_dir() && path.extension().is_some_and(|e| e == crate::core::PROJECT_EXTENSION) {
+                                    if let Ok(p) = Project::load(&path) {
+                                        return Box::new(Some(p));
                                     }
                                 }
                             }
                         }
-                    }
-                    self.notification = Some(format!("No .{} projects found in ~/{}/", crate::core::PROJECT_EXTENSION, PROJECTS_DIR_NAME));
-                } else {
-                    self.notification = Some("No projects directory found. Create a project first.".to_string());
-                }
+                        Box::new(None)
+                    },
+                    Message::ProjectLoaded,
+                );
             }
 
             Message::SaveProject => {
@@ -820,10 +411,17 @@ impl ScrineverApp {
                         &p.binder,
                         p.path.as_deref(),
                     );
+                    let title = p.title.clone();
                     self.project = Some(p);
                     self.selected_item = None;
                     self.editor = EditorState::new();
                     self.linguistic_result = None;
+                    self.notification = Some(format!("Opened project: {}", title));
+                } else {
+                    self.notification = Some(format!(
+                        "No .{} projects found in ~/{}/",
+                        crate::core::PROJECT_EXTENSION, PROJECTS_DIR_NAME
+                    ));
                 }
             }
 
@@ -1411,7 +1009,7 @@ impl ScrineverApp {
             }
 
             Message::DoThesaurusLookup => {
-                self.thesaurus_results = self.thesaurus.lookup(&self.thesaurus_query);
+                self.thesaurus_results = self.thesaurus.lookup(&self.thesaurus_query).to_vec();
             }
 
             Message::InsertSynonym(word) => {
@@ -1892,7 +1490,7 @@ impl ScrineverApp {
                                         }
                                         "tex" | "latex" => {
                                             if let Ok(content) = std::fs::read_to_string(&path) {
-                                                let plain = strip_latex_commands(&content);
+                                                let plain = helpers::strip_latex_commands(&content);
                                                 let mut item = BinderItem::new_text(&title);
                                                 if let Some(ref mut doc) = item.document {
                                                     doc.content = plain;
@@ -2227,7 +1825,7 @@ impl ScrineverApp {
                     if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
                         if let Some(item) = project.binder.find_item_mut(&item_id) {
                             if let Some(ref mut doc) = item.document {
-                                doc.content = title_case(&doc.content);
+                                doc.content = helpers::title_case(&doc.content);
                                 self.editor.load_document(doc);
                                 self.editor.mark_dirty();
                             }
@@ -2824,7 +2422,7 @@ impl ScrineverApp {
                                                 .unwrap_or("Imported HTML")
                                                 .to_string();
                                             // Strip HTML tags for plain text import
-                                            let plain = strip_html_tags(&content);
+                                            let plain = helpers::strip_html_tags(&content);
                                             let mut item = BinderItem::new_text(&title);
                                             if let Some(ref mut doc) = item.document {
                                                 doc.content = plain;
@@ -4387,232 +3985,5 @@ impl ScrineverApp {
     }
 }
 
-/// Convert text to Title Case
-fn title_case(text: &str) -> String {
-    text.split_whitespace()
-        .map(|word| {
-            let mut chars = word.chars();
-            match chars.next() {
-                None => String::new(),
-                Some(first) => {
-                    let upper: String = first.to_uppercase().collect();
-                    let rest: String = chars.collect();
-                    format!("{}{}", upper, rest.to_lowercase())
-                }
-            }
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-/// Strip HTML tags from content for plain text import
-fn strip_html_tags(html: &str) -> String {
-    let mut result = String::new();
-    let mut in_tag = false;
-    let mut in_script = false;
-
-    let lower = html.to_lowercase();
-    let chars: Vec<char> = html.chars().collect();
-    let lower_chars: Vec<char> = lower.chars().collect();
-
-    let mut i = 0;
-    while i < chars.len() {
-        if !in_tag && i + 7 < lower_chars.len() {
-            let slice: String = lower_chars[i..i + 7].iter().collect();
-            if slice == "<script" {
-                in_script = true;
-            }
-        }
-        if in_script && i + 8 < lower_chars.len() {
-            let slice: String = lower_chars[i..i + 9].iter().collect();
-            if slice == "</script>" {
-                in_script = false;
-                i += 9;
-                continue;
-            }
-        }
-
-        if in_script {
-            i += 1;
-            continue;
-        }
-
-        if chars[i] == '<' {
-            in_tag = true;
-            // Convert block elements to newlines
-            if i + 2 < lower_chars.len() {
-                let next_two: String = lower_chars[i + 1..i + 3.min(lower_chars.len())].iter().collect();
-                if next_two.starts_with('p') || next_two.starts_with('b') || next_two.starts_with('h')
-                    || next_two.starts_with('l') || next_two.starts_with('d')
-                    || next_two.starts_with('t')
-                {
-                    result.push('\n');
-                }
-            }
-        } else if chars[i] == '>' {
-            in_tag = false;
-        } else if !in_tag {
-            result.push(chars[i]);
-        }
-        i += 1;
-    }
-
-    // Clean up excessive newlines
-    let mut cleaned = String::new();
-    let mut prev_was_newline = false;
-    for ch in result.chars() {
-        if ch == '\n' {
-            if !prev_was_newline {
-                cleaned.push('\n');
-            }
-            prev_was_newline = true;
-        } else {
-            prev_was_newline = false;
-            cleaned.push(ch);
-        }
-    }
-
-    // Unescape common HTML entities
-    cleaned = cleaned.replace("&amp;", "&");
-    cleaned = cleaned.replace("&lt;", "<");
-    cleaned = cleaned.replace("&gt;", ">");
-    cleaned = cleaned.replace("&quot;", "\"");
-    cleaned = cleaned.replace("&#39;", "'");
-    cleaned = cleaned.replace("&nbsp;", " ");
-
-    cleaned.trim().to_string()
-}
-
-/// Strip LaTeX commands from content for plain text import
-fn strip_latex_commands(latex: &str) -> String {
-    let mut result = String::new();
-    let mut i = 0;
-    let chars: Vec<char> = latex.chars().collect();
-
-    while i < chars.len() {
-        if chars[i] == '\\' {
-            // Skip the command name
-            i += 1;
-            // Check for \begin{...} and \end{...} — skip the whole thing
-            let mut cmd = String::new();
-            while i < chars.len() && chars[i].is_alphanumeric() {
-                cmd.push(chars[i]);
-                i += 1;
-            }
-            // Convert some commands to their content
-            match cmd.as_str() {
-                "section" | "subsection" | "subsubsection" | "chapter" | "part" => {
-                    result.push('\n');
-                    result.push('\n');
-                    // Skip the {title} — extract the text inside
-                    if i < chars.len() && chars[i] == '{' {
-                        i += 1; // skip {
-                        let mut depth = 1;
-                        while i < chars.len() && depth > 0 {
-                            if chars[i] == '{' { depth += 1; }
-                            else if chars[i] == '}' { depth -= 1; }
-                            if depth > 0 { result.push(chars[i]); }
-                            i += 1;
-                        }
-                    }
-                    result.push('\n');
-                }
-                "textbf" | "textit" | "emph" | "underline" | "textsf" | "texttt" => {
-                    // Extract content from braces
-                    if i < chars.len() && chars[i] == '{' {
-                        i += 1;
-                        let mut depth = 1;
-                        while i < chars.len() && depth > 0 {
-                            if chars[i] == '{' { depth += 1; }
-                            else if chars[i] == '}' { depth -= 1; }
-                            if depth > 0 { result.push(chars[i]); }
-                            i += 1;
-                        }
-                    }
-                }
-                "begin" | "end" => {
-                    // Skip {environment}
-                    if i < chars.len() && chars[i] == '{' {
-                        i += 1;
-                        let mut env = String::new();
-                        while i < chars.len() && chars[i] != '}' {
-                            env.push(chars[i]);
-                            i += 1;
-                        }
-                        if i < chars.len() { i += 1; } // skip }
-                        if env == "itemize" || env == "enumerate" || env == "description" {
-                            result.push('\n');
-                        }
-                    }
-                }
-                "item" => {
-                    result.push('\n');
-                    result.push_str("  - ");
-                }
-                "par" | "newline" | "linebreak" => {
-                    result.push('\n');
-                }
-                _ => {
-                    // Skip unknown commands and their optional/required args
-                    if i < chars.len() && chars[i] == '{' {
-                        let mut depth = 1;
-                        i += 1;
-                        while i < chars.len() && depth > 0 {
-                            if chars[i] == '{' { depth += 1; }
-                            else if chars[i] == '}' { depth -= 1; }
-                            i += 1;
-                        }
-                    }
-                }
-            }
-        } else if chars[i] == '{' || chars[i] == '}' {
-            // Skip bare braces
-            i += 1;
-        } else if chars[i] == '%' {
-            // Skip LaTeX comments
-            while i < chars.len() && chars[i] != '\n' {
-                i += 1;
-            }
-        } else if chars[i] == '$' {
-            // Skip math mode
-            i += 1;
-            if i < chars.len() && chars[i] == '$' {
-                // Display math $$...$$
-                i += 1;
-                while i + 1 < chars.len() && !(chars[i] == '$' && chars[i + 1] == '$') {
-                    result.push(chars[i]);
-                    i += 1;
-                }
-                if i + 1 < chars.len() { i += 2; }
-            } else {
-                // Inline math $...$
-                while i < chars.len() && chars[i] != '$' {
-                    result.push(chars[i]);
-                    i += 1;
-                }
-                if i < chars.len() { i += 1; }
-            }
-        } else {
-            result.push(chars[i]);
-            i += 1;
-        }
-    }
-
-    // Clean up multiple blank lines
-    let mut cleaned = String::new();
-    let mut blank_count = 0;
-    for line in result.lines() {
-        if line.trim().is_empty() {
-            blank_count += 1;
-            if blank_count <= 2 {
-                cleaned.push('\n');
-            }
-        } else {
-            blank_count = 0;
-            cleaned.push_str(line);
-            cleaned.push('\n');
-        }
-    }
-
-    cleaned.trim().to_string()
-}
+// Free functions (title_case, strip_html_tags, strip_latex_commands)
+// have been moved to gui/helpers.rs

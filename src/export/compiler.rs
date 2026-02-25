@@ -174,12 +174,9 @@ impl Compiler {
 
         // Replace placeholders if enabled
         if options.replace_placeholders {
-            let total_words = contents.iter()
-                .map(|c| c.text.split_whitespace().count())
-                .sum::<usize>();
-            let total_chars = contents.iter()
-                .map(|c| c.text.len())
-                .sum::<usize>();
+            let (total_words, total_chars) = contents.iter().fold((0usize, 0usize), |(w, c), item| {
+                (w + item.text.split_whitespace().count(), c + item.text.len())
+            });
 
             let context = super::placeholders::PlaceholderContext {
                 project_title: options.title.clone(),
@@ -218,9 +215,15 @@ impl Compiler {
 
     /// Collect contents from the binder tree in order
     fn collect_contents(item: &BinderItem, options: &CompileOptions) -> Vec<CompileContent> {
-        let mut contents = Vec::new();
+        let estimated_count = Self::count_items(item);
+        let mut contents = Vec::with_capacity(estimated_count);
         Self::collect_recursive(item, options, 0, &mut contents);
         contents
+    }
+
+    /// Count total items in a binder subtree (for pre-allocation).
+    fn count_items(item: &BinderItem) -> usize {
+        1 + item.children.iter().map(Self::count_items).sum::<usize>()
     }
 
     fn collect_recursive(
@@ -592,4 +595,270 @@ pub fn decode_xml_entities(text: &str) -> String {
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
         .replace("&apos;", "'")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── OutputFormat ────────────────────────────────────────────
+
+    #[test]
+    fn test_output_format_extensions() {
+        assert_eq!(OutputFormat::PlainText.extension(), "txt");
+        assert_eq!(OutputFormat::Markdown.extension(), "md");
+        assert_eq!(OutputFormat::Html.extension(), "html");
+        assert_eq!(OutputFormat::Pdf.extension(), "pdf");
+        assert_eq!(OutputFormat::Latex.extension(), "tex");
+        assert_eq!(OutputFormat::Docx.extension(), "docx");
+        assert_eq!(OutputFormat::Epub.extension(), "epub");
+        assert_eq!(OutputFormat::Rtf.extension(), "rtf");
+        assert_eq!(OutputFormat::Opml.extension(), "opml");
+        assert_eq!(OutputFormat::Fountain.extension(), "fountain");
+    }
+
+    #[test]
+    fn test_output_format_display_names() {
+        assert_eq!(OutputFormat::PlainText.display_name(), "Plain Text");
+        assert_eq!(OutputFormat::Html.display_name(), "HTML");
+        assert_eq!(OutputFormat::Pdf.display_name(), "PDF");
+        assert_eq!(OutputFormat::Latex.display_name(), "LaTeX");
+    }
+
+    #[test]
+    fn test_output_format_all() {
+        let all = OutputFormat::all();
+        assert_eq!(all.len(), 10);
+        assert_eq!(all[0], OutputFormat::PlainText);
+        assert_eq!(all[9], OutputFormat::Fountain);
+    }
+
+    // ── CompileOptions ─────────────────────────────────────────
+
+    #[test]
+    fn test_compile_options_default() {
+        let opts = CompileOptions::default();
+        assert_eq!(opts.format, OutputFormat::Markdown);
+        assert!(opts.title.is_empty());
+        assert!(opts.include_front_matter);
+        assert!(opts.compile_marked_only);
+        assert_eq!(opts.font_size, 12.0);
+    }
+
+    #[test]
+    fn test_compile_options_validate_empty_title() {
+        let opts = CompileOptions {
+            include_front_matter: true,
+            ..CompileOptions::default()
+        };
+        let issues = opts.validate();
+        assert!(issues.iter().any(|i| i.contains("Title is empty")));
+    }
+
+    #[test]
+    fn test_compile_options_validate_bad_font_size() {
+        let opts = CompileOptions {
+            font_size: 2.0,
+            title: "Test".to_string(),
+            ..CompileOptions::default()
+        };
+        let issues = opts.validate();
+        assert!(issues.iter().any(|i| i.contains("Font size")));
+    }
+
+    #[test]
+    fn test_compile_options_validate_ok() {
+        let opts = CompileOptions {
+            title: "My Book".to_string(),
+            font_size: 12.0,
+            font_family: "Arial".to_string(),
+            ..CompileOptions::default()
+        };
+        assert!(opts.validate().is_empty());
+    }
+
+    #[test]
+    fn test_settings_summary() {
+        let opts = CompileOptions {
+            title: "Test".to_string(),
+            include_toc: true,
+            ..CompileOptions::default()
+        };
+        let summary = opts.settings_summary();
+        assert!(summary.contains("Markdown"));
+        assert!(summary.contains("With TOC"));
+        assert!(summary.contains("With front matter"));
+    }
+
+    // ── SeparatorType ──────────────────────────────────────────
+
+    #[test]
+    fn test_separator_strings() {
+        assert_eq!(SeparatorType::EmptyLine.separator_string(), "\n\n");
+        assert_eq!(SeparatorType::PageBreak.separator_string(), "\n\n---\n\n");
+        assert_eq!(SeparatorType::SectionBreak.separator_string(), "\n\n***\n\n");
+        assert_eq!(SeparatorType::None.separator_string(), "");
+        assert_eq!(SeparatorType::Custom("~~~".to_string()).separator_string(), "~~~");
+    }
+
+    // ── CompileContent ─────────────────────────────────────────
+
+    #[test]
+    fn test_compile_content_word_count() {
+        let c = CompileContent {
+            title: "Test".to_string(),
+            text: "Hello world, this is a test.".to_string(),
+            depth: 0,
+            is_folder: false,
+        };
+        assert_eq!(c.word_count(), 6);
+    }
+
+    #[test]
+    fn test_compile_content_char_count() {
+        let c = CompileContent {
+            title: "".to_string(),
+            text: "Hello".to_string(),
+            depth: 0,
+            is_folder: false,
+        };
+        assert_eq!(c.char_count(), 5);
+    }
+
+    #[test]
+    fn test_compile_content_paragraph_count() {
+        let c = CompileContent {
+            title: "".to_string(),
+            text: "Para one.\n\nPara two.\n\nPara three.".to_string(),
+            depth: 0,
+            is_folder: false,
+        };
+        assert_eq!(c.paragraph_count(), 3);
+    }
+
+    #[test]
+    fn test_compile_content_sentence_count() {
+        let c = CompileContent {
+            title: "".to_string(),
+            text: "Hello. World! How are you?".to_string(),
+            depth: 0,
+            is_folder: false,
+        };
+        assert_eq!(c.sentence_count(), 3);
+    }
+
+    #[test]
+    fn test_compile_content_sentence_count_empty() {
+        let c = CompileContent {
+            title: "".to_string(),
+            text: "".to_string(),
+            depth: 0,
+            is_folder: false,
+        };
+        assert_eq!(c.sentence_count(), 0);
+    }
+
+    // ── CompileStatistics ──────────────────────────────────────
+
+    #[test]
+    fn test_compile_statistics() {
+        let contents = vec![
+            CompileContent { title: "Ch 1".to_string(), text: "Hello world".to_string(), depth: 0, is_folder: false },
+            CompileContent { title: "Folder".to_string(), text: String::new(), depth: 0, is_folder: true },
+            CompileContent { title: "Ch 2".to_string(), text: "One two three".to_string(), depth: 1, is_folder: false },
+        ];
+        let stats = CompileStatistics::from_contents(&contents);
+        assert_eq!(stats.total_words, 5); // "Hello world" + "One two three"
+    }
+
+    // ── Utility functions ──────────────────────────────────────
+
+    #[test]
+    fn test_escape_xml() {
+        assert_eq!(escape_xml("a & b < c > d"), "a &amp; b &lt; c &gt; d");
+        assert_eq!(escape_xml("\"hello\" 'world'"), "&quot;hello&quot; &apos;world&apos;");
+    }
+
+    #[test]
+    fn test_escape_html() {
+        assert_eq!(escape_html("a & b"), "a &amp; b");
+        assert_eq!(escape_html("'test'"), "&#39;test&#39;");
+    }
+
+    #[test]
+    fn test_slug() {
+        assert_eq!(slug("Hello World"), "hello-world");
+        assert_eq!(slug("Chapter 1: The Beginning"), "chapter-1-the-beginning");
+        assert_eq!(slug("  spaces  "), "spaces");
+    }
+
+    #[test]
+    fn test_decode_xml_entities() {
+        assert_eq!(decode_xml_entities("&amp; &lt; &gt; &quot; &apos;"), "& < > \" '");
+    }
+
+    #[test]
+    fn test_total_word_count() {
+        let contents = vec![
+            CompileContent { title: "".to_string(), text: "one two".to_string(), depth: 0, is_folder: false },
+            CompileContent { title: "".to_string(), text: "three four five".to_string(), depth: 0, is_folder: false },
+        ];
+        assert_eq!(total_word_count(&contents), 5);
+    }
+
+    // ── CompileManifest ────────────────────────────────────────
+
+    #[test]
+    fn test_manifest_from_contents() {
+        let opts = CompileOptions {
+            page_break_between_folders: true,
+            ..CompileOptions::default()
+        };
+        let contents = vec![
+            CompileContent { title: "Part 1".to_string(), text: String::new(), depth: 0, is_folder: true },
+            CompileContent { title: "Ch 1".to_string(), text: "text".to_string(), depth: 1, is_folder: false },
+            CompileContent { title: "Part 2".to_string(), text: String::new(), depth: 0, is_folder: true },
+        ];
+        let manifest = CompileManifest::from_contents(&contents, &opts);
+        assert_eq!(manifest.sections.len(), 3);
+        assert!(!manifest.sections[0].has_page_break_before); // first item
+        assert!(manifest.sections[2].has_page_break_before); // second top-level folder
+    }
+
+    // ── SectionAssembler ───────────────────────────────────────
+
+    #[test]
+    fn test_section_assembler_format_heading_markdown() {
+        let heading = SectionAssembler::format_heading("Test", 2, &OutputFormat::Markdown);
+        assert_eq!(heading, "## Test");
+    }
+
+    #[test]
+    fn test_section_assembler_format_heading_html() {
+        let heading = SectionAssembler::format_heading("Test", 3, &OutputFormat::Html);
+        assert_eq!(heading, "<h3>Test</h3>");
+    }
+
+    #[test]
+    fn test_section_assembler_format_heading_latex() {
+        let heading = SectionAssembler::format_heading("Test", 2, &OutputFormat::Latex);
+        assert_eq!(heading, "\\section{Test}");
+    }
+
+    #[test]
+    fn test_section_assembler_format_heading_plain() {
+        let heading = SectionAssembler::format_heading("Test Title", 1, &OutputFormat::PlainText);
+        assert_eq!(heading, "TEST TITLE");
+    }
+
+    #[test]
+    fn test_section_assembler_assemble() {
+        let opts = CompileOptions::default();
+        let contents = vec![
+            CompileContent { title: "Chapter 1".to_string(), text: "Some text here.".to_string(), depth: 0, is_folder: false },
+        ];
+        let output = SectionAssembler::assemble(&contents, &opts);
+        assert!(output.contains("Chapter 1"));
+        assert!(output.contains("Some text here."));
+    }
 }

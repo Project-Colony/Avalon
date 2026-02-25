@@ -692,7 +692,7 @@ mod tests {
 
         // Create a snapshot
         let item_id = project.binder.draft.children.last().unwrap().id;
-        let _ = project.create_snapshot(&item_id, "First Draft");
+        project.create_snapshot(&item_id, "First Draft").expect("snapshot should succeed in test");
 
         // Verify snapshot exists in memory
         let item = project.binder.find_item(&item_id).unwrap();

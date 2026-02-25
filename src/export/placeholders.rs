@@ -4,38 +4,57 @@ use chrono::Utc;
 /// Replace placeholders in compiled text with actual values.
 /// Scrivener-compatible placeholder syntax: <$placeholder>
 pub fn replace_placeholders(text: &str, context: &PlaceholderContext) -> String {
-    let mut result = text.to_string();
+    // Early exit: skip all work if no placeholders present
+    if !text.contains("<$") {
+        return text.to_string();
+    }
 
-    // Date/time placeholders
+    // Build replacement table once (avoids repeated formatting)
     let now = Utc::now();
-    result = result.replace("<$date>", &now.format(crate::core::DATE_FORMAT).to_string());
-    result = result.replace("<$longdate>", &now.format("%B %d, %Y").to_string());
-    result = result.replace("<$shortdate>", &now.format("%m/%d/%y").to_string());
-    result = result.replace("<$time>", &now.format("%H:%M").to_string());
-    result = result.replace("<$year>", &now.format("%Y").to_string());
-    result = result.replace("<$month>", &now.format("%B").to_string());
-    result = result.replace("<$day>", &now.format("%d").to_string());
+    let wc = context.word_count.to_string();
+    let cc = context.char_count.to_string();
+    let pc = context.page_count.to_string();
 
-    // Project placeholders
-    result = result.replace("<$projecttitle>", &context.project_title);
-    result = result.replace("<$author>", &context.author);
-    result = result.replace("<$surname>", &context.surname());
-    result = result.replace("<$forename>", &context.forename());
+    let simple_replacements: &[(&str, &str)] = &[
+        ("<$date>", &now.format(crate::core::DATE_FORMAT).to_string()),
+        ("<$longdate>", &now.format("%B %d, %Y").to_string()),
+        ("<$shortdate>", &now.format("%m/%d/%y").to_string()),
+        ("<$time>", &now.format("%H:%M").to_string()),
+        ("<$year>", &now.format("%Y").to_string()),
+        ("<$month>", &now.format("%B").to_string()),
+        ("<$day>", &now.format("%d").to_string()),
+        ("<$projecttitle>", &context.project_title),
+        ("<$author>", &context.author),
+        ("<$surname>", &context.surname()),
+        ("<$forename>", &context.forename()),
+        ("<$wc>", &wc),
+        ("<$wordcount>", &wc),
+        ("<$cc>", &cc),
+        ("<$charcount>", &cc),
+        ("<$pagecount>", &pc),
+    ];
 
-    // Statistics placeholders
-    result = result.replace("<$wc>", &context.word_count.to_string());
-    result = result.replace("<$wordcount>", &context.word_count.to_string());
-    result = result.replace("<$cc>", &context.char_count.to_string());
-    result = result.replace("<$charcount>", &context.char_count.to_string());
-    result = result.replace("<$pagecount>", &context.page_count.to_string());
+    // Single pass for simple (non-counting) placeholders
+    let mut result = text.to_string();
+    for &(placeholder, value) in simple_replacements {
+        if result.contains(placeholder) {
+            result = result.replace(placeholder, value);
+        }
+    }
 
-    // Auto-numbering (chapter/section numbers)
-    // These are replaced with incrementing counters
+    // Auto-numbering requires per-line stateful processing
+    let has_numbering = result.contains("<$n>") || result.contains("<$N>")
+        || result.contains("<$W>") || result.contains("<$sn>")
+        || result.contains("<$fn>") || result.contains("<$pagebreak>");
+
+    if !has_numbering {
+        return result;
+    }
+
     let mut chapter_num = 0;
     let mut section_num = 0;
     let mut figure_num = 0;
 
-    // Process line by line for auto-numbering
     let lines: Vec<String> = result.lines().map(|l| {
         let mut line = l.to_string();
         if line.contains("<$n>") {
@@ -183,5 +202,138 @@ fn to_word(num: usize) -> String {
         41..=49 => format!("Forty-{}", to_word(num - 40).to_lowercase()),
         50 => "Fifty".to_string(),
         _ => num.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_context() -> PlaceholderContext {
+        PlaceholderContext {
+            project_title: "My Novel".to_string(),
+            author: "Jane Smith".to_string(),
+            word_count: 50000,
+            char_count: 250000,
+            page_count: 200,
+        }
+    }
+
+    #[test]
+    fn test_surname() {
+        assert_eq!(test_context().surname(), "Smith");
+    }
+
+    #[test]
+    fn test_forename() {
+        assert_eq!(test_context().forename(), "Jane");
+    }
+
+    #[test]
+    fn test_no_placeholders() {
+        let result = replace_placeholders("Hello world", &test_context());
+        assert_eq!(result, "Hello world");
+    }
+
+    #[test]
+    fn test_project_title_placeholder() {
+        let result = replace_placeholders("Title: <$projecttitle>", &test_context());
+        assert_eq!(result, "Title: My Novel");
+    }
+
+    #[test]
+    fn test_author_placeholder() {
+        let result = replace_placeholders("By <$author>", &test_context());
+        assert_eq!(result, "By Jane Smith");
+    }
+
+    #[test]
+    fn test_name_placeholders() {
+        let result = replace_placeholders("<$forename> <$surname>", &test_context());
+        assert_eq!(result, "Jane Smith");
+    }
+
+    #[test]
+    fn test_word_count_placeholders() {
+        let result = replace_placeholders("<$wc> / <$wordcount>", &test_context());
+        assert_eq!(result, "50000 / 50000");
+    }
+
+    #[test]
+    fn test_auto_numbering_n() {
+        let text = "Ch <$n>\nCh <$n>\nCh <$n>";
+        let result = replace_placeholders(text, &test_context());
+        assert!(result.contains("Ch 1"));
+        assert!(result.contains("Ch 2"));
+        assert!(result.contains("Ch 3"));
+    }
+
+    #[test]
+    fn test_auto_numbering_roman() {
+        let text = "Part <$N>\nPart <$N>";
+        let result = replace_placeholders(text, &test_context());
+        assert!(result.contains("Part I"));
+        assert!(result.contains("Part II"));
+    }
+
+    #[test]
+    fn test_auto_numbering_word() {
+        let text = "Ch <$W>\nCh <$W>";
+        let result = replace_placeholders(text, &test_context());
+        assert!(result.contains("Ch One"));
+        assert!(result.contains("Ch Two"));
+    }
+
+    #[test]
+    fn test_section_numbering() {
+        let text = "Ch <$n>\nSec <$sn>\nSec <$sn>\nCh <$n>\nSec <$sn>";
+        let result = replace_placeholders(text, &test_context());
+        assert!(result.contains("Sec 1.1"));
+        assert!(result.contains("Sec 1.2"));
+        assert!(result.contains("Sec 2.1"));
+    }
+
+    #[test]
+    fn test_generate_toc() {
+        let sections = vec![
+            ("Chapter 1".to_string(), 0),
+            ("Scene 1".to_string(), 1),
+        ];
+        let toc = generate_toc(&sections);
+        assert!(toc.contains("Table of Contents"));
+        assert!(toc.contains("1.  Chapter 1"));
+    }
+
+    #[test]
+    fn test_generate_toc_markdown() {
+        let sections = vec![("Intro".to_string(), 0)];
+        let toc = generate_toc_markdown(&sections);
+        assert!(toc.contains("[Intro]"));
+        assert!(toc.contains("#intro"));
+    }
+
+    #[test]
+    fn test_generate_toc_html() {
+        let sections = vec![("Intro".to_string(), 0)];
+        let toc = generate_toc_html(&sections);
+        assert!(toc.contains("<nav"));
+        assert!(toc.contains("Intro"));
+    }
+
+    #[test]
+    fn test_to_roman() {
+        assert_eq!(to_roman(1), "I");
+        assert_eq!(to_roman(4), "IV");
+        assert_eq!(to_roman(9), "IX");
+        assert_eq!(to_roman(42), "XLII");
+    }
+
+    #[test]
+    fn test_to_word() {
+        assert_eq!(to_word(1), "One");
+        assert_eq!(to_word(10), "Ten");
+        assert_eq!(to_word(21), "Twenty-one");
+        assert_eq!(to_word(50), "Fifty");
+        assert_eq!(to_word(99), "99");
     }
 }

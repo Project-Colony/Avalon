@@ -106,17 +106,35 @@ impl EditorState {
         text[..pos].matches('\n').count()
     }
 
+    /// Maximum total bytes across all undo entries before evicting old ones.
+    const UNDO_MEMORY_BUDGET: usize = 10 * 1024 * 1024; // 10 MiB
+
     /// Push current state onto undo stack
     pub fn push_undo(&mut self) {
+        // Skip if top of undo stack already has identical content
+        if let Some(top) = self.undo_stack.back() {
+            if top.content == self.document.content && top.cursor == self.cursor {
+                return;
+            }
+        }
+
         self.undo_stack.push_back(UndoEntry {
             content: self.document.content.clone(),
             cursor: self.cursor,
         });
         self.redo_stack.clear();
 
-        // Limit undo stack size
+        // Limit undo stack by count
         if self.undo_stack.len() > 100 {
             self.undo_stack.pop_front();
+        }
+
+        // Limit undo stack by total memory usage
+        let mut total_bytes: usize = self.undo_stack.iter().map(|e| e.content.len()).sum();
+        while total_bytes > Self::UNDO_MEMORY_BUDGET && self.undo_stack.len() > 1 {
+            if let Some(evicted) = self.undo_stack.pop_front() {
+                total_bytes -= evicted.content.len();
+            }
         }
     }
 

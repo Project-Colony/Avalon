@@ -21,7 +21,11 @@ pub fn save_pdf(contents: &[CompileContent], options: &CompileOptions, path: &Pa
     let line_height = options.font_size * 0.5;
     let margin_left = 25.0_f32;
     let page_width = 160.0_f32; // Usable width in mm
-    let chars_per_line = (page_width / (options.font_size * 0.2)) as usize;
+    let chars_per_line = if options.font_size > 0.0 {
+        (page_width / (options.font_size * 0.2)) as usize
+    } else {
+        80 // safe fallback when font_size is zero
+    };
 
     // Title page
     if options.include_front_matter && !options.title.is_empty() {
