@@ -1,6 +1,6 @@
-use std::path::Path;
 use anyhow::Result;
 use docx_rs::*;
+use std::path::Path;
 
 use super::compiler::{CompileContent, CompileOptions, SeparatorType};
 
@@ -10,23 +10,13 @@ pub fn save_docx(contents: &[CompileContent], options: &CompileOptions, path: &P
     // Title page
     if options.include_front_matter && !options.title.is_empty() {
         let title_para = Paragraph::new()
-            .add_run(
-                Run::new()
-                    .add_text(&options.title)
-                    .size(48)
-                    .bold(),
-            )
+            .add_run(Run::new().add_text(&options.title).size(48).bold())
             .align(AlignmentType::Center);
         docx = docx.add_paragraph(title_para);
 
         if !options.author.is_empty() {
             let author_para = Paragraph::new()
-                .add_run(
-                    Run::new()
-                        .add_text(&options.author)
-                        .size(24)
-                        .italic(),
-                )
+                .add_run(Run::new().add_text(&options.author).size(24).italic())
                 .align(AlignmentType::Center);
             docx = docx.add_paragraph(author_para);
         }
@@ -34,18 +24,12 @@ pub fn save_docx(contents: &[CompileContent], options: &CompileOptions, path: &P
         // Date line
         let date_str = chrono::Local::now().format("%B %d, %Y").to_string();
         let date_para = Paragraph::new()
-            .add_run(
-                Run::new()
-                    .add_text(&date_str)
-                    .size(20)
-                    .italic(),
-            )
+            .add_run(Run::new().add_text(&date_str).size(20).italic())
             .align(AlignmentType::Center);
         docx = docx.add_paragraph(date_para);
 
         // Page break after title
-        let break_para = Paragraph::new()
-            .add_run(Run::new().add_break(BreakType::Page));
+        let break_para = Paragraph::new().add_run(Run::new().add_break(BreakType::Page));
         docx = docx.add_paragraph(break_para);
     }
 
@@ -55,8 +39,7 @@ pub fn save_docx(contents: &[CompileContent], options: &CompileOptions, path: &P
         if content.is_folder {
             // Page break before top-level folders (except the first)
             if content.depth == 0 && i > 0 && options.page_break_between_folders {
-                let break_para = Paragraph::new()
-                    .add_run(Run::new().add_break(BreakType::Page));
+                let break_para = Paragraph::new().add_run(Run::new().add_break(BreakType::Page));
                 docx = docx.add_paragraph(break_para);
             }
 
@@ -68,13 +51,7 @@ pub fn save_docx(contents: &[CompileContent], options: &CompileOptions, path: &P
                 _ => 22,
             };
 
-            let heading_para = Paragraph::new()
-                .add_run(
-                    Run::new()
-                        .add_text(&content.title)
-                        .size(heading_size)
-                        .bold(),
-                );
+            let heading_para = Paragraph::new().add_run(Run::new().add_text(&content.title).size(heading_size).bold());
             docx = docx.add_paragraph(heading_para);
 
             // Extra space after heading
@@ -104,13 +81,7 @@ pub fn save_docx(contents: &[CompileContent], options: &CompileOptions, path: &P
                         3 => 24,
                         _ => 22,
                     };
-                    let para = Paragraph::new()
-                        .add_run(
-                            Run::new()
-                                .add_text(heading_text)
-                                .size(heading_size)
-                                .bold(),
-                        );
+                    let para = Paragraph::new().add_run(Run::new().add_text(heading_text).size(heading_size).bold());
                     docx = docx.add_paragraph(para);
                     continue;
                 }
@@ -118,13 +89,12 @@ pub fn save_docx(contents: &[CompileContent], options: &CompileOptions, path: &P
                 // Check for blockquote
                 if trimmed.starts_with("> ") {
                     let quote_text = trimmed.strip_prefix("> ").unwrap_or(trimmed);
-                    let para = Paragraph::new()
-                        .add_run(
-                            Run::new()
-                                .add_text(quote_text)
-                                .size((options.font_size * 2.0) as usize)
-                                .italic(),
-                        );
+                    let para = Paragraph::new().add_run(
+                        Run::new()
+                            .add_text(quote_text)
+                            .size((options.font_size * 2.0) as usize)
+                            .italic(),
+                    );
                     docx = docx.add_paragraph(para);
                     continue;
                 }
@@ -149,28 +119,18 @@ pub fn save_docx(contents: &[CompileContent], options: &CompileOptions, path: &P
 
 fn add_separator(docx: Docx, sep: &SeparatorType) -> Docx {
     match sep {
-        SeparatorType::EmptyLine => {
-            docx.add_paragraph(Paragraph::new())
-        }
-        SeparatorType::PageBreak => {
-            docx.add_paragraph(
-                Paragraph::new().add_run(Run::new().add_break(BreakType::Page)),
-            )
-        }
-        SeparatorType::SectionBreak => {
-            docx.add_paragraph(
-                Paragraph::new()
-                    .add_run(Run::new().add_text("* * *").size(20))
-                    .align(AlignmentType::Center),
-            )
-        }
-        SeparatorType::Custom(s) => {
-            docx.add_paragraph(
-                Paragraph::new()
-                    .add_run(Run::new().add_text(s).size(20))
-                    .align(AlignmentType::Center),
-            )
-        }
+        SeparatorType::EmptyLine => docx.add_paragraph(Paragraph::new()),
+        SeparatorType::PageBreak => docx.add_paragraph(Paragraph::new().add_run(Run::new().add_break(BreakType::Page))),
+        SeparatorType::SectionBreak => docx.add_paragraph(
+            Paragraph::new()
+                .add_run(Run::new().add_text("* * *").size(20))
+                .align(AlignmentType::Center),
+        ),
+        SeparatorType::Custom(s) => docx.add_paragraph(
+            Paragraph::new()
+                .add_run(Run::new().add_text(s).size(20))
+                .align(AlignmentType::Center),
+        ),
         SeparatorType::None => docx,
     }
 }

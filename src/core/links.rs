@@ -1,7 +1,7 @@
 #![allow(dead_code)] // Methods used by test code
+use super::binder::{Binder, BinderItem};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
-use super::binder::{Binder, BinderItem};
 
 /// A parsed internal document link
 #[derive(Debug, Clone, PartialEq)]
@@ -97,10 +97,7 @@ fn build_title_index<'a>(all_items: &[&'a BinderItem]) -> HashMap<&'a str, Vec<U
 /// Validate all links in a single document against the binder.
 /// Note: Builds a title index each call. For batch validation, prefer
 /// `validate_all_links` which builds the index once.
-pub fn validate_document_links(
-    item: &BinderItem,
-    binder: &Binder,
-) -> Vec<LinkValidation> {
+pub fn validate_document_links(item: &BinderItem, binder: &Binder) -> Vec<LinkValidation> {
     let all_items = binder.all_items();
     let title_index = build_title_index(&all_items);
     validate_document_links_with_index(item, &title_index)
@@ -133,24 +130,27 @@ fn validate_document_links_with_index(
 
     let links = extract_links(&doc.content);
 
-    links.into_iter().map(|link| {
-        let matches: Vec<Uuid> = title_index
-            .get(link.link_text.as_str())
-            .map(|ids| ids.iter().copied().filter(|id| *id != item.id).collect())
-            .unwrap_or_default();
+    links
+        .into_iter()
+        .map(|link| {
+            let matches: Vec<Uuid> = title_index
+                .get(link.link_text.as_str())
+                .map(|ids| ids.iter().copied().filter(|id| *id != item.id).collect())
+                .unwrap_or_default();
 
-        let status = match matches.len() {
-            0 => LinkStatus::Broken,
-            1 => LinkStatus::Valid(matches[0]),
-            _ => LinkStatus::Ambiguous(matches),
-        };
+            let status = match matches.len() {
+                0 => LinkStatus::Broken,
+                1 => LinkStatus::Valid(matches[0]),
+                _ => LinkStatus::Ambiguous(matches),
+            };
 
-        LinkValidation {
-            link,
-            source_id: item.id,
-            status,
-        }
-    }).collect()
+            LinkValidation {
+                link,
+                source_id: item.id,
+                status,
+            }
+        })
+        .collect()
 }
 
 /// Validate all links across the entire project
@@ -179,11 +179,18 @@ pub fn link_health_summary(binder: &Binder) -> LinkHealthSummary {
     }
 
     let total = all_validations.len();
-    let valid = all_validations.iter().filter(|v| matches!(v.status, LinkStatus::Valid(_))).count();
-    let ambiguous = all_validations.iter().filter(|v| matches!(v.status, LinkStatus::Ambiguous(_))).count();
+    let valid = all_validations
+        .iter()
+        .filter(|v| matches!(v.status, LinkStatus::Valid(_)))
+        .count();
+    let ambiguous = all_validations
+        .iter()
+        .filter(|v| matches!(v.status, LinkStatus::Ambiguous(_)))
+        .count();
 
     // Collect broken links for reporting
-    let broken_links: Vec<BrokenLink> = all_validations.iter()
+    let broken_links: Vec<BrokenLink> = all_validations
+        .iter()
         .filter(|v| v.status == LinkStatus::Broken)
         .map(|v| BrokenLink {
             source_id: v.source_id,
@@ -193,14 +200,16 @@ pub fn link_health_summary(binder: &Binder) -> LinkHealthSummary {
         .collect();
 
     // Find orphan documents (no incoming links) — reuse all_items from above
-    let linked_ids: HashSet<Uuid> = all_validations.iter()
+    let linked_ids: HashSet<Uuid> = all_validations
+        .iter()
         .filter_map(|v| match &v.status {
             LinkStatus::Valid(id) => Some(*id),
             _ => None,
         })
         .collect();
 
-    let orphans: Vec<Uuid> = all_items.iter()
+    let orphans: Vec<Uuid> = all_items
+        .iter()
         .filter(|i| i.document.is_some() && !linked_ids.contains(&i.id))
         .map(|i| i.id)
         .collect();
@@ -237,9 +246,11 @@ impl LinkHealthSummary {
         if self.total_links == 0 {
             return "No internal links".to_string();
         }
-        let mut parts = vec![
-            format!("{} link{}", self.total_links, if self.total_links == 1 { "" } else { "s" }),
-        ];
+        let mut parts = vec![format!(
+            "{} link{}",
+            self.total_links,
+            if self.total_links == 1 { "" } else { "s" }
+        )];
         if self.broken_links > 0 {
             parts.push(format!("{} broken", self.broken_links));
         }
@@ -247,8 +258,11 @@ impl LinkHealthSummary {
             parts.push(format!("{} ambiguous", self.ambiguous_links));
         }
         if self.orphan_documents > 0 {
-            parts.push(format!("{} orphan doc{}", self.orphan_documents,
-                if self.orphan_documents == 1 { "" } else { "s" }));
+            parts.push(format!(
+                "{} orphan doc{}",
+                self.orphan_documents,
+                if self.orphan_documents == 1 { "" } else { "s" }
+            ));
         }
         parts.join(", ")
     }
@@ -264,10 +278,15 @@ impl LinkHealthSummary {
     /// Health grade label
     pub fn health_grade(&self) -> &str {
         let score = self.health_score();
-        if score >= 100.0 { "Excellent" }
-        else if score >= 80.0 { "Good" }
-        else if score >= 50.0 { "Needs Work" }
-        else { "Poor" }
+        if score >= 100.0 {
+            "Excellent"
+        } else if score >= 80.0 {
+            "Good"
+        } else if score >= 50.0 {
+            "Needs Work"
+        } else {
+            "Poor"
+        }
     }
 
     /// Whether there are broken links that need fixing
@@ -290,7 +309,8 @@ pub fn suggest_link_targets(broken_title: &str, binder: &Binder) -> Vec<String> 
     let lower = broken_title.to_lowercase();
 
     // Find items whose title is close to the broken link
-    let mut suggestions: Vec<(String, usize)> = all_items.iter()
+    let mut suggestions: Vec<(String, usize)> = all_items
+        .iter()
         .filter(|i| i.document.is_some())
         .filter_map(|i| {
             let item_lower = i.title.to_lowercase();
@@ -417,9 +437,7 @@ fn edit_distance(a: &str, b: &str) -> usize {
     for i in 1..=a_len {
         for j in 1..=b_len {
             let cost = if a_bytes[i - 1] == b_bytes[j - 1] { 0 } else { 1 };
-            dp[i][j] = (dp[i - 1][j] + 1)
-                .min(dp[i][j - 1] + 1)
-                .min(dp[i - 1][j - 1] + cost);
+            dp[i][j] = (dp[i - 1][j] + 1).min(dp[i][j - 1] + 1).min(dp[i - 1][j - 1] + cost);
         }
     }
 
@@ -836,7 +854,12 @@ mod tests {
     #[test]
     fn test_link_validation_convenience() {
         let validation = LinkValidation {
-            link: DocLink { link_text: "X".into(), display_text: None, start: 0, end: 5 },
+            link: DocLink {
+                link_text: "X".into(),
+                display_text: None,
+                start: 0,
+                end: 5,
+            },
             source_id: Uuid::new_v4(),
             status: LinkStatus::Broken,
         };
@@ -894,30 +917,46 @@ mod tests {
     fn test_health_grade_levels() {
         // Test via direct construction
         let excellent = LinkHealthSummary {
-            total_links: 10, valid_links: 10, broken_links: 0,
-            ambiguous_links: 0, orphan_documents: 0,
-            broken_link_details: vec![], orphan_ids: vec![],
+            total_links: 10,
+            valid_links: 10,
+            broken_links: 0,
+            ambiguous_links: 0,
+            orphan_documents: 0,
+            broken_link_details: vec![],
+            orphan_ids: vec![],
         };
         assert_eq!(excellent.health_grade(), "Excellent");
 
         let good = LinkHealthSummary {
-            total_links: 10, valid_links: 9, broken_links: 1,
-            ambiguous_links: 0, orphan_documents: 0,
-            broken_link_details: vec![], orphan_ids: vec![],
+            total_links: 10,
+            valid_links: 9,
+            broken_links: 1,
+            ambiguous_links: 0,
+            orphan_documents: 0,
+            broken_link_details: vec![],
+            orphan_ids: vec![],
         };
         assert_eq!(good.health_grade(), "Good");
 
         let needs_work = LinkHealthSummary {
-            total_links: 10, valid_links: 5, broken_links: 5,
-            ambiguous_links: 0, orphan_documents: 0,
-            broken_link_details: vec![], orphan_ids: vec![],
+            total_links: 10,
+            valid_links: 5,
+            broken_links: 5,
+            ambiguous_links: 0,
+            orphan_documents: 0,
+            broken_link_details: vec![],
+            orphan_ids: vec![],
         };
         assert_eq!(needs_work.health_grade(), "Needs Work");
 
         let poor = LinkHealthSummary {
-            total_links: 10, valid_links: 2, broken_links: 8,
-            ambiguous_links: 0, orphan_documents: 0,
-            broken_link_details: vec![], orphan_ids: vec![],
+            total_links: 10,
+            valid_links: 2,
+            broken_links: 8,
+            ambiguous_links: 0,
+            orphan_documents: 0,
+            broken_link_details: vec![],
+            orphan_ids: vec![],
         };
         assert_eq!(poor.health_grade(), "Poor");
     }
@@ -987,9 +1026,13 @@ mod tests {
     #[test]
     fn test_link_health_display_ambiguous() {
         let summary = LinkHealthSummary {
-            total_links: 3, valid_links: 1, broken_links: 1,
-            ambiguous_links: 1, orphan_documents: 0,
-            broken_link_details: vec![], orphan_ids: vec![],
+            total_links: 3,
+            valid_links: 1,
+            broken_links: 1,
+            ambiguous_links: 1,
+            orphan_documents: 0,
+            broken_link_details: vec![],
+            orphan_ids: vec![],
         };
         let display = summary.display();
         assert!(display.contains("3 links"));
@@ -1000,9 +1043,13 @@ mod tests {
     #[test]
     fn test_link_health_display_singular() {
         let summary = LinkHealthSummary {
-            total_links: 1, valid_links: 1, broken_links: 0,
-            ambiguous_links: 0, orphan_documents: 1,
-            broken_link_details: vec![], orphan_ids: vec![],
+            total_links: 1,
+            valid_links: 1,
+            broken_links: 0,
+            ambiguous_links: 0,
+            orphan_documents: 1,
+            broken_link_details: vec![],
+            orphan_ids: vec![],
         };
         let display = summary.display();
         assert!(display.contains("1 link")); // singular

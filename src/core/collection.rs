@@ -1,6 +1,6 @@
 #![allow(dead_code)] // Methods used by test code
-use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use uuid::Uuid;
 
 /// A Collection groups binder items outside the normal binder hierarchy.
@@ -18,7 +18,11 @@ pub enum CollectionKind {
     /// Manually curated list of items
     Manual,
     /// Auto-populated from a saved search
-    Search { query: String, case_sensitive: bool, whole_word: bool },
+    Search {
+        query: String,
+        case_sensitive: bool,
+        whole_word: bool,
+    },
 }
 
 impl Collection {
@@ -175,14 +179,21 @@ impl Collection {
     }
 
     /// Keep only items that pass the predicate
-    pub fn retain<F>(&mut self, f: F) where F: FnMut(&Uuid) -> bool {
+    pub fn retain<F>(&mut self, f: F)
+    where
+        F: FnMut(&Uuid) -> bool,
+    {
         self.item_ids.retain(f);
     }
 
     /// Get intersection of items with another collection
     pub fn intersection(&self, other: &Collection) -> Vec<Uuid> {
         let other_set: HashSet<&Uuid> = other.item_ids.iter().collect();
-        self.item_ids.iter().filter(|id| other_set.contains(id)).copied().collect()
+        self.item_ids
+            .iter()
+            .filter(|id| other_set.contains(id))
+            .copied()
+            .collect()
     }
 
     /// Get union of items with another collection (no duplicates)
@@ -200,7 +211,11 @@ impl Collection {
     /// Get items in this collection but not in the other
     pub fn difference(&self, other: &Collection) -> Vec<Uuid> {
         let other_set: HashSet<&Uuid> = other.item_ids.iter().collect();
-        self.item_ids.iter().filter(|id| !other_set.contains(id)).copied().collect()
+        self.item_ids
+            .iter()
+            .filter(|id| !other_set.contains(id))
+            .copied()
+            .collect()
     }
 }
 
@@ -229,7 +244,9 @@ pub struct CollectionManager {
 
 impl CollectionManager {
     pub fn new() -> Self {
-        Self { collections: Vec::new() }
+        Self {
+            collections: Vec::new(),
+        }
     }
 
     /// Add a new collection, returning its UUID
@@ -284,7 +301,9 @@ impl CollectionManager {
 
     /// Unique items across all collections
     pub fn unique_items(&self) -> usize {
-        let all: HashSet<Uuid> = self.collections.iter()
+        let all: HashSet<Uuid> = self
+            .collections
+            .iter()
             .flat_map(|c| c.item_ids.iter().copied())
             .collect();
         all.len()
@@ -326,7 +345,13 @@ impl CollectionManager {
         let manual = self.manual_collections().len();
         let smart = self.smart_collections().len();
         let total = self.total_items();
-        format!("{} collections ({} manual, {} smart), {} total items", self.count(), manual, smart, total)
+        format!(
+            "{} collections ({} manual, {} smart), {} total items",
+            self.count(),
+            manual,
+            smart,
+            total
+        )
     }
 
     /// Check if manager is empty

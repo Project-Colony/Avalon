@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 /// An annotation (inline comment) attached to a text range in a document
 #[derive(Debug, Clone, Serialize, Deserialize)]

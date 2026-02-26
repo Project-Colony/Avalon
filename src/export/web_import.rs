@@ -71,7 +71,10 @@ pub fn decode_html_entities(text: &str) -> String {
                     "nbsp" => result.push(' '),
                     _ if entity.starts_with('#') => {
                         let numeric_part = &entity[1..];
-                        let code_point = if let Some(hex) = numeric_part.strip_prefix('x').or_else(|| numeric_part.strip_prefix('X')) {
+                        let code_point = if let Some(hex) = numeric_part
+                            .strip_prefix('x')
+                            .or_else(|| numeric_part.strip_prefix('X'))
+                        {
                             u32::from_str_radix(hex, 16).ok()
                         } else {
                             numeric_part.parse::<u32>().ok()
@@ -154,14 +157,20 @@ pub fn extract_headings(html: &str) -> Vec<HtmlHeading> {
         // Find the end of the opening tag
         let open_end = match lower[tag_start..].find('>') {
             Some(pos) => tag_start + pos + 1,
-            None => { search_pos = tag_start + 1; continue; }
+            None => {
+                search_pos = tag_start + 1;
+                continue;
+            }
         };
 
         // Find the closing tag
         let close_tag = format!("</h{}>", level);
         let close_start = match lower[open_end..].find(&close_tag) {
             Some(pos) => open_end + pos,
-            None => { search_pos = open_end; continue; }
+            None => {
+                search_pos = open_end;
+                continue;
+            }
         };
 
         let raw_content = &html[open_end..close_start];

@@ -1,7 +1,7 @@
 #![allow(dead_code)] // Methods used by test code
-use std::path::Path;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 
 use crate::core::binder::{Binder, BinderItem, BinderItemKind};
 
@@ -65,7 +65,6 @@ impl OutputFormat {
             OutputFormat::Fountain,
         ]
     }
-
 }
 
 /// Options for compiling/exporting
@@ -135,20 +134,15 @@ impl Compiler {
             OutputFormat::Rtf => super::rtf::compile(&contents, options),
             OutputFormat::Fountain => super::fountain::compile(&contents, options),
             OutputFormat::Opml => super::opml::export_opml(binder, &options.title),
-            OutputFormat::Pdf => {
-                Ok("PDF compilation requires save_to_file()".to_string())
-            }
-            OutputFormat::Docx => {
-                Ok("DOCX compilation requires save_to_file()".to_string())
-            }
-            OutputFormat::Epub => {
-                Ok("ePub compilation requires save_to_file()".to_string())
-            }
+            OutputFormat::Pdf => Ok("PDF compilation requires save_to_file()".to_string()),
+            OutputFormat::Docx => Ok("DOCX compilation requires save_to_file()".to_string()),
+            OutputFormat::Epub => Ok("ePub compilation requires save_to_file()".to_string()),
         }?;
 
         // Insert table of contents if enabled
         if options.include_toc {
-            let sections: Vec<(String, usize)> = contents.iter()
+            let sections: Vec<(String, usize)> = contents
+                .iter()
                 .filter(|c| c.is_folder || !c.text.is_empty())
                 .map(|c| (c.title.clone(), c.depth))
                 .collect();
@@ -196,15 +190,9 @@ impl Compiler {
         let contents = Self::collect_contents(&binder.draft, options);
 
         match options.format {
-            OutputFormat::Pdf => {
-                super::pdf::save_pdf(&contents, options, path)
-            }
-            OutputFormat::Docx => {
-                super::docx::save_docx(&contents, options, path)
-            }
-            OutputFormat::Epub => {
-                super::epub::save_epub(&contents, options, path)
-            }
+            OutputFormat::Pdf => super::pdf::save_pdf(&contents, options, path),
+            OutputFormat::Docx => super::docx::save_docx(&contents, options, path),
+            OutputFormat::Epub => super::epub::save_epub(&contents, options, path),
             _ => {
                 let output = Self::compile(binder, options)?;
                 std::fs::write(path, output)?;
@@ -292,12 +280,12 @@ impl CompileContent {
 
     /// Sentence count (approximate)
     pub fn sentence_count(&self) -> usize {
-        self.text.chars()
+        self.text
+            .chars()
             .filter(|c| matches!(c, '.' | '!' | '?'))
             .count()
             .max(if self.text.trim().is_empty() { 0 } else { 1 })
     }
-
 }
 
 impl CompileOptions {
@@ -308,7 +296,10 @@ impl CompileOptions {
             issues.push("Title is empty but front matter is enabled".to_string());
         }
         if self.font_size < 6.0 || self.font_size > 72.0 {
-            issues.push(format!("Font size {} is outside reasonable range (6-72)", self.font_size));
+            issues.push(format!(
+                "Font size {} is outside reasonable range (6-72)",
+                self.font_size
+            ));
         }
         if self.font_family.is_empty() {
             issues.push("Font family is empty".to_string());
@@ -322,9 +313,15 @@ impl CompileOptions {
             format!("Format: {}", self.format.display_name()),
             format!("Font: {} {}pt", self.font_family, self.font_size),
         ];
-        if self.include_front_matter { parts.push("With front matter".to_string()); }
-        if self.include_toc { parts.push("With TOC".to_string()); }
-        if self.compile_marked_only { parts.push("Marked items only".to_string()); }
+        if self.include_front_matter {
+            parts.push("With front matter".to_string());
+        }
+        if self.include_toc {
+            parts.push("With TOC".to_string());
+        }
+        if self.compile_marked_only {
+            parts.push("Marked items only".to_string());
+        }
         parts.join(", ")
     }
 }
@@ -340,7 +337,6 @@ impl SeparatorType {
             SeparatorType::None => "",
         }
     }
-
 }
 
 /// Statistics gathered from compiled content
@@ -356,9 +352,7 @@ impl CompileStatistics {
 
         let total_words: usize = sections.iter().map(|c| c.word_count()).sum();
 
-        Self {
-            total_words,
-        }
+        Self { total_words }
     }
 }
 
@@ -405,9 +399,7 @@ impl CompileManifest {
             prev_was_folder_at_depth_0 = c.is_folder && c.depth == 0;
         }
 
-        Self {
-            sections,
-        }
+        Self { sections }
     }
 }
 
@@ -469,7 +461,7 @@ impl SectionAssembler {
                     4 => "subsubsection",
                     _ => "paragraph",
                 };
-                format!("\\{}{{{}}}",  cmd, title)
+                format!("\\{}{{{}}}", cmd, title)
             }
             _ => {
                 // Plain text: uppercase for top-level, indented for deeper
@@ -763,9 +755,24 @@ mod tests {
     #[test]
     fn test_compile_statistics() {
         let contents = vec![
-            CompileContent { title: "Ch 1".to_string(), text: "Hello world".to_string(), depth: 0, is_folder: false },
-            CompileContent { title: "Folder".to_string(), text: String::new(), depth: 0, is_folder: true },
-            CompileContent { title: "Ch 2".to_string(), text: "One two three".to_string(), depth: 1, is_folder: false },
+            CompileContent {
+                title: "Ch 1".to_string(),
+                text: "Hello world".to_string(),
+                depth: 0,
+                is_folder: false,
+            },
+            CompileContent {
+                title: "Folder".to_string(),
+                text: String::new(),
+                depth: 0,
+                is_folder: true,
+            },
+            CompileContent {
+                title: "Ch 2".to_string(),
+                text: "One two three".to_string(),
+                depth: 1,
+                is_folder: false,
+            },
         ];
         let stats = CompileStatistics::from_contents(&contents);
         assert_eq!(stats.total_words, 5); // "Hello world" + "One two three"
@@ -800,8 +807,18 @@ mod tests {
     #[test]
     fn test_total_word_count() {
         let contents = vec![
-            CompileContent { title: "".to_string(), text: "one two".to_string(), depth: 0, is_folder: false },
-            CompileContent { title: "".to_string(), text: "three four five".to_string(), depth: 0, is_folder: false },
+            CompileContent {
+                title: "".to_string(),
+                text: "one two".to_string(),
+                depth: 0,
+                is_folder: false,
+            },
+            CompileContent {
+                title: "".to_string(),
+                text: "three four five".to_string(),
+                depth: 0,
+                is_folder: false,
+            },
         ];
         assert_eq!(total_word_count(&contents), 5);
     }
@@ -815,9 +832,24 @@ mod tests {
             ..CompileOptions::default()
         };
         let contents = vec![
-            CompileContent { title: "Part 1".to_string(), text: String::new(), depth: 0, is_folder: true },
-            CompileContent { title: "Ch 1".to_string(), text: "text".to_string(), depth: 1, is_folder: false },
-            CompileContent { title: "Part 2".to_string(), text: String::new(), depth: 0, is_folder: true },
+            CompileContent {
+                title: "Part 1".to_string(),
+                text: String::new(),
+                depth: 0,
+                is_folder: true,
+            },
+            CompileContent {
+                title: "Ch 1".to_string(),
+                text: "text".to_string(),
+                depth: 1,
+                is_folder: false,
+            },
+            CompileContent {
+                title: "Part 2".to_string(),
+                text: String::new(),
+                depth: 0,
+                is_folder: true,
+            },
         ];
         let manifest = CompileManifest::from_contents(&contents, &opts);
         assert_eq!(manifest.sections.len(), 3);
@@ -854,9 +886,12 @@ mod tests {
     #[test]
     fn test_section_assembler_assemble() {
         let opts = CompileOptions::default();
-        let contents = vec![
-            CompileContent { title: "Chapter 1".to_string(), text: "Some text here.".to_string(), depth: 0, is_folder: false },
-        ];
+        let contents = vec![CompileContent {
+            title: "Chapter 1".to_string(),
+            text: "Some text here.".to_string(),
+            depth: 0,
+            is_folder: false,
+        }];
         let output = SectionAssembler::assemble(&contents, &opts);
         assert!(output.contains("Chapter 1"));
         assert!(output.contains("Some text here."));

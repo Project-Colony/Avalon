@@ -39,32 +39,43 @@ pub fn view(
         Space::with_width(4),
         text("\u{f0c1}").size(10),
         Space::with_width(Length::Fill),
-        text(format!("{} total link{}", total_links, if total_links == 1 { "" } else { "s" }))
-            .size(10)
-            .color(Theme::TEXT_MUTED),
+        text(format!(
+            "{} total link{}",
+            total_links,
+            if total_links == 1 { "" } else { "s" }
+        ))
+        .size(10)
+        .color(Theme::TEXT_MUTED),
         Space::with_width(8),
         if broken_links.is_empty() {
             text("\u{f00c} healthy").size(10).color(Theme::SUCCESS)
         } else {
-            text(format!("\u{f071} {} issue{}", broken_links.len(),
-                if broken_links.len() == 1 { "" } else { "s" }))
-                .size(10).color(Theme::WARNING)
+            text(format!(
+                "\u{f071} {} issue{}",
+                broken_links.len(),
+                if broken_links.len() == 1 { "" } else { "s" }
+            ))
+            .size(10)
+            .color(Theme::WARNING)
         },
     ];
 
     // Outgoing links (from current document)
-    let outgoing_label_color = if outgoing_links.is_empty() { Theme::TEXT_MUTED } else { Theme::TEXT_ACCENT };
-    let mut outgoing_col = column![
-        text(format!("\u{f061} Outgoing ({})", outgoing_links.len()))
-            .size(11)
-            .color(outgoing_label_color),
-    ].spacing(2);
+    let outgoing_label_color = if outgoing_links.is_empty() {
+        Theme::TEXT_MUTED
+    } else {
+        Theme::TEXT_ACCENT
+    };
+    let mut outgoing_col = column![text(format!("\u{f061} Outgoing ({})", outgoing_links.len()))
+        .size(11)
+        .color(outgoing_label_color),]
+    .spacing(2);
 
     if outgoing_links.is_empty() && broken_links.is_empty() {
         outgoing_col = outgoing_col.push(
             text("No outgoing links. Use [[Title]] syntax to create links.")
                 .size(10)
-                .color(Theme::TEXT_MUTED)
+                .color(Theme::TEXT_MUTED),
         );
     }
 
@@ -77,23 +88,24 @@ pub fn view(
         };
         outgoing_col = outgoing_col.push(
             row![
-                text(format!("{}.", i + 1)).size(9).color(Theme::TEXT_MUTED).width(Length::Fixed(16.0)),
-                button(
-                    text(display).size(11).color(Theme::TEXT_ACCENT),
-                )
-                .on_press(Message::SelectBinderItem(id))
-                .padding(Padding::from([2, 4])),
-            ].align_y(iced::Alignment::Center)
+                text(format!("{}.", i + 1))
+                    .size(9)
+                    .color(Theme::TEXT_MUTED)
+                    .width(Length::Fixed(16.0)),
+                button(text(display).size(11).color(Theme::TEXT_ACCENT),)
+                    .on_press(Message::SelectBinderItem(id))
+                    .padding(Padding::from([2, 4])),
+            ]
+            .align_y(iced::Alignment::Center),
         );
     }
 
     // Broken/ambiguous links section
     let broken_section: Element<'static, Message> = if !broken_links.is_empty() {
-        let mut broken_col = column![
-            text(format!("\u{f071} Broken/Ambiguous ({})", broken_links.len()))
-                .size(11)
-                .color(Theme::WARNING),
-        ].spacing(2);
+        let mut broken_col = column![text(format!("\u{f071} Broken/Ambiguous ({})", broken_links.len()))
+            .size(11)
+            .color(Theme::WARNING),]
+        .spacing(2);
 
         for blink in broken_links {
             let status_text = match &blink.status {
@@ -111,16 +123,10 @@ pub fn view(
 
             if !blink.suggestions.is_empty() {
                 link_row = link_row.push(Space::with_width(8));
-                link_row = link_row.push(
-                    text("Did you mean:").size(9).color(Theme::TEXT_MUTED)
-                );
+                link_row = link_row.push(text("Did you mean:").size(9).color(Theme::TEXT_MUTED));
                 for suggestion in &blink.suggestions {
                     link_row = link_row.push(Space::with_width(4));
-                    link_row = link_row.push(
-                        text(format!("\"{}\"", suggestion))
-                            .size(9)
-                            .color(Theme::TEXT_ACCENT),
-                    );
+                    link_row = link_row.push(text(format!("\"{}\"", suggestion)).size(9).color(Theme::TEXT_ACCENT));
                 }
             }
 
@@ -133,18 +139,21 @@ pub fn view(
     };
 
     // Incoming links (backlinks to current document)
-    let incoming_label_color = if incoming_links.is_empty() { Theme::TEXT_MUTED } else { Theme::SUCCESS };
-    let mut incoming_col = column![
-        text(format!("\u{f060} Backlinks ({})", incoming_links.len()))
-            .size(11)
-            .color(incoming_label_color),
-    ].spacing(2);
+    let incoming_label_color = if incoming_links.is_empty() {
+        Theme::TEXT_MUTED
+    } else {
+        Theme::SUCCESS
+    };
+    let mut incoming_col = column![text(format!("\u{f060} Backlinks ({})", incoming_links.len()))
+        .size(11)
+        .color(incoming_label_color),]
+    .spacing(2);
 
     if incoming_links.is_empty() {
         incoming_col = incoming_col.push(
             text("No documents link to this one (orphan).")
                 .size(10)
-                .color(Theme::TEXT_MUTED)
+                .color(Theme::TEXT_MUTED),
         );
     }
 
@@ -152,26 +161,33 @@ pub fn view(
         let id = link.target_id;
         incoming_col = incoming_col.push(
             row![
-                text(format!("{}.", i + 1)).size(9).color(Theme::TEXT_MUTED).width(Length::Fixed(16.0)),
+                text(format!("{}.", i + 1))
+                    .size(9)
+                    .color(Theme::TEXT_MUTED)
+                    .width(Length::Fixed(16.0)),
                 button(
-                    text(format!("\u{f060} {}", link.target_title)).size(11).color(Theme::TEXT_SECONDARY),
+                    text(format!("\u{f060} {}", link.target_title))
+                        .size(11)
+                        .color(Theme::TEXT_SECONDARY),
                 )
                 .on_press(Message::SelectBinderItem(id))
                 .padding(Padding::from([2, 4])),
-            ].align_y(iced::Alignment::Center)
+            ]
+            .align_y(iced::Alignment::Center),
         );
     }
 
     // Quick link insertion (available docs to link to)
-    let mut insert_col = column![
-        text(format!("Insert Link ({} available):", available_docs.len()))
-            .size(11)
-            .color(Theme::TEXT_MUTED),
-    ].spacing(1);
+    let mut insert_col = column![text(format!("Insert Link ({} available):", available_docs.len()))
+        .size(11)
+        .color(Theme::TEXT_MUTED),]
+    .spacing(1);
 
     if available_docs.is_empty() {
         insert_col = insert_col.push(
-            text("No documents available to link.").size(10).color(Theme::TEXT_MUTED)
+            text("No documents available to link.")
+                .size(10)
+                .color(Theme::TEXT_MUTED),
         );
     }
 
@@ -180,14 +196,16 @@ pub fn view(
         // Check if already linked
         let already_linked = outgoing_links.iter().any(|l| l.target_id == target_id);
         let icon = if already_linked { "\u{f00c} " } else { "  " };
-        let color = if already_linked { Theme::TEXT_MUTED } else { Theme::TEXT_SECONDARY };
+        let color = if already_linked {
+            Theme::TEXT_MUTED
+        } else {
+            Theme::TEXT_SECONDARY
+        };
 
         insert_col = insert_col.push(
-            button(
-                text(format!("{}{}", icon, title)).size(10).color(color),
-            )
-            .on_press(Message::InsertDocLink(target_id))
-            .padding(Padding::from([1, 4]))
+            button(text(format!("{}{}", icon, title)).size(10).color(color))
+                .on_press(Message::InsertDocLink(target_id))
+                .padding(Padding::from([1, 4])),
         );
     }
 
@@ -196,9 +214,13 @@ pub fn view(
             .size(9)
             .color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
-        text(format!("{}\u{f061} {}\u{f060}", outgoing_links.len(), incoming_links.len()))
-            .size(9)
-            .color(Theme::TEXT_MUTED),
+        text(format!(
+            "{}\u{f061} {}\u{f060}",
+            outgoing_links.len(),
+            incoming_links.len()
+        ))
+        .size(9)
+        .color(Theme::TEXT_MUTED),
     ];
 
     let content = column![
@@ -215,8 +237,5 @@ pub fn view(
     ]
     .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }

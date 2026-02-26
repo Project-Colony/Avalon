@@ -1,7 +1,7 @@
-use std::path::{Path, PathBuf};
-use std::fs;
-use chrono::Utc;
 use anyhow::{Context, Result};
+use chrono::Utc;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 /// Backup manager for Scrinever projects.
 /// Creates timestamped backups and manages retention.
@@ -14,9 +14,7 @@ impl BackupManager {
         let backup_dir = Self::backup_directory()?;
         fs::create_dir_all(&backup_dir)?;
 
-        let project_name = project_dir.file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("unknown");
+        let project_name = project_dir.file_stem().and_then(|s| s.to_str()).unwrap_or("unknown");
 
         let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
         let backup_name = format!("{}_{}.backup.json", project_name, timestamp);
@@ -25,8 +23,7 @@ impl BackupManager {
         // Read project.json and copy it as backup
         let project_json = project_dir.join("project.json");
         if project_json.exists() {
-            fs::copy(&project_json, &backup_path)
-                .context("Failed to create backup copy")?;
+            fs::copy(&project_json, &backup_path).context("Failed to create backup copy")?;
         }
 
         // Prune old backups (keep last 20)
@@ -38,8 +35,7 @@ impl BackupManager {
     /// Restore a project from a backup file
     pub fn restore_backup(backup_path: &Path, project_dir: &Path) -> Result<()> {
         let project_json = project_dir.join("project.json");
-        fs::copy(backup_path, &project_json)
-            .context("Failed to restore backup")?;
+        fs::copy(backup_path, &project_json).context("Failed to restore backup")?;
         Ok(())
     }
 
@@ -53,19 +49,13 @@ impl BackupManager {
         }
 
         let prefix = format!("{}_", project_name);
-        let dir_entries = fs::read_dir(&backup_dir)
-            .context("Failed to read backup directory")?;
+        let dir_entries = fs::read_dir(&backup_dir).context("Failed to read backup directory")?;
         for entry in dir_entries.flatten() {
             let path = entry.path();
-            let name = path.file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("")
-                .to_string();
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
 
             if name.starts_with(&prefix) && name.ends_with(".backup.json") {
-                let size = fs::metadata(&path)
-                    .map(|m| m.len())
-                    .unwrap_or(0);
+                let size = fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
 
                 // Parse timestamp from filename
                 let timestamp_str = name
@@ -87,8 +77,7 @@ impl BackupManager {
 
     /// Get the backup directory path
     fn backup_directory() -> Result<PathBuf> {
-        let home = dirs::home_dir()
-            .context("Could not determine home directory")?;
+        let home = dirs::home_dir().context("Could not determine home directory")?;
         Ok(home.join(super::BACKUPS_DIR_NAME))
     }
 
@@ -105,7 +94,6 @@ impl BackupManager {
         }
         Ok(())
     }
-
 }
 
 /// A single backup entry
@@ -141,7 +129,6 @@ impl BackupEntry {
             self.timestamp.clone()
         }
     }
-
 }
 
 #[cfg(test)]

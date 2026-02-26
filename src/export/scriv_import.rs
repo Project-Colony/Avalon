@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use chrono::{DateTime, NaiveDateTime, Utc};
 
 use crate::core::binder::{BinderItem, BinderItemKind};
@@ -24,8 +24,7 @@ use crate::export::rtf_import::extract_text_from_rtf;
 
 /// High-level metadata about a Scrivener project.
 #[derive(Debug, Clone)]
-pub struct ScrivProjectInfo {
-}
+pub struct ScrivProjectInfo {}
 
 /// An intermediate representation of a single node parsed from the `.scrivx`
 /// binder XML.  This is used as an in-between step before converting to the
@@ -80,9 +79,11 @@ fn extract_element_text<'a>(xml: &'a str, tag_name: &str) -> Option<&'a str> {
 /// Parse the `<Binder>` section of a `.scrivx` XML file into a flat list of
 /// top-level `ScrivNode` trees.
 pub fn parse_scrivx_xml(xml: &str) -> Result<Vec<ScrivNode>> {
-    let binder_start = xml.find("<Binder")
+    let binder_start = xml
+        .find("<Binder")
         .context("No <Binder> element found in .scrivx XML")?;
-    let binder_end = xml.find("</Binder>")
+    let binder_end = xml
+        .find("</Binder>")
         .context("No closing </Binder> element found in .scrivx XML")?
         + "</Binder>".len();
 
@@ -99,23 +100,22 @@ fn parse_binder_items(xml: &str) -> Result<Vec<ScrivNode>> {
         let tag_start = search_from + pos;
 
         // Locate the end of the opening tag.
-        let Some(close_offset) = xml[tag_start..].find('>') else { break; };
+        let Some(close_offset) = xml[tag_start..].find('>') else {
+            break;
+        };
         let tag_close = tag_start + close_offset;
         let opening_tag = &xml[tag_start..=tag_close];
 
         // Extract attributes from the opening tag.
-        let id = extract_attribute(opening_tag, "ID")
-            .unwrap_or("0")
-            .to_string();
-        let item_type = extract_attribute(opening_tag, "Type")
-            .unwrap_or("Text")
-            .to_string();
-        let created = extract_attribute(opening_tag, "Created")
-            .map(|s| s.to_string());
+        let id = extract_attribute(opening_tag, "ID").unwrap_or("0").to_string();
+        let item_type = extract_attribute(opening_tag, "Type").unwrap_or("Text").to_string();
+        let created = extract_attribute(opening_tag, "Created").map(|s| s.to_string());
 
         // Find the matching </BinderItem> by counting nesting depth.
         let after_open = tag_close + 1;
-        let Some(close_start) = find_matching_close(xml, after_open, "BinderItem") else { break; };
+        let Some(close_start) = find_matching_close(xml, after_open, "BinderItem") else {
+            break;
+        };
         let close_end = close_start + "</BinderItem>".len();
 
         let inner_xml = &xml[after_open..close_start];
@@ -131,8 +131,7 @@ fn parse_binder_items(xml: &str) -> Result<Vec<ScrivNode>> {
         // <Children> blocks.
         let children = if let Some(ch_start) = inner_xml.find("<Children>") {
             let ch_inner_start = ch_start + "<Children>".len();
-            let ch_end = find_matching_close(inner_xml, ch_inner_start, "Children")
-                .unwrap_or(inner_xml.len());
+            let ch_end = find_matching_close(inner_xml, ch_inner_start, "Children").unwrap_or(inner_xml.len());
             let children_xml = &inner_xml[ch_inner_start..ch_end];
             parse_binder_items(children_xml).unwrap_or_default()
         } else {
@@ -202,9 +201,7 @@ fn find_matching_close(xml: &str, start: usize, tag_name: &str) -> Option<usize>
 /// Map a Scrivener type string to a `BinderItemKind`.
 fn scriv_type_to_kind(scriv_type: &str) -> BinderItemKind {
     match scriv_type {
-        "Folder" | "DraftFolder" | "ResearchFolder" | "TrashFolder" | "Root" => {
-            BinderItemKind::Folder
-        }
+        "Folder" | "DraftFolder" | "ResearchFolder" | "TrashFolder" | "Root" => BinderItemKind::Folder,
         "Image" => BinderItemKind::Image,
         "PDF" => BinderItemKind::Pdf,
         "WebPage" => BinderItemKind::WebPage,
@@ -233,10 +230,7 @@ fn parse_scriv_datetime(s: &str) -> Option<DateTime<Utc>> {
         return Some(ndt.and_utc());
     }
     // Try date only.
-    if let Ok(ndt) = NaiveDateTime::parse_from_str(
-        &format!("{} 00:00:00", s),
-        "%Y-%m-%d %H:%M:%S",
-    ) {
+    if let Ok(ndt) = NaiveDateTime::parse_from_str(&format!("{} 00:00:00", s), "%Y-%m-%d %H:%M:%S") {
         return Some(ndt.and_utc());
     }
     None
@@ -244,10 +238,7 @@ fn parse_scriv_datetime(s: &str) -> Option<DateTime<Utc>> {
 
 /// Convert a single `ScrivNode` into a `BinderItem`, recursively processing
 /// children.  Content is looked up in `content_map` by Scrivener item ID.
-fn scriv_node_to_binder_item(
-    node: &ScrivNode,
-    content_map: &HashMap<String, String>,
-) -> BinderItem {
+fn scriv_node_to_binder_item(node: &ScrivNode, content_map: &HashMap<String, String>) -> BinderItem {
     let kind = scriv_type_to_kind(&node.item_type);
 
     let mut item = match kind {
@@ -300,24 +291,17 @@ pub fn import_scriv(path: &Path) -> Result<(ScrivProjectInfo, Vec<BinderItem>)> 
     }
 
     // Locate the .scrivx file inside the package.
-    let scrivx_path = find_scrivx_file(path)
-        .with_context(|| {
-            format!(
-                "Could not find a .scrivx file inside {}",
-                path.display()
-            )
-        })?;
+    let scrivx_path =
+        find_scrivx_file(path).with_context(|| format!("Could not find a .scrivx file inside {}", path.display()))?;
 
     let xml = std::fs::read_to_string(&scrivx_path)
         .with_context(|| format!("Failed to read .scrivx file: {}", scrivx_path.display()))?;
 
     // Parse the binder XML into ScrivNodes.
-    let nodes = parse_scrivx_xml(&xml)
-        .context("Failed to parse .scrivx binder structure")?;
+    let nodes = parse_scrivx_xml(&xml).context("Failed to parse .scrivx binder structure")?;
 
     // Build content map by reading files from Files/Data/<ID>/content.rtf (or .txt).
-    let content_map = build_content_map(path, &nodes)
-        .context("Failed to read content files from .scriv package")?;
+    let content_map = build_content_map(path, &nodes).context("Failed to read content files from .scriv package")?;
 
     // Convert ScrivNodes to BinderItems.
     let items = nodes
@@ -356,10 +340,7 @@ fn collect_ids(nodes: &[ScrivNode], ids: &mut Vec<String>) {
 
 /// Build a map from Scrivener item ID to plain-text content by reading files
 /// from the `Files/Data/<ID>/` subdirectories inside the `.scriv` package.
-fn build_content_map(
-    scriv_dir: &Path,
-    nodes: &[ScrivNode],
-) -> Result<HashMap<String, String>> {
+fn build_content_map(scriv_dir: &Path, nodes: &[ScrivNode]) -> Result<HashMap<String, String>> {
     let mut ids = Vec::new();
     collect_ids(nodes, &mut ids);
 

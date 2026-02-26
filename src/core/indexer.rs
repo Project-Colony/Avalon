@@ -1,7 +1,7 @@
 #![allow(dead_code)] // Methods used by test code
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
-use serde::{Deserialize, Serialize};
 
 /// A full-text search index for fast lookups across project documents.
 /// Uses an inverted index mapping terms to document IDs with positions.
@@ -65,10 +65,13 @@ impl SearchIndex {
         self.document_count = 0;
 
         for item in binder.all_items() {
-            self.doc_metadata.insert(item.id, DocMeta {
-                title: item.title.clone(),
-                word_count: item.document.as_ref().map(|d| d.word_count()).unwrap_or(0),
-            });
+            self.doc_metadata.insert(
+                item.id,
+                DocMeta {
+                    title: item.title.clone(),
+                    word_count: item.document.as_ref().map(|d| d.word_count()).unwrap_or(0),
+                },
+            );
 
             // Index title
             self.index_text(item.id, &item.title, IndexField::Title);
@@ -98,21 +101,15 @@ impl SearchIndex {
         let mut positions_map: HashMap<String, Vec<usize>> = HashMap::new();
 
         for (pos, term) in terms.into_iter().enumerate() {
-            positions_map
-                .entry(term)
-                .or_default()
-                .push(pos);
+            positions_map.entry(term).or_default().push(pos);
         }
 
         for (term, positions) in positions_map {
-            self.index
-                .entry(term)
-                .or_default()
-                .push(IndexEntry {
-                    doc_id,
-                    positions,
-                    field,
-                });
+            self.index.entry(term).or_default().push(IndexEntry {
+                doc_id,
+                positions,
+                field,
+            });
         }
     }
 
@@ -126,10 +123,13 @@ impl SearchIndex {
         self.index.retain(|_, entries| !entries.is_empty());
 
         // Re-index
-        self.doc_metadata.insert(doc_id, DocMeta {
-            title: title.to_string(),
-            word_count: content.split_whitespace().count(),
-        });
+        self.doc_metadata.insert(
+            doc_id,
+            DocMeta {
+                title: title.to_string(),
+                word_count: content.split_whitespace().count(),
+            },
+        );
 
         self.index_text(doc_id, title, IndexField::Title);
         if !content.is_empty() {
@@ -211,7 +211,9 @@ impl SearchIndex {
         let mut results: Vec<IndexSearchResult> = doc_scores
             .into_iter()
             .map(|((doc_id, field), (score, positions))| {
-                let doc_title = self.doc_metadata.get(&doc_id)
+                let doc_title = self
+                    .doc_metadata
+                    .get(&doc_id)
                     .map(|m| m.title.clone())
                     .unwrap_or_else(|| "Unknown".to_string());
                 IndexSearchResult {
@@ -318,7 +320,8 @@ impl SearchIndex {
     /// Get the total number of occurrences of a specific term
     pub fn term_frequency(&self, term: &str) -> usize {
         let normalized = term.to_lowercase();
-        self.index.get(&normalized)
+        self.index
+            .get(&normalized)
             .map(|entries| entries.iter().map(|e| e.positions.len()).sum())
             .unwrap_or(0)
     }
@@ -326,7 +329,9 @@ impl SearchIndex {
     /// Suggest terms that start with the given prefix
     pub fn suggest_terms(&self, prefix: &str, limit: usize) -> Vec<String> {
         let normalized = prefix.to_lowercase();
-        let mut matches: Vec<String> = self.index.keys()
+        let mut matches: Vec<String> = self
+            .index
+            .keys()
             .filter(|k| k.starts_with(&normalized))
             .cloned()
             .collect();
@@ -349,7 +354,12 @@ impl SearchIndex {
 impl IndexField {
     /// All available fields
     pub fn all() -> Vec<Self> {
-        vec![IndexField::Title, IndexField::Content, IndexField::Notes, IndexField::Synopsis]
+        vec![
+            IndexField::Title,
+            IndexField::Content,
+            IndexField::Notes,
+            IndexField::Synopsis,
+        ]
     }
 
     /// Human-readable label
@@ -376,9 +386,30 @@ fn tokenize(text: &str) -> Vec<String> {
 fn is_stop_word(word: &str) -> bool {
     matches!(
         word,
-        "the" | "is" | "at" | "in" | "of" | "on" | "to" | "and" | "or"
-        | "an" | "it" | "by" | "as" | "be" | "do" | "if" | "so" | "no"
-        | "up" | "he" | "we" | "am" | "my" | "me"
+        "the"
+            | "is"
+            | "at"
+            | "in"
+            | "of"
+            | "on"
+            | "to"
+            | "and"
+            | "or"
+            | "an"
+            | "it"
+            | "by"
+            | "as"
+            | "be"
+            | "do"
+            | "if"
+            | "so"
+            | "no"
+            | "up"
+            | "he"
+            | "we"
+            | "am"
+            | "my"
+            | "me"
     )
 }
 
@@ -388,21 +419,26 @@ fn generate_snippet(text: &str, query: &str) -> String {
     if let Some(pos) = text_lower.find(query) {
         // pos and query.len() are byte offsets from find(), always on char boundaries.
         // Walk back ~60 chars for context start.
-        let start_byte = text.char_indices()
+        let start_byte = text
+            .char_indices()
             .rev()
             .find(|&(idx, _)| idx <= pos.saturating_sub(60))
             .map(|(idx, _)| idx)
             .unwrap_or(0);
         // Walk forward ~60 chars past the match for context end.
         let match_end = pos + query.len();
-        let end_byte = text.char_indices()
+        let end_byte = text
+            .char_indices()
             .find(|&(idx, _)| idx >= match_end + 60)
             .map(|(idx, _)| idx)
             .unwrap_or(text.len());
 
         // Align to word boundaries
         let start = if start_byte > 0 {
-            text[start_byte..].find(' ').map(|p| start_byte + p + 1).unwrap_or(start_byte)
+            text[start_byte..]
+                .find(' ')
+                .map(|p| start_byte + p + 1)
+                .unwrap_or(start_byte)
         } else {
             0
         };
@@ -413,8 +449,12 @@ fn generate_snippet(text: &str, query: &str) -> String {
         };
 
         let mut snippet = text[start..end].to_string();
-        if start > 0 { snippet.insert_str(0, "..."); }
-        if end < text.len() { snippet.push_str("..."); }
+        if start > 0 {
+            snippet.insert_str(0, "...");
+        }
+        if end < text.len() {
+            snippet.push_str("...");
+        }
         snippet
     } else {
         // No direct match, return first 120 chars

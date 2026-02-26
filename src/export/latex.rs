@@ -1,9 +1,13 @@
-use std::fmt::Write as _;
-use anyhow::Result;
 use super::compiler::{CompileContent, CompileOptions, SeparatorType};
+use anyhow::Result;
+use std::fmt::Write as _;
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
-    let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 40).sum::<usize>() + 512;
+    let estimated_size: usize = contents
+        .iter()
+        .map(|c| c.text.len() + c.title.len() + 40)
+        .sum::<usize>()
+        + 512;
     let mut output = String::with_capacity(estimated_size);
 
     // LaTeX preamble
@@ -25,19 +29,16 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
 
     // Header with author/title
     if !options.title.is_empty() {
-        let _ = writeln!(output,
-            "\\fancyhead[R]{{\\textit{{{}}}}}",
-            escape_latex(&options.title)
-        );
+        writeln!(output, "\\fancyhead[R]{{\\textit{{{}}}}}", escape_latex(&options.title)).unwrap();
     }
 
     output.push('\n');
 
     if !options.title.is_empty() {
-        let _ = writeln!(output,"\\title{{{}}}", escape_latex(&options.title));
+        writeln!(output, "\\title{{{}}}", escape_latex(&options.title)).unwrap();
     }
     if !options.author.is_empty() {
-        let _ = writeln!(output,"\\author{{{}}}", escape_latex(&options.author));
+        writeln!(output, "\\author{{{}}}", escape_latex(&options.author)).unwrap();
     }
     output.push_str("\\date{}\n\n");
     output.push_str("\\begin{document}\n\n");
@@ -59,11 +60,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                 3 => "paragraph",
                 _ => "subparagraph",
             };
-            let _ = write!(output,
-                "\\{}{{{}}} \n\n",
-                cmd,
-                escape_latex(&content.title)
-            );
+            write!(output, "\\{}{{{}}} \n\n", cmd, escape_latex(&content.title)).unwrap();
             prev_was_text = false;
         } else {
             // Separator between consecutive text documents
@@ -89,14 +86,10 @@ fn separator_latex(sep: &SeparatorType) -> String {
         SeparatorType::EmptyLine => "\\bigskip\n\n".to_string(),
         SeparatorType::PageBreak => "\\newpage\n\n".to_string(),
         SeparatorType::SectionBreak => {
-            "\\begin{center}\n$\\ast$ \\quad $\\ast$ \\quad $\\ast$\n\\end{center}\n\n"
-                .to_string()
+            "\\begin{center}\n$\\ast$ \\quad $\\ast$ \\quad $\\ast$\n\\end{center}\n\n".to_string()
         }
         SeparatorType::Custom(s) => {
-            format!(
-                "\\begin{{center}}\n{}\n\\end{{center}}\n\n",
-                escape_latex(s)
-            )
+            format!("\\begin{{center}}\n{}\n\\end{{center}}\n\n", escape_latex(s))
         }
         SeparatorType::None => String::new(),
     }
@@ -168,7 +161,7 @@ fn markdown_to_latex(text: &str) -> String {
         // Unordered list item
         if trimmed.starts_with("- ") || trimmed.starts_with("* ") {
             let content = convert_inline_formatting(&trimmed[2..]);
-            let _ = writeln!(output,"\\textbullet\\ {}", content);
+            writeln!(output, "\\textbullet\\ {}", content).unwrap();
             continue;
         }
 
@@ -221,7 +214,7 @@ fn convert_inline_formatting(text: &str) -> String {
         if i + 1 < len && chars[i] == '*' && chars[i + 1] == '*' {
             if let Some(end) = find_closing(&chars, i + 2, '*', '*') {
                 let inner: String = chars[i + 2..end].iter().collect();
-                let _ = write!(result,"\\textbf{{{}}}", escape_latex(&inner));
+                write!(result, "\\textbf{{{}}}", escape_latex(&inner)).unwrap();
                 i = end + 2;
                 continue;
             }
@@ -231,7 +224,7 @@ fn convert_inline_formatting(text: &str) -> String {
         if chars[i] == '*' {
             if let Some(end) = find_closing_single(&chars, i + 1, '*') {
                 let inner: String = chars[i + 1..end].iter().collect();
-                let _ = write!(result,"\\textit{{{}}}", escape_latex(&inner));
+                write!(result, "\\textit{{{}}}", escape_latex(&inner)).unwrap();
                 i = end + 1;
                 continue;
             }
@@ -241,7 +234,7 @@ fn convert_inline_formatting(text: &str) -> String {
         if i + 1 < len && chars[i] == '~' && chars[i + 1] == '~' {
             if let Some(end) = find_closing(&chars, i + 2, '~', '~') {
                 let inner: String = chars[i + 2..end].iter().collect();
-                let _ = write!(result,"\\sout{{{}}}", escape_latex(&inner));
+                write!(result, "\\sout{{{}}}", escape_latex(&inner)).unwrap();
                 i = end + 2;
                 continue;
             }
@@ -251,7 +244,7 @@ fn convert_inline_formatting(text: &str) -> String {
         if chars[i] == '`' {
             if let Some(end) = find_closing_single(&chars, i + 1, '`') {
                 let inner: String = chars[i + 1..end].iter().collect();
-                let _ = write!(result,"\\texttt{{{}}}", escape_latex(&inner));
+                write!(result, "\\texttt{{{}}}", escape_latex(&inner)).unwrap();
                 i = end + 1;
                 continue;
             }
@@ -292,4 +285,94 @@ fn find_closing(chars: &[char], start: usize, c1: char, c2: char) -> Option<usiz
 /// Find closing single-char delimiter (e.g. *)
 fn find_closing_single(chars: &[char], start: usize, c: char) -> Option<usize> {
     (start..chars.len()).find(|&i| chars[i] == c)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::compiler::{CompileContent, CompileOptions};
+    use super::*;
+
+    fn sample_contents() -> Vec<CompileContent> {
+        vec![
+            CompileContent {
+                title: "Chapter 1".into(),
+                text: String::new(),
+                depth: 0,
+                is_folder: true,
+            },
+            CompileContent {
+                title: "Scene".into(),
+                text: "Hello world.".into(),
+                depth: 1,
+                is_folder: false,
+            },
+        ]
+    }
+
+    fn default_options() -> CompileOptions {
+        CompileOptions {
+            include_front_matter: false,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_compile_basic_structure() {
+        let output = compile(&sample_contents(), &default_options()).unwrap();
+        assert!(output.contains("\\documentclass"));
+        assert!(output.contains("\\begin{document}"));
+        assert!(output.contains("\\end{document}"));
+        assert!(output.contains("\\section{Chapter 1}"));
+        assert!(output.contains("Hello world."));
+    }
+
+    #[test]
+    fn test_compile_with_front_matter() {
+        let mut opts = default_options();
+        opts.include_front_matter = true;
+        opts.title = "My Book".into();
+        opts.author = "Author".into();
+        let output = compile(&sample_contents(), &opts).unwrap();
+        assert!(output.contains("\\title{My Book}"));
+        assert!(output.contains("\\author{Author}"));
+        assert!(output.contains("\\maketitle"));
+    }
+
+    #[test]
+    fn test_escape_latex_special_chars() {
+        assert_eq!(escape_latex("$100 & 50%"), "\\$100 \\& 50\\%");
+        assert_eq!(escape_latex("a#b_c{d}"), "a\\#b\\_c\\{d\\}");
+    }
+
+    #[test]
+    fn test_convert_inline_bold() {
+        let result = convert_inline_formatting("**bold**");
+        assert!(result.contains("\\textbf{bold}"));
+    }
+
+    #[test]
+    fn test_convert_inline_italic() {
+        let result = convert_inline_formatting("*italic*");
+        assert!(result.contains("\\textit{italic}"));
+    }
+
+    #[test]
+    fn test_convert_inline_code() {
+        let result = convert_inline_formatting("`code`");
+        assert!(result.contains("\\texttt{code}"));
+    }
+
+    #[test]
+    fn test_parse_heading() {
+        assert_eq!(parse_heading("# Title").unwrap(), "\\section*{Title}");
+        assert_eq!(parse_heading("## Sub").unwrap(), "\\subsection*{Sub}");
+        assert!(parse_heading("No heading").is_none());
+    }
+
+    #[test]
+    fn test_markdown_to_latex_blockquote() {
+        let output = markdown_to_latex("> A quote");
+        assert!(output.contains("\\begin{quote}"));
+        assert!(output.contains("\\end{quote}"));
+    }
 }

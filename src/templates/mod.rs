@@ -61,12 +61,12 @@ impl TemplateCategory {
     /// Get a Nerd Font icon for the category
     pub fn icon(&self) -> &str {
         match self {
-            TemplateCategory::Fiction => "\u{f02d}",      // nf-fa-book
-            TemplateCategory::NonFiction => "\u{f1ea}",   // nf-fa-newspaper_o
+            TemplateCategory::Fiction => "\u{f02d}",       // nf-fa-book
+            TemplateCategory::NonFiction => "\u{f1ea}",    // nf-fa-newspaper_o
             TemplateCategory::Scriptwriting => "\u{f008}", // nf-fa-film
-            TemplateCategory::Academic => "\u{f19d}",     // nf-fa-graduation_cap
-            TemplateCategory::Miscellaneous => "\u{f0ea}",// nf-fa-clipboard
-            TemplateCategory::Blank => "\u{f15c}",        // nf-fa-file_text
+            TemplateCategory::Academic => "\u{f19d}",      // nf-fa-graduation_cap
+            TemplateCategory::Miscellaneous => "\u{f0ea}", // nf-fa-clipboard
+            TemplateCategory::Blank => "\u{f15c}",         // nf-fa-file_text
         }
     }
 }
@@ -93,7 +93,10 @@ pub fn find_template(id: &str) -> Option<Template> {
 
 /// Get templates filtered by category
 pub fn templates_by_category(category: &TemplateCategory) -> Vec<Template> {
-    built_in_templates().into_iter().filter(|t| &t.category == category).collect()
+    built_in_templates()
+        .into_iter()
+        .filter(|t| &t.category == category)
+        .collect()
 }
 
 /// Get the total number of built-in templates
@@ -396,8 +399,11 @@ mod tests {
         let templates = built_in_templates();
         let all_cats = TemplateCategory::all();
         for t in &templates {
-            assert!(all_cats.contains(&t.category),
-                "Template '{}' has unrecognized category", t.name);
+            assert!(
+                all_cats.contains(&t.category),
+                "Template '{}' has unrecognized category",
+                t.name
+            );
         }
     }
 

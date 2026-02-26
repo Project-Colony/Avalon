@@ -1,6 +1,6 @@
 #![allow(dead_code)] // Methods used by test code
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// A margin comment (side bubble) attached to a text range in a document.
@@ -226,9 +226,7 @@ impl Comment {
 impl CommentManager {
     /// Create an empty manager.
     pub fn new() -> Self {
-        Self {
-            comments: Vec::new(),
-        }
+        Self { comments: Vec::new() }
     }
 
     /// Add a comment and return its id.
@@ -286,10 +284,7 @@ impl CommentManager {
 
     /// Comments matching a specific priority.
     pub fn by_priority(&self, priority: &CommentPriority) -> Vec<&Comment> {
-        self.comments
-            .iter()
-            .filter(|c| &c.priority == priority)
-            .collect()
+        self.comments.iter().filter(|c| &c.priority == priority).collect()
     }
 
     /// Search comment text and replies for a query (case-insensitive).
@@ -355,10 +350,7 @@ impl CommentManager {
             .iter()
             .map(|c| {
                 let status = if c.resolved { "RESOLVED" } else { "OPEN" };
-                format!(
-                    "[{}] ({}) @{}: {}",
-                    status, c.priority.label(), c.author, c.text,
-                )
+                format!("[{}] ({}) @{}: {}", status, c.priority.label(), c.author, c.text,)
             })
             .collect()
     }
@@ -372,10 +364,26 @@ impl CommentManager {
         let unique_authors = self.unique_authors().len();
 
         let by_priority = PriorityBreakdown {
-            low: self.comments.iter().filter(|c| c.priority == CommentPriority::Low).count(),
-            normal: self.comments.iter().filter(|c| c.priority == CommentPriority::Normal).count(),
-            high: self.comments.iter().filter(|c| c.priority == CommentPriority::High).count(),
-            critical: self.comments.iter().filter(|c| c.priority == CommentPriority::Critical).count(),
+            low: self
+                .comments
+                .iter()
+                .filter(|c| c.priority == CommentPriority::Low)
+                .count(),
+            normal: self
+                .comments
+                .iter()
+                .filter(|c| c.priority == CommentPriority::Normal)
+                .count(),
+            high: self
+                .comments
+                .iter()
+                .filter(|c| c.priority == CommentPriority::High)
+                .count(),
+            critical: self
+                .comments
+                .iter()
+                .filter(|c| c.priority == CommentPriority::Critical)
+                .count(),
         };
 
         let by_color = ColorBreakdown {
@@ -612,10 +620,10 @@ mod tests {
         assert!(c.overlaps(15, 25));
         assert!(c.overlaps(5, 15));
         assert!(c.overlaps(12, 18));
-        assert!(c.overlaps(0, 100));  // fully contains
-        assert!(c.overlaps(10, 20));  // exact match
+        assert!(c.overlaps(0, 100)); // fully contains
+        assert!(c.overlaps(10, 20)); // exact match
         assert!(!c.overlaps(20, 30)); // adjacent, no overlap
-        assert!(!c.overlaps(0, 10));  // adjacent, no overlap
+        assert!(!c.overlaps(0, 10)); // adjacent, no overlap
     }
 
     // -- Shift ---------------------------------------------------------------
@@ -967,7 +975,7 @@ mod tests {
 
         mgr.shift_after(15, 5);
         let sorted = mgr.sorted_by_position();
-        assert_eq!(sorted[0].anchor_start, 0);  // unshifted
+        assert_eq!(sorted[0].anchor_start, 0); // unshifted
         assert_eq!(sorted[0].anchor_end, 10);
         assert_eq!(sorted[1].anchor_start, 25); // shifted +5
         assert_eq!(sorted[1].anchor_end, 35);
@@ -981,7 +989,7 @@ mod tests {
 
         mgr.shift_after(15, -5);
         let sorted = mgr.sorted_by_position();
-        assert_eq!(sorted[0].anchor_start, 0);  // unshifted
+        assert_eq!(sorted[0].anchor_start, 0); // unshifted
         assert_eq!(sorted[1].anchor_start, 15); // shifted -5
         assert_eq!(sorted[1].anchor_end, 25);
     }

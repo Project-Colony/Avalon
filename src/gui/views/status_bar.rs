@@ -47,7 +47,11 @@ pub fn view(params: &StatusBarParams<'_>) -> Element<'static, Message> {
     } = params;
 
     let dirty_indicator = if *is_dirty { " \u{2022}" } else { "" };
-    let dirty_color = if *is_dirty { Theme::WARNING } else { Theme::TEXT_SECONDARY };
+    let dirty_color = if *is_dirty {
+        Theme::WARNING
+    } else {
+        Theme::TEXT_SECONDARY
+    };
     let project_info = format!("{}{}", project_title, dirty_indicator);
 
     let progress = stats.progress_string(*target_words);
@@ -80,7 +84,8 @@ pub fn view(params: &StatusBarParams<'_>) -> Element<'static, Message> {
             text("\u{f017}").size(10),
             Space::with_width(2),
             text("REC").size(9).color(Theme::SUCCESS),
-        ].into()
+        ]
+        .into()
     } else {
         Space::with_width(0).into()
     };
@@ -92,7 +97,8 @@ pub fn view(params: &StatusBarParams<'_>) -> Element<'static, Message> {
             text("\u{f017}").size(10),
             Space::with_width(2),
             text(timer_remaining.to_string()).size(9).color(Theme::TEXT_ACCENT),
-        ].into()
+        ]
+        .into()
     } else {
         Space::with_width(0).into()
     };
@@ -119,11 +125,7 @@ pub fn view(params: &StatusBarParams<'_>) -> Element<'static, Message> {
             let bar_width: usize = 10;
             let filled = ((pct / 100.0) * bar_width as f64) as usize;
             let empty = bar_width.saturating_sub(filled);
-            let bar = format!(
-                "{}{}",
-                "\u{2588}".repeat(filled),
-                "\u{2591}".repeat(empty)
-            );
+            let bar = format!("{}{}", "\u{2588}".repeat(filled), "\u{2591}".repeat(empty));
 
             row![
                 Space::with_width(8),
@@ -152,14 +154,21 @@ pub fn view(params: &StatusBarParams<'_>) -> Element<'static, Message> {
 
     // Writing streak indicator
     let streak_indicator: Element<'static, Message> = if *writing_streak > 0 {
-        let streak_color = if *writing_streak >= 7 { Theme::SUCCESS }
-        else if *writing_streak >= 3 { Theme::WARNING }
-        else { Theme::TEXT_MUTED };
+        let streak_color = if *writing_streak >= 7 {
+            Theme::SUCCESS
+        } else if *writing_streak >= 3 {
+            Theme::WARNING
+        } else {
+            Theme::TEXT_MUTED
+        };
         let streak_icon = if *writing_streak >= 7 { "\u{f06d}" } else { "\u{f0e7}" };
         row![
             Space::with_width(4),
-            text(format!("{} {}d", streak_icon, writing_streak)).size(9).color(streak_color),
-        ].into()
+            text(format!("{} {}d", streak_icon, writing_streak))
+                .size(9)
+                .color(streak_color),
+        ]
+        .into()
     } else {
         Space::with_width(0).into()
     };

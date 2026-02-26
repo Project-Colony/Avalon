@@ -155,7 +155,6 @@ pub fn find_template(id: &str) -> Option<DocumentTemplate> {
     builtin_templates().into_iter().find(|t| t.id == id)
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -228,7 +227,11 @@ mod tests {
         for template in builtin_templates() {
             assert!(!template.name.is_empty(), "Template {} has empty name", template.id);
             assert!(!template.id.is_empty());
-            assert!(!template.description.is_empty(), "Template {} has empty description", template.id);
+            assert!(
+                !template.description.is_empty(),
+                "Template {} has empty description",
+                template.id
+            );
         }
     }
 

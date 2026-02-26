@@ -88,7 +88,11 @@ pub enum Message {
     DeleteItem(Uuid),
     RenameItem(Uuid, String),
     UpdateSynopsis(Uuid, String),
-    MoveItem { item_id: Uuid, target_id: Uuid, position: usize },
+    MoveItem {
+        item_id: Uuid,
+        target_id: Uuid,
+        position: usize,
+    },
     MoveItemUp(Uuid),
     MoveItemDown(Uuid),
     DuplicateItem(Uuid),

@@ -1,17 +1,15 @@
 use iced::widget::{column, container, row, scrollable, text, Space};
 use iced::{Element, Length, Padding};
 
+use crate::core::linguistic;
 use crate::core::stats::TextAnalysis;
 use crate::core::text_analysis as advanced_analysis;
-use crate::core::linguistic;
 use crate::gui::app::Message;
 use crate::gui::theme::{self, Theme};
 
 /// Render the text statistics panel (bottom panel)
 pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message> {
-    let header = text("TEXT STATISTICS")
-        .size(11)
-        .color(Theme::TEXT_SECONDARY);
+    let header = text("TEXT STATISTICS").size(11).color(Theme::TEXT_SECONDARY);
 
     // Basic stats
     let basic_stats = row![
@@ -45,15 +43,25 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
     let readability = row![
         text("Readability:").size(11).color(Theme::TEXT_MUTED),
         Space::with_width(4),
-        text(format!("Flesch: {:.1}", advanced.flesch_reading_ease)).size(11).color(readability_color),
+        text(format!("Flesch: {:.1}", advanced.flesch_reading_ease))
+            .size(11)
+            .color(readability_color),
         Space::with_width(8),
-        text(format!("FK Grade: {:.1}", advanced.flesch_kincaid_grade)).size(11).color(Theme::TEXT_SECONDARY),
+        text(format!("FK Grade: {:.1}", advanced.flesch_kincaid_grade))
+            .size(11)
+            .color(Theme::TEXT_SECONDARY),
         Space::with_width(8),
-        text(format!("Fog: {:.1}", advanced.gunning_fog)).size(11).color(Theme::TEXT_SECONDARY),
+        text(format!("Fog: {:.1}", advanced.gunning_fog))
+            .size(11)
+            .color(Theme::TEXT_SECONDARY),
         Space::with_width(8),
-        text(format!("Reading: {:.0} min", analysis.reading_time_minutes)).size(11).color(Theme::TEXT_MUTED),
+        text(format!("Reading: {:.0} min", analysis.reading_time_minutes))
+            .size(11)
+            .color(Theme::TEXT_MUTED),
         Space::with_width(8),
-        text(format!("Speaking: {:.0} min", analysis.speaking_time_minutes)).size(11).color(Theme::TEXT_MUTED),
+        text(format!("Speaking: {:.0} min", analysis.speaking_time_minutes))
+            .size(11)
+            .color(Theme::TEXT_MUTED),
     ]
     .align_y(iced::Alignment::Center);
 
@@ -61,15 +69,21 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
     let readability_extra = row![
         text("Coleman-Liau:").size(10).color(Theme::TEXT_MUTED),
         Space::with_width(4),
-        text(format!("{:.1}", advanced.coleman_liau)).size(10).color(Theme::TEXT_SECONDARY),
+        text(format!("{:.1}", advanced.coleman_liau))
+            .size(10)
+            .color(Theme::TEXT_SECONDARY),
         Space::with_width(12),
         text("ARI:").size(10).color(Theme::TEXT_MUTED),
         Space::with_width(4),
-        text(format!("{:.1}", advanced.ari)).size(10).color(Theme::TEXT_SECONDARY),
+        text(format!("{:.1}", advanced.ari))
+            .size(10)
+            .color(Theme::TEXT_SECONDARY),
         Space::with_width(12),
         text("SMOG:").size(10).color(Theme::TEXT_MUTED),
         Space::with_width(4),
-        text(format!("{:.1}", advanced.smog)).size(10).color(Theme::TEXT_SECONDARY),
+        text(format!("{:.1}", advanced.smog))
+            .size(10)
+            .color(Theme::TEXT_SECONDARY),
     ]
     .align_y(iced::Alignment::Center);
 
@@ -80,14 +94,24 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
         Space::with_width(4),
         text(format!("TTR: {:.1}%", vocab.type_token_ratio * 100.0))
             .size(11)
-            .color(if vocab.type_token_ratio >= 0.7 { Theme::SUCCESS }
-                else if vocab.type_token_ratio >= 0.5 { Theme::WARNING }
-                else { Theme::ERROR }),
+            .color(if vocab.type_token_ratio >= 0.7 {
+                Theme::SUCCESS
+            } else if vocab.type_token_ratio >= 0.5 {
+                Theme::WARNING
+            } else {
+                Theme::ERROR
+            }),
         Space::with_width(8),
-        text(format!("Hapax: {}", vocab.hapax_legomena)).size(10).color(Theme::TEXT_SECONDARY),
+        text(format!("Hapax: {}", vocab.hapax_legomena))
+            .size(10)
+            .color(Theme::TEXT_SECONDARY),
         Space::with_width(8),
-        text(format!("Pages: {:.1}", analysis.word_count as f64 / crate::core::WORDS_PER_PAGE as f64))
-            .size(11).color(Theme::TEXT_MUTED),
+        text(format!(
+            "Pages: {:.1}",
+            analysis.word_count as f64 / crate::core::WORDS_PER_PAGE as f64
+        ))
+        .size(11)
+        .color(Theme::TEXT_MUTED),
     ]
     .align_y(iced::Alignment::Center);
 
@@ -151,25 +175,24 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
 
     // Top words from text_analysis module
     let top_words = advanced_analysis::top_n_words(raw_text, 10);
-    let mut common_words = row![
-        text("Top words: ").size(11).color(Theme::TEXT_MUTED),
-    ]
-    .spacing(4);
+    let mut common_words = row![text("Top words: ").size(11).color(Theme::TEXT_MUTED),].spacing(4);
     for wf in &top_words {
         common_words = common_words.push(
-            text(format!("{}({})", wf.word, wf.count)).size(10).color(Theme::TEXT_SECONDARY)
+            text(format!("{}({})", wf.word, wf.count))
+                .size(10)
+                .color(Theme::TEXT_SECONDARY),
         );
     }
 
     // Overused words from text_analysis module
     let overused_words = advanced_analysis::overused_words(raw_text, 5);
     let overused_row: Element<'static, Message> = if !overused_words.is_empty() {
-        let mut r = row![
-            text("Overused: ").size(11).color(Theme::WARNING),
-        ].spacing(4);
+        let mut r = row![text("Overused: ").size(11).color(Theme::WARNING),].spacing(4);
         for wf in &overused_words {
             r = r.push(
-                text(format!("{}({}x)", wf.word, wf.count)).size(10).color(Theme::WARNING)
+                text(format!("{}({}x)", wf.word, wf.count))
+                    .size(10)
+                    .color(Theme::WARNING),
             );
         }
         r.into()
@@ -183,14 +206,20 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
     let sentence_row = row![
         text("Sentences:").size(11).color(Theme::TEXT_MUTED),
         Space::with_width(4),
-        text(format!("Avg: {:.1} words", avg_len)).size(10).color(Theme::TEXT_SECONDARY),
+        text(format!("Avg: {:.1} words", avg_len))
+            .size(10)
+            .color(Theme::TEXT_SECONDARY),
         Space::with_width(8),
-        text(format!("Longest: {} words",
+        text(format!(
+            "Longest: {} words",
             longest.first().map_or(0, |s| s.word_count)
-        )).size(10).color(
-            if longest.first().is_some_and(|s| s.word_count > 40) { Theme::WARNING }
-            else { Theme::TEXT_SECONDARY }
-        ),
+        ))
+        .size(10)
+        .color(if longest.first().is_some_and(|s| s.word_count > 40) {
+            Theme::WARNING
+        } else {
+            Theme::TEXT_SECONDARY
+        }),
     ]
     .align_y(iced::Alignment::Center);
 
@@ -199,39 +228,63 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
     let density_row = row![
         text("Density:").size(11).color(Theme::TEXT_MUTED),
         Space::with_width(4),
-        text(format!("{} paragraphs", paragraphs.len())).size(10).color(Theme::TEXT_SECONDARY),
+        text(format!("{} paragraphs", paragraphs.len()))
+            .size(10)
+            .color(Theme::TEXT_SECONDARY),
         Space::with_width(8),
-        text(format!("Avg: {:.1} words/para",
+        text(format!(
+            "Avg: {:.1} words/para",
             if !paragraphs.is_empty() {
                 paragraphs.iter().map(|p| p.word_count).sum::<usize>() as f64 / paragraphs.len() as f64
-            } else { 0.0 }
-        )).size(10).color(Theme::TEXT_SECONDARY),
+            } else {
+                0.0
+            }
+        ))
+        .size(10)
+        .color(Theme::TEXT_SECONDARY),
         Space::with_width(8),
-        text(format!("Avg: {:.1} sentences/para",
+        text(format!(
+            "Avg: {:.1} sentences/para",
             if !paragraphs.is_empty() {
                 paragraphs.iter().map(|p| p.sentence_count).sum::<usize>() as f64 / paragraphs.len() as f64
-            } else { 0.0 }
-        )).size(10).color(Theme::TEXT_SECONDARY),
+            } else {
+                0.0
+            }
+        ))
+        .size(10)
+        .color(Theme::TEXT_SECONDARY),
     ]
     .align_y(iced::Alignment::Center);
 
     // Grade level estimation using advanced readability
     let est_grade = advanced.flesch_kincaid_grade.clamp(0.0, 20.0);
-    let est_audience = if est_grade <= 6.0 { "Children / General Public" }
-    else if est_grade <= 9.0 { "Young Adults" }
-    else if est_grade <= 13.0 { "General Adults" }
-    else if est_grade <= 17.0 { "College-educated" }
-    else { "Academic / Professional" };
-    let grade_color = if est_grade <= 8.0 { Theme::SUCCESS }
-    else if est_grade <= 12.0 { Theme::WARNING }
-    else { Theme::ERROR };
+    let est_audience = if est_grade <= 6.0 {
+        "Children / General Public"
+    } else if est_grade <= 9.0 {
+        "Young Adults"
+    } else if est_grade <= 13.0 {
+        "General Adults"
+    } else if est_grade <= 17.0 {
+        "College-educated"
+    } else {
+        "Academic / Professional"
+    };
+    let grade_color = if est_grade <= 8.0 {
+        Theme::SUCCESS
+    } else if est_grade <= 12.0 {
+        Theme::WARNING
+    } else {
+        Theme::ERROR
+    };
 
     let grade_row = row![
         text("Est. Grade:").size(11).color(Theme::TEXT_MUTED),
         Space::with_width(4),
         text(format!("{:.1}", est_grade)).size(12).color(grade_color),
         Space::with_width(4),
-        text(format!("({})", est_audience)).size(11).color(Theme::TEXT_SECONDARY),
+        text(format!("({})", est_audience))
+            .size(11)
+            .color(Theme::TEXT_SECONDARY),
     ]
     .align_y(iced::Alignment::Center);
 
@@ -263,10 +316,7 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
     ]
     .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }
 
 fn stat_col(label: &str, value: &str) -> Element<'static, Message> {

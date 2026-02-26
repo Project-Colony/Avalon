@@ -24,7 +24,8 @@ pub struct SpellChecker {
 
 /// Built-in common English words (~3000 most frequent)
 fn built_in_dictionary() -> HashSet<String> {
-    include_str!("wordlist.txt").lines()
+    include_str!("wordlist.txt")
+        .lines()
         .filter(|l| !l.is_empty() && !l.starts_with('#'))
         .map(|w| w.trim().to_lowercase())
         .collect()
@@ -34,8 +35,12 @@ fn built_in_dictionary() -> HashSet<String> {
 fn edit_distance(a: &str, b: &str) -> usize {
     let a_len = a.len();
     let b_len = b.len();
-    if a_len == 0 { return b_len; }
-    if b_len == 0 { return a_len; }
+    if a_len == 0 {
+        return b_len;
+    }
+    if b_len == 0 {
+        return a_len;
+    }
 
     let mut prev: Vec<usize> = (0..=b_len).collect();
     let mut curr = vec![0; b_len + 1];
@@ -44,9 +49,7 @@ fn edit_distance(a: &str, b: &str) -> usize {
         curr[0] = i + 1;
         for (j, cb) in b.chars().enumerate() {
             let cost = if ca == cb { 0 } else { 1 };
-            curr[j + 1] = (prev[j] + cost)
-                .min(prev[j + 1] + 1)
-                .min(curr[j] + 1);
+            curr[j + 1] = (prev[j] + cost).min(prev[j + 1] + 1).min(curr[j] + 1);
         }
         std::mem::swap(&mut prev, &mut curr);
     }
@@ -92,7 +95,9 @@ impl SpellChecker {
         let lower = word.to_lowercase();
         let max_distance = if lower.len() <= 4 { 1 } else { 2 };
 
-        let mut candidates: Vec<(String, usize)> = self.dictionary.iter()
+        let mut candidates: Vec<(String, usize)> = self
+            .dictionary
+            .iter()
             .filter(|dict_word| {
                 // Quick length-based pre-filter
                 let len_diff = (dict_word.len() as isize - lower.len() as isize).unsigned_abs();
@@ -199,7 +204,9 @@ impl SpellChecker {
             return Vec::new();
         }
         let lower = word.to_lowercase();
-        let mut candidates: Vec<(String, usize)> = self.dictionary.iter()
+        let mut candidates: Vec<(String, usize)> = self
+            .dictionary
+            .iter()
             .map(|dict_word| (dict_word.clone(), edit_distance(&lower, dict_word)))
             .filter(|(_, dist)| *dist > 0)
             .collect();
@@ -270,9 +277,12 @@ impl SpellSuggestion {
         if self.suggestions.is_empty() {
             format!("\"{}\" — no suggestions", self.word)
         } else {
-            format!("\"{}\" — {} suggestions: {}", self.word,
+            format!(
+                "\"{}\" — {} suggestions: {}",
+                self.word,
                 self.suggestions.len(),
-                self.suggestions.iter().take(3).cloned().collect::<Vec<_>>().join(", "))
+                self.suggestions.iter().take(3).cloned().collect::<Vec<_>>().join(", ")
+            )
         }
     }
 }
@@ -611,7 +621,7 @@ mod tests {
         if similar.len() >= 2 {
             // Should be sorted by distance (ascending)
             for i in 1..similar.len() {
-                assert!(similar[i].1 >= similar[i-1].1);
+                assert!(similar[i].1 >= similar[i - 1].1);
             }
         }
     }
@@ -637,7 +647,12 @@ mod tests {
     fn test_suggestion_summary_with_suggestions() {
         let suggestion = SpellSuggestion {
             word: "teh".to_string(),
-            suggestions: vec!["the".to_string(), "ten".to_string(), "tea".to_string(), "ted".to_string()],
+            suggestions: vec![
+                "the".to_string(),
+                "ten".to_string(),
+                "tea".to_string(),
+                "ted".to_string(),
+            ],
             position: 5,
         };
         let summary = suggestion.summary();

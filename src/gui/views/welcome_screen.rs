@@ -73,9 +73,7 @@ fn template_card_style(_theme: &iced::Theme) -> container::Style {
 
 fn section_header(label: &str) -> Element<'static, Message> {
     row![
-        text(label.to_string())
-            .size(14)
-            .color(Theme::TEXT_SECONDARY),
+        text(label.to_string()).size(14).color(Theme::TEXT_SECONDARY),
         Space::with_width(Length::Fill),
     ]
     .into()
@@ -90,9 +88,7 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
         column![
             Space::with_height(28),
             text("Avalon").size(48).color(Theme::TEXT_PRIMARY),
-            text("Free Writing Studio")
-                .size(15)
-                .color(Theme::TEXT_MUTED),
+            text("Free Writing Studio").size(15).color(Theme::TEXT_MUTED),
             Space::with_height(24),
             row![
                 button(
@@ -130,12 +126,7 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
     let recent_content = build_recent_section(recent_projects);
 
     let recent_card = container(
-        column![
-            section_header("Recent Projects"),
-            Space::with_height(8),
-            recent_content,
-        ]
-        .width(Length::Fill),
+        column![section_header("Recent Projects"), Space::with_height(8), recent_content,].width(Length::Fill),
     )
     .style(card_style)
     .padding(Padding::from([16, 20]))
@@ -191,9 +182,7 @@ fn build_recent_section(recent_projects: &RecentProjects) -> Element<'static, Me
     if recent_projects.projects.is_empty() {
         return column![
             Space::with_height(20),
-            text("No recent projects yet.")
-                .size(13)
-                .color(Theme::TEXT_MUTED),
+            text("No recent projects yet.").size(13).color(Theme::TEXT_MUTED),
             Space::with_height(4),
             text("Create a new project or open an existing one to get started.")
                 .size(12)
@@ -213,9 +202,7 @@ fn build_recent_section(recent_projects: &RecentProjects) -> Element<'static, Me
         let entry = button(
             row![
                 column![
-                    text(rp.title.clone())
-                        .size(14)
-                        .color(Theme::TEXT_PRIMARY),
+                    text(rp.title.clone()).size(14).color(Theme::TEXT_PRIMARY),
                     text(if dir.is_empty() {
                         rp.path.to_string_lossy().to_string()
                     } else {
@@ -226,9 +213,7 @@ fn build_recent_section(recent_projects: &RecentProjects) -> Element<'static, Me
                 ]
                 .spacing(2)
                 .width(Length::Fill),
-                text(age)
-                    .size(11)
-                    .color(Theme::TEXT_MUTED),
+                text(age).size(11).color(Theme::TEXT_MUTED),
             ]
             .align_y(iced::Alignment::Center)
             .width(Length::Fill),
@@ -269,9 +254,7 @@ fn build_templates_section() -> Element<'static, Message> {
         let cat_header = row![
             text(icon).size(13),
             Space::with_width(6),
-            text(cat_name)
-                .size(13)
-                .color(Theme::TEXT_ACCENT),
+            text(cat_name).size(13).color(Theme::TEXT_ACCENT),
         ];
 
         let mut template_col = column![].spacing(4);
@@ -280,12 +263,8 @@ fn build_templates_section() -> Element<'static, Message> {
             let tmpl_btn = button(
                 container(
                     column![
-                        text(tmpl.name.clone())
-                            .size(13)
-                            .color(Theme::TEXT_PRIMARY),
-                        text(tmpl.description.clone())
-                            .size(11)
-                            .color(Theme::TEXT_MUTED),
+                        text(tmpl.name.clone()).size(13).color(Theme::TEXT_PRIMARY),
+                        text(tmpl.description.clone()).size(11).color(Theme::TEXT_MUTED),
                     ]
                     .spacing(2),
                 )
@@ -300,9 +279,7 @@ fn build_templates_section() -> Element<'static, Message> {
             template_col = template_col.push(tmpl_btn);
         }
 
-        sections = sections
-            .push(cat_header)
-            .push(template_col);
+        sections = sections.push(cat_header).push(template_col);
     }
 
     scrollable(sections).height(Length::Fill).into()
@@ -337,13 +314,9 @@ fn build_footer() -> Element<'static, Message> {
             Space::with_width(4),
             text("Tip:").size(11).color(Theme::TEXT_ACCENT),
             Space::with_width(6),
-            text(tips[tip_index])
-                .size(11)
-                .color(Theme::TEXT_SECONDARY),
+            text(tips[tip_index]).size(11).color(Theme::TEXT_SECONDARY),
             Space::with_width(Length::Fill),
-            text("Avalon v0.1.0")
-                .size(10)
-                .color(Theme::TEXT_MUTED),
+            text("Avalon v0.1.0").size(10).color(Theme::TEXT_MUTED),
         ]
         .align_y(iced::Alignment::Center),
     )

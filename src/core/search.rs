@@ -1,7 +1,7 @@
 #![allow(dead_code)] // Methods used by test code
+use regex::Regex;
 use std::sync::Mutex;
 use uuid::Uuid;
-use regex::Regex;
 
 use super::binder::Binder;
 
@@ -209,7 +209,6 @@ impl SearchResult {
     }
 }
 
-
 /// Manages saved searches and search history
 #[derive(Debug, Default)]
 pub struct SearchManager {
@@ -237,7 +236,8 @@ impl SearchManager {
     /// Get history entries matching a prefix (for autocomplete)
     pub fn suggest(&self, prefix: &str) -> Vec<&str> {
         let lower = prefix.to_lowercase();
-        self.history.iter()
+        self.history
+            .iter()
             .filter(|q| q.to_lowercase().starts_with(&lower))
             .map(|q| q.as_str())
             .collect()
@@ -264,7 +264,10 @@ mod tests {
     #[test]
     fn test_search_empty_query() {
         let binder = make_binder_with_content(vec![("Doc1", "Hello world")]);
-        let options = SearchOptions { query: String::new(), ..Default::default() };
+        let options = SearchOptions {
+            query: String::new(),
+            ..Default::default()
+        };
         let results = search_binder(&binder, &options);
         assert!(results.is_empty());
     }
@@ -286,9 +289,7 @@ mod tests {
 
     #[test]
     fn test_search_case_sensitive() {
-        let binder = make_binder_with_content(vec![
-            ("Doc", "Hello hello HELLO"),
-        ]);
+        let binder = make_binder_with_content(vec![("Doc", "Hello hello HELLO")]);
         let options = SearchOptions {
             query: "Hello".to_string(),
             case_sensitive: true,
@@ -299,7 +300,9 @@ mod tests {
         let results = search_binder(&binder, &options);
         assert!(!results.is_empty());
         // Should find exactly 1 match for case-sensitive "Hello"
-        let content_matches: Vec<_> = results[0].matches.iter()
+        let content_matches: Vec<_> = results[0]
+            .matches
+            .iter()
             .filter(|m| !m.context.starts_with("[Title]"))
             .collect();
         assert_eq!(content_matches.len(), 1);
@@ -307,9 +310,7 @@ mod tests {
 
     #[test]
     fn test_search_in_title() {
-        let binder = make_binder_with_content(vec![
-            ("Important Chapter", "Some content here"),
-        ]);
+        let binder = make_binder_with_content(vec![("Important Chapter", "Some content here")]);
         let options = SearchOptions {
             query: "important".to_string(),
             search_titles: true,
@@ -322,9 +323,7 @@ mod tests {
 
     #[test]
     fn test_search_no_results() {
-        let binder = make_binder_with_content(vec![
-            ("Doc", "Hello world"),
-        ]);
+        let binder = make_binder_with_content(vec![("Doc", "Hello world")]);
         let options = SearchOptions {
             query: "zzzzz".to_string(),
             ..Default::default()
@@ -335,9 +334,7 @@ mod tests {
 
     #[test]
     fn test_search_result_context() {
-        let binder = make_binder_with_content(vec![
-            ("Doc", "The quick brown fox jumps over the lazy dog"),
-        ]);
+        let binder = make_binder_with_content(vec![("Doc", "The quick brown fox jumps over the lazy dog")]);
         let options = SearchOptions {
             query: "fox".to_string(),
             search_content: true,
@@ -351,9 +348,7 @@ mod tests {
 
     #[test]
     fn test_search_whole_word() {
-        let binder = make_binder_with_content(vec![
-            ("Doc", "The cat concatenated strings"),
-        ]);
+        let binder = make_binder_with_content(vec![("Doc", "The cat concatenated strings")]);
         let options = SearchOptions {
             query: "cat".to_string(),
             whole_word: true,
@@ -369,9 +364,7 @@ mod tests {
 
     #[test]
     fn test_search_regex() {
-        let binder = make_binder_with_content(vec![
-            ("Doc", "apple 123 banana 456 cherry"),
-        ]);
+        let binder = make_binder_with_content(vec![("Doc", "apple 123 banana 456 cherry")]);
         let options = SearchOptions {
             query: r"\d+".to_string(),
             regex: true,
@@ -430,16 +423,20 @@ mod tests {
             item_id: Uuid::new_v4(),
             item_title: "Doc1".to_string(),
             matches: vec![
-                SearchMatch { context: "abc".to_string() },
-                SearchMatch { context: "def".to_string() },
+                SearchMatch {
+                    context: "abc".to_string(),
+                },
+                SearchMatch {
+                    context: "def".to_string(),
+                },
             ],
         };
         let r2 = SearchResult {
             item_id: Uuid::new_v4(),
             item_title: "Doc2".to_string(),
-            matches: vec![
-                SearchMatch { context: "ghi".to_string() },
-            ],
+            matches: vec![SearchMatch {
+                context: "ghi".to_string(),
+            }],
         };
         assert_eq!(total_match_count(&[r1, r2]), 3);
     }
@@ -449,9 +446,9 @@ mod tests {
         let r1 = SearchResult {
             item_id: Uuid::new_v4(),
             item_title: "Doc1".to_string(),
-            matches: vec![
-                SearchMatch { context: "a".to_string() },
-            ],
+            matches: vec![SearchMatch {
+                context: "a".to_string(),
+            }],
         };
         assert_eq!(document_count(&[r1]), 1);
         assert_eq!(document_count(&[]), 0);
@@ -469,8 +466,12 @@ mod tests {
             item_id: Uuid::new_v4(),
             item_title: "D".to_string(),
             matches: vec![
-                SearchMatch { context: "x".to_string() },
-                SearchMatch { context: "y".to_string() },
+                SearchMatch {
+                    context: "x".to_string(),
+                },
+                SearchMatch {
+                    context: "y".to_string(),
+                },
             ],
         };
         let summary = search_summary(&[r]);
@@ -484,8 +485,12 @@ mod tests {
             item_id: Uuid::new_v4(),
             item_title: "D".to_string(),
             matches: vec![
-                SearchMatch { context: "a".to_string() },
-                SearchMatch { context: "b".to_string() },
+                SearchMatch {
+                    context: "a".to_string(),
+                },
+                SearchMatch {
+                    context: "b".to_string(),
+                },
             ],
         };
         assert_eq!(r.match_count(), 2);
@@ -496,9 +501,9 @@ mod tests {
         let r = SearchResult {
             item_id: Uuid::new_v4(),
             item_title: "D".to_string(),
-            matches: vec![
-                SearchMatch { context: "Hello World Extended".to_string() },
-            ],
+            matches: vec![SearchMatch {
+                context: "Hello World Extended".to_string(),
+            }],
         };
         let preview = r.context_preview(0, 10);
         assert_eq!(preview, "Hello Worl...");
@@ -522,9 +527,7 @@ mod tests {
 
     #[test]
     fn test_search_multiline_content() {
-        let binder = make_binder_with_content(vec![
-            ("Doc", "Line 1 has cat\nLine 2 has dog\nLine 3 has cat again"),
-        ]);
+        let binder = make_binder_with_content(vec![("Doc", "Line 1 has cat\nLine 2 has dog\nLine 3 has cat again")]);
         let options = SearchOptions {
             query: "cat".to_string(),
             search_content: true,
@@ -538,9 +541,7 @@ mod tests {
 
     #[test]
     fn test_search_binder_content_and_title() {
-        let binder = make_binder_with_content(vec![
-            ("Cat Story", "The dog barked."),
-        ]);
+        let binder = make_binder_with_content(vec![("Cat Story", "The dog barked.")]);
         let options = SearchOptions {
             query: "cat".to_string(),
             search_titles: true,

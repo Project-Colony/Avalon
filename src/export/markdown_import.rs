@@ -179,13 +179,16 @@ pub fn import_markdown_flat(content: &str) -> Vec<BinderItem> {
         return Vec::new();
     }
 
-    sections.iter().map(|section| {
-        let mut item = BinderItem::new_text(&section.title);
-        if let Some(ref mut doc) = item.document {
-            doc.content = section.content.clone();
-        }
-        item
-    }).collect()
+    sections
+        .iter()
+        .map(|section| {
+            let mut item = BinderItem::new_text(&section.title);
+            if let Some(ref mut doc) = item.document {
+                doc.content = section.content.clone();
+            }
+            item
+        })
+        .collect()
 }
 
 /// Convert a Markdown string to plain text (strip formatting)
@@ -306,7 +309,8 @@ pub fn extract_front_matter(content: &str) -> Option<FrontMatter> {
             let line = line.trim();
             if let Some(colon_pos) = line.find(':') {
                 let key = line[..colon_pos].trim().to_lowercase();
-                let value = line[colon_pos + 1..].trim()
+                let value = line[colon_pos + 1..]
+                    .trim()
                     .trim_matches('"')
                     .trim_matches('\'')
                     .to_string();
@@ -316,7 +320,8 @@ pub fn extract_front_matter(content: &str) -> Option<FrontMatter> {
                     "author" => fm.author = Some(value),
                     "date" => fm.date = Some(value),
                     "tags" | "keywords" => {
-                        fm.tags = value.split(',')
+                        fm.tags = value
+                            .split(',')
                             .map(|s| s.trim().to_string())
                             .filter(|s| !s.is_empty())
                             .collect();

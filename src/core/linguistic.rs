@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use std::sync::LazyLock;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::LazyLock;
 
 // ---------------------------------------------------------------------------
 // 1. Readability Analysis
@@ -92,9 +92,7 @@ impl ReadabilityMetrics {
 /// suffixes, and other English spelling patterns. This is an approximation
 /// and will not be perfectly accurate for every word.
 pub fn count_syllables(word: &str) -> usize {
-    let lower = word
-        .trim_matches(|c: char| !c.is_alphabetic())
-        .to_lowercase();
+    let lower = word.trim_matches(|c: char| !c.is_alphabetic()).to_lowercase();
     if lower.is_empty() {
         return 1;
     }
@@ -160,10 +158,8 @@ pub fn analyze_readability(text: &str) -> ReadabilityMetrics {
     let avg_word_length = total_char_len as f64 / word_count as f64;
     let avg_syllables_per_word = syllable_count as f64 / word_count as f64;
 
-    let flesch_reading_ease =
-        206.835 - 1.015 * avg_sentence_length - 84.6 * avg_syllables_per_word;
-    let flesch_kincaid_grade =
-        (0.39 * avg_sentence_length + 11.8 * avg_syllables_per_word - 15.59).max(0.0);
+    let flesch_reading_ease = 206.835 - 1.015 * avg_sentence_length - 84.6 * avg_syllables_per_word;
+    let flesch_kincaid_grade = (0.39 * avg_sentence_length + 11.8 * avg_syllables_per_word - 15.59).max(0.0);
 
     ReadabilityMetrics {
         sentence_count,
@@ -227,10 +223,9 @@ pub fn detect_passive_voice(text: &str) -> Vec<PassiveVoiceMatch> {
 /// past participles.
 fn is_false_positive_participle(word: &str) -> bool {
     const FALSE_POSITIVES: &[&str] = &[
-        "been", "when", "then", "ten", "men", "women", "often", "even",
-        "sudden", "garden", "children", "given", "open", "broken",
-        "between", "happen", "listen", "golden", "kitten", "written",
-        "chicken", "heaven", "eleven", "dozen", "linen", "oven",
+        "been", "when", "then", "ten", "men", "women", "often", "even", "sudden", "garden", "children", "given",
+        "open", "broken", "between", "happen", "listen", "golden", "kitten", "written", "chicken", "heaven", "eleven",
+        "dozen", "linen", "oven",
     ];
     FALSE_POSITIVES.contains(&word.to_lowercase().as_str())
 }
@@ -255,25 +250,17 @@ pub struct RepetitionWarning {
 /// - `min_length`: ignore words shorter than this many characters.
 /// - `max_distance`: maximum number of words apart two occurrences can be
 ///   to count as a close repetition.
-pub fn detect_repetitions(
-    text: &str,
-    min_length: usize,
-    max_distance: usize,
-) -> Vec<RepetitionWarning> {
+pub fn detect_repetitions(text: &str, min_length: usize, max_distance: usize) -> Vec<RepetitionWarning> {
     // Common English words that are naturally repeated and should be ignored.
     const STOP_WORDS: &[&str] = &[
-        "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
-        "of", "with", "by", "from", "is", "it", "was", "were", "are", "be",
-        "been", "being", "have", "has", "had", "do", "does", "did", "will",
-        "would", "shall", "should", "may", "might", "must", "can", "could",
-        "that", "this", "these", "those", "he", "she", "they", "we", "you",
-        "his", "her", "its", "our", "your", "their", "not", "no", "so",
-        "if", "then", "than", "as", "into", "about",
+        "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "from", "is", "it",
+        "was", "were", "are", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would",
+        "shall", "should", "may", "might", "must", "can", "could", "that", "this", "these", "those", "he", "she",
+        "they", "we", "you", "his", "her", "its", "our", "your", "their", "not", "no", "so", "if", "then", "than",
+        "as", "into", "about",
     ];
 
-    static WORD_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"[a-zA-Z]+").expect("word regex must compile")
-    });
+    static WORD_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[a-zA-Z]+").expect("word regex must compile"));
     let word_re = &*WORD_RE;
 
     // Collect (word_lowercase, byte_position, word_index)
@@ -288,10 +275,7 @@ pub fn detect_repetitions(
     // Group positions by word
     let mut word_map: HashMap<String, Vec<(usize, usize)>> = HashMap::new();
     for (word, pos, idx) in word_entries {
-        word_map
-            .entry(word)
-            .or_default()
-            .push((pos, idx));
+        word_map.entry(word).or_default().push((pos, idx));
     }
 
     let mut warnings = Vec::new();
@@ -338,17 +322,48 @@ pub fn detect_repetitions(
 /// exceptions such as "family", "only", "early", etc. are excluded.
 pub fn detect_adverbs(text: &str) -> Vec<(usize, String)> {
     const EXCEPTIONS: &[&str] = &[
-        "family", "only", "early", "daily", "holy", "rely", "reply",
-        "apply", "supply", "ally", "belly", "bully", "curly", "fly",
-        "folly", "gully", "hilly", "holly", "homely", "imply", "italy",
-        "jelly", "jolly", "july", "lily", "lonely", "lovely", "multiply",
-        "rally", "silly", "tally", "ugly", "unlikely", "comply", "poly",
-        "melancholy", "butterfly", "assembly",
+        "family",
+        "only",
+        "early",
+        "daily",
+        "holy",
+        "rely",
+        "reply",
+        "apply",
+        "supply",
+        "ally",
+        "belly",
+        "bully",
+        "curly",
+        "fly",
+        "folly",
+        "gully",
+        "hilly",
+        "holly",
+        "homely",
+        "imply",
+        "italy",
+        "jelly",
+        "jolly",
+        "july",
+        "lily",
+        "lonely",
+        "lovely",
+        "multiply",
+        "rally",
+        "silly",
+        "tally",
+        "ugly",
+        "unlikely",
+        "comply",
+        "poly",
+        "melancholy",
+        "butterfly",
+        "assembly",
     ];
 
-    static ADVERB_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"\b([a-zA-Z]+ly)\b").expect("adverb regex must compile")
-    });
+    static ADVERB_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"\b([a-zA-Z]+ly)\b").expect("adverb regex must compile"));
     let word_re = &*ADVERB_RE;
     let mut results = Vec::new();
 
@@ -382,9 +397,8 @@ pub struct SentenceLengthWarning {
 
 /// Detect sentences that exceed a given word count threshold.
 pub fn detect_long_sentences(text: &str, max_words: usize) -> Vec<SentenceLengthWarning> {
-    static SENTENCE_RE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"[^.!?]+[.!?]+").expect("sentence regex must compile")
-    });
+    static SENTENCE_RE: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"[^.!?]+[.!?]+").expect("sentence regex must compile"));
     let sentence_re = &*SENTENCE_RE;
     let mut warnings = Vec::new();
 
@@ -532,10 +546,7 @@ const OVERUSED_DIALOG_TAGS: &[&str] = &[
 pub fn detect_said_alternatives(text: &str) -> Vec<(usize, String)> {
     // Build a single combined regex for all dialog tags (compiled once)
     static DIALOG_RE: LazyLock<Regex> = LazyLock::new(|| {
-        let alternatives: Vec<String> = OVERUSED_DIALOG_TAGS
-            .iter()
-            .map(|tag| regex::escape(tag))
-            .collect();
+        let alternatives: Vec<String> = OVERUSED_DIALOG_TAGS.iter().map(|tag| regex::escape(tag)).collect();
         let pattern = format!(r"(?i)\b(?:{})\b", alternatives.join("|"));
         Regex::new(&pattern).expect("dialog tag regex must compile")
     });
@@ -578,9 +589,7 @@ impl WritingAnalysis {
         ));
         parts.push(format!(
             "Words: {} | Sentences: {} | Syllables: {}",
-            self.readability.word_count,
-            self.readability.sentence_count,
-            self.readability.syllable_count,
+            self.readability.word_count, self.readability.sentence_count, self.readability.syllable_count,
         ));
 
         if !self.passive_voice.is_empty() {
@@ -598,28 +607,16 @@ impl WritingAnalysis {
             ));
         }
         if !self.adverbs.is_empty() {
-            parts.push(format!(
-                "Adverbs: {} found",
-                self.adverbs.len(),
-            ));
+            parts.push(format!("Adverbs: {} found", self.adverbs.len(),));
         }
         if !self.long_sentences.is_empty() {
-            parts.push(format!(
-                "Long sentences: {}",
-                self.long_sentences.len(),
-            ));
+            parts.push(format!("Long sentences: {}", self.long_sentences.len(),));
         }
         if !self.cliches.is_empty() {
-            parts.push(format!(
-                "Cliches: {} detected",
-                self.cliches.len(),
-            ));
+            parts.push(format!("Cliches: {} detected", self.cliches.len(),));
         }
         if !self.dialog_tags.is_empty() {
-            parts.push(format!(
-                "Overused dialog tags: {}",
-                self.dialog_tags.len(),
-            ));
+            parts.push(format!("Overused dialog tags: {}", self.dialog_tags.len(),));
         }
 
         parts.join("\n")

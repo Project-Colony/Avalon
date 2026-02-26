@@ -1,9 +1,9 @@
-use std::path::Path;
+use anyhow::Result;
+use pulldown_cmark::{html::push_html, Parser};
+use std::fmt::Write as FmtWrite;
 use std::fs;
 use std::io::Write;
-use std::fmt::Write as FmtWrite;
-use anyhow::Result;
-use pulldown_cmark::{Parser, html::push_html};
+use std::path::Path;
 
 use super::compiler::{self, CompileContent, CompileOptions};
 
@@ -12,10 +12,9 @@ use super::compiler::{self, CompileContent, CompileOptions};
 pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &Path) -> Result<()> {
     let file = fs::File::create(path)?;
     let mut zip = zip::ZipWriter::new(file);
-    let zip_options = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Stored);
-    let zip_options_deflated = zip::write::SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated);
+    let zip_options = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+    let zip_options_deflated =
+        zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
 
     // 1. mimetype (must be first, uncompressed)
     zip.start_file("mimetype", zip_options)?;
@@ -23,12 +22,14 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
 
     // 2. META-INF/container.xml
     zip.start_file("META-INF/container.xml", zip_options_deflated)?;
-    zip.write_all(br#"<?xml version="1.0" encoding="UTF-8"?>
+    zip.write_all(
+        br#"<?xml version="1.0" encoding="UTF-8"?>
 <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
   <rootfiles>
     <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
   </rootfiles>
-</container>"#)?;
+</container>"#,
+    )?;
 
     // 3. Build chapter XHTML files
     let mut chapters: Vec<(String, String, String)> = Vec::new(); // (filename, title, html_content)
@@ -48,10 +49,14 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
                 current_chapter_title = content.title.clone();
             }
             let level = (content.depth + 1).min(6);
-            let _ = writeln!(current_chapter_html,
+            writeln!(
+                current_chapter_html,
                 "<h{}>{}</h{}>",
-                level, escape_xml(&content.title), level
-            );
+                level,
+                escape_xml(&content.title),
+                level
+            )
+            .unwrap();
         } else {
             if current_chapter_title.is_empty() {
                 current_chapter_title = content.title.clone();
@@ -140,23 +145,24 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
     let mut spine_items = String::new();
 
     if options.include_front_matter && !options.title.is_empty() {
-        manifest_items.push_str(
-            "    <item id=\"titlepage\" href=\"titlepage.xhtml\" media-type=\"application/xhtml+xml\"/>\n"
-        );
+        manifest_items
+            .push_str("    <item id=\"titlepage\" href=\"titlepage.xhtml\" media-type=\"application/xhtml+xml\"/>\n");
         spine_items.push_str("    <itemref idref=\"titlepage\"/>\n");
     }
 
     for (i, (filename, _, _)) in chapters.iter().enumerate() {
-        let _ = writeln!(manifest_items,
+        writeln!(
+            manifest_items,
             "    <item id=\"ch{}\" href=\"{}\" media-type=\"application/xhtml+xml\"/>",
             i, filename
-        );
-        let _ = writeln!(spine_items,"    <itemref idref=\"ch{}\"/>", i);
+        )
+        .unwrap();
+        writeln!(spine_items, "    <itemref idref=\"ch{}\"/>", i).unwrap();
     }
 
     // Table of contents nav
     manifest_items.push_str(
-        "    <item id=\"toc\" href=\"toc.xhtml\" media-type=\"application/xhtml+xml\" properties=\"nav\"/>\n"
+        "    <item id=\"toc\" href=\"toc.xhtml\" media-type=\"application/xhtml+xml\" properties=\"nav\"/>\n",
     );
 
     let opf = format!(
@@ -192,11 +198,13 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
         } else {
             title.clone()
         };
-        let _ = writeln!(toc_entries,
+        writeln!(
+            toc_entries,
             "      <li><a href=\"{}\">{}</a></li>",
             filename,
             escape_xml(&display_title)
-        );
+        )
+        .unwrap();
     }
 
     let toc = format!(
@@ -220,4 +228,6 @@ pub fn save_epub(contents: &[CompileContent], options: &CompileOptions, path: &P
     Ok(())
 }
 
-fn escape_xml(s: &str) -> String { compiler::escape_xml(s) }
+fn escape_xml(s: &str) -> String {
+    compiler::escape_xml(s)
+}

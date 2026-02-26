@@ -1,8 +1,8 @@
 #![allow(dead_code)] // Methods used by test code
-use uuid::Uuid;
-use std::collections::HashSet;
 use super::binder::{Binder, BinderItem, BinderItemKind};
 use super::links;
+use std::collections::HashSet;
+use uuid::Uuid;
 
 /// Run a comprehensive validation pass on a project's binder
 pub fn validate_project(binder: &Binder) -> ProjectValidation {
@@ -74,8 +74,12 @@ fn check_items_single_pass(all_items: &[&BinderItem], issues: &mut Vec<Validatio
 
         if item.kind == BinderItemKind::Text {
             total_text += 1;
-            if item.metadata.label.is_some() { with_label += 1; }
-            if item.metadata.status.is_some() { with_status += 1; }
+            if item.metadata.label.is_some() {
+                with_label += 1;
+            }
+            if item.metadata.status.is_some() {
+                with_status += 1;
+            }
 
             // Empty document / missing document check
             if let Some(ref doc) = item.document {
@@ -142,12 +146,18 @@ fn check_empty_folders(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
     fn check_folder(item: &BinderItem, issues: &mut Vec<ValidationIssue>) {
         if item.kind == BinderItemKind::Folder && item.children.is_empty() {
             // Skip root folders (Draft, Research, Trash) — they're allowed to be empty
-            let is_root = item.title == "Draft" || item.title == "Research"
-                || item.title == "Trash" || item.title == "Manuscript"
-                || item.title == "Screenplay" || item.title == "Paper"
-                || item.title == "Story" || item.title == "Collection"
-                || item.title == "Book" || item.title == "Essay"
-                || item.title == "Thesis" || item.title == "Journal"
+            let is_root = item.title == "Draft"
+                || item.title == "Research"
+                || item.title == "Trash"
+                || item.title == "Manuscript"
+                || item.title == "Screenplay"
+                || item.title == "Paper"
+                || item.title == "Story"
+                || item.title == "Collection"
+                || item.title == "Book"
+                || item.title == "Essay"
+                || item.title == "Thesis"
+                || item.title == "Journal"
                 || item.title == "Blog";
             if !is_root {
                 issues.push(ValidationIssue {
@@ -179,7 +189,6 @@ fn check_broken_links(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
     }
 }
 
-
 fn check_deep_nesting(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
     let max_depth_limit = 8;
     fn check_depth(item: &BinderItem, depth: usize, limit: usize, issues: &mut Vec<ValidationIssue>) {
@@ -202,7 +211,6 @@ fn check_deep_nesting(binder: &Binder, issues: &mut Vec<ValidationIssue>) {
     check_depth(&binder.research, 0, max_depth_limit, issues);
 }
 
-
 /// The result of a project validation pass
 #[derive(Debug, Clone)]
 pub struct ProjectValidation {
@@ -213,7 +221,10 @@ pub struct ProjectValidation {
 
 impl ProjectValidation {
     pub fn is_clean(&self) -> bool {
-        !self.issues.iter().any(|i| i.severity == Severity::Error || i.severity == Severity::Warning)
+        !self
+            .issues
+            .iter()
+            .any(|i| i.severity == Severity::Error || i.severity == Severity::Warning)
     }
 
     pub fn error_count(&self) -> usize {
@@ -238,9 +249,15 @@ impl ProjectValidation {
         }
 
         let mut parts = Vec::new();
-        if errors > 0 { parts.push(format!("{} error{}", errors, if errors == 1 { "" } else { "s" })); }
-        if warnings > 0 { parts.push(format!("{} warning{}", warnings, if warnings == 1 { "" } else { "s" })); }
-        if infos > 0 { parts.push(format!("{} info", infos)); }
+        if errors > 0 {
+            parts.push(format!("{} error{}", errors, if errors == 1 { "" } else { "s" }));
+        }
+        if warnings > 0 {
+            parts.push(format!("{} warning{}", warnings, if warnings == 1 { "" } else { "s" }));
+        }
+        if infos > 0 {
+            parts.push(format!("{} info", infos));
+        }
         parts.join(", ")
     }
 
@@ -286,10 +303,15 @@ impl ProjectValidation {
     /// Health grade
     pub fn health_grade(&self) -> &str {
         let score = self.health_score();
-        if score >= 95.0 { "Excellent" }
-        else if score >= 80.0 { "Good" }
-        else if score >= 60.0 { "Fair" }
-        else { "Needs Attention" }
+        if score >= 95.0 {
+            "Excellent"
+        } else if score >= 80.0 {
+            "Good"
+        } else if score >= 60.0 {
+            "Fair"
+        } else {
+            "Needs Attention"
+        }
     }
 }
 
@@ -373,8 +395,13 @@ impl IssueKind {
 
     /// Whether this kind is automatically fixable
     pub fn is_auto_fixable(&self) -> bool {
-        matches!(self, IssueKind::EmptyDocument | IssueKind::UntitledItem | IssueKind::EmptyFolder
-            | IssueKind::InconsistentMetadata)
+        matches!(
+            self,
+            IssueKind::EmptyDocument
+                | IssueKind::UntitledItem
+                | IssueKind::EmptyFolder
+                | IssueKind::InconsistentMetadata
+        )
     }
 
     /// Suggested fix description
@@ -511,16 +538,15 @@ pub fn auto_fix(binder: &mut Binder) -> AutoFixResult {
         }
     }
 
-    AutoFixResult {
-        fixes_applied,
-        skipped,
-    }
+    AutoFixResult { fixes_applied, skipped }
 }
 
 /// Fix only a specific issue kind
 pub fn fix_issues_of_kind(binder: &mut Binder, kind: &IssueKind) -> Vec<FixRecord> {
     let validation = validate_project(binder);
-    let matching: Vec<&ValidationIssue> = validation.issues.iter()
+    let matching: Vec<&ValidationIssue> = validation
+        .issues
+        .iter()
         .filter(|i| &i.kind == kind && i.is_auto_fixable())
         .collect();
 
@@ -791,9 +817,10 @@ mod tests {
     fn test_validate_root_folder_not_flagged() {
         let binder = Binder::default_structure();
         let result = validate_project(&binder);
-        assert!(!result.issues.iter().any(|i| {
-            i.kind == IssueKind::EmptyFolder && i.message.contains("Draft")
-        }));
+        assert!(!result
+            .issues
+            .iter()
+            .any(|i| { i.kind == IssueKind::EmptyFolder && i.message.contains("Draft") }));
     }
 
     #[test]
@@ -808,22 +835,21 @@ mod tests {
         binder.draft.children.push(folder);
 
         let result = validate_project(&binder);
-        assert!(!result.issues.iter().any(|i| {
-            i.kind == IssueKind::EmptyFolder && i.message.contains("Chapter 1")
-        }));
+        assert!(!result
+            .issues
+            .iter()
+            .any(|i| { i.kind == IssueKind::EmptyFolder && i.message.contains("Chapter 1") }));
     }
 
     #[test]
     fn test_display_single_error() {
         let validation = ProjectValidation {
-            issues: vec![
-                ValidationIssue {
-                    severity: Severity::Error,
-                    kind: IssueKind::DuplicateId,
-                    item_id: None,
-                    message: "test".to_string(),
-                },
-            ],
+            issues: vec![ValidationIssue {
+                severity: Severity::Error,
+                kind: IssueKind::DuplicateId,
+                item_id: None,
+                message: "test".to_string(),
+            }],
             total_items: 1,
             trash_items: 0,
         };
@@ -859,14 +885,12 @@ mod tests {
     #[test]
     fn test_is_clean_info_only() {
         let validation = ProjectValidation {
-            issues: vec![
-                ValidationIssue {
-                    severity: Severity::Info,
-                    kind: IssueKind::EmptyDocument,
-                    item_id: None,
-                    message: "info".to_string(),
-                },
-            ],
+            issues: vec![ValidationIssue {
+                severity: Severity::Info,
+                kind: IssueKind::EmptyDocument,
+                item_id: None,
+                message: "info".to_string(),
+            }],
             total_items: 1,
             trash_items: 0,
         };
@@ -951,10 +975,16 @@ mod tests {
 
     #[test]
     fn test_issue_kind_fix_hints() {
-        for kind in [IssueKind::DuplicateId, IssueKind::EmptyDocument,
-            IssueKind::MissingDocument, IssueKind::UntitledItem,
-            IssueKind::EmptyFolder, IssueKind::BrokenLink,
-            IssueKind::LargeDocument, IssueKind::Orphan] {
+        for kind in [
+            IssueKind::DuplicateId,
+            IssueKind::EmptyDocument,
+            IssueKind::MissingDocument,
+            IssueKind::UntitledItem,
+            IssueKind::EmptyFolder,
+            IssueKind::BrokenLink,
+            IssueKind::LargeDocument,
+            IssueKind::Orphan,
+        ] {
             assert!(!kind.fix_hint().is_empty());
         }
     }
@@ -997,9 +1027,24 @@ mod tests {
     fn test_sorted_issues() {
         let validation = ProjectValidation {
             issues: vec![
-                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyFolder, item_id: None, message: "a".to_string() },
-                ValidationIssue { severity: Severity::Error, kind: IssueKind::DuplicateId, item_id: None, message: "b".to_string() },
-                ValidationIssue { severity: Severity::Warning, kind: IssueKind::BrokenLink, item_id: None, message: "c".to_string() },
+                ValidationIssue {
+                    severity: Severity::Info,
+                    kind: IssueKind::EmptyFolder,
+                    item_id: None,
+                    message: "a".to_string(),
+                },
+                ValidationIssue {
+                    severity: Severity::Error,
+                    kind: IssueKind::DuplicateId,
+                    item_id: None,
+                    message: "b".to_string(),
+                },
+                ValidationIssue {
+                    severity: Severity::Warning,
+                    kind: IssueKind::BrokenLink,
+                    item_id: None,
+                    message: "c".to_string(),
+                },
             ],
             total_items: 5,
             trash_items: 0,
@@ -1015,9 +1060,24 @@ mod tests {
     fn test_issues_of_kind() {
         let validation = ProjectValidation {
             issues: vec![
-                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyDocument, item_id: None, message: "a".to_string() },
-                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyDocument, item_id: None, message: "b".to_string() },
-                ValidationIssue { severity: Severity::Warning, kind: IssueKind::BrokenLink, item_id: None, message: "c".to_string() },
+                ValidationIssue {
+                    severity: Severity::Info,
+                    kind: IssueKind::EmptyDocument,
+                    item_id: None,
+                    message: "a".to_string(),
+                },
+                ValidationIssue {
+                    severity: Severity::Info,
+                    kind: IssueKind::EmptyDocument,
+                    item_id: None,
+                    message: "b".to_string(),
+                },
+                ValidationIssue {
+                    severity: Severity::Warning,
+                    kind: IssueKind::BrokenLink,
+                    item_id: None,
+                    message: "c".to_string(),
+                },
             ],
             total_items: 5,
             trash_items: 0,
@@ -1033,9 +1093,24 @@ mod tests {
         let id = Uuid::new_v4();
         let validation = ProjectValidation {
             issues: vec![
-                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyDocument, item_id: Some(id), message: "a".to_string() },
-                ValidationIssue { severity: Severity::Warning, kind: IssueKind::UntitledItem, item_id: Some(id), message: "b".to_string() },
-                ValidationIssue { severity: Severity::Warning, kind: IssueKind::BrokenLink, item_id: None, message: "c".to_string() },
+                ValidationIssue {
+                    severity: Severity::Info,
+                    kind: IssueKind::EmptyDocument,
+                    item_id: Some(id),
+                    message: "a".to_string(),
+                },
+                ValidationIssue {
+                    severity: Severity::Warning,
+                    kind: IssueKind::UntitledItem,
+                    item_id: Some(id),
+                    message: "b".to_string(),
+                },
+                ValidationIssue {
+                    severity: Severity::Warning,
+                    kind: IssueKind::BrokenLink,
+                    item_id: None,
+                    message: "c".to_string(),
+                },
             ],
             total_items: 5,
             trash_items: 0,
@@ -1048,9 +1123,12 @@ mod tests {
     #[test]
     fn test_has_auto_fixable() {
         let validation_with = ProjectValidation {
-            issues: vec![
-                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyDocument, item_id: None, message: "fix me".to_string() },
-            ],
+            issues: vec![ValidationIssue {
+                severity: Severity::Info,
+                kind: IssueKind::EmptyDocument,
+                item_id: None,
+                message: "fix me".to_string(),
+            }],
             total_items: 1,
             trash_items: 0,
         };
@@ -1058,9 +1136,12 @@ mod tests {
         assert_eq!(validation_with.auto_fixable_count(), 1);
 
         let validation_without = ProjectValidation {
-            issues: vec![
-                ValidationIssue { severity: Severity::Error, kind: IssueKind::DuplicateId, item_id: None, message: "no fix".to_string() },
-            ],
+            issues: vec![ValidationIssue {
+                severity: Severity::Error,
+                kind: IssueKind::DuplicateId,
+                item_id: None,
+                message: "no fix".to_string(),
+            }],
             total_items: 1,
             trash_items: 0,
         };
@@ -1083,8 +1164,18 @@ mod tests {
     fn test_health_score_with_issues() {
         let validation = ProjectValidation {
             issues: vec![
-                ValidationIssue { severity: Severity::Error, kind: IssueKind::DuplicateId, item_id: None, message: "e".to_string() },
-                ValidationIssue { severity: Severity::Warning, kind: IssueKind::BrokenLink, item_id: None, message: "w".to_string() },
+                ValidationIssue {
+                    severity: Severity::Error,
+                    kind: IssueKind::DuplicateId,
+                    item_id: None,
+                    message: "e".to_string(),
+                },
+                ValidationIssue {
+                    severity: Severity::Warning,
+                    kind: IssueKind::BrokenLink,
+                    item_id: None,
+                    message: "w".to_string(),
+                },
             ],
             total_items: 10,
             trash_items: 0,
@@ -1107,20 +1198,64 @@ mod tests {
     #[test]
     fn test_health_grade_levels() {
         // Excellent: 100 - 0 = 100
-        let excellent = ProjectValidation { issues: vec![], total_items: 1, trash_items: 0 };
+        let excellent = ProjectValidation {
+            issues: vec![],
+            total_items: 1,
+            trash_items: 0,
+        };
         assert_eq!(excellent.health_grade(), "Excellent");
 
         // Good: 100 - (3*3 + 1*5) = 100 - 14 = 86
         let good = ProjectValidation {
             issues: vec![
-                ValidationIssue { severity: Severity::Warning, kind: IssueKind::BrokenLink, item_id: None, message: "w1".to_string() },
-                ValidationIssue { severity: Severity::Warning, kind: IssueKind::BrokenLink, item_id: None, message: "w2".to_string() },
-                ValidationIssue { severity: Severity::Warning, kind: IssueKind::BrokenLink, item_id: None, message: "w3".to_string() },
-                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyFolder, item_id: None, message: "i1".to_string() },
-                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyFolder, item_id: None, message: "i2".to_string() },
-                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyFolder, item_id: None, message: "i3".to_string() },
-                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyFolder, item_id: None, message: "i4".to_string() },
-                ValidationIssue { severity: Severity::Info, kind: IssueKind::EmptyFolder, item_id: None, message: "i5".to_string() },
+                ValidationIssue {
+                    severity: Severity::Warning,
+                    kind: IssueKind::BrokenLink,
+                    item_id: None,
+                    message: "w1".to_string(),
+                },
+                ValidationIssue {
+                    severity: Severity::Warning,
+                    kind: IssueKind::BrokenLink,
+                    item_id: None,
+                    message: "w2".to_string(),
+                },
+                ValidationIssue {
+                    severity: Severity::Warning,
+                    kind: IssueKind::BrokenLink,
+                    item_id: None,
+                    message: "w3".to_string(),
+                },
+                ValidationIssue {
+                    severity: Severity::Info,
+                    kind: IssueKind::EmptyFolder,
+                    item_id: None,
+                    message: "i1".to_string(),
+                },
+                ValidationIssue {
+                    severity: Severity::Info,
+                    kind: IssueKind::EmptyFolder,
+                    item_id: None,
+                    message: "i2".to_string(),
+                },
+                ValidationIssue {
+                    severity: Severity::Info,
+                    kind: IssueKind::EmptyFolder,
+                    item_id: None,
+                    message: "i3".to_string(),
+                },
+                ValidationIssue {
+                    severity: Severity::Info,
+                    kind: IssueKind::EmptyFolder,
+                    item_id: None,
+                    message: "i4".to_string(),
+                },
+                ValidationIssue {
+                    severity: Severity::Info,
+                    kind: IssueKind::EmptyFolder,
+                    item_id: None,
+                    message: "i5".to_string(),
+                },
             ],
             total_items: 20,
             trash_items: 0,
@@ -1192,7 +1327,10 @@ mod tests {
                 doc.content = format!("Content for item {}", i);
             }
             if i == 0 {
-                item.metadata.label = Some(Label { name: "Important".to_string(), color: LabelColor::Red });
+                item.metadata.label = Some(Label {
+                    name: "Important".to_string(),
+                    color: LabelColor::Red,
+                });
             }
             binder.draft.add_child(item);
         }
@@ -1241,7 +1379,9 @@ mod tests {
         binder.draft.children.push(item);
 
         let result = auto_fix(&mut binder);
-        let empty_fixes: Vec<_> = result.fixes_applied.iter()
+        let empty_fixes: Vec<_> = result
+            .fixes_applied
+            .iter()
             .filter(|f| f.kind == IssueKind::EmptyDocument)
             .collect();
         assert!(!empty_fixes.is_empty());
@@ -1258,7 +1398,9 @@ mod tests {
         binder.draft.children.push(folder);
 
         let result = auto_fix(&mut binder);
-        let folder_fixes: Vec<_> = result.fixes_applied.iter()
+        let folder_fixes: Vec<_> = result
+            .fixes_applied
+            .iter()
             .filter(|f| f.kind == IssueKind::EmptyFolder)
             .collect();
         assert!(!folder_fixes.is_empty());
@@ -1274,7 +1416,9 @@ mod tests {
         binder.draft.children.push(item);
 
         let result = auto_fix(&mut binder);
-        let broken_link_skips: Vec<_> = result.skipped.iter()
+        let broken_link_skips: Vec<_> = result
+            .skipped
+            .iter()
             .filter(|i| i.kind == IssueKind::BrokenLink)
             .collect();
         assert!(!broken_link_skips.is_empty());
@@ -1296,12 +1440,17 @@ mod tests {
     #[test]
     fn test_auto_fix_result_summary() {
         let result = AutoFixResult {
-            fixes_applied: vec![
-                FixRecord { kind: IssueKind::UntitledItem, item_id: None, description: "fixed".to_string() },
-            ],
-            skipped: vec![
-                ValidationIssue { severity: Severity::Error, kind: IssueKind::DuplicateId, item_id: None, message: "skip".to_string() },
-            ],
+            fixes_applied: vec![FixRecord {
+                kind: IssueKind::UntitledItem,
+                item_id: None,
+                description: "fixed".to_string(),
+            }],
+            skipped: vec![ValidationIssue {
+                severity: Severity::Error,
+                kind: IssueKind::DuplicateId,
+                item_id: None,
+                message: "skip".to_string(),
+            }],
         };
         let summary = result.summary();
         assert!(summary.contains("1 fixes applied"));

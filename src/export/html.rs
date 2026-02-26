@@ -1,7 +1,7 @@
-use std::fmt::Write;
-use anyhow::Result;
-use pulldown_cmark::{Parser, html::push_html};
 use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
+use anyhow::Result;
+use pulldown_cmark::{html::push_html, Parser};
+use std::fmt::Write;
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
     let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 100).sum();
@@ -12,10 +12,16 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
         if content.is_folder {
             let level = (content.depth + 1).min(6);
             let id = slug(&content.title);
-            let _ = writeln!(body,
+            writeln!(
+                body,
                 "<h{} id=\"{}\" class=\"folder-heading depth-{}\">{}</h{}>",
-                level, id, content.depth, escape_html(&content.title), level
-            );
+                level,
+                id,
+                content.depth,
+                escape_html(&content.title),
+                level
+            )
+            .unwrap();
         } else {
             doc_index += 1;
 
@@ -24,7 +30,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                 body.push_str(&separator_html(&options.separator));
             }
 
-            let _ = writeln!(body,"<div class=\"document\" data-index=\"{}\">", doc_index);
+            writeln!(body, "<div class=\"document\" data-index=\"{}\">", doc_index).unwrap();
 
             // Convert markdown content to HTML
             let parser = Parser::new(&content.text);
@@ -111,16 +117,10 @@ fn build_front_matter(options: &CompileOptions) -> String {
     let mut fm = format!("<h1>{}</h1>\n", escape_html(&options.title));
 
     if !options.author.is_empty() {
-        let _ = writeln!(fm,
-            "<p class=\"author\">by {}</p>",
-            escape_html(&options.author)
-        );
+        writeln!(fm, "<p class=\"author\">by {}</p>", escape_html(&options.author)).unwrap();
     }
 
-    let _ = writeln!(fm,
-        "<p class=\"date\">{}</p>",
-        chrono::Local::now().format("%B %d, %Y")
-    );
+    writeln!(fm, "<p class=\"date\">{}</p>", chrono::Local::now().format("%B %d, %Y")).unwrap();
 
     fm.push_str("<hr>\n");
     fm
@@ -130,13 +130,109 @@ fn separator_html(sep: &SeparatorType) -> String {
     match sep {
         SeparatorType::EmptyLine => "<br>\n".to_string(),
         SeparatorType::PageBreak => "<div class=\"page-break\"></div>\n".to_string(),
-        SeparatorType::SectionBreak => {
-            "<p class=\"section-break\">&bull; &bull; &bull;</p>\n".to_string()
-        }
+        SeparatorType::SectionBreak => "<p class=\"section-break\">&bull; &bull; &bull;</p>\n".to_string(),
         SeparatorType::Custom(s) => format!("<p class=\"section-break\">{}</p>\n", escape_html(s)),
         SeparatorType::None => String::new(),
     }
 }
 
-fn slug(title: &str) -> String { compiler::slug(title) }
-fn escape_html(text: &str) -> String { compiler::escape_html(text) }
+fn slug(title: &str) -> String {
+    compiler::slug(title)
+}
+fn escape_html(text: &str) -> String {
+    compiler::escape_html(text)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::compiler::{CompileContent, CompileOptions, SeparatorType};
+    use super::*;
+
+    fn sample_contents() -> Vec<CompileContent> {
+        vec![
+            CompileContent {
+                title: "Chapter 1".into(),
+                text: String::new(),
+                depth: 0,
+                is_folder: true,
+            },
+            CompileContent {
+                title: "Scene 1".into(),
+                text: "Hello world.".into(),
+                depth: 1,
+                is_folder: false,
+            },
+        ]
+    }
+
+    fn default_options() -> CompileOptions {
+        CompileOptions {
+            include_front_matter: false,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_compile_basic_structure() {
+        let html = compile(&sample_contents(), &default_options()).unwrap();
+        assert!(html.contains("<!DOCTYPE html>"));
+        assert!(html.contains("<h1"));
+        assert!(html.contains("Chapter 1"));
+        assert!(html.contains("Hello world."));
+        assert!(html.contains("</html>"));
+    }
+
+    #[test]
+    fn test_compile_escapes_title() {
+        let mut opts = default_options();
+        opts.title = "Tom & Jerry's <Adventures>".into();
+        let html = compile(&[], &opts).unwrap();
+        assert!(html.contains("Tom &amp; Jerry&#39;s &lt;Adventures&gt;"));
+    }
+
+    #[test]
+    fn test_compile_with_front_matter() {
+        let mut opts = default_options();
+        opts.include_front_matter = true;
+        opts.title = "My Book".into();
+        opts.author = "Author".into();
+        let html = compile(&sample_contents(), &opts).unwrap();
+        assert!(html.contains("<h1>My Book</h1>"));
+        assert!(html.contains("by Author"));
+    }
+
+    #[test]
+    fn test_compile_empty_contents() {
+        let html = compile(&[], &default_options()).unwrap();
+        assert!(html.contains("<!DOCTYPE html>"));
+    }
+
+    #[test]
+    fn test_separator_html_variants() {
+        assert!(separator_html(&SeparatorType::EmptyLine).contains("<br>"));
+        assert!(separator_html(&SeparatorType::PageBreak).contains("page-break"));
+        assert!(separator_html(&SeparatorType::SectionBreak).contains("&bull;"));
+        assert!(separator_html(&SeparatorType::None).is_empty());
+    }
+
+    #[test]
+    fn test_document_index_increments() {
+        let contents = vec![
+            CompileContent {
+                title: "A".into(),
+                text: "Text A".into(),
+                depth: 0,
+                is_folder: false,
+            },
+            CompileContent {
+                title: "B".into(),
+                text: "Text B".into(),
+                depth: 0,
+                is_folder: false,
+            },
+        ];
+        let html = compile(&contents, &default_options()).unwrap();
+        assert!(html.contains("data-index=\"1\""));
+        assert!(html.contains("data-index=\"2\""));
+    }
+}

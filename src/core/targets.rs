@@ -1,8 +1,8 @@
 #![allow(dead_code)] // Methods used by test code
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Write;
 use uuid::Uuid;
-use serde::{Deserialize, Serialize};
 
 /// Per-document word count targets and progress tracking
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -72,13 +72,16 @@ impl DocumentTargets {
 
     /// Set a word count target for a document
     pub fn set_target(&mut self, doc_id: Uuid, word_count: usize) {
-        self.targets.insert(doc_id, DocumentTarget {
-            word_count,
-            deadline: None,
-            show_in_binder: true,
-            notify_on_complete: true,
-            target_type: TargetType::Minimum,
-        });
+        self.targets.insert(
+            doc_id,
+            DocumentTarget {
+                word_count,
+                deadline: None,
+                show_in_binder: true,
+                notify_on_complete: true,
+                target_type: TargetType::Minimum,
+            },
+        );
     }
 
     /// Set a target with full configuration
@@ -184,7 +187,8 @@ impl DocumentTargets {
 
     /// Get all targets with their progress
     pub fn all_progress(&self, word_counts: &HashMap<Uuid, usize>) -> Vec<TargetProgress> {
-        self.targets.keys()
+        self.targets
+            .keys()
             .filter_map(|id| {
                 let current = word_counts.get(id).copied().unwrap_or(0);
                 self.progress(id, current)
@@ -198,7 +202,9 @@ impl DocumentTargets {
             return 0.0;
         }
         let total_target: usize = self.targets.values().map(|t| t.word_count).sum();
-        let total_current: usize = self.targets.keys()
+        let total_current: usize = self
+            .targets
+            .keys()
             .map(|id| word_counts.get(id).copied().unwrap_or(0))
             .sum();
         if total_target == 0 {
@@ -209,7 +215,8 @@ impl DocumentTargets {
 
     /// Count of completed targets
     pub fn completed_count(&self, word_counts: &HashMap<Uuid, usize>) -> usize {
-        self.targets.keys()
+        self.targets
+            .keys()
             .filter(|id| {
                 let current = word_counts.get(id).copied().unwrap_or(0);
                 self.progress(id, current)
@@ -232,10 +239,7 @@ impl DocumentTargets {
         }
         let completed = self.completed_count(word_counts);
         let overall = self.overall_progress(word_counts);
-        format!(
-            "{}/{} targets complete ({:.0}% overall)",
-            completed, total, overall
-        )
+        format!("{}/{} targets complete ({:.0}% overall)", completed, total, overall)
     }
 
     /// Get documents that have a deadline set
@@ -268,7 +272,8 @@ impl DocumentTargets {
 
     /// Get documents that are over their target limit
     pub fn over_limit_docs(&self, word_counts: &HashMap<Uuid, usize>) -> Vec<Uuid> {
-        self.targets.keys()
+        self.targets
+            .keys()
             .filter(|id| {
                 let current = word_counts.get(id).copied().unwrap_or(0);
                 self.progress(id, current)
@@ -283,10 +288,7 @@ impl DocumentTargets {
 impl TargetProgress {
     /// Format the progress as a compact string
     pub fn compact_display(&self) -> String {
-        format!(
-            "{}/{} ({:.0}%)",
-            self.current_words, self.target_words, self.percentage
-        )
+        format!("{}/{} ({:.0}%)", self.current_words, self.target_words, self.percentage)
     }
 
     /// Get a progress bar string (10 chars wide)
@@ -349,7 +351,7 @@ impl TargetProgress {
     pub fn is_on_track(&self) -> bool {
         match (self.status == TargetStatus::Complete, self.words_per_day_needed) {
             (true, _) => true,
-            (_, Some(wpd)) => wpd <= 2000, // Reasonable daily target
+            (_, Some(wpd)) => wpd <= 2000,              // Reasonable daily target
             (_, None) => self.days_remaining.is_none(), // No deadline = on track
         }
     }
@@ -882,7 +884,7 @@ mod tests {
 
         let mut wc = HashMap::new();
         wc.insert(id1, 100); // complete
-        wc.insert(id2, 50);  // in progress
+        wc.insert(id2, 50); // in progress
 
         let summary = targets.summary(&wc);
         assert!(summary.contains("1/2 targets complete"));
@@ -911,7 +913,7 @@ mod tests {
 
         let mut wc = HashMap::new();
         wc.insert(id1, 100); // complete
-        wc.insert(id2, 50);  // incomplete
+        wc.insert(id2, 50); // incomplete
 
         let incomplete = targets.incomplete_targets(&wc);
         assert_eq!(incomplete.len(), 1);

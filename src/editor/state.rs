@@ -1,5 +1,5 @@
-use std::collections::{HashSet, VecDeque};
 use crate::core::document::Document;
+use std::collections::{HashSet, VecDeque};
 
 /// The state of the text editor
 #[derive(Debug)]
@@ -95,7 +95,11 @@ impl EditorState {
     pub fn selection_range(&self) -> Option<(usize, usize)> {
         self.selection_start.map(|start| {
             let end = self.cursor;
-            if start <= end { (start, end) } else { (end, start) }
+            if start <= end {
+                (start, end)
+            } else {
+                (end, start)
+            }
         })
     }
 
@@ -176,12 +180,15 @@ impl EditorState {
     pub fn transpose_chars(&mut self) {
         let text = self.document.content.clone();
         let pos = self.cursor;
-        if (pos == 0 || pos >= text.len())
-            && (pos < 2 || text.len() < 2) {
-                return;
-            }
+        if (pos == 0 || pos >= text.len()) && (pos < 2 || text.len() < 2) {
+            return;
+        }
 
-        let swap_pos = if pos >= text.len() { pos - 2 } else { pos.saturating_sub(1) };
+        let swap_pos = if pos >= text.len() {
+            pos - 2
+        } else {
+            pos.saturating_sub(1)
+        };
         let bytes = text.as_bytes();
         if swap_pos + 1 >= text.len() {
             return;
@@ -225,9 +232,7 @@ impl EditorState {
         }
         self.push_undo();
         let mut seen = HashSet::new();
-        let unique: Vec<&str> = lines.into_iter()
-            .filter(|line| seen.insert(*line))
-            .collect();
+        let unique: Vec<&str> = lines.into_iter().filter(|line| seen.insert(*line)).collect();
         let new_content = unique.join("\n");
         self.document.content = new_content.clone();
         self.content = iced::widget::text_editor::Content::with_text(&new_content);
@@ -269,9 +274,7 @@ impl EditorState {
         new_lines.swap(current_line, current_line - 1);
         let new_content = new_lines.join("\n");
 
-        let new_cursor = new_lines[..current_line - 1].iter()
-            .map(|l| l.len() + 1)
-            .sum::<usize>();
+        let new_cursor = new_lines[..current_line - 1].iter().map(|l| l.len() + 1).sum::<usize>();
 
         self.document.content = new_content.clone();
         self.content = iced::widget::text_editor::Content::with_text(&new_content);
@@ -298,9 +301,7 @@ impl EditorState {
         new_lines.swap(current_line, current_line + 1);
         let new_content = new_lines.join("\n");
 
-        let new_cursor = new_lines[..current_line + 1].iter()
-            .map(|l| l.len() + 1)
-            .sum::<usize>();
+        let new_cursor = new_lines[..current_line + 1].iter().map(|l| l.len() + 1).sum::<usize>();
 
         self.document.content = new_content.clone();
         self.content = iced::widget::text_editor::Content::with_text(&new_content);
@@ -328,9 +329,7 @@ impl EditorState {
             0
         } else {
             let target_line = current_line.min(new_lines.len() - 1);
-            new_lines[..target_line].iter()
-                .map(|l| l.len() + 1)
-                .sum::<usize>()
+            new_lines[..target_line].iter().map(|l| l.len() + 1).sum::<usize>()
         };
 
         self.document.content = new_content.clone();
@@ -357,9 +356,7 @@ impl EditorState {
         new_lines.insert(line_idx + 1, dup);
         let new_content = new_lines.join("\n");
 
-        let new_cursor = new_lines[..line_idx + 1].iter()
-            .map(|l| l.len() + 1)
-            .sum::<usize>();
+        let new_cursor = new_lines[..line_idx + 1].iter().map(|l| l.len() + 1).sum::<usize>();
 
         self.document.content = new_content.clone();
         self.content = iced::widget::text_editor::Content::with_text(&new_content);

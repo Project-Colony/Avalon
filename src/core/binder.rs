@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 use super::document::Document;
 use super::metadata::Metadata;
@@ -30,7 +30,8 @@ impl Binder {
 
     /// Find an item by ID anywhere in the binder
     pub fn find_item(&self, id: &Uuid) -> Option<&BinderItem> {
-        self.draft.find(id)
+        self.draft
+            .find(id)
             .or_else(|| self.research.find(id))
             .or_else(|| self.trash.find(id))
     }
@@ -58,7 +59,6 @@ impl Binder {
         items
     }
 
-
     /// Move an item to trash
     pub fn move_to_trash(&mut self, id: &Uuid) -> bool {
         if let Some(item) = self.draft.remove_child(id).or_else(|| self.research.remove_child(id)) {
@@ -76,7 +76,6 @@ impl Binder {
     }
 
     /// Visit each item mutably in the binder tree without allocating a Vec.
-    #[allow(dead_code)]
     pub fn for_each_item_mut<F: FnMut(&mut BinderItem)>(&mut self, mut f: F) {
         self.draft.visit_mut(&mut f);
         self.research.visit_mut(&mut f);
@@ -123,15 +122,23 @@ impl Binder {
 
     /// Move an item up in its parent's children list
     pub fn move_item_up(&mut self, id: &Uuid) -> bool {
-        if self.draft.move_child_up(id) { return true; }
-        if self.research.move_child_up(id) { return true; }
+        if self.draft.move_child_up(id) {
+            return true;
+        }
+        if self.research.move_child_up(id) {
+            return true;
+        }
         self.trash.move_child_up(id)
     }
 
     /// Move an item down in its parent's children list
     pub fn move_item_down(&mut self, id: &Uuid) -> bool {
-        if self.draft.move_child_down(id) { return true; }
-        if self.research.move_child_down(id) { return true; }
+        if self.draft.move_child_down(id) {
+            return true;
+        }
+        if self.research.move_child_down(id) {
+            return true;
+        }
         self.trash.move_child_down(id)
     }
 
@@ -142,7 +149,8 @@ impl Binder {
 
     /// Duplicate an item (creates a copy next to the original)
     pub fn duplicate_item(&mut self, id: &Uuid) -> Option<Uuid> {
-        self.draft.duplicate_child(id)
+        self.draft
+            .duplicate_child(id)
             .or_else(|| self.research.duplicate_child(id))
     }
 
@@ -280,7 +288,6 @@ impl BinderItem {
 
     /// Visit this item and all descendants mutably without allocating a Vec.
     /// Safe because `f(self)` releases its borrow before we access `self.children`.
-    #[allow(dead_code)]
     pub fn visit_mut<F: FnMut(&mut BinderItem)>(&mut self, f: &mut F) {
         f(self);
         for child in &mut self.children {
@@ -324,9 +331,7 @@ impl BinderItem {
     /// Get the total word count for this item and all children
     pub fn total_word_count(&self) -> usize {
         let own_count = self.document.as_ref().map_or(0, |d| d.word_count());
-        let children_count: usize = self.children.iter()
-            .map(|c| c.total_word_count())
-            .sum();
+        let children_count: usize = self.children.iter().map(|c| c.total_word_count()).sum();
         own_count + children_count
     }
 
@@ -449,9 +454,6 @@ pub enum BinderItemKind {
     Pdf,
     WebPage,
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
@@ -968,5 +970,4 @@ mod tests {
         found.title = "Renamed".to_string();
         assert_eq!(binder.find_item(&id).unwrap().title, "Renamed");
     }
-
 }

@@ -5,253 +5,520 @@ pub struct NameGenerator;
 impl NameGenerator {
     // === English/Western names ===
     const FIRST_NAMES_M: &'static [&'static str] = &[
-        "James", "John", "Robert", "Michael", "William", "David", "Richard",
-        "Joseph", "Thomas", "Charles", "Christopher", "Daniel", "Matthew",
-        "Anthony", "Mark", "Alexander", "Benjamin", "Samuel", "Henry", "Arthur",
-        "Edward", "Theodore", "Oliver", "Lucas", "Elijah", "Sebastian", "Felix",
-        "Adrian", "Victor", "Marcus", "Julian", "Dorian", "Lucian", "Cassian",
-        "Cedric", "Roland", "Tristan", "Gareth", "Aldric", "Leander",
+        "James",
+        "John",
+        "Robert",
+        "Michael",
+        "William",
+        "David",
+        "Richard",
+        "Joseph",
+        "Thomas",
+        "Charles",
+        "Christopher",
+        "Daniel",
+        "Matthew",
+        "Anthony",
+        "Mark",
+        "Alexander",
+        "Benjamin",
+        "Samuel",
+        "Henry",
+        "Arthur",
+        "Edward",
+        "Theodore",
+        "Oliver",
+        "Lucas",
+        "Elijah",
+        "Sebastian",
+        "Felix",
+        "Adrian",
+        "Victor",
+        "Marcus",
+        "Julian",
+        "Dorian",
+        "Lucian",
+        "Cassian",
+        "Cedric",
+        "Roland",
+        "Tristan",
+        "Gareth",
+        "Aldric",
+        "Leander",
     ];
 
     const FIRST_NAMES_F: &'static [&'static str] = &[
-        "Mary", "Patricia", "Jennifer", "Linda", "Barbara", "Elizabeth",
-        "Susan", "Jessica", "Sarah", "Karen", "Emily", "Sophia", "Olivia",
-        "Ava", "Isabella", "Charlotte", "Amelia", "Mia", "Harper", "Eleanor",
-        "Genevieve", "Arabella", "Cordelia", "Rosalind", "Evangeline",
-        "Seraphina", "Isolde", "Vivienne", "Celestine", "Calista",
-        "Ophelia", "Lyra", "Aurora", "Helena", "Cressida", "Linnea",
+        "Mary",
+        "Patricia",
+        "Jennifer",
+        "Linda",
+        "Barbara",
+        "Elizabeth",
+        "Susan",
+        "Jessica",
+        "Sarah",
+        "Karen",
+        "Emily",
+        "Sophia",
+        "Olivia",
+        "Ava",
+        "Isabella",
+        "Charlotte",
+        "Amelia",
+        "Mia",
+        "Harper",
+        "Eleanor",
+        "Genevieve",
+        "Arabella",
+        "Cordelia",
+        "Rosalind",
+        "Evangeline",
+        "Seraphina",
+        "Isolde",
+        "Vivienne",
+        "Celestine",
+        "Calista",
+        "Ophelia",
+        "Lyra",
+        "Aurora",
+        "Helena",
+        "Cressida",
+        "Linnea",
     ];
 
     const LAST_NAMES: &'static [&'static str] = &[
-        "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller",
-        "Davis", "Rodriguez", "Martinez", "Anderson", "Taylor", "Thomas",
-        "Moore", "Jackson", "Martin", "Lee", "Thompson", "White", "Harris",
-        "Blackwood", "Ashford", "Thornton", "Whitmore", "Hawthorne",
-        "Ravencroft", "Nightingale", "Silverstone", "Langley", "Winslow",
-        "Pemberton", "Fairfax", "Kingsley", "Aldridge", "Montague",
-        "Sinclair", "Whitfield", "Beaumont", "Lockhart", "Castleberry",
+        "Smith",
+        "Johnson",
+        "Williams",
+        "Brown",
+        "Jones",
+        "Garcia",
+        "Miller",
+        "Davis",
+        "Rodriguez",
+        "Martinez",
+        "Anderson",
+        "Taylor",
+        "Thomas",
+        "Moore",
+        "Jackson",
+        "Martin",
+        "Lee",
+        "Thompson",
+        "White",
+        "Harris",
+        "Blackwood",
+        "Ashford",
+        "Thornton",
+        "Whitmore",
+        "Hawthorne",
+        "Ravencroft",
+        "Nightingale",
+        "Silverstone",
+        "Langley",
+        "Winslow",
+        "Pemberton",
+        "Fairfax",
+        "Kingsley",
+        "Aldridge",
+        "Montague",
+        "Sinclair",
+        "Whitfield",
+        "Beaumont",
+        "Lockhart",
+        "Castleberry",
     ];
 
     // === Japanese names ===
     const JAPANESE_GIVEN_M: &'static [&'static str] = &[
-        "Haruto", "Ren", "Sota", "Yuto", "Hiroto", "Minato", "Kaito",
-        "Asahi", "Riku", "Hinata", "Takeshi", "Kenji", "Akira", "Yuki",
-        "Ryota", "Daichi", "Sho", "Hayato", "Kenta", "Makoto",
+        "Haruto", "Ren", "Sota", "Yuto", "Hiroto", "Minato", "Kaito", "Asahi", "Riku", "Hinata", "Takeshi", "Kenji",
+        "Akira", "Yuki", "Ryota", "Daichi", "Sho", "Hayato", "Kenta", "Makoto",
     ];
 
     const JAPANESE_GIVEN_F: &'static [&'static str] = &[
-        "Yui", "Hina", "Koharu", "Aoi", "Akari", "Sakura", "Mei",
-        "Himari", "Rin", "Mio", "Ichika", "Yuna", "Haruka", "Saki",
-        "Nanami", "Kaede", "Misaki", "Ayaka", "Chihiro", "Yuki",
+        "Yui", "Hina", "Koharu", "Aoi", "Akari", "Sakura", "Mei", "Himari", "Rin", "Mio", "Ichika", "Yuna", "Haruka",
+        "Saki", "Nanami", "Kaede", "Misaki", "Ayaka", "Chihiro", "Yuki",
     ];
 
     const JAPANESE_FAMILY: &'static [&'static str] = &[
-        "Sato", "Suzuki", "Takahashi", "Tanaka", "Watanabe", "Ito",
-        "Yamamoto", "Nakamura", "Kobayashi", "Kato", "Yoshida",
-        "Yamada", "Sasaki", "Yamaguchi", "Matsumoto", "Inoue",
-        "Kimura", "Hayashi", "Shimizu", "Yamazaki",
+        "Sato",
+        "Suzuki",
+        "Takahashi",
+        "Tanaka",
+        "Watanabe",
+        "Ito",
+        "Yamamoto",
+        "Nakamura",
+        "Kobayashi",
+        "Kato",
+        "Yoshida",
+        "Yamada",
+        "Sasaki",
+        "Yamaguchi",
+        "Matsumoto",
+        "Inoue",
+        "Kimura",
+        "Hayashi",
+        "Shimizu",
+        "Yamazaki",
     ];
 
     // === Chinese names ===
     const CHINESE_GIVEN_M: &'static [&'static str] = &[
-        "Wei", "Jian", "Hao", "Lei", "Jun", "Yong", "Ming",
-        "Long", "Tao", "Feng", "Chen", "Zhi", "Xiang", "Yang",
+        "Wei", "Jian", "Hao", "Lei", "Jun", "Yong", "Ming", "Long", "Tao", "Feng", "Chen", "Zhi", "Xiang", "Yang",
         "Bo", "Peng", "Kai", "Liang", "Cheng", "Jie",
     ];
 
     const CHINESE_GIVEN_F: &'static [&'static str] = &[
-        "Li", "Fang", "Na", "Ying", "Xia", "Mei", "Jing",
-        "Yan", "Juan", "Min", "Hua", "Qin", "Yun", "Xue",
-        "Ping", "Hong", "Lan", "Wen", "Zhen", "Rui",
+        "Li", "Fang", "Na", "Ying", "Xia", "Mei", "Jing", "Yan", "Juan", "Min", "Hua", "Qin", "Yun", "Xue", "Ping",
+        "Hong", "Lan", "Wen", "Zhen", "Rui",
     ];
 
     const CHINESE_FAMILY: &'static [&'static str] = &[
-        "Wang", "Li", "Zhang", "Liu", "Chen", "Yang", "Zhao",
-        "Huang", "Zhou", "Wu", "Xu", "Sun", "Hu", "Zhu",
-        "Gao", "Lin", "He", "Guo", "Ma", "Luo",
+        "Wang", "Li", "Zhang", "Liu", "Chen", "Yang", "Zhao", "Huang", "Zhou", "Wu", "Xu", "Sun", "Hu", "Zhu", "Gao",
+        "Lin", "He", "Guo", "Ma", "Luo",
     ];
 
     // === Spanish/Latin names ===
     const SPANISH_GIVEN_M: &'static [&'static str] = &[
-        "Santiago", "Mateo", "Sebastian", "Leonardo", "Emiliano",
-        "Diego", "Miguel", "Alejandro", "Daniel", "Pablo",
-        "Rafael", "Carlos", "Fernando", "Andres", "Luis",
-        "Jorge", "Eduardo", "Francisco", "Javier", "Rodrigo",
+        "Santiago",
+        "Mateo",
+        "Sebastian",
+        "Leonardo",
+        "Emiliano",
+        "Diego",
+        "Miguel",
+        "Alejandro",
+        "Daniel",
+        "Pablo",
+        "Rafael",
+        "Carlos",
+        "Fernando",
+        "Andres",
+        "Luis",
+        "Jorge",
+        "Eduardo",
+        "Francisco",
+        "Javier",
+        "Rodrigo",
     ];
 
     const SPANISH_GIVEN_F: &'static [&'static str] = &[
-        "Sofia", "Valentina", "Isabella", "Camila", "Lucia",
-        "Mariana", "Gabriela", "Victoria", "Elena", "Daniela",
-        "Carmen", "Rosa", "Pilar", "Esperanza", "Paloma",
-        "Catalina", "Dolores", "Marisol", "Alejandra", "Ximena",
+        "Sofia",
+        "Valentina",
+        "Isabella",
+        "Camila",
+        "Lucia",
+        "Mariana",
+        "Gabriela",
+        "Victoria",
+        "Elena",
+        "Daniela",
+        "Carmen",
+        "Rosa",
+        "Pilar",
+        "Esperanza",
+        "Paloma",
+        "Catalina",
+        "Dolores",
+        "Marisol",
+        "Alejandra",
+        "Ximena",
     ];
 
     const SPANISH_FAMILY: &'static [&'static str] = &[
-        "Garcia", "Rodriguez", "Martinez", "Lopez", "Gonzalez",
-        "Hernandez", "Perez", "Sanchez", "Ramirez", "Torres",
-        "Flores", "Rivera", "Gomez", "Diaz", "Morales",
-        "Reyes", "Cruz", "Ortiz", "Gutierrez", "Chavez",
+        "Garcia",
+        "Rodriguez",
+        "Martinez",
+        "Lopez",
+        "Gonzalez",
+        "Hernandez",
+        "Perez",
+        "Sanchez",
+        "Ramirez",
+        "Torres",
+        "Flores",
+        "Rivera",
+        "Gomez",
+        "Diaz",
+        "Morales",
+        "Reyes",
+        "Cruz",
+        "Ortiz",
+        "Gutierrez",
+        "Chavez",
     ];
 
     // === Indian names ===
     const INDIAN_GIVEN_M: &'static [&'static str] = &[
-        "Aarav", "Vihaan", "Aditya", "Sai", "Arjun", "Rohan",
-        "Vivaan", "Krishna", "Ishaan", "Shaurya", "Dhruv", "Anish",
-        "Ravi", "Dev", "Raj", "Pranav", "Vikram", "Amit", "Nikhil", "Karan",
+        "Aarav", "Vihaan", "Aditya", "Sai", "Arjun", "Rohan", "Vivaan", "Krishna", "Ishaan", "Shaurya", "Dhruv",
+        "Anish", "Ravi", "Dev", "Raj", "Pranav", "Vikram", "Amit", "Nikhil", "Karan",
     ];
 
     const INDIAN_GIVEN_F: &'static [&'static str] = &[
-        "Aadhya", "Ananya", "Diya", "Saanvi", "Isha", "Aanya",
-        "Kiara", "Priya", "Riya", "Meera", "Kavya", "Nisha",
+        "Aadhya", "Ananya", "Diya", "Saanvi", "Isha", "Aanya", "Kiara", "Priya", "Riya", "Meera", "Kavya", "Nisha",
         "Sita", "Lakshmi", "Anjali", "Divya", "Pooja", "Neha", "Shreya", "Aisha",
     ];
 
     const INDIAN_FAMILY: &'static [&'static str] = &[
-        "Patel", "Sharma", "Singh", "Kumar", "Das", "Reddy",
-        "Gupta", "Nair", "Joshi", "Rao", "Shah", "Mehta",
-        "Iyer", "Mishra", "Verma", "Chatterjee", "Mukherjee",
-        "Desai", "Pillai", "Menon",
+        "Patel",
+        "Sharma",
+        "Singh",
+        "Kumar",
+        "Das",
+        "Reddy",
+        "Gupta",
+        "Nair",
+        "Joshi",
+        "Rao",
+        "Shah",
+        "Mehta",
+        "Iyer",
+        "Mishra",
+        "Verma",
+        "Chatterjee",
+        "Mukherjee",
+        "Desai",
+        "Pillai",
+        "Menon",
     ];
 
     // === Arabic names ===
     const ARABIC_GIVEN_M: &'static [&'static str] = &[
-        "Omar", "Yusuf", "Ahmed", "Ali", "Hassan", "Ibrahim",
-        "Khalid", "Tariq", "Farid", "Rashid", "Zaid", "Nabil",
-        "Karim", "Samir", "Hamza", "Bilal", "Jamal", "Walid",
-        "Faisal", "Salim",
+        "Omar", "Yusuf", "Ahmed", "Ali", "Hassan", "Ibrahim", "Khalid", "Tariq", "Farid", "Rashid", "Zaid", "Nabil",
+        "Karim", "Samir", "Hamza", "Bilal", "Jamal", "Walid", "Faisal", "Salim",
     ];
 
     const ARABIC_GIVEN_F: &'static [&'static str] = &[
-        "Fatima", "Aisha", "Zahra", "Maryam", "Noor", "Leila",
-        "Yasmin", "Amira", "Sara", "Hana", "Layla", "Dina",
-        "Samira", "Nadia", "Rania", "Farida", "Khadija", "Zainab",
-        "Salma", "Malika",
+        "Fatima", "Aisha", "Zahra", "Maryam", "Noor", "Leila", "Yasmin", "Amira", "Sara", "Hana", "Layla", "Dina",
+        "Samira", "Nadia", "Rania", "Farida", "Khadija", "Zainab", "Salma", "Malika",
     ];
 
     const ARABIC_FAMILY: &'static [&'static str] = &[
-        "Al-Rashid", "Al-Farsi", "Al-Hashimi", "Al-Mahmoud", "Al-Sharif",
-        "Al-Qasim", "Al-Zahri", "Al-Salem", "Al-Hussein", "Al-Bakri",
-        "Al-Nasser", "Al-Khatib", "Al-Razi", "Al-Wazir", "Al-Hakim",
-        "Al-Mansour", "Al-Farouk", "Al-Ghazi", "Al-Tayeb", "Al-Sayed",
+        "Al-Rashid",
+        "Al-Farsi",
+        "Al-Hashimi",
+        "Al-Mahmoud",
+        "Al-Sharif",
+        "Al-Qasim",
+        "Al-Zahri",
+        "Al-Salem",
+        "Al-Hussein",
+        "Al-Bakri",
+        "Al-Nasser",
+        "Al-Khatib",
+        "Al-Razi",
+        "Al-Wazir",
+        "Al-Hakim",
+        "Al-Mansour",
+        "Al-Farouk",
+        "Al-Ghazi",
+        "Al-Tayeb",
+        "Al-Sayed",
     ];
 
     // === Fantasy names ===
     const FANTASY_PREFIXES: &'static [&'static str] = &[
-        "Ael", "Thr", "Val", "Mor", "Kal", "Zan", "Eld", "Fen", "Gar",
-        "Lyn", "Nyr", "Sar", "Dra", "Kor", "Xen", "Bel", "Lor", "Mir",
-        "Ash", "Ryn", "Sol", "Tar", "Vel", "Wyr", "Zor", "Ith", "Ora",
+        "Ael", "Thr", "Val", "Mor", "Kal", "Zan", "Eld", "Fen", "Gar", "Lyn", "Nyr", "Sar", "Dra", "Kor", "Xen", "Bel",
+        "Lor", "Mir", "Ash", "Ryn", "Sol", "Tar", "Vel", "Wyr", "Zor", "Ith", "Ora",
     ];
 
     const FANTASY_SUFFIXES: &'static [&'static str] = &[
-        "iel", "wen", "dor", "rin", "eth", "ael", "ara", "ith", "orn",
-        "wyn", "las", "mir", "oth", "enn", "dra", "val", "ien",
-        "eon", "ala", "ion", "yon", "ath", "ess", "ora", "iel",
+        "iel", "wen", "dor", "rin", "eth", "ael", "ara", "ith", "orn", "wyn", "las", "mir", "oth", "enn", "dra", "val",
+        "ien", "eon", "ala", "ion", "yon", "ath", "ess", "ora", "iel",
     ];
 
     // === Place names ===
     const PLACE_PREFIXES: &'static [&'static str] = &[
-        "New", "Old", "East", "West", "North", "South", "Upper", "Lower",
-        "Great", "Little", "Dark", "Bright", "Shadow", "Silver", "Golden",
-        "Iron", "Storm", "Raven", "Wolf", "Dragon", "Crystal", "Frost",
+        "New", "Old", "East", "West", "North", "South", "Upper", "Lower", "Great", "Little", "Dark", "Bright",
+        "Shadow", "Silver", "Golden", "Iron", "Storm", "Raven", "Wolf", "Dragon", "Crystal", "Frost",
     ];
 
     const PLACE_SUFFIXES: &'static [&'static str] = &[
-        "haven", "shire", "ford", "field", "town", "burg", "vale", "moor",
-        "wood", "dale", "bridge", "hollow", "gate", "peak", "falls",
-        "watch", "reach", "keep", "hold", "port", "crest", "grove",
+        "haven", "shire", "ford", "field", "town", "burg", "vale", "moor", "wood", "dale", "bridge", "hollow", "gate",
+        "peak", "falls", "watch", "reach", "keep", "hold", "port", "crest", "grove",
     ];
 
     // === Sci-fi names ===
     const SCIFI_PREFIXES: &'static [&'static str] = &[
-        "Zyx", "Kael", "Nex", "Vex", "Cyr", "Aeth", "Orx", "Tyx",
-        "Rynn", "Jace", "Zara", "Kira", "Nova", "Axel", "Syr", "Nyx",
-        "Cael", "Dex", "Hex", "Lex", "Myx", "Rex", "Tex", "Wex",
+        "Zyx", "Kael", "Nex", "Vex", "Cyr", "Aeth", "Orx", "Tyx", "Rynn", "Jace", "Zara", "Kira", "Nova", "Axel",
+        "Syr", "Nyx", "Cael", "Dex", "Hex", "Lex", "Myx", "Rex", "Tex", "Wex",
     ];
 
     const SCIFI_SUFFIXES: &'static [&'static str] = &[
-        "-7", "-X", "on", "ar", "ix", "us", "ax", "ex",
-        "os", "is", "an", "en", "um", "or", "al", "el",
+        "-7", "-X", "on", "ar", "ix", "us", "ax", "ex", "os", "is", "an", "en", "um", "or", "al", "el",
     ];
 
     // === Medieval names ===
     const MEDIEVAL_NAMES_M: &'static [&'static str] = &[
-        "Aldric", "Baldwin", "Cedric", "Dunstan", "Edmund", "Godfrey",
-        "Harold", "Leofric", "Oswald", "Percival", "Reginald", "Siegfried",
-        "Theodoric", "Ulric", "Wolfgang", "Alaric", "Bertram", "Conrad",
-        "Dietrich", "Engelbert", "Fulk", "Gawain", "Hector", "Ivanhoe",
+        "Aldric",
+        "Baldwin",
+        "Cedric",
+        "Dunstan",
+        "Edmund",
+        "Godfrey",
+        "Harold",
+        "Leofric",
+        "Oswald",
+        "Percival",
+        "Reginald",
+        "Siegfried",
+        "Theodoric",
+        "Ulric",
+        "Wolfgang",
+        "Alaric",
+        "Bertram",
+        "Conrad",
+        "Dietrich",
+        "Engelbert",
+        "Fulk",
+        "Gawain",
+        "Hector",
+        "Ivanhoe",
     ];
 
     const MEDIEVAL_NAMES_F: &'static [&'static str] = &[
-        "Adelheid", "Brunhilde", "Clothilde", "Elfrida", "Gwendolyn",
-        "Hildegard", "Isolde", "Mathilde", "Rosmund", "Sigrid",
-        "Theodora", "Ysabel", "Alienor", "Blanche", "Constance",
-        "Elowen", "Fayette", "Guinevere", "Heloise", "Ione",
+        "Adelheid",
+        "Brunhilde",
+        "Clothilde",
+        "Elfrida",
+        "Gwendolyn",
+        "Hildegard",
+        "Isolde",
+        "Mathilde",
+        "Rosmund",
+        "Sigrid",
+        "Theodora",
+        "Ysabel",
+        "Alienor",
+        "Blanche",
+        "Constance",
+        "Elowen",
+        "Fayette",
+        "Guinevere",
+        "Heloise",
+        "Ione",
     ];
 
     const MEDIEVAL_TITLES: &'static [&'static str] = &[
-        "of Ashford", "of Blackwood", "the Bold", "the Brave", "the Fair",
-        "the Just", "the Wise", "of Thornfield", "of Ravenholm", "the Strong",
-        "of Wintermere", "the Red", "the Black", "of Highcastle", "the Elder",
+        "of Ashford",
+        "of Blackwood",
+        "the Bold",
+        "the Brave",
+        "the Fair",
+        "the Just",
+        "the Wise",
+        "of Thornfield",
+        "of Ravenholm",
+        "the Strong",
+        "of Wintermere",
+        "the Red",
+        "the Black",
+        "of Highcastle",
+        "the Elder",
     ];
 
     // === Titles / Honorifics ===
     const HONORIFICS: &'static [&'static str] = &[
-        "Sir", "Dame", "Lord", "Lady", "Baron", "Baroness", "Count", "Countess",
-        "Duke", "Duchess", "Prince", "Princess", "King", "Queen", "Captain",
-        "Admiral", "General", "Professor", "Doctor", "Reverend", "Bishop",
-        "Cardinal", "Chancellor", "Ambassador", "Senator", "Governor",
+        "Sir",
+        "Dame",
+        "Lord",
+        "Lady",
+        "Baron",
+        "Baroness",
+        "Count",
+        "Countess",
+        "Duke",
+        "Duchess",
+        "Prince",
+        "Princess",
+        "King",
+        "Queen",
+        "Captain",
+        "Admiral",
+        "General",
+        "Professor",
+        "Doctor",
+        "Reverend",
+        "Bishop",
+        "Cardinal",
+        "Chancellor",
+        "Ambassador",
+        "Senator",
+        "Governor",
     ];
 
     // === Nicknames ===
     const NICKNAME_ADJECTIVES: &'static [&'static str] = &[
-        "Red", "Big", "Lucky", "Slim", "Quick", "Sly", "Iron", "Golden",
-        "Shadow", "Wild", "Silent", "Swift", "Dark", "Bright", "Clever",
-        "Fierce", "Gentle", "Mad", "Old", "Young", "Little", "Tall",
+        "Red", "Big", "Lucky", "Slim", "Quick", "Sly", "Iron", "Golden", "Shadow", "Wild", "Silent", "Swift", "Dark",
+        "Bright", "Clever", "Fierce", "Gentle", "Mad", "Old", "Young", "Little", "Tall",
     ];
 
     const NICKNAME_NOUNS: &'static [&'static str] = &[
-        "Fox", "Wolf", "Bear", "Hawk", "Raven", "Storm", "Thunder",
-        "Blade", "Hammer", "Shield", "Arrow", "Fist", "Eye", "Jack",
-        "Pete", "Ace", "Duke", "King", "Ghost", "Sage", "Spark", "Dagger",
+        "Fox", "Wolf", "Bear", "Hawk", "Raven", "Storm", "Thunder", "Blade", "Hammer", "Shield", "Arrow", "Fist",
+        "Eye", "Jack", "Pete", "Ace", "Duke", "King", "Ghost", "Sage", "Spark", "Dagger",
     ];
 
     // === Company names ===
     const COMPANY_PREFIXES: &'static [&'static str] = &[
-        "Apex", "Sterling", "Pinnacle", "Vanguard", "Atlas", "Crown",
-        "Phoenix", "Summit", "Iron", "Golden", "Raven", "Pacific",
-        "Nordic", "Titan", "Quantum", "Meridian", "Obsidian", "Eclipse",
+        "Apex", "Sterling", "Pinnacle", "Vanguard", "Atlas", "Crown", "Phoenix", "Summit", "Iron", "Golden", "Raven",
+        "Pacific", "Nordic", "Titan", "Quantum", "Meridian", "Obsidian", "Eclipse",
     ];
 
     const COMPANY_SUFFIXES: &'static [&'static str] = &[
-        "Industries", "Corp", "Ltd", "Enterprises", "Holdings", "Group",
-        "Solutions", "Systems", "Technologies", "Partners", "Associates",
-        "Dynamics", "Ventures", "Capital", "Global", "International",
+        "Industries",
+        "Corp",
+        "Ltd",
+        "Enterprises",
+        "Holdings",
+        "Group",
+        "Solutions",
+        "Systems",
+        "Technologies",
+        "Partners",
+        "Associates",
+        "Dynamics",
+        "Ventures",
+        "Capital",
+        "Global",
+        "International",
     ];
 
     // === Ship/Vehicle names ===
     const VEHICLE_ADJECTIVES: &'static [&'static str] = &[
-        "Black", "Crimson", "Silver", "Golden", "Iron", "Dark", "Bright",
-        "Storm", "Thunder", "Silent", "Swift", "Vengeful", "Fearless",
-        "Northern", "Southern", "Eternal", "Ancient", "Mighty",
+        "Black", "Crimson", "Silver", "Golden", "Iron", "Dark", "Bright", "Storm", "Thunder", "Silent", "Swift",
+        "Vengeful", "Fearless", "Northern", "Southern", "Eternal", "Ancient", "Mighty",
     ];
 
     const VEHICLE_NOUNS: &'static [&'static str] = &[
-        "Dragon", "Serpent", "Phoenix", "Falcon", "Raven", "Wolf", "Lion",
-        "Eagle", "Star", "Wind", "Dawn", "Horizon", "Arrow", "Flame",
-        "Pearl", "Crown", "Tide", "Wrath", "Fortune", "Spirit",
+        "Dragon", "Serpent", "Phoenix", "Falcon", "Raven", "Wolf", "Lion", "Eagle", "Star", "Wind", "Dawn", "Horizon",
+        "Arrow", "Flame", "Pearl", "Crown", "Tide", "Wrath", "Fortune", "Spirit",
     ];
 
     // === Tavern/Inn names ===
     const TAVERN_ADJECTIVES: &'static [&'static str] = &[
-        "Golden", "Silver", "Rusty", "Jolly", "Prancing", "Dancing",
-        "Sleeping", "Howling", "Laughing", "Weeping", "Wandering",
-        "Drunken", "Merry", "Crooked", "Flying", "Lonely", "Broken",
+        "Golden",
+        "Silver",
+        "Rusty",
+        "Jolly",
+        "Prancing",
+        "Dancing",
+        "Sleeping",
+        "Howling",
+        "Laughing",
+        "Weeping",
+        "Wandering",
+        "Drunken",
+        "Merry",
+        "Crooked",
+        "Flying",
+        "Lonely",
+        "Broken",
     ];
 
     const TAVERN_NOUNS: &'static [&'static str] = &[
-        "Dragon", "Pony", "Griffin", "Stag", "Boar", "Fox", "Raven",
-        "Crown", "Tankard", "Barrel", "Anvil", "Shield", "Sword",
-        "Goblet", "Lantern", "Hound", "Unicorn", "Phoenix", "Badger",
+        "Dragon", "Pony", "Griffin", "Stag", "Boar", "Fox", "Raven", "Crown", "Tankard", "Barrel", "Anvil", "Shield",
+        "Sword", "Goblet", "Lantern", "Hound", "Unicorn", "Phoenix", "Badger",
     ];
 
     /// Simple pseudo-random using current time
@@ -285,7 +552,8 @@ impl NameGenerator {
     pub fn fantasy_name() -> String {
         let seed = Self::rand_index(1000000);
         let prefix = Self::FANTASY_PREFIXES[Self::rand_index_seeded(Self::FANTASY_PREFIXES.len(), seed)];
-        let suffix = Self::FANTASY_SUFFIXES[Self::rand_index_seeded(Self::FANTASY_SUFFIXES.len(), seed.wrapping_add(42))];
+        let suffix =
+            Self::FANTASY_SUFFIXES[Self::rand_index_seeded(Self::FANTASY_SUFFIXES.len(), seed.wrapping_add(42))];
         format!("{}{}", prefix, suffix)
     }
 
@@ -338,7 +606,8 @@ impl NameGenerator {
     pub fn company_name() -> String {
         let seed = Self::rand_index(1000000);
         let prefix = Self::COMPANY_PREFIXES[Self::rand_index_seeded(Self::COMPANY_PREFIXES.len(), seed)];
-        let suffix = Self::COMPANY_SUFFIXES[Self::rand_index_seeded(Self::COMPANY_SUFFIXES.len(), seed.wrapping_add(43))];
+        let suffix =
+            Self::COMPANY_SUFFIXES[Self::rand_index_seeded(Self::COMPANY_SUFFIXES.len(), seed.wrapping_add(43))];
         format!("{} {}", prefix, suffix)
     }
 
@@ -384,8 +653,10 @@ impl NameGenerator {
                 } else {
                     Self::SPANISH_GIVEN_M[Self::rand_index_seeded(Self::SPANISH_GIVEN_M.len(), seed)]
                 };
-                let family1 = Self::SPANISH_FAMILY[Self::rand_index_seeded(Self::SPANISH_FAMILY.len(), seed.wrapping_add(37))];
-                let family2 = Self::SPANISH_FAMILY[Self::rand_index_seeded(Self::SPANISH_FAMILY.len(), seed.wrapping_add(71))];
+                let family1 =
+                    Self::SPANISH_FAMILY[Self::rand_index_seeded(Self::SPANISH_FAMILY.len(), seed.wrapping_add(37))];
+                let family2 =
+                    Self::SPANISH_FAMILY[Self::rand_index_seeded(Self::SPANISH_FAMILY.len(), seed.wrapping_add(71))];
                 format!("{} {} {}", given, family1, family2) // Spanish double surname
             }
             "indian" => {
@@ -394,7 +665,8 @@ impl NameGenerator {
                 } else {
                     Self::INDIAN_GIVEN_M[Self::rand_index_seeded(Self::INDIAN_GIVEN_M.len(), seed)]
                 };
-                let family = Self::INDIAN_FAMILY[Self::rand_index_seeded(Self::INDIAN_FAMILY.len(), seed.wrapping_add(37))];
+                let family =
+                    Self::INDIAN_FAMILY[Self::rand_index_seeded(Self::INDIAN_FAMILY.len(), seed.wrapping_add(37))];
                 format!("{} {}", given, family)
             }
             "arabic" => {
@@ -403,7 +675,8 @@ impl NameGenerator {
                 } else {
                     Self::ARABIC_GIVEN_M[Self::rand_index_seeded(Self::ARABIC_GIVEN_M.len(), seed)]
                 };
-                let family = Self::ARABIC_FAMILY[Self::rand_index_seeded(Self::ARABIC_FAMILY.len(), seed.wrapping_add(37))];
+                let family =
+                    Self::ARABIC_FAMILY[Self::rand_index_seeded(Self::ARABIC_FAMILY.len(), seed.wrapping_add(37))];
                 format!("{} {}", given, family)
             }
             _ => {
@@ -459,7 +732,6 @@ impl NameGenerator {
         }
         names
     }
-
 }
 
 #[cfg(test)]
@@ -522,7 +794,11 @@ mod tests {
     fn test_title_name_has_honorific() {
         let name = NameGenerator::title_name();
         assert!(!name.is_empty());
-        assert!(name.contains(' '), "Title name should have honorific + surname: {}", name);
+        assert!(
+            name.contains(' '),
+            "Title name should have honorific + surname: {}",
+            name
+        );
     }
 
     #[test]
@@ -540,13 +816,21 @@ mod tests {
     #[test]
     fn test_vehicle_name_starts_with_the() {
         let name = NameGenerator::vehicle_name();
-        assert!(name.starts_with("The "), "Vehicle name should start with 'The ': {}", name);
+        assert!(
+            name.starts_with("The "),
+            "Vehicle name should start with 'The ': {}",
+            name
+        );
     }
 
     #[test]
     fn test_tavern_name_starts_with_the() {
         let name = NameGenerator::tavern_name();
-        assert!(name.starts_with("The "), "Tavern name should start with 'The ': {}", name);
+        assert!(
+            name.starts_with("The "),
+            "Tavern name should start with 'The ': {}",
+            name
+        );
     }
 
     #[test]
@@ -577,7 +861,12 @@ mod tests {
     fn test_spanish_name_has_double_surname() {
         let name = NameGenerator::culture_name("spanish", "male");
         let parts: Vec<&str> = name.split_whitespace().collect();
-        assert_eq!(parts.len(), 3, "Spanish name should have given + two surnames: {}", name);
+        assert_eq!(
+            parts.len(),
+            3,
+            "Spanish name should have given + two surnames: {}",
+            name
+        );
     }
 
     #[test]
@@ -696,7 +985,11 @@ mod tests {
         assert_eq!(parts.len(), 2);
         // First part should be an honorific
         let honorifics = NameGenerator::HONORIFICS;
-        assert!(honorifics.contains(&parts[0]), "First part should be an honorific: {}", parts[0]);
+        assert!(
+            honorifics.contains(&parts[0]),
+            "First part should be an honorific: {}",
+            parts[0]
+        );
     }
 
     #[test]

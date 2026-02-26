@@ -1,9 +1,9 @@
 #![allow(dead_code)] // Methods used by test code
+use notify::{self, Event, EventKind, RecursiveMode, Watcher};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
-use notify::{self, Watcher, RecursiveMode, Event, EventKind};
 
 /// Events emitted by the file watcher
 #[derive(Debug, Clone)]
@@ -36,19 +36,17 @@ impl ProjectWatcher {
         let sender = tx.clone();
         let project_dir = project_path.to_path_buf();
 
-        let mut watcher = notify::recommended_watcher(move |result: Result<Event, notify::Error>| {
-            match result {
-                Ok(event) => {
-                    let watch_events = Self::translate_event(&event, &project_dir);
-                    for we in watch_events {
-                        if sender.send(we).is_err() {
-                            log::warn!("File watcher: receiver dropped, event lost");
-                            break;
-                        }
+        let mut watcher = notify::recommended_watcher(move |result: Result<Event, notify::Error>| match result {
+            Ok(event) => {
+                let watch_events = Self::translate_event(&event, &project_dir);
+                for we in watch_events {
+                    if sender.send(we).is_err() {
+                        log::warn!("File watcher: receiver dropped, event lost");
+                        break;
                     }
                 }
-                Err(e) => log::warn!("File watcher error: {}", e),
             }
+            Err(e) => log::warn!("File watcher error: {}", e),
         })?;
 
         watcher.watch(project_path, RecursiveMode::Recursive)?;
@@ -107,9 +105,7 @@ impl ProjectWatcher {
         let mut seen = HashSet::new();
         events.retain(|e| {
             let path = match e {
-                WatchEvent::FileModified(p)
-                | WatchEvent::FileCreated(p)
-                | WatchEvent::FileRemoved(p) => p.clone(),
+                WatchEvent::FileModified(p) | WatchEvent::FileCreated(p) | WatchEvent::FileRemoved(p) => p.clone(),
                 WatchEvent::ProjectRemoved => self.project_path.clone(),
             };
             seen.insert(path)
@@ -222,9 +218,7 @@ mod tests {
     #[test]
     fn test_external_change_tracker_clear() {
         let mut tracker = ExternalChangeTracker::new();
-        let events = vec![
-            WatchEvent::FileModified(PathBuf::from("/project/project.json")),
-        ];
+        let events = vec![WatchEvent::FileModified(PathBuf::from("/project/project.json"))];
         tracker.process_events(&events);
         assert!(tracker.has_changes());
         tracker.clear();
@@ -234,9 +228,7 @@ mod tests {
     #[test]
     fn test_external_change_tracker_file_created() {
         let mut tracker = ExternalChangeTracker::new();
-        let events = vec![
-            WatchEvent::FileCreated(PathBuf::from("/project/docs/new-doc.json")),
-        ];
+        let events = vec![WatchEvent::FileCreated(PathBuf::from("/project/docs/new-doc.json"))];
         tracker.process_events(&events);
         assert!(tracker.has_changes());
         assert_eq!(tracker.documents_changed.len(), 1);
@@ -246,9 +238,7 @@ mod tests {
     #[test]
     fn test_external_change_tracker_file_removed() {
         let mut tracker = ExternalChangeTracker::new();
-        let events = vec![
-            WatchEvent::FileRemoved(PathBuf::from("/project/docs/deleted.json")),
-        ];
+        let events = vec![WatchEvent::FileRemoved(PathBuf::from("/project/docs/deleted.json"))];
         tracker.process_events(&events);
         assert!(tracker.has_changes());
         assert_eq!(tracker.modified_paths.len(), 1);
@@ -282,9 +272,7 @@ mod tests {
     #[test]
     fn test_external_change_tracker_non_json_file() {
         let mut tracker = ExternalChangeTracker::new();
-        let events = vec![
-            WatchEvent::FileModified(PathBuf::from("/project/readme.md")),
-        ];
+        let events = vec![WatchEvent::FileModified(PathBuf::from("/project/readme.md"))];
         tracker.process_events(&events);
         assert!(tracker.has_changes());
         assert!(!tracker.project_metadata_changed);
@@ -312,15 +300,11 @@ mod tests {
     #[test]
     fn test_external_change_tracker_process_replaces() {
         let mut tracker = ExternalChangeTracker::new();
-        let events1 = vec![
-            WatchEvent::FileModified(PathBuf::from("/project/file1.txt")),
-        ];
+        let events1 = vec![WatchEvent::FileModified(PathBuf::from("/project/file1.txt"))];
         tracker.process_events(&events1);
         assert_eq!(tracker.modified_paths.len(), 1);
 
-        let events2 = vec![
-            WatchEvent::FileModified(PathBuf::from("/project/file2.txt")),
-        ];
+        let events2 = vec![WatchEvent::FileModified(PathBuf::from("/project/file2.txt"))];
         tracker.process_events(&events2);
         // process_events clears previous state first
         assert_eq!(tracker.modified_paths.len(), 1);
@@ -337,9 +321,7 @@ mod tests {
     #[test]
     fn test_external_change_tracker_json_not_in_docs() {
         let mut tracker = ExternalChangeTracker::new();
-        let events = vec![
-            WatchEvent::FileModified(PathBuf::from("/project/config/settings.json")),
-        ];
+        let events = vec![WatchEvent::FileModified(PathBuf::from("/project/config/settings.json"))];
         tracker.process_events(&events);
         assert!(tracker.has_changes());
         // JSON file outside docs/ should not be in documents_changed
@@ -397,9 +379,7 @@ mod tests {
     #[test]
     fn test_tracker_non_json_in_docs_not_counted() {
         let mut tracker = ExternalChangeTracker::new();
-        let events = vec![
-            WatchEvent::FileModified(PathBuf::from("/project/docs/readme.md")),
-        ];
+        let events = vec![WatchEvent::FileModified(PathBuf::from("/project/docs/readme.md"))];
         tracker.process_events(&events);
         assert!(tracker.documents_changed.is_empty());
         assert_eq!(tracker.modified_paths.len(), 1);
@@ -422,15 +402,11 @@ mod tests {
     #[test]
     fn test_tracker_process_replaces_previous_state() {
         let mut tracker = ExternalChangeTracker::new();
-        let events1 = vec![
-            WatchEvent::FileModified(PathBuf::from("/project/project.json")),
-        ];
+        let events1 = vec![WatchEvent::FileModified(PathBuf::from("/project/project.json"))];
         tracker.process_events(&events1);
         assert!(tracker.project_metadata_changed);
 
-        let events2 = vec![
-            WatchEvent::FileModified(PathBuf::from("/project/docs/a.json")),
-        ];
+        let events2 = vec![WatchEvent::FileModified(PathBuf::from("/project/docs/a.json"))];
         tracker.process_events(&events2);
         // Previous metadata_changed flag should be reset
         assert!(!tracker.project_metadata_changed);
@@ -441,9 +417,9 @@ mod tests {
     fn test_tracker_nested_docs_path() {
         let mut tracker = ExternalChangeTracker::new();
         // JSON in nested docs subdirectory should NOT be counted
-        let events = vec![
-            WatchEvent::FileModified(PathBuf::from("/project/docs/subfolder/deep.json")),
-        ];
+        let events = vec![WatchEvent::FileModified(PathBuf::from(
+            "/project/docs/subfolder/deep.json",
+        ))];
         tracker.process_events(&events);
         // Parent is "subfolder", not "docs", so shouldn't be in documents_changed
         assert!(tracker.documents_changed.is_empty());
@@ -452,9 +428,7 @@ mod tests {
     #[test]
     fn test_tracker_project_json_in_subdirectory() {
         let mut tracker = ExternalChangeTracker::new();
-        let events = vec![
-            WatchEvent::FileModified(PathBuf::from("/project/subdir/project.json")),
-        ];
+        let events = vec![WatchEvent::FileModified(PathBuf::from("/project/subdir/project.json"))];
         tracker.process_events(&events);
         // Only root-level project.json triggers metadata change
         assert!(tracker.project_metadata_changed);
@@ -501,9 +475,7 @@ mod tests {
     #[test]
     fn test_tracker_has_changes_after_clear() {
         let mut tracker = ExternalChangeTracker::new();
-        let events = vec![
-            WatchEvent::FileCreated(PathBuf::from("/project/docs/new.json")),
-        ];
+        let events = vec![WatchEvent::FileCreated(PathBuf::from("/project/docs/new.json"))];
         tracker.process_events(&events);
         assert!(tracker.has_changes());
         tracker.clear();

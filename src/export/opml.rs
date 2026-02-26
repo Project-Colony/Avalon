@@ -1,5 +1,5 @@
-use std::fmt::Write;
 use anyhow::Result;
+use std::fmt::Write;
 
 use crate::core::binder::{Binder, BinderItem};
 
@@ -9,7 +9,7 @@ pub fn export_opml(binder: &Binder, title: &str) -> Result<String> {
     output.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     output.push_str("<opml version=\"2.0\">\n");
     output.push_str("  <head>\n");
-    let _ = writeln!(output, "    <title>{}</title>", escape_xml(title));
+    writeln!(output, "    <title>{}</title>", escape_xml(title)).unwrap();
     output.push_str("  </head>\n");
     output.push_str("  <body>\n");
 
@@ -29,7 +29,9 @@ fn write_opml_item(item: &BinderItem, depth: usize, output: &mut String) {
     let indent = "  ".repeat(depth);
     let text_attr = escape_xml(&item.title);
 
-    let content_note = item.document.as_ref()
+    let content_note = item
+        .document
+        .as_ref()
         .map(|d| escape_xml(&d.content))
         .unwrap_or_default();
 
@@ -43,28 +45,30 @@ fn write_opml_item(item: &BinderItem, depth: usize, output: &mut String) {
 
     if item.children.is_empty() {
         if combined_note.is_empty() {
-            let _ = writeln!(output, "{}<outline text=\"{}\"/>", indent, text_attr);
+            writeln!(output, "{}<outline text=\"{}\"/>", indent, text_attr).unwrap();
         } else {
-            let _ = writeln!(
+            writeln!(
                 output,
                 "{}<outline text=\"{}\" _note=\"{}\"/>",
                 indent, text_attr, combined_note
-            );
+            )
+            .unwrap();
         }
     } else {
         if combined_note.is_empty() {
-            let _ = writeln!(output, "{}<outline text=\"{}\">", indent, text_attr);
+            writeln!(output, "{}<outline text=\"{}\">", indent, text_attr).unwrap();
         } else {
-            let _ = writeln!(
+            writeln!(
                 output,
                 "{}<outline text=\"{}\" _note=\"{}\">",
                 indent, text_attr, combined_note
-            );
+            )
+            .unwrap();
         }
         for child in &item.children {
             write_opml_item(child, depth + 1, output);
         }
-        let _ = writeln!(output, "{}</outline>", indent);
+        writeln!(output, "{}</outline>", indent).unwrap();
     }
 }
 
@@ -157,11 +161,98 @@ fn extract_attr(line: &str, attr_name: &str) -> Option<String> {
     None
 }
 
-fn escape_xml(s: &str) -> String { super::compiler::escape_xml(s) }
+fn escape_xml(s: &str) -> String {
+    super::compiler::escape_xml(s)
+}
 
 fn unescape_xml(s: &str) -> String {
     s.replace("&amp;", "&")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::binder::{Binder, BinderItem};
+
+    #[test]
+    fn test_export_opml_basic() {
+        let binder = Binder::default_structure();
+        let output = export_opml(&binder, "Test").unwrap();
+        assert!(output.contains("<opml version=\"2.0\">"));
+        assert!(output.contains("<title>Test</title>"));
+        assert!(output.contains("</opml>"));
+    }
+
+    #[test]
+    fn test_export_opml_escapes_title() {
+        let binder = Binder::default_structure();
+        let output = export_opml(&binder, "Tom & Jerry").unwrap();
+        assert!(output.contains("Tom &amp; Jerry"));
+    }
+
+    #[test]
+    fn test_import_opml_empty() {
+        let input = r#"<?xml version="1.0"?><opml><head></head><body></body></opml>"#;
+        let items = import_opml(input).unwrap();
+        assert!(items.is_empty());
+    }
+
+    #[test]
+    fn test_import_opml_single_item() {
+        let input = r#"<?xml version="1.0"?>
+<opml version="2.0">
+<head><title>T</title></head>
+<body>
+  <outline text="Chapter One"/>
+</body>
+</opml>"#;
+        let items = import_opml(input).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].title, "Chapter One");
+    }
+
+    #[test]
+    fn test_import_opml_nested() {
+        let input = r#"<opml>
+<head></head>
+<body>
+  <outline text="Part 1">
+    <outline text="Ch 1"/>
+    <outline text="Ch 2"/>
+  </outline>
+</body>
+</opml>"#;
+        let items = import_opml(input).unwrap();
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].children.len(), 2);
+    }
+
+    #[test]
+    fn test_roundtrip_export_import() {
+        let mut binder = Binder::default_structure();
+        let child = BinderItem::new_text("Scene A");
+        binder.draft.children.push(child);
+        let opml = export_opml(&binder, "Test").unwrap();
+        let imported = import_opml(&opml).unwrap();
+        // Draft + Research are exported as top-level items
+        assert!(!imported.is_empty());
+    }
+
+    #[test]
+    fn test_unescape_xml() {
+        assert_eq!(unescape_xml("&amp;&lt;&gt;&quot;"), "&<>\"");
+    }
+
+    #[test]
+    fn test_extract_attr() {
+        assert_eq!(extract_attr(r#"<outline text="hello"/>"#, "text"), Some("hello".into()));
+        assert_eq!(
+            extract_attr(r#"<outline text="a" _note="b"/>"#, "_note"),
+            Some("b".into())
+        );
+        assert!(extract_attr("<outline/>", "text").is_none());
+    }
 }

@@ -42,7 +42,9 @@ fn extract_wt_texts(xml: &str) -> Vec<String> {
         let tag_start = search_from + pos;
 
         // Locate the closing `>` of the opening tag.
-        let Some(close_pos) = xml[tag_start..].find('>') else { break; };
+        let Some(close_pos) = xml[tag_start..].find('>') else {
+            break;
+        };
         let content_start = tag_start + close_pos + 1;
 
         // Check for self-closing tag `/>` — content_start is 1 past '>',
@@ -53,7 +55,9 @@ fn extract_wt_texts(xml: &str) -> Vec<String> {
         }
 
         // Find the matching `</w:t>`.
-        let Some(end_pos) = xml[content_start..].find("</w:t>") else { break; };
+        let Some(end_pos) = xml[content_start..].find("</w:t>") else {
+            break;
+        };
         let content_end = content_start + end_pos;
 
         let text = &xml[content_start..content_end];
@@ -99,7 +103,7 @@ fn detect_heading_level(paragraph_xml: &str) -> u8 {
         let patterns = [
             format!("heading{}", level),
             format!("heading {}", level),
-            format!("titre{}", level),     // French locale
+            format!("titre{}", level), // French locale
             format!("titre {}", level),
         ];
         for pattern in &patterns {
@@ -130,7 +134,9 @@ fn parse_paragraphs(xml: &str) -> Vec<DocxParagraph> {
         let p_start = search_from + pos;
 
         // Find the matching </w:p>.
-        let Some(end_pos) = xml[p_start..].find("</w:p>") else { break; };
+        let Some(end_pos) = xml[p_start..].find("</w:p>") else {
+            break;
+        };
         let p_end = p_start + end_pos + "</w:p>".len();
 
         let paragraph_xml = &xml[p_start..p_end];
@@ -141,10 +147,7 @@ fn parse_paragraphs(xml: &str) -> Vec<DocxParagraph> {
 
         let heading_level = detect_heading_level(paragraph_xml);
 
-        paragraphs.push(DocxParagraph {
-            text,
-            heading_level,
-        });
+        paragraphs.push(DocxParagraph { text, heading_level });
 
         search_from = p_end;
     }
@@ -171,7 +174,13 @@ fn find_tag_start(xml: &str, tag_name: &str) -> Option<usize> {
             return None;
         }
         let next_char = xml.as_bytes()[after];
-        if next_char == b'>' || next_char == b' ' || next_char == b'/' || next_char == b'\n' || next_char == b'\r' || next_char == b'\t' {
+        if next_char == b'>'
+            || next_char == b' '
+            || next_char == b'/'
+            || next_char == b'\n'
+            || next_char == b'\r'
+            || next_char == b'\t'
+        {
             return Some(pos);
         }
 
@@ -248,17 +257,16 @@ fn paragraphs_to_binder_items(paragraphs: &[DocxParagraph], title: &str) -> Vec<
     };
 
     // Helper: push the current text item into the current folder or root.
-    let push_text_item = |text_item: Option<BinderItem>,
-                          folder: &mut Option<BinderItem>,
-                          root: &mut Vec<BinderItem>| {
-        if let Some(item) = text_item {
-            if let Some(ref mut f) = folder {
-                f.add_child(item);
-            } else {
-                root.push(item);
+    let push_text_item =
+        |text_item: Option<BinderItem>, folder: &mut Option<BinderItem>, root: &mut Vec<BinderItem>| {
+            if let Some(item) = text_item {
+                if let Some(ref mut f) = folder {
+                    f.add_child(item);
+                } else {
+                    root.push(item);
+                }
             }
-        }
-    };
+        };
 
     for para in paragraphs {
         match para.heading_level {
@@ -323,8 +331,7 @@ fn paragraphs_to_binder_items(paragraphs: &[DocxParagraph], title: &str) -> Vec<
 /// tree.  Heading1 elements become folders; Heading2+ become text items
 /// nested inside them.
 pub fn import_docx(path: &Path) -> Result<Vec<BinderItem>> {
-    let data = std::fs::read(path)
-        .with_context(|| format!("Failed to read DOCX file: {}", path.display()))?;
+    let data = std::fs::read(path).with_context(|| format!("Failed to read DOCX file: {}", path.display()))?;
 
     let title = path
         .file_stem()
@@ -342,8 +349,8 @@ pub fn import_docx(path: &Path) -> Result<Vec<BinderItem>> {
 /// when the file contains no headings.
 pub fn import_docx_bytes(data: &[u8], title: &str) -> Result<Vec<BinderItem>> {
     let cursor = Cursor::new(data);
-    let mut archive = ZipArchive::new(cursor)
-        .context("Failed to open data as a ZIP archive (is this a valid DOCX file?)")?;
+    let mut archive =
+        ZipArchive::new(cursor).context("Failed to open data as a ZIP archive (is this a valid DOCX file?)")?;
 
     let xml = read_document_xml(&mut archive)?;
     let paragraphs = parse_paragraphs(&xml);
@@ -355,8 +362,7 @@ pub fn import_docx_bytes(data: &[u8], title: &str) -> Result<Vec<BinderItem>> {
 /// Extract all text content from a `.docx` file on disk and return it as a
 /// single string with paragraphs separated by newlines.
 pub fn extract_text_from_docx(path: &Path) -> Result<String> {
-    let data = std::fs::read(path)
-        .with_context(|| format!("Failed to read DOCX file: {}", path.display()))?;
+    let data = std::fs::read(path).with_context(|| format!("Failed to read DOCX file: {}", path.display()))?;
 
     extract_text_from_docx_bytes(&data)
 }
@@ -365,8 +371,8 @@ pub fn extract_text_from_docx(path: &Path) -> Result<String> {
 /// single string with paragraphs separated by newlines.
 pub fn extract_text_from_docx_bytes(data: &[u8]) -> Result<String> {
     let cursor = Cursor::new(data);
-    let mut archive = ZipArchive::new(cursor)
-        .context("Failed to open data as a ZIP archive (is this a valid DOCX file?)")?;
+    let mut archive =
+        ZipArchive::new(cursor).context("Failed to open data as a ZIP archive (is this a valid DOCX file?)")?;
 
     let xml = read_document_xml(&mut archive)?;
     let paragraphs = parse_paragraphs(&xml);

@@ -122,11 +122,23 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
     .align_y(iced::Alignment::Center);
 
     let case_label = if data.case_sensitive { "[Aa]" } else { "Aa" };
-    let case_color = if data.case_sensitive { Theme::TEXT_ACCENT } else { Theme::TEXT_MUTED };
+    let case_color = if data.case_sensitive {
+        Theme::TEXT_ACCENT
+    } else {
+        Theme::TEXT_MUTED
+    };
     let word_label = if data.whole_word { "[W]" } else { "W" };
-    let word_color = if data.whole_word { Theme::TEXT_ACCENT } else { Theme::TEXT_MUTED };
+    let word_color = if data.whole_word {
+        Theme::TEXT_ACCENT
+    } else {
+        Theme::TEXT_MUTED
+    };
     let regex_label = if data.use_regex { "[.*]" } else { ".*" };
-    let regex_color = if data.use_regex { Theme::TEXT_ACCENT } else { Theme::TEXT_MUTED };
+    let regex_color = if data.use_regex {
+        Theme::TEXT_ACCENT
+    } else {
+        Theme::TEXT_MUTED
+    };
 
     let mode_hint = if data.use_regex {
         "Regex mode active"
@@ -137,9 +149,7 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
     };
 
     let info = row![
-        text(match_info)
-            .size(10)
-            .color(match_color),
+        text(match_info).size(10).color(match_color),
         Space::with_width(12),
         button(text(case_label).size(11).color(case_color))
             .on_press(Message::DocFindToggleCase)
@@ -155,9 +165,7 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
         Space::with_width(8),
         text(mode_hint).size(9).color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
-        text("Enter: next | Shift+Enter: prev")
-            .size(9)
-            .color(Theme::TEXT_MUTED),
+        text("Enter: next | Shift+Enter: prev").size(9).color(Theme::TEXT_MUTED),
     ];
 
     let content = column![
@@ -171,8 +179,5 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
     ]
     .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }

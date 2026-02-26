@@ -1,6 +1,6 @@
-use std::collections::HashSet;
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 /// Pre-computed text statistics from a single pass over the content.
 /// Use this instead of calling `word_count()`, `char_count()`, etc. separately
@@ -28,11 +28,7 @@ impl TextStats {
         let char_count_no_spaces = text.chars().filter(|c| !c.is_whitespace()).count();
         let paragraph_count = text.split("\n\n").filter(|p| !p.trim().is_empty()).count();
         let line_count = text.lines().count();
-        let sentence_count = text
-            .chars()
-            .filter(|c| matches!(c, '.' | '!' | '?'))
-            .count()
-            .max(1);
+        let sentence_count = text.chars().filter(|c| matches!(c, '.' | '!' | '?')).count().max(1);
         let page_count = word_count as f64 / super::WORDS_PER_PAGE as f64;
 
         Self {
@@ -102,7 +98,7 @@ impl Document {
     }
 
     /// Get character count (without spaces)
-    #[allow(dead_code)]
+    #[allow(dead_code)] // used only in tests; production uses TextStats
     pub fn char_count_no_spaces(&self) -> usize {
         self.content.chars().filter(|c| !c.is_whitespace()).count()
     }
@@ -117,7 +113,8 @@ impl Document {
 
     /// Get sentence count (approximate)
     pub fn sentence_count(&self) -> usize {
-        self.content.chars()
+        self.content
+            .chars()
             .filter(|c| matches!(c, '.' | '!' | '?'))
             .count()
             .max(if self.content.is_empty() { 0 } else { 1 })
@@ -182,7 +179,6 @@ impl Document {
         }
         seen.len()
     }
-
 }
 
 impl Default for Document {
@@ -221,7 +217,6 @@ pub struct Reference {
     pub notes: String,
 }
 
-
 /// A footnote or endnote
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Footnote {
@@ -229,9 +224,6 @@ pub struct Footnote {
     pub text: String,
     pub is_endnote: bool,
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
@@ -322,5 +314,4 @@ mod tests {
         assert_eq!(doc.char_count_no_spaces(), 4);
         assert_eq!(doc.char_count(), 7);
     }
-
 }

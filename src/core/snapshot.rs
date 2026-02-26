@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use super::document::Document;
@@ -144,7 +144,6 @@ impl DiffStats {
         }
         self.total_changes() as f64 / total as f64 * 100.0
     }
-
 }
 
 /// Compute diff using Longest Common Subsequence (Myers-like) algorithm.
@@ -206,9 +205,15 @@ pub fn format_unified_diff(chunks: &[DiffChunk], old_label: &str, new_label: &st
         );
         for line in &hunk.lines {
             match line {
-                DiffChunk::Equal(text) => { let _ = writeln!(output, " {}", text); }
-                DiffChunk::Added(text) => { let _ = writeln!(output, "+{}", text); }
-                DiffChunk::Removed(text) => { let _ = writeln!(output, "-{}", text); }
+                DiffChunk::Equal(text) => {
+                    let _ = writeln!(output, " {}", text);
+                }
+                DiffChunk::Added(text) => {
+                    let _ = writeln!(output, "+{}", text);
+                }
+                DiffChunk::Removed(text) => {
+                    let _ = writeln!(output, "-{}", text);
+                }
             }
         }
     }
@@ -271,9 +276,16 @@ fn build_hunk(chunks: &[DiffChunk], start: usize, end: usize) -> DiffHunk {
     // Count lines before the hunk start
     for chunk in &chunks[..start] {
         match chunk {
-            DiffChunk::Equal(_) => { old_start += 1; new_start += 1; }
-            DiffChunk::Removed(_) => { old_start += 1; }
-            DiffChunk::Added(_) => { new_start += 1; }
+            DiffChunk::Equal(_) => {
+                old_start += 1;
+                new_start += 1;
+            }
+            DiffChunk::Removed(_) => {
+                old_start += 1;
+            }
+            DiffChunk::Added(_) => {
+                new_start += 1;
+            }
         }
     }
 
@@ -282,13 +294,26 @@ fn build_hunk(chunks: &[DiffChunk], start: usize, end: usize) -> DiffHunk {
     let lines: Vec<DiffChunk> = chunks[start..end].to_vec();
     for chunk in &lines {
         match chunk {
-            DiffChunk::Equal(_) => { old_count += 1; new_count += 1; }
-            DiffChunk::Removed(_) => { old_count += 1; }
-            DiffChunk::Added(_) => { new_count += 1; }
+            DiffChunk::Equal(_) => {
+                old_count += 1;
+                new_count += 1;
+            }
+            DiffChunk::Removed(_) => {
+                old_count += 1;
+            }
+            DiffChunk::Added(_) => {
+                new_count += 1;
+            }
         }
     }
 
-    DiffHunk { old_start, old_count, new_start, new_count, lines }
+    DiffHunk {
+        old_start,
+        old_count,
+        new_start,
+        new_count,
+        lines,
+    }
 }
 
 /// Inline diff: find differences within a single line
@@ -625,9 +650,7 @@ mod tests {
 
     #[test]
     fn test_diff_stats_words_positive() {
-        let chunks = vec![
-            DiffChunk::Added("new word here".to_string()),
-        ];
+        let chunks = vec![DiffChunk::Added("new word here".to_string())];
         let stats = DiffStats::from_chunks(&chunks);
         assert_eq!(stats.words_added, 3);
         let summary = stats.summary();
@@ -636,9 +659,7 @@ mod tests {
 
     #[test]
     fn test_diff_stats_words_negative() {
-        let chunks = vec![
-            DiffChunk::Removed("deleted these words now".to_string()),
-        ];
+        let chunks = vec![DiffChunk::Removed("deleted these words now".to_string())];
         let stats = DiffStats::from_chunks(&chunks);
         assert_eq!(stats.words_added, -4);
         let summary = stats.summary();
@@ -647,9 +668,7 @@ mod tests {
 
     #[test]
     fn test_diff_stats_no_word_change() {
-        let chunks = vec![
-            DiffChunk::Equal("same line".to_string()),
-        ];
+        let chunks = vec![DiffChunk::Equal("same line".to_string())];
         let stats = DiffStats::from_chunks(&chunks);
         assert_eq!(stats.words_added, 0);
         let summary = stats.summary();
@@ -671,10 +690,7 @@ mod tests {
 
     #[test]
     fn test_diff_stats_change_percentage() {
-        let chunks = vec![
-            DiffChunk::Equal("a".to_string()),
-            DiffChunk::Added("b".to_string()),
-        ];
+        let chunks = vec![DiffChunk::Equal("a".to_string()), DiffChunk::Added("b".to_string())];
         let stats = DiffStats::from_chunks(&chunks);
         assert!((stats.change_percentage() - 50.0).abs() < 0.01);
     }
@@ -688,9 +704,7 @@ mod tests {
 
     #[test]
     fn test_unified_diff_no_changes() {
-        let chunks = vec![
-            DiffChunk::Equal("same".to_string()),
-        ];
+        let chunks = vec![DiffChunk::Equal("same".to_string())];
         let unified = format_unified_diff(&chunks, "a", "b");
         assert!(unified.contains("--- a"));
         assert!(unified.contains("+++ b"));
@@ -701,7 +715,10 @@ mod tests {
     fn test_inline_diff_completely_different() {
         let chunks = inline_diff("hello world", "foo bar");
         let added = chunks.iter().filter(|c| matches!(c, InlineDiffChunk::Added(_))).count();
-        let removed = chunks.iter().filter(|c| matches!(c, InlineDiffChunk::Removed(_))).count();
+        let removed = chunks
+            .iter()
+            .filter(|c| matches!(c, InlineDiffChunk::Removed(_)))
+            .count();
         assert!(added >= 1);
         assert!(removed >= 1);
     }
@@ -716,7 +733,10 @@ mod tests {
     #[test]
     fn test_inline_diff_empty_new() {
         let chunks = inline_diff("old content", "");
-        let removed = chunks.iter().filter(|c| matches!(c, InlineDiffChunk::Removed(_))).count();
+        let removed = chunks
+            .iter()
+            .filter(|c| matches!(c, InlineDiffChunk::Removed(_)))
+            .count();
         assert_eq!(removed, 2);
     }
 

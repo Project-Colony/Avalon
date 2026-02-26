@@ -1,6 +1,6 @@
-use std::fmt::Write;
-use anyhow::Result;
 use super::compiler::{self, CompileContent, CompileOptions, SeparatorType};
+use anyhow::Result;
+use std::fmt::Write;
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
     let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 20).sum();
@@ -9,22 +9,27 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
     // YAML front matter block (common in Markdown publishing)
     if options.include_front_matter && !options.title.is_empty() {
         output.push_str("---\n");
-        let _ = writeln!(output,"title: \"{}\"", escape_yaml(&options.title));
+        writeln!(output, "title: \"{}\"", escape_yaml(&options.title)).unwrap();
         if !options.author.is_empty() {
-            let _ = writeln!(output,"author: \"{}\"", escape_yaml(&options.author));
+            writeln!(output, "author: \"{}\"", escape_yaml(&options.author)).unwrap();
         }
-        let _ = writeln!(output,"date: \"{}\"", chrono::Local::now().format(crate::core::DATE_FORMAT));
+        writeln!(
+            output,
+            "date: \"{}\"",
+            chrono::Local::now().format(crate::core::DATE_FORMAT)
+        )
+        .unwrap();
 
         // Word count metadata
         let total_words = compiler::total_word_count(contents);
-        let _ = writeln!(output,"wordcount: {}", total_words);
+        writeln!(output, "wordcount: {}", total_words).unwrap();
 
         output.push_str("---\n\n");
 
         // Title as H1
-        let _ = write!(output,"# {}\n\n", options.title);
+        write!(output, "# {}\n\n", options.title).unwrap();
         if !options.author.is_empty() {
-            let _ = write!(output,"*by {}*\n\n", options.author);
+            write!(output, "*by {}*\n\n", options.author).unwrap();
         }
         output.push_str("---\n\n");
     }
@@ -36,10 +41,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
             if content.is_folder || !content.text.is_empty() {
                 let indent = "  ".repeat(content.depth);
                 let anchor = slug(&content.title);
-                let _ = writeln!(output,
-                    "{}- [{}](#{})",
-                    indent, content.title, anchor
-                );
+                writeln!(output, "{}- [{}](#{})", indent, content.title, anchor).unwrap();
             }
         }
         output.push_str("\n---\n\n");
@@ -57,7 +59,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
             // Folder becomes heading, depth maps: 0->##, 1->##, 2->###, etc.
             let level = (content.depth + 2).min(6);
             let hashes = "#".repeat(level);
-            let _ = write!(output,"{} {}\n\n", hashes, content.title);
+            write!(output, "{} {}\n\n", hashes, content.title).unwrap();
             prev_was_text = false;
         } else if !content.text.is_empty() {
             // Section separator between consecutive text documents
@@ -71,7 +73,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                         output.push_str("\n---\n\n");
                     }
                     SeparatorType::Custom(s) => {
-                        let _ = write!(output,"\n{}\n\n", s);
+                        write!(output, "\n{}\n\n", s).unwrap();
                     }
                     SeparatorType::None => {}
                 }
@@ -88,8 +90,102 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
 
 /// Escape special characters in YAML string values
 fn escape_yaml(s: &str) -> String {
-    s.replace('\\', "\\\\")
-     .replace('"', "\\\"")
+    s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-fn slug(title: &str) -> String { compiler::slug(title) }
+fn slug(title: &str) -> String {
+    compiler::slug(title)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::compiler::{CompileContent, CompileOptions, SeparatorType};
+    use super::*;
+
+    fn sample_contents() -> Vec<CompileContent> {
+        vec![
+            CompileContent {
+                title: "Part One".into(),
+                text: String::new(),
+                depth: 0,
+                is_folder: true,
+            },
+            CompileContent {
+                title: "Chapter 1".into(),
+                text: "First paragraph.".into(),
+                depth: 1,
+                is_folder: false,
+            },
+        ]
+    }
+
+    fn default_options() -> CompileOptions {
+        CompileOptions {
+            include_front_matter: false,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_compile_basic() {
+        let output = compile(&sample_contents(), &default_options()).unwrap();
+        assert!(output.contains("## Part One"));
+        assert!(output.contains("First paragraph."));
+    }
+
+    #[test]
+    fn test_compile_front_matter_yaml() {
+        let mut opts = default_options();
+        opts.include_front_matter = true;
+        opts.title = "My Novel".into();
+        opts.author = "Jane".into();
+        let output = compile(&sample_contents(), &opts).unwrap();
+        assert!(output.contains("---"));
+        assert!(output.contains("title: \"My Novel\""));
+        assert!(output.contains("author: \"Jane\""));
+        assert!(output.contains("# My Novel"));
+    }
+
+    #[test]
+    fn test_compile_with_toc() {
+        let mut opts = default_options();
+        opts.include_toc = true;
+        let output = compile(&sample_contents(), &opts).unwrap();
+        assert!(output.contains("## Table of Contents"));
+        assert!(output.contains("[Part One]"));
+    }
+
+    #[test]
+    fn test_compile_empty() {
+        let output = compile(&[], &default_options()).unwrap();
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn test_separator_custom() {
+        let contents = vec![
+            CompileContent {
+                title: "A".into(),
+                text: "Text A".into(),
+                depth: 0,
+                is_folder: false,
+            },
+            CompileContent {
+                title: "B".into(),
+                text: "Text B".into(),
+                depth: 0,
+                is_folder: false,
+            },
+        ];
+        let mut opts = default_options();
+        opts.separator = SeparatorType::Custom("~~~".into());
+        let output = compile(&contents, &opts).unwrap();
+        assert!(output.contains("~~~"));
+    }
+
+    #[test]
+    fn test_escape_yaml() {
+        assert_eq!(escape_yaml("hello \"world\""), "hello \\\"world\\\"");
+        assert_eq!(escape_yaml("back\\slash"), "back\\\\slash");
+    }
+}

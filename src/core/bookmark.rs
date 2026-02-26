@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 /// A bookmark marks a binder item as a favorite for quick access
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,7 +26,6 @@ impl Bookmark {
             note: None,
         }
     }
-
 }
 
 /// Manages the list of bookmarks for a project
@@ -61,7 +60,6 @@ impl BookmarkList {
             self.add(item_id, name);
         }
     }
-
 }
 
 #[cfg(test)]

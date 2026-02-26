@@ -1,6 +1,6 @@
-use std::fmt::Write;
-use anyhow::Result;
 use super::compiler::{CompileContent, CompileOptions, SeparatorType};
+use anyhow::Result;
+use std::fmt::Write;
 
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
     let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 20).sum();
@@ -16,7 +16,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
         output.push('\n');
 
         if !options.author.is_empty() {
-            let _ = write!(output, "by {}", options.author);
+            write!(output, "by {}", options.author).unwrap();
             output.push('\n');
         }
 
@@ -52,7 +52,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                 }
                 _ => {
                     let indent = "  ".repeat(content.depth.saturating_sub(2));
-                    let _ = write!(output, "{}* {}", indent, content.title);
+                    write!(output, "{}* {}", indent, content.title).unwrap();
                 }
             }
             output.push_str("\n\n");
@@ -66,7 +66,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                         output.push_str("\n        * * *\n\n");
                     }
                     SeparatorType::Custom(s) => {
-                        let _ = write!(output, "\n{}\n\n", s);
+                        write!(output, "\n{}\n\n", s).unwrap();
                     }
                     SeparatorType::PageBreak => {
                         output.push_str("\n\n");
@@ -134,4 +134,67 @@ fn strip_markdown(text: &str) -> String {
     }
 
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::compiler::{CompileContent, CompileOptions};
+    use super::*;
+
+    fn default_options() -> CompileOptions {
+        CompileOptions {
+            include_front_matter: false,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_compile_basic() {
+        let contents = vec![
+            CompileContent {
+                title: "Ch 1".into(),
+                text: String::new(),
+                depth: 0,
+                is_folder: true,
+            },
+            CompileContent {
+                title: "Scene".into(),
+                text: "Hello **world**.".into(),
+                depth: 1,
+                is_folder: false,
+            },
+        ];
+        let output = compile(&contents, &default_options()).unwrap();
+        assert!(output.contains("CH 1"));
+        assert!(output.contains("Hello world.")); // markdown stripped
+        assert!(!output.contains("**"));
+    }
+
+    #[test]
+    fn test_compile_with_front_matter() {
+        let mut opts = default_options();
+        opts.include_front_matter = true;
+        opts.title = "My Book".into();
+        opts.author = "Author".into();
+        let output = compile(&[], &opts).unwrap();
+        assert!(output.contains("MY BOOK"));
+        assert!(output.contains("by Author"));
+    }
+
+    #[test]
+    fn test_strip_markdown_headings() {
+        assert_eq!(strip_markdown("# Title").trim(), "Title");
+        assert_eq!(strip_markdown("## Sub").trim(), "Sub");
+    }
+
+    #[test]
+    fn test_strip_markdown_bold_italic() {
+        assert_eq!(strip_markdown("**bold**").trim(), "bold");
+        assert_eq!(strip_markdown("~~struck~~").trim(), "struck");
+    }
+
+    #[test]
+    fn test_strip_markdown_blockquote() {
+        assert_eq!(strip_markdown("> quoted").trim(), "quoted");
+    }
 }

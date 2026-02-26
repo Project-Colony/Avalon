@@ -1,6 +1,6 @@
 #![allow(dead_code)] // Methods used by test code
-use std::collections::HashMap;
 use super::binder::Binder;
+use std::collections::HashMap;
 
 /// Aggregated statistics for the project or a selection
 #[derive(Debug, Clone, Default)]
@@ -138,7 +138,8 @@ impl Statistics {
             char_count: text.len(),
             char_count_no_spaces: text.chars().filter(|c| !c.is_whitespace()).count(),
             paragraph_count: text.split("\n\n").filter(|p| !p.trim().is_empty()).count(),
-            sentence_count: text.chars()
+            sentence_count: text
+                .chars()
                 .filter(|c| *c == '.' || *c == '!' || *c == '?')
                 .count()
                 .max(if text.is_empty() { 0 } else { 1 }),
@@ -264,15 +265,13 @@ impl TextAnalysis {
         });
         let sentence_count = raw_sentences.max(1);
 
-        let paragraph_count = text.split("\n\n")
-            .filter(|p| !p.trim().is_empty())
-            .count()
-            .max(1);
+        let paragraph_count = text.split("\n\n").filter(|p| !p.trim().is_empty()).count().max(1);
 
         // Unique words
         let mut word_freq = HashMap::new();
         for word in &words {
-            let lower = word.to_lowercase()
+            let lower = word
+                .to_lowercase()
                 .trim_matches(|c: char| !c.is_alphanumeric())
                 .to_string();
             if !lower.is_empty() {
@@ -282,7 +281,8 @@ impl TextAnalysis {
         let unique_words = word_freq.len();
 
         // Most common words (exclude short words)
-        let mut word_list: Vec<(String, usize)> = word_freq.into_iter()
+        let mut word_list: Vec<(String, usize)> = word_freq
+            .into_iter()
             .filter(|(w, _): &(String, usize)| w.len() > 3)
             .collect();
         word_list.sort_by(|a, b| b.1.cmp(&a.1));
@@ -328,13 +328,21 @@ impl TextAnalysis {
     }
 
     pub fn readability_label(&self) -> &str {
-        if self.readability_score >= 90.0 { "Very Easy" }
-        else if self.readability_score >= 80.0 { "Easy" }
-        else if self.readability_score >= 70.0 { "Fairly Easy" }
-        else if self.readability_score >= 60.0 { "Standard" }
-        else if self.readability_score >= 50.0 { "Fairly Difficult" }
-        else if self.readability_score >= 30.0 { "Difficult" }
-        else { "Very Difficult" }
+        if self.readability_score >= 90.0 {
+            "Very Easy"
+        } else if self.readability_score >= 80.0 {
+            "Easy"
+        } else if self.readability_score >= 70.0 {
+            "Fairly Easy"
+        } else if self.readability_score >= 60.0 {
+            "Standard"
+        } else if self.readability_score >= 50.0 {
+            "Fairly Difficult"
+        } else if self.readability_score >= 30.0 {
+            "Difficult"
+        } else {
+            "Very Difficult"
+        }
     }
 
     /// Vocabulary richness (type-token ratio)
@@ -348,17 +356,23 @@ impl TextAnalysis {
     /// Vocabulary richness label
     pub fn vocabulary_label(&self) -> &str {
         let ttr = self.vocabulary_richness();
-        if ttr >= 70.0 { "Rich" }
-        else if ttr >= 50.0 { "Moderate" }
-        else { "Repetitive" }
+        if ttr >= 70.0 {
+            "Rich"
+        } else if ttr >= 50.0 {
+            "Moderate"
+        } else {
+            "Repetitive"
+        }
     }
 
     /// Get a one-line summary
     pub fn summary(&self) -> String {
         format!(
             "{} words, {} unique, readability: {:.0} ({})",
-            self.word_count, self.unique_words,
-            self.readability_score, self.readability_label()
+            self.word_count,
+            self.unique_words,
+            self.readability_score,
+            self.readability_label()
         )
     }
 
@@ -369,8 +383,7 @@ impl TextAnalysis {
         }
         // Flesch-Kincaid Grade Level
         let syllables: f64 = self.avg_word_length * 0.6 * self.word_count as f64;
-        0.39 * (self.word_count as f64 / self.sentence_count as f64)
-            + 11.8 * (syllables / self.word_count as f64)
+        0.39 * (self.word_count as f64 / self.sentence_count as f64) + 11.8 * (syllables / self.word_count as f64)
             - 15.59
     }
 
@@ -418,7 +431,8 @@ impl ReadabilityMetrics {
             return Self::default();
         }
 
-        let sentence_count = text.chars()
+        let sentence_count = text
+            .chars()
             .filter(|c| *c == '.' || *c == '!' || *c == '?')
             .count()
             .max(1);
@@ -433,17 +447,16 @@ impl ReadabilityMetrics {
         let words_per_sentence = word_count as f64 / sentence_count as f64;
 
         // Character counts for Coleman-Liau and ARI
-        let total_chars: usize = words.iter().map(|w| w.chars().filter(|c| c.is_alphanumeric()).count()).sum();
+        let total_chars: usize = words
+            .iter()
+            .map(|w| w.chars().filter(|c| c.is_alphanumeric()).count())
+            .sum();
 
         // Flesch Reading Ease
-        let flesch_reading_ease = 206.835
-            - 1.015 * words_per_sentence
-            - 84.6 * avg_syllables_per_word;
+        let flesch_reading_ease = 206.835 - 1.015 * words_per_sentence - 84.6 * avg_syllables_per_word;
 
         // Flesch-Kincaid Grade Level
-        let flesch_kincaid_grade = 0.39 * words_per_sentence
-            + 11.8 * avg_syllables_per_word
-            - 15.59;
+        let flesch_kincaid_grade = 0.39 * words_per_sentence + 11.8 * avg_syllables_per_word - 15.59;
 
         // Gunning Fog Index
         let complex_word_percentage = complex_word_count as f64 / word_count as f64 * 100.0;
@@ -455,9 +468,7 @@ impl ReadabilityMetrics {
         let coleman_liau = 0.0588 * l - 0.296 * s - 15.8;
 
         // Automated Readability Index
-        let automated_readability = 4.71 * (total_chars as f64 / word_count as f64)
-            + 0.5 * words_per_sentence
-            - 21.43;
+        let automated_readability = 4.71 * (total_chars as f64 / word_count as f64) + 0.5 * words_per_sentence - 21.43;
 
         // SMOG Grade
         let smog_grade = if sentence_count >= 3 {
@@ -488,31 +499,49 @@ impl ReadabilityMetrics {
             self.coleman_liau,
             self.automated_readability,
         ];
-        let (sum, count) = grades.iter().fold((0.0, 0u32), |(s, c), &g| {
-            if g > 0.0 { (s + g, c + 1) } else { (s, c) }
-        });
-        if count == 0 { 0.0 } else { sum / count as f64 }
+        let (sum, count) = grades
+            .iter()
+            .fold((0.0, 0u32), |(s, c), &g| if g > 0.0 { (s + g, c + 1) } else { (s, c) });
+        if count == 0 {
+            0.0
+        } else {
+            sum / count as f64
+        }
     }
 
     /// Human-readable label for the Flesch score
     pub fn flesch_label(&self) -> &str {
-        if self.flesch_reading_ease >= 90.0 { "Very Easy (5th grade)" }
-        else if self.flesch_reading_ease >= 80.0 { "Easy (6th grade)" }
-        else if self.flesch_reading_ease >= 70.0 { "Fairly Easy (7th grade)" }
-        else if self.flesch_reading_ease >= 60.0 { "Standard (8th-9th grade)" }
-        else if self.flesch_reading_ease >= 50.0 { "Fairly Difficult (10th-12th grade)" }
-        else if self.flesch_reading_ease >= 30.0 { "Difficult (College)" }
-        else { "Very Difficult (Graduate)" }
+        if self.flesch_reading_ease >= 90.0 {
+            "Very Easy (5th grade)"
+        } else if self.flesch_reading_ease >= 80.0 {
+            "Easy (6th grade)"
+        } else if self.flesch_reading_ease >= 70.0 {
+            "Fairly Easy (7th grade)"
+        } else if self.flesch_reading_ease >= 60.0 {
+            "Standard (8th-9th grade)"
+        } else if self.flesch_reading_ease >= 50.0 {
+            "Fairly Difficult (10th-12th grade)"
+        } else if self.flesch_reading_ease >= 30.0 {
+            "Difficult (College)"
+        } else {
+            "Very Difficult (Graduate)"
+        }
     }
 
     /// Audience recommendation based on grade level
     pub fn audience_label(&self) -> &str {
         let grade = self.consensus_grade();
-        if grade <= 6.0 { "Children / General Public" }
-        else if grade <= 8.0 { "Young Adults" }
-        else if grade <= 12.0 { "General Adults" }
-        else if grade <= 16.0 { "College-educated" }
-        else { "Academic / Professional" }
+        if grade <= 6.0 {
+            "Children / General Public"
+        } else if grade <= 8.0 {
+            "Young Adults"
+        } else if grade <= 12.0 {
+            "General Adults"
+        } else if grade <= 16.0 {
+            "College-educated"
+        } else {
+            "Academic / Professional"
+        }
     }
 }
 
@@ -542,7 +571,11 @@ impl WordFrequencyAnalysis {
 
         let words: Vec<String> = text
             .split_whitespace()
-            .map(|w| w.to_lowercase().trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .map(|w| {
+                w.to_lowercase()
+                    .trim_matches(|c: char| !c.is_alphanumeric())
+                    .to_string()
+            })
             .filter(|w| !w.is_empty())
             .collect();
 
@@ -557,9 +590,7 @@ impl WordFrequencyAnalysis {
         let unique_count = freq_map.len();
         let hapax_count = freq_map.values().filter(|&&c| c == 1).count();
 
-        let mut frequencies: Vec<(String, usize)> = freq_map.into_iter()
-            .map(|(k, v)| (k.to_string(), v))
-            .collect();
+        let mut frequencies: Vec<(String, usize)> = freq_map.into_iter().map(|(k, v)| (k.to_string(), v)).collect();
         frequencies.sort_by(|a, b| b.1.cmp(&a.1));
 
         // Bigrams
@@ -568,10 +599,7 @@ impl WordFrequencyAnalysis {
             let bigram = format!("{} {}", window[0], window[1]);
             *bigram_map.entry(bigram).or_insert(0usize) += 1;
         }
-        let mut top_bigrams: Vec<(String, usize)> = bigram_map
-            .into_iter()
-            .filter(|(_, count)| *count > 1)
-            .collect();
+        let mut top_bigrams: Vec<(String, usize)> = bigram_map.into_iter().filter(|(_, count)| *count > 1).collect();
         top_bigrams.sort_by(|a, b| b.1.cmp(&a.1));
         top_bigrams.truncate(15);
 
@@ -608,11 +636,17 @@ impl WordFrequencyAnalysis {
 
     /// Vocabulary richness label
     pub fn richness_label(&self) -> &str {
-        if self.type_token_ratio >= 70.0 { "Very Rich" }
-        else if self.type_token_ratio >= 55.0 { "Rich" }
-        else if self.type_token_ratio >= 40.0 { "Moderate" }
-        else if self.type_token_ratio >= 25.0 { "Repetitive" }
-        else { "Very Repetitive" }
+        if self.type_token_ratio >= 70.0 {
+            "Very Rich"
+        } else if self.type_token_ratio >= 55.0 {
+            "Rich"
+        } else if self.type_token_ratio >= 40.0 {
+            "Moderate"
+        } else if self.type_token_ratio >= 25.0 {
+            "Repetitive"
+        } else {
+            "Very Repetitive"
+        }
     }
 }
 
@@ -780,10 +814,7 @@ impl WritingHistory {
         }
         let mut result = Vec::new();
         for i in (window - 1)..self.entries.len() {
-            let sum: i64 = self.entries[i + 1 - window..=i]
-                .iter()
-                .map(|e| e.words_written)
-                .sum();
+            let sum: i64 = self.entries[i + 1 - window..=i].iter().map(|e| e.words_written).sum();
             let avg = sum as f64 / window as f64;
             result.push((self.entries[i].date, avg));
         }
@@ -800,8 +831,7 @@ impl WritingHistory {
             TrendDirection::Stable
         } else {
             let mid = self.entries.len() / 2;
-            let first_half: f64 = self.entries[..mid].iter().map(|e| e.words_written as f64).sum::<f64>()
-                / mid as f64;
+            let first_half: f64 = self.entries[..mid].iter().map(|e| e.words_written as f64).sum::<f64>() / mid as f64;
             let second_half: f64 = self.entries[mid..].iter().map(|e| e.words_written as f64).sum::<f64>()
                 / (self.entries.len() - mid) as f64;
             let diff = second_half - first_half;
@@ -865,8 +895,12 @@ impl WritingTrend {
     pub fn summary(&self) -> String {
         format!(
             "{} words over {} days ({} productive), avg {:.0}/day, streak: {}, trend: {}",
-            self.total_words, self.total_days, self.productive_days,
-            self.avg_words_per_day, self.current_streak, self.direction.label()
+            self.total_words,
+            self.total_days,
+            self.productive_days,
+            self.avg_words_per_day,
+            self.current_streak,
+            self.direction.label()
         )
     }
 }

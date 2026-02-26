@@ -1,35 +1,36 @@
-use iced::widget::{button, column, container, row, scrollable, text, text_input, Space};
-use iced::{Element, Length, Padding};
 use crate::core::annotation::Annotation;
 use crate::gui::app::Message;
 use crate::gui::theme::{self, Theme};
+use iced::widget::{button, column, container, row, scrollable, text, text_input, Space};
+use iced::{Element, Length, Padding};
 
 /// Render the annotations panel (bottom panel)
-pub fn view(
-    annotations: &[Annotation],
-    new_annotation_text: &str,
-) -> Element<'static, Message> {
+pub fn view(annotations: &[Annotation], new_annotation_text: &str) -> Element<'static, Message> {
     let total = annotations.len();
     let resolved_count = annotations.iter().filter(|a| a.resolved).count();
     let open_count = total - resolved_count;
 
     // Count by category
-    let categorized = annotations.iter()
-        .filter_map(|a| a.category.as_ref())
-        .count();
+    let categorized = annotations.iter().filter_map(|a| a.category.as_ref()).count();
 
     let header = row![
         text("ANNOTATIONS").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(4),
         text("\u{f044}").size(10),
         Space::with_width(Length::Fill),
-        text(format!("{} open", open_count))
-            .size(10)
-            .color(if open_count > 0 { Theme::WARNING } else { Theme::TEXT_MUTED }),
+        text(format!("{} open", open_count)).size(10).color(if open_count > 0 {
+            Theme::WARNING
+        } else {
+            Theme::TEXT_MUTED
+        }),
         Space::with_width(6),
         text(format!("{} resolved", resolved_count))
             .size(10)
-            .color(if resolved_count > 0 { Theme::SUCCESS } else { Theme::TEXT_MUTED }),
+            .color(if resolved_count > 0 {
+                Theme::SUCCESS
+            } else {
+                Theme::TEXT_MUTED
+            }),
     ];
 
     // Add annotation input
@@ -40,11 +41,9 @@ pub fn view(
             .padding(4)
             .width(Length::FillPortion(3)),
         Space::with_width(4),
-        button(
-            text("\u{f067} Add").size(11).color(Theme::TEXT_ACCENT),
-        )
-        .on_press(Message::AddAnnotation)
-        .padding(Padding::from([4, 10])),
+        button(text("\u{f067} Add").size(11).color(Theme::TEXT_ACCENT),)
+            .on_press(Message::AddAnnotation)
+            .padding(Padding::from([4, 10])),
     ]
     .align_y(iced::Alignment::Center);
 
@@ -53,15 +52,14 @@ pub fn view(
 
     if annotations.is_empty() {
         list = list.push(
-            container(
-                column![
-                    text("No annotations yet.").size(12).color(Theme::TEXT_MUTED),
-                    Space::with_height(4),
-                    text("Select text in the editor, then add a comment with color and category.")
-                        .size(10)
-                        .color(Theme::TEXT_MUTED),
-                ]
-            ).padding(Padding::from([4, 0]))
+            container(column![
+                text("No annotations yet.").size(12).color(Theme::TEXT_MUTED),
+                Space::with_height(4),
+                text("Select text in the editor, then add a comment with color and category.")
+                    .size(10)
+                    .color(Theme::TEXT_MUTED),
+            ])
+            .padding(Padding::from([4, 0])),
         );
     }
 
@@ -73,9 +71,12 @@ pub fn view(
     // Then resolved (dimmed)
     if resolved_count > 0 {
         list = list.push(
-            text(format!("\u{2500}\u{2500}\u{2500} Resolved ({}) \u{2500}\u{2500}\u{2500}", resolved_count))
-                .size(9)
-                .color(Theme::TEXT_MUTED)
+            text(format!(
+                "\u{2500}\u{2500}\u{2500} Resolved ({}) \u{2500}\u{2500}\u{2500}",
+                resolved_count
+            ))
+            .size(9)
+            .color(Theme::TEXT_MUTED),
         );
         for ann in annotations.iter().filter(|a| a.resolved) {
             list = list.push(render_annotation(ann));
@@ -103,10 +104,7 @@ pub fn view(
     ]
     .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }
 
 fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
@@ -134,12 +132,10 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
 
     // Color dot button - click to cycle to next color
     let color_btn: Element<'static, Message> = if !is_resolved {
-        button(
-            text(format!("{} ", status_icon)).size(12).color(color),
-        )
-        .on_press(Message::SetAnnotationColor(ann_id, next_color_label))
-        .padding(Padding::from([0, 2]))
-        .into()
+        button(text(format!("{} ", status_icon)).size(12).color(color))
+            .on_press(Message::SetAnnotationColor(ann_id, next_color_label))
+            .padding(Padding::from([0, 2]))
+            .into()
     } else {
         text(format!("{} ", status_icon)).size(12).color(color).into()
     };
@@ -147,23 +143,19 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
     // Category tag with dropdown-like buttons
     let category_display: Element<'static, Message> = if let Some(cat) = ann_category {
         // Show current category as clickable button to clear it
-        button(
-            text(format!("[{}]", cat)).size(9).color(Theme::TEXT_ACCENT),
-        )
-        .on_press(Message::SetAnnotationCategory(ann_id, String::new()))
-        .padding(Padding::from([0, 2]))
-        .into()
+        button(text(format!("[{}]", cat)).size(9).color(Theme::TEXT_ACCENT))
+            .on_press(Message::SetAnnotationCategory(ann_id, String::new()))
+            .padding(Padding::from([0, 2]))
+            .into()
     } else if !is_resolved {
         // Show category assignment buttons
         let mut cat_row = row![].spacing(2);
         for cat in &["Note", "Todo", "Question", "Research", "Continuity", "Revision"] {
             let cat_str = cat.to_string();
             cat_row = cat_row.push(
-                button(
-                    text(*cat).size(8).color(Theme::TEXT_MUTED),
-                )
-                .on_press(Message::SetAnnotationCategory(ann_id, cat_str))
-                .padding(Padding::from([0, 3])),
+                button(text(*cat).size(8).color(Theme::TEXT_MUTED))
+                    .on_press(Message::SetAnnotationCategory(ann_id, cat_str))
+                    .padding(Padding::from([0, 3])),
             );
         }
         cat_row.into()
@@ -183,19 +175,19 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
 
     // Author display
     let author_display: Element<'static, Message> = if !ann_author.is_empty() {
-        text(format!("by {}", ann_author)).size(8).color(Theme::TEXT_MUTED).into()
+        text(format!("by {}", ann_author))
+            .size(8)
+            .color(Theme::TEXT_MUTED)
+            .into()
     } else {
         Space::with_width(0).into()
     };
 
     // Annotation text display
-    let ann_text_el: Element<'static, Message> =
-        text(ann_text_str).size(12).color(text_color).into();
+    let ann_text_el: Element<'static, Message> = text(ann_text_str).size(12).color(text_color).into();
 
     // Color label
-    let color_label_el = text(color_label_str)
-        .size(8)
-        .color(color);
+    let color_label_el = text(color_label_str).size(8).color(color);
 
     container(
         column![
@@ -224,15 +216,13 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
                 .on_press(Message::ToggleAnnotationResolved(ann_id))
                 .padding(Padding::from([1, 4])),
                 Space::with_width(4),
-                button(
-                    text("\u{f00d}").size(9).color(Theme::ERROR),
-                )
-                .on_press(Message::DeleteAnnotation(ann_id))
-                .padding(Padding::from([1, 4])),
+                button(text("\u{f00d}").size(9).color(Theme::ERROR),)
+                    .on_press(Message::DeleteAnnotation(ann_id))
+                    .padding(Padding::from([1, 4])),
             ],
             category_display,
         ]
-        .spacing(2)
+        .spacing(2),
     )
     .padding(Padding::from([4, 8]))
     .into()

@@ -1,7 +1,7 @@
 #![allow(dead_code)] // Methods used by test code
-use std::path::Path;
 use anyhow::Result;
 use printpdf::*;
+use std::path::Path;
 
 use super::compiler::{CompileContent, CompileOptions};
 
@@ -21,8 +21,10 @@ pub fn save_pdf(contents: &[CompileContent], options: &CompileOptions, path: &Pa
     let line_height = options.font_size * 0.5;
     let margin_left = 25.0_f32;
     let page_width = 160.0_f32; // Usable width in mm
+                                // chars_per_line: approximate glyph count that fits in the usable page width.
+                                // Clamped to [1, 500] before casting to avoid overflow on very small font sizes.
     let chars_per_line = if options.font_size > 0.0 {
-        (page_width / (options.font_size * 0.2)) as usize
+        (page_width / (options.font_size * 0.2)).clamp(1.0, 500.0) as usize
     } else {
         80 // safe fallback when font_size is zero
     };
@@ -32,7 +34,7 @@ pub fn save_pdf(contents: &[CompileContent], options: &CompileOptions, path: &Pa
         current_layer.use_text(
             &options.title,
             options.font_size * 2.0,
-            Mm(105.0 - (options.title.len() as f32 * options.font_size * 0.5)),
+            Mm((105.0 - options.title.len() as f32 * options.font_size * 0.5).max(5.0)),
             Mm(200.0),
             &bold_font,
         );
@@ -41,7 +43,7 @@ pub fn save_pdf(contents: &[CompileContent], options: &CompileOptions, path: &Pa
             current_layer.use_text(
                 &options.author,
                 options.font_size,
-                Mm(105.0 - (options.author.len() as f32 * options.font_size * 0.25)),
+                Mm((105.0 - options.author.len() as f32 * options.font_size * 0.25).max(5.0)),
                 Mm(180.0),
                 &font,
             );
@@ -121,13 +123,7 @@ pub fn save_pdf(contents: &[CompileContent], options: &CompileOptions, path: &Pa
                         y_position = 270.0;
                     }
 
-                    current_layer.use_text(
-                        &current_line,
-                        options.font_size,
-                        Mm(margin_left),
-                        Mm(y_position),
-                        &font,
-                    );
+                    current_layer.use_text(&current_line, options.font_size, Mm(margin_left), Mm(y_position), &font);
                     y_position -= line_height;
                 }
             }
@@ -142,13 +138,7 @@ pub fn save_pdf(contents: &[CompileContent], options: &CompileOptions, path: &Pa
 
 /// Add a page number footer to the current layer
 fn add_page_number(layer: &PdfLayerReference, page_num: usize, font: &IndirectFontRef) {
-    layer.use_text(
-        format!("- {} -", page_num),
-        10.0,
-        Mm(100.0),
-        Mm(15.0),
-        font,
-    );
+    layer.use_text(format!("- {} -", page_num), 10.0, Mm(100.0), Mm(15.0), font);
 }
 
 /// Strip basic markdown formatting from text for PDF rendering

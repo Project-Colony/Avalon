@@ -20,9 +20,7 @@ pub struct TargetsData {
 
 /// Render the project targets panel (bottom panel)
 pub fn view(data: &TargetsData) -> Element<'static, Message> {
-    let header = text("PROJECT TARGETS")
-        .size(11)
-        .color(Theme::TEXT_SECONDARY);
+    let header = text("PROJECT TARGETS").size(11).color(Theme::TEXT_SECONDARY);
 
     // Project target progress
     let project_progress: Element<'static, Message> = if let Some(target) = data.project_target {
@@ -72,11 +70,9 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
                 .color(Theme::TEXT_PRIMARY),
             ],
             text(bar).size(12).color(progress_color),
-            row![
-                text(format!("~{}/{} pages", pages_done, pages_total))
-                    .size(10)
-                    .color(Theme::TEXT_MUTED),
-            ],
+            row![text(format!("~{}/{} pages", pages_done, pages_total))
+                .size(10)
+                .color(Theme::TEXT_MUTED),],
         ]
         .spacing(2)
         .into()
@@ -167,9 +163,10 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
                 ]
                 .into()
             }
-            (Some(days), _) if days <= 0 => {
-                text("\u{f071} Deadline has passed!").size(11).color(Theme::ERROR).into()
-            }
+            (Some(days), _) if days <= 0 => text("\u{f071} Deadline has passed!")
+                .size(11)
+                .color(Theme::ERROR)
+                .into(),
             _ => Space::with_height(0).into(),
         };
 
@@ -192,9 +189,7 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
 
     // Per-document target progress
     let doc_targets_section: Element<'static, Message> = if !data.doc_progress.is_empty() {
-        let mut doc_list = column![
-            text("DOCUMENT TARGETS").size(10).color(Theme::TEXT_MUTED),
-        ].spacing(2);
+        let mut doc_list = column![text("DOCUMENT TARGETS").size(10).color(Theme::TEXT_MUTED),].spacing(2);
 
         for (title, progress) in &data.doc_progress {
             let status_color = if progress.status.is_complete() {
@@ -205,15 +200,16 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
                 Theme::TEXT_SECONDARY
             };
             let bar = progress.progress_bar();
-            doc_list = doc_list.push(
-                row![
-                    text(title.clone()).size(10).color(Theme::TEXT_PRIMARY).width(Length::Fixed(120.0)),
-                    Space::with_width(4),
-                    text(bar).size(10).color(status_color),
-                    Space::with_width(4),
-                    text(progress.compact_display()).size(10).color(Theme::TEXT_MUTED),
-                ]
-            );
+            doc_list = doc_list.push(row![
+                text(title.clone())
+                    .size(10)
+                    .color(Theme::TEXT_PRIMARY)
+                    .width(Length::Fixed(120.0)),
+                Space::with_width(4),
+                text(bar).size(10).color(status_color),
+                Space::with_width(4),
+                text(progress.compact_display()).size(10).color(Theme::TEXT_MUTED),
+            ]);
         }
         scrollable(doc_list).height(Length::Fixed(80.0)).into()
     } else {
@@ -235,10 +231,7 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
     ]
     .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }
 
 fn format_number(n: usize) -> String {

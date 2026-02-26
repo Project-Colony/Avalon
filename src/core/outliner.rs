@@ -1,6 +1,6 @@
 #![allow(dead_code)] // Methods used by test code
-use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use uuid::Uuid;
 
 /// Columns available in the outliner view
@@ -99,27 +99,101 @@ impl OutlinerState {
         self.settings.sort_column = Some(column);
         self.settings.sort_ascending = ascending;
     }
-
 }
 
 /// Returns a sensible default set of columns for the outliner
 pub fn default_columns() -> Vec<ColumnConfig> {
     vec![
-        ColumnConfig { column: OutlinerColumn::Title, visible: true, width: 250.0, position: 0 },
-        ColumnConfig { column: OutlinerColumn::Synopsis, visible: true, width: 300.0, position: 1 },
-        ColumnConfig { column: OutlinerColumn::Label, visible: true, width: 100.0, position: 2 },
-        ColumnConfig { column: OutlinerColumn::Status, visible: true, width: 100.0, position: 3 },
-        ColumnConfig { column: OutlinerColumn::WordCount, visible: true, width: 80.0, position: 4 },
-        ColumnConfig { column: OutlinerColumn::CharCount, visible: false, width: 80.0, position: 5 },
-        ColumnConfig { column: OutlinerColumn::TargetWordCount, visible: false, width: 100.0, position: 6 },
-        ColumnConfig { column: OutlinerColumn::TargetProgress, visible: true, width: 100.0, position: 7 },
-        ColumnConfig { column: OutlinerColumn::DateCreated, visible: false, width: 140.0, position: 8 },
-        ColumnConfig { column: OutlinerColumn::DateModified, visible: true, width: 140.0, position: 9 },
-        ColumnConfig { column: OutlinerColumn::Section, visible: false, width: 100.0, position: 10 },
-        ColumnConfig { column: OutlinerColumn::IncludeInCompile, visible: true, width: 80.0, position: 11 },
-        ColumnConfig { column: OutlinerColumn::PageCount, visible: false, width: 80.0, position: 12 },
-        ColumnConfig { column: OutlinerColumn::ParagraphCount, visible: false, width: 80.0, position: 13 },
-        ColumnConfig { column: OutlinerColumn::WordFrequency, visible: false, width: 120.0, position: 14 },
+        ColumnConfig {
+            column: OutlinerColumn::Title,
+            visible: true,
+            width: 250.0,
+            position: 0,
+        },
+        ColumnConfig {
+            column: OutlinerColumn::Synopsis,
+            visible: true,
+            width: 300.0,
+            position: 1,
+        },
+        ColumnConfig {
+            column: OutlinerColumn::Label,
+            visible: true,
+            width: 100.0,
+            position: 2,
+        },
+        ColumnConfig {
+            column: OutlinerColumn::Status,
+            visible: true,
+            width: 100.0,
+            position: 3,
+        },
+        ColumnConfig {
+            column: OutlinerColumn::WordCount,
+            visible: true,
+            width: 80.0,
+            position: 4,
+        },
+        ColumnConfig {
+            column: OutlinerColumn::CharCount,
+            visible: false,
+            width: 80.0,
+            position: 5,
+        },
+        ColumnConfig {
+            column: OutlinerColumn::TargetWordCount,
+            visible: false,
+            width: 100.0,
+            position: 6,
+        },
+        ColumnConfig {
+            column: OutlinerColumn::TargetProgress,
+            visible: true,
+            width: 100.0,
+            position: 7,
+        },
+        ColumnConfig {
+            column: OutlinerColumn::DateCreated,
+            visible: false,
+            width: 140.0,
+            position: 8,
+        },
+        ColumnConfig {
+            column: OutlinerColumn::DateModified,
+            visible: true,
+            width: 140.0,
+            position: 9,
+        },
+        ColumnConfig {
+            column: OutlinerColumn::Section,
+            visible: false,
+            width: 100.0,
+            position: 10,
+        },
+        ColumnConfig {
+            column: OutlinerColumn::IncludeInCompile,
+            visible: true,
+            width: 80.0,
+            position: 11,
+        },
+        ColumnConfig {
+            column: OutlinerColumn::PageCount,
+            visible: false,
+            width: 80.0,
+            position: 12,
+        },
+        ColumnConfig {
+            column: OutlinerColumn::ParagraphCount,
+            visible: false,
+            width: 80.0,
+            position: 13,
+        },
+        ColumnConfig {
+            column: OutlinerColumn::WordFrequency,
+            visible: false,
+            width: 120.0,
+            position: 14,
+        },
     ]
 }
 
@@ -135,10 +209,7 @@ mod tests {
     }
 
     fn make_item_with_id(id: Uuid, children: Vec<OutlinerItem>) -> OutlinerItem {
-        OutlinerItem {
-            id,
-            children,
-        }
+        OutlinerItem { id, children }
     }
 
     fn default_settings() -> OutlinerSettings {
@@ -171,14 +242,8 @@ mod tests {
     fn test_expand_all() {
         let mut state = OutlinerState::new(default_settings());
         let items = vec![
-            make_item(vec![
-                make_item(vec![
-                    make_item(vec![]),
-                ]),
-            ]),
-            make_item(vec![
-                make_item(vec![]),
-            ]),
+            make_item(vec![make_item(vec![make_item(vec![])])]),
+            make_item(vec![make_item(vec![])]),
         ];
         state.expand_all(&items);
         // Should have expanded: Part 1, Ch 1, Part 2 (3 nodes with children)
@@ -236,11 +301,7 @@ mod tests {
     #[test]
     fn test_expand_collapse_roundtrip() {
         let mut state = OutlinerState::new(default_settings());
-        let items = vec![
-            make_item(vec![
-                make_item(vec![]),
-            ]),
-        ];
+        let items = vec![make_item(vec![make_item(vec![])])];
         state.expand_all(&items);
         assert_eq!(state.expanded.len(), 1);
 

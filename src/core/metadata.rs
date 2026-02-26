@@ -9,7 +9,6 @@ pub struct Metadata {
     pub keywords: Vec<String>,
 }
 
-
 /// Color-coded label for organizing items
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Label {
@@ -52,7 +51,6 @@ impl LabelColor {
         let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(128) as f32 / 255.0;
         iced::Color::from_rgb(r, g, b)
     }
-
 }
 
 /// Status of a document (e.g., "First Draft", "Revised", "Final")
@@ -63,9 +61,7 @@ pub struct Status {
 
 impl Status {
     pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-        }
+        Self { name: name.to_string() }
     }
 
     /// Default statuses
@@ -189,12 +185,30 @@ impl Default for ProjectSettings {
     fn default() -> Self {
         Self {
             labels: vec![
-                Label { name: "Concept".into(), color: LabelColor::Red },
-                Label { name: "Chapter".into(), color: LabelColor::Blue },
-                Label { name: "Scene".into(), color: LabelColor::Green },
-                Label { name: "Notes".into(), color: LabelColor::Yellow },
-                Label { name: "Character".into(), color: LabelColor::Purple },
-                Label { name: "Setting".into(), color: LabelColor::Orange },
+                Label {
+                    name: "Concept".into(),
+                    color: LabelColor::Red,
+                },
+                Label {
+                    name: "Chapter".into(),
+                    color: LabelColor::Blue,
+                },
+                Label {
+                    name: "Scene".into(),
+                    color: LabelColor::Green,
+                },
+                Label {
+                    name: "Notes".into(),
+                    color: LabelColor::Yellow,
+                },
+                Label {
+                    name: "Character".into(),
+                    color: LabelColor::Purple,
+                },
+                Label {
+                    name: "Setting".into(),
+                    color: LabelColor::Orange,
+                },
             ],
             statuses: Status::defaults(),
             editor_zoom: 1.0,
@@ -265,10 +279,7 @@ mod tests {
             CustomFieldValue::Text("hello".into()),
             CustomFieldValue::Text("hello".into())
         );
-        assert_ne!(
-            CustomFieldValue::Text("hello".into()),
-            CustomFieldValue::Number(0.0)
-        );
+        assert_ne!(CustomFieldValue::Text("hello".into()), CustomFieldValue::Number(0.0));
     }
 
     #[test]

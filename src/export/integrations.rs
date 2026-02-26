@@ -4,9 +4,7 @@
 //! statistics, and import modules into convenient workflows the GUI calls.
 
 use crate::core::binder::{Binder, BinderItem, BinderItemKind};
-use crate::export::compiler::{
-    CompileContent, CompileManifest, CompileOptions, CompileStatistics,
-};
+use crate::export::compiler::{CompileContent, CompileManifest, CompileOptions, CompileStatistics};
 
 // ---------------------------------------------------------------------------
 // Compile with statistics
@@ -42,12 +40,7 @@ fn collect_contents(binder: &Binder, options: &CompileOptions) -> Vec<CompileCon
     contents
 }
 
-fn collect_recursive(
-    item: &BinderItem,
-    options: &CompileOptions,
-    depth: usize,
-    contents: &mut Vec<CompileContent>,
-) {
+fn collect_recursive(item: &BinderItem, options: &CompileOptions, depth: usize, contents: &mut Vec<CompileContent>) {
     if options.compile_marked_only && !item.include_in_compile {
         return;
     }

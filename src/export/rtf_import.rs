@@ -26,13 +26,22 @@ pub fn extract_text_from_rtf(rtf: &str) -> String {
                 let rest = peek_control_word(&chars, i);
                 if matches!(
                     rest.as_str(),
-                    "\\fonttbl" | "\\colortbl" | "\\stylesheet" | "\\info"
-                        | "\\*" | "\\pict" | "\\header" | "\\footer"
-                        | "\\headerl" | "\\headerr" | "\\footerl" | "\\footerr"
-                )
-                    && skip_depth.is_none() {
-                        skip_depth = Some(depth);
-                    }
+                    "\\fonttbl"
+                        | "\\colortbl"
+                        | "\\stylesheet"
+                        | "\\info"
+                        | "\\*"
+                        | "\\pict"
+                        | "\\header"
+                        | "\\footer"
+                        | "\\headerl"
+                        | "\\headerr"
+                        | "\\footerl"
+                        | "\\footerr"
+                ) && skip_depth.is_none()
+                {
+                    skip_depth = Some(depth);
+                }
             }
             '}' => {
                 if skip_depth == Some(depth) {

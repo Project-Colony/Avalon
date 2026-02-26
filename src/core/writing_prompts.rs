@@ -413,11 +413,31 @@ fn build_prompt(category: PromptCategory, prompt_index: usize, text: &str) -> Wr
 // =============================================================================
 
 const CHARACTER_TRAITS: &[&str] = &[
-    "compassionate", "stubborn", "analytical", "impulsive", "charismatic",
-    "cautious", "optimistic", "cynical", "resourceful", "idealistic",
-    "pragmatic", "loyal", "rebellious", "meticulous", "adventurous",
-    "introverted", "generous", "ambitious", "patient", "witty",
-    "stoic", "empathetic", "cunning", "gentle", "fierce",
+    "compassionate",
+    "stubborn",
+    "analytical",
+    "impulsive",
+    "charismatic",
+    "cautious",
+    "optimistic",
+    "cynical",
+    "resourceful",
+    "idealistic",
+    "pragmatic",
+    "loyal",
+    "rebellious",
+    "meticulous",
+    "adventurous",
+    "introverted",
+    "generous",
+    "ambitious",
+    "patient",
+    "witty",
+    "stoic",
+    "empathetic",
+    "cunning",
+    "gentle",
+    "fierce",
 ];
 
 const CHARACTER_FLAWS: &[&str] = &[
@@ -439,13 +459,26 @@ const CHARACTER_FLAWS: &[&str] = &[
 ];
 
 const OCCUPATIONS: &[&str] = &[
-    "lighthouse keeper", "forensic botanist", "war correspondent",
-    "antiquarian bookseller", "storm chaser", "cryptographer",
-    "marine biologist", "puppeteer", "volcanologist",
-    "cartographer", "sommelier", "archivist",
-    "deep sea diver", "falconer", "glassblower",
-    "midwife", "taxidermist", "translator",
-    "clockmaker", "mycologist",
+    "lighthouse keeper",
+    "forensic botanist",
+    "war correspondent",
+    "antiquarian bookseller",
+    "storm chaser",
+    "cryptographer",
+    "marine biologist",
+    "puppeteer",
+    "volcanologist",
+    "cartographer",
+    "sommelier",
+    "archivist",
+    "deep sea diver",
+    "falconer",
+    "glassblower",
+    "midwife",
+    "taxidermist",
+    "translator",
+    "clockmaker",
+    "mycologist",
 ];
 
 const MOTIVATIONS: &[&str] = &[
@@ -462,9 +495,15 @@ const MOTIVATIONS: &[&str] = &[
 ];
 
 const AGE_RANGES: &[&str] = &[
-    "teenager (14-17)", "young adult (18-25)", "late twenties (26-30)",
-    "early thirties (31-35)", "late thirties (36-40)", "middle-aged (41-55)",
-    "mature adult (56-65)", "elderly (66-80)", "child (8-13)",
+    "teenager (14-17)",
+    "young adult (18-25)",
+    "late twenties (26-30)",
+    "early thirties (31-35)",
+    "late thirties (36-40)",
+    "middle-aged (41-55)",
+    "mature adult (56-65)",
+    "elderly (66-80)",
+    "child (8-13)",
     "early twenties (20-24)",
 ];
 
@@ -482,47 +521,118 @@ const BACKGROUND_HOOKS: &[&str] = &[
 ];
 
 const FIRST_NAMES_NEUTRAL: &[&str] = &[
-    "Alex", "Jordan", "Morgan", "Casey", "Riley",
-    "Avery", "Quinn", "Rowan", "Sage", "Emery",
-    "Dakota", "Reese", "Finley", "Hayden", "Skyler",
-    "Cameron", "Phoenix", "River", "Blair", "Ashton",
+    "Alex", "Jordan", "Morgan", "Casey", "Riley", "Avery", "Quinn", "Rowan", "Sage", "Emery", "Dakota", "Reese",
+    "Finley", "Hayden", "Skyler", "Cameron", "Phoenix", "River", "Blair", "Ashton",
 ];
 
 const FIRST_NAMES_MALE: &[&str] = &[
-    "James", "Marcus", "Oliver", "Elijah", "Sebastian",
-    "Theodore", "Felix", "Adrian", "Victor", "Julian",
-    "Leo", "Gabriel", "Arthur", "Henry", "Samuel",
-    "Dorian", "Lucian", "Cedric", "Roland", "Tristan",
+    "James",
+    "Marcus",
+    "Oliver",
+    "Elijah",
+    "Sebastian",
+    "Theodore",
+    "Felix",
+    "Adrian",
+    "Victor",
+    "Julian",
+    "Leo",
+    "Gabriel",
+    "Arthur",
+    "Henry",
+    "Samuel",
+    "Dorian",
+    "Lucian",
+    "Cedric",
+    "Roland",
+    "Tristan",
 ];
 
 const FIRST_NAMES_FEMALE: &[&str] = &[
-    "Eleanor", "Sophia", "Vivienne", "Cordelia", "Rosalind",
-    "Evangeline", "Seraphina", "Isolde", "Celeste", "Arabella",
-    "Lyra", "Aurora", "Helena", "Ophelia", "Linnea",
-    "Genevieve", "Amara", "Iris", "Thea", "Camille",
+    "Eleanor",
+    "Sophia",
+    "Vivienne",
+    "Cordelia",
+    "Rosalind",
+    "Evangeline",
+    "Seraphina",
+    "Isolde",
+    "Celeste",
+    "Arabella",
+    "Lyra",
+    "Aurora",
+    "Helena",
+    "Ophelia",
+    "Linnea",
+    "Genevieve",
+    "Amara",
+    "Iris",
+    "Thea",
+    "Camille",
 ];
 
 const LAST_NAMES: &[&str] = &[
-    "Ashford", "Blackwood", "Thornton", "Whitmore", "Hawthorne",
-    "Ravencroft", "Nightingale", "Silverstone", "Langley", "Winslow",
-    "Pemberton", "Fairfax", "Kingsley", "Aldridge", "Montague",
-    "Sinclair", "Whitfield", "Beaumont", "Lockhart", "Castleberry",
-    "Holloway", "Stirling", "Dunmore", "Ashworth", "Everett",
+    "Ashford",
+    "Blackwood",
+    "Thornton",
+    "Whitmore",
+    "Hawthorne",
+    "Ravencroft",
+    "Nightingale",
+    "Silverstone",
+    "Langley",
+    "Winslow",
+    "Pemberton",
+    "Fairfax",
+    "Kingsley",
+    "Aldridge",
+    "Montague",
+    "Sinclair",
+    "Whitfield",
+    "Beaumont",
+    "Lockhart",
+    "Castleberry",
+    "Holloway",
+    "Stirling",
+    "Dunmore",
+    "Ashworth",
+    "Everett",
 ];
 
 const NAME_ORIGINS: &[&str] = &[
-    "English", "French", "Germanic", "Celtic", "Latin",
-    "Greek", "Scandinavian", "Italian", "Spanish", "Slavic",
+    "English",
+    "French",
+    "Germanic",
+    "Celtic",
+    "Latin",
+    "Greek",
+    "Scandinavian",
+    "Italian",
+    "Spanish",
+    "Slavic",
 ];
 
 const NAME_MEANINGS: &[&str] = &[
-    "protector of the people", "born of fire", "keeper of secrets",
-    "gentle strength", "wanderer of paths", "light bringer",
-    "steadfast heart", "voice of reason", "storm caller",
-    "child of the forest", "dawn's herald", "silver-tongued",
-    "sword bearer", "peace weaver", "star watcher",
-    "stone guardian", "river dancer", "shadow walker",
-    "flame keeper", "wind singer",
+    "protector of the people",
+    "born of fire",
+    "keeper of secrets",
+    "gentle strength",
+    "wanderer of paths",
+    "light bringer",
+    "steadfast heart",
+    "voice of reason",
+    "storm caller",
+    "child of the forest",
+    "dawn's herald",
+    "silver-tongued",
+    "sword bearer",
+    "peace weaver",
+    "star watcher",
+    "stone guardian",
+    "river dancer",
+    "shadow walker",
+    "flame keeper",
+    "wind singer",
 ];
 
 // =============================================================================
@@ -530,9 +640,18 @@ const NAME_MEANINGS: &[&str] = &[
 // =============================================================================
 
 const GENRES: &[&str] = &[
-    "Literary Fiction", "Science Fiction", "Fantasy", "Mystery",
-    "Thriller", "Horror", "Romance", "Historical Fiction",
-    "Dystopian", "Magical Realism", "Gothic", "Western",
+    "Literary Fiction",
+    "Science Fiction",
+    "Fantasy",
+    "Mystery",
+    "Thriller",
+    "Horror",
+    "Romance",
+    "Historical Fiction",
+    "Dystopian",
+    "Magical Realism",
+    "Gothic",
+    "Western",
 ];
 
 const PROTAGONIST_TYPES: &[&str] = &[
@@ -588,10 +707,15 @@ const CENTRAL_CONFLICTS: &[&str] = &[
 ];
 
 const THEMES: &[&str] = &[
-    "the cost of power", "identity and belonging", "the nature of truth",
-    "forgiveness and redemption", "the tension between duty and desire",
-    "what it means to be human", "the legacy we leave behind",
-    "the boundaries of loyalty", "freedom versus security",
+    "the cost of power",
+    "identity and belonging",
+    "the nature of truth",
+    "forgiveness and redemption",
+    "the tension between duty and desire",
+    "what it means to be human",
+    "the legacy we leave behind",
+    "the boundaries of loyalty",
+    "freedom versus security",
     "the stories we tell ourselves to survive",
 ];
 
@@ -693,15 +817,9 @@ pub fn generate_name(seed: u64, gender: Option<&str>) -> NameSuggestion {
     let s3 = next_seed(s2);
 
     let first_name = match gender {
-        Some("male") | Some("m") => {
-            FIRST_NAMES_MALE[simple_hash(s0, FIRST_NAMES_MALE.len())].to_string()
-        }
-        Some("female") | Some("f") => {
-            FIRST_NAMES_FEMALE[simple_hash(s0, FIRST_NAMES_FEMALE.len())].to_string()
-        }
-        _ => {
-            FIRST_NAMES_NEUTRAL[simple_hash(s0, FIRST_NAMES_NEUTRAL.len())].to_string()
-        }
+        Some("male") | Some("m") => FIRST_NAMES_MALE[simple_hash(s0, FIRST_NAMES_MALE.len())].to_string(),
+        Some("female") | Some("f") => FIRST_NAMES_FEMALE[simple_hash(s0, FIRST_NAMES_FEMALE.len())].to_string(),
+        _ => FIRST_NAMES_NEUTRAL[simple_hash(s0, FIRST_NAMES_NEUTRAL.len())].to_string(),
     };
 
     let last_name = LAST_NAMES[simple_hash(s1, LAST_NAMES.len())].to_string();
@@ -737,7 +855,9 @@ pub fn daily_prompt(day_offset: u32) -> WritingPrompt {
 /// Return writing exercises filtered by difficulty level
 pub fn writing_exercises(difficulty: Difficulty) -> Vec<WritingExercise> {
     let all = all_exercises();
-    all.into_iter().filter(|e| exercise_difficulty(e) == difficulty).collect()
+    all.into_iter()
+        .filter(|e| exercise_difficulty(e) == difficulty)
+        .collect()
 }
 
 fn exercise_difficulty(exercise: &WritingExercise) -> Difficulty {
@@ -974,7 +1094,11 @@ mod tests {
     #[test]
     fn test_all_prompts_for_category_freewrite() {
         let prompts = all_prompts_for_category(PromptCategory::FreeWrite);
-        assert!(prompts.len() >= 5, "Expected at least 5 freewrite prompts, got {}", prompts.len());
+        assert!(
+            prompts.len() >= 5,
+            "Expected at least 5 freewrite prompts, got {}",
+            prompts.len()
+        );
         for p in &prompts {
             assert_eq!(p.category, PromptCategory::FreeWrite);
         }
@@ -1038,7 +1162,12 @@ mod tests {
     fn test_generate_character_name_has_two_parts() {
         let c = generate_character(55);
         let parts: Vec<&str> = c.name_suggestion.split_whitespace().collect();
-        assert_eq!(parts.len(), 2, "Character name should be first + last: {}", c.name_suggestion);
+        assert_eq!(
+            parts.len(),
+            2,
+            "Character name should be first + last: {}",
+            c.name_suggestion
+        );
     }
 
     #[test]
@@ -1095,15 +1224,21 @@ mod tests {
     #[test]
     fn test_generate_name_male() {
         let name = generate_name(42, Some("male"));
-        assert!(FIRST_NAMES_MALE.contains(&name.first_name.as_str()),
-            "Expected male name, got {}", name.first_name);
+        assert!(
+            FIRST_NAMES_MALE.contains(&name.first_name.as_str()),
+            "Expected male name, got {}",
+            name.first_name
+        );
     }
 
     #[test]
     fn test_generate_name_female() {
         let name = generate_name(42, Some("female"));
-        assert!(FIRST_NAMES_FEMALE.contains(&name.first_name.as_str()),
-            "Expected female name, got {}", name.first_name);
+        assert!(
+            FIRST_NAMES_FEMALE.contains(&name.first_name.as_str()),
+            "Expected female name, got {}",
+            name.first_name
+        );
     }
 
     #[test]
@@ -1128,9 +1263,15 @@ mod tests {
 
     #[test]
     fn test_name_data_counts() {
-        assert!(FIRST_NAMES_NEUTRAL.len() + FIRST_NAMES_MALE.len() + FIRST_NAMES_FEMALE.len() >= 30,
-            "Expected at least 30 total first names");
-        assert!(LAST_NAMES.len() >= 20, "Expected at least 20 last names, got {}", LAST_NAMES.len());
+        assert!(
+            FIRST_NAMES_NEUTRAL.len() + FIRST_NAMES_MALE.len() + FIRST_NAMES_FEMALE.len() >= 30,
+            "Expected at least 30 total first names"
+        );
+        assert!(
+            LAST_NAMES.len() >= 20,
+            "Expected at least 20 last names, got {}",
+            LAST_NAMES.len()
+        );
     }
 
     // --- Daily prompt tests ---
@@ -1338,7 +1479,12 @@ mod tests {
     fn test_simple_hash_in_range() {
         for seed in 0..100 {
             let result = simple_hash(seed, 10);
-            assert!(result < 10, "simple_hash({}, 10) = {} which is out of range", seed, result);
+            assert!(
+                result < 10,
+                "simple_hash({}, 10) = {} which is out of range",
+                seed,
+                result
+            );
         }
     }
 
@@ -1378,12 +1524,20 @@ mod tests {
 
     #[test]
     fn test_character_traits_count() {
-        assert!(CHARACTER_TRAITS.len() >= 20, "Expected at least 20 character traits, got {}", CHARACTER_TRAITS.len());
+        assert!(
+            CHARACTER_TRAITS.len() >= 20,
+            "Expected at least 20 character traits, got {}",
+            CHARACTER_TRAITS.len()
+        );
     }
 
     #[test]
     fn test_occupations_count() {
-        assert!(OCCUPATIONS.len() >= 15, "Expected at least 15 occupations, got {}", OCCUPATIONS.len());
+        assert!(
+            OCCUPATIONS.len() >= 15,
+            "Expected at least 15 occupations, got {}",
+            OCCUPATIONS.len()
+        );
     }
 
     // --- Edge case tests ---
@@ -1408,8 +1562,14 @@ mod tests {
         let beginner = estimated_words_for_category(cat, Difficulty::Beginner);
         let intermediate = estimated_words_for_category(cat, Difficulty::Intermediate);
         let advanced = estimated_words_for_category(cat, Difficulty::Advanced);
-        assert!(beginner < intermediate, "Intermediate should have more words than beginner");
-        assert!(intermediate < advanced, "Advanced should have more words than intermediate");
+        assert!(
+            beginner < intermediate,
+            "Intermediate should have more words than beginner"
+        );
+        assert!(
+            intermediate < advanced,
+            "Advanced should have more words than intermediate"
+        );
     }
 
     #[test]

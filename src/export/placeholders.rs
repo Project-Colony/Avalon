@@ -1,5 +1,5 @@
-use std::fmt::Write as _;
 use chrono::Utc;
+use std::fmt::Write as _;
 
 /// Replace placeholders in compiled text with actual values.
 /// Scrivener-compatible placeholder syntax: <$placeholder>
@@ -43,9 +43,12 @@ pub fn replace_placeholders(text: &str, context: &PlaceholderContext) -> String 
     }
 
     // Auto-numbering requires per-line stateful processing
-    let has_numbering = result.contains("<$n>") || result.contains("<$N>")
-        || result.contains("<$W>") || result.contains("<$sn>")
-        || result.contains("<$fn>") || result.contains("<$pagebreak>");
+    let has_numbering = result.contains("<$n>")
+        || result.contains("<$N>")
+        || result.contains("<$W>")
+        || result.contains("<$sn>")
+        || result.contains("<$fn>")
+        || result.contains("<$pagebreak>");
 
     if !has_numbering {
         return result;
@@ -55,36 +58,39 @@ pub fn replace_placeholders(text: &str, context: &PlaceholderContext) -> String 
     let mut section_num = 0;
     let mut figure_num = 0;
 
-    let lines: Vec<String> = result.lines().map(|l| {
-        let mut line = l.to_string();
-        if line.contains("<$n>") {
-            chapter_num += 1;
-            section_num = 0;
-            line = line.replace("<$n>", &chapter_num.to_string());
-        }
-        if line.contains("<$N>") {
-            chapter_num += 1;
-            section_num = 0;
-            line = line.replace("<$N>", &to_roman(chapter_num));
-        }
-        if line.contains("<$W>") {
-            chapter_num += 1;
-            section_num = 0;
-            line = line.replace("<$W>", &to_word(chapter_num));
-        }
-        if line.contains("<$sn>") {
-            section_num += 1;
-            line = line.replace("<$sn>", &format!("{}.{}", chapter_num, section_num));
-        }
-        if line.contains("<$fn>") {
-            figure_num += 1;
-            line = line.replace("<$fn>", &figure_num.to_string());
-        }
-        if line.contains("<$pagebreak>") {
-            line = line.replace("<$pagebreak>", "\n---\n");
-        }
-        line
-    }).collect();
+    let lines: Vec<String> = result
+        .lines()
+        .map(|l| {
+            let mut line = l.to_string();
+            if line.contains("<$n>") {
+                chapter_num += 1;
+                section_num = 0;
+                line = line.replace("<$n>", &chapter_num.to_string());
+            }
+            if line.contains("<$N>") {
+                chapter_num += 1;
+                section_num = 0;
+                line = line.replace("<$N>", &to_roman(chapter_num));
+            }
+            if line.contains("<$W>") {
+                chapter_num += 1;
+                section_num = 0;
+                line = line.replace("<$W>", &to_word(chapter_num));
+            }
+            if line.contains("<$sn>") {
+                section_num += 1;
+                line = line.replace("<$sn>", &format!("{}.{}", chapter_num, section_num));
+            }
+            if line.contains("<$fn>") {
+                figure_num += 1;
+                line = line.replace("<$fn>", &figure_num.to_string());
+            }
+            if line.contains("<$pagebreak>") {
+                line = line.replace("<$pagebreak>", "\n---\n");
+            }
+            line
+        })
+        .collect();
 
     lines.join("\n")
 }
@@ -98,7 +104,7 @@ pub fn generate_toc(sections: &[(String, usize)]) -> String {
     for (i, (title, depth)) in sections.iter().enumerate() {
         let indent = "  ".repeat(*depth);
         let num = i + 1;
-        let _ = writeln!(toc,"{}{}.  {}", indent, num, title);
+        writeln!(toc, "{}{}.  {}", indent, num, title).unwrap();
     }
     toc.push('\n');
     toc
@@ -111,9 +117,13 @@ pub fn generate_toc_markdown(sections: &[(String, usize)]) -> String {
 
     for (title, depth) in sections {
         let indent = "  ".repeat(*depth);
-        let slug = title.to_lowercase().replace(' ', "-")
-            .chars().filter(|c| c.is_alphanumeric() || *c == '-').collect::<String>();
-        let _ = writeln!(toc,"{}- [{}](#{})", indent, title, slug);
+        let slug = title
+            .to_lowercase()
+            .replace(' ', "-")
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '-')
+            .collect::<String>();
+        writeln!(toc, "{}- [{}](#{})", indent, title, slug).unwrap();
     }
     toc.push('\n');
     toc
@@ -125,9 +135,13 @@ pub fn generate_toc_html(sections: &[(String, usize)]) -> String {
     toc.push_str("<nav class=\"toc\">\n<h2>Table of Contents</h2>\n<ul>\n");
 
     for (title, _depth) in sections {
-        let slug = title.to_lowercase().replace(' ', "-")
-            .chars().filter(|c| c.is_alphanumeric() || *c == '-').collect::<String>();
-        let _ = writeln!(toc,"  <li><a href=\"#{}\">{}</a></li>", slug, title);
+        let slug = title
+            .to_lowercase()
+            .replace(' ', "-")
+            .chars()
+            .filter(|c| c.is_alphanumeric() || *c == '-')
+            .collect::<String>();
+        writeln!(toc, "  <li><a href=\"#{}\">{}</a></li>", slug, title).unwrap();
     }
 
     toc.push_str("</ul>\n</nav>\n");
@@ -151,15 +165,24 @@ impl PlaceholderContext {
     pub fn forename(&self) -> String {
         self.author.split_whitespace().next().unwrap_or("").to_string()
     }
-
 }
 
 /// Convert a number to Roman numerals
 fn to_roman(num: usize) -> String {
     let values = [
-        (1000, "M"), (900, "CM"), (500, "D"), (400, "CD"),
-        (100, "C"), (90, "XC"), (50, "L"), (40, "XL"),
-        (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I"),
+        (1000, "M"),
+        (900, "CM"),
+        (500, "D"),
+        (400, "CD"),
+        (100, "C"),
+        (90, "XC"),
+        (50, "L"),
+        (40, "XL"),
+        (10, "X"),
+        (9, "IX"),
+        (5, "V"),
+        (4, "IV"),
+        (1, "I"),
     ];
     let mut result = String::new();
     let mut n = num;
@@ -295,10 +318,7 @@ mod tests {
 
     #[test]
     fn test_generate_toc() {
-        let sections = vec![
-            ("Chapter 1".to_string(), 0),
-            ("Scene 1".to_string(), 1),
-        ];
+        let sections = vec![("Chapter 1".to_string(), 0), ("Scene 1".to_string(), 1)];
         let toc = generate_toc(&sections);
         assert!(toc.contains("Table of Contents"));
         assert!(toc.contains("1.  Chapter 1"));
