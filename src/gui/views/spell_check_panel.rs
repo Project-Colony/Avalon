@@ -16,13 +16,15 @@ pub fn view(
     let status_text = if spell_active { "Active" } else { "Inactive" };
 
     let header_row = row![
-        text("SPELL CHECK")
-            .size(11)
-            .color(Theme::TEXT_SECONDARY),
+        text("SPELL CHECK").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(8),
         text(format!("{} {}", status_icon, status_text))
             .size(10)
-            .color(if spell_active { Theme::SUCCESS } else { Theme::TEXT_MUTED }),
+            .color(if spell_active {
+                Theme::SUCCESS
+            } else {
+                Theme::TEXT_MUTED
+            }),
         Space::with_width(8),
         text(format!("Dictionary: {} words", format_number(dict_size)))
             .size(10)
@@ -40,19 +42,15 @@ pub fn view(
         .on_press(Message::ToggleSpellChecker)
         .padding(Padding::from([2, 8])),
         Space::with_width(4),
-        button(
-            text("\u{f021} Re-check").size(10).color(Theme::TEXT_ACCENT),
-        )
-        .on_press(Message::RunSpellCheck)
-        .padding(Padding::from([2, 8])),
+        button(text("\u{f021} Re-check").size(10).color(Theme::TEXT_ACCENT),)
+            .on_press(Message::RunSpellCheck)
+            .padding(Padding::from([2, 8])),
     ];
 
     // Summary line
     let summary = if results.is_empty() {
         if spell_active {
-            text("\u{f00c} No spelling errors found")
-                .size(11)
-                .color(Theme::SUCCESS)
+            text("\u{f00c} No spelling errors found").size(11).color(Theme::SUCCESS)
         } else {
             text("Enable spell checker to scan document")
                 .size(11)
@@ -95,9 +93,7 @@ pub fn view(
                 .size(12)
                 .color(iced::Color::from_rgb(0.9, 0.3, 0.3)),
             Space::with_width(2),
-            text(format!("@{}", position))
-                .size(9)
-                .color(Theme::TEXT_MUTED),
+            text(format!("@{}", position)).size(9).color(Theme::TEXT_MUTED),
             Space::with_width(4),
             text("\u{f061}").size(11).color(Theme::TEXT_MUTED),
             Space::with_width(4),
@@ -105,35 +101,23 @@ pub fn view(
         .spacing(4);
 
         if result.suggestions.is_empty() {
-            result_row = result_row.push(
-                text("(no suggestions)")
-                    .size(11)
-                    .color(Theme::TEXT_MUTED),
-            );
+            result_row = result_row.push(text("(no suggestions)").size(11).color(Theme::TEXT_MUTED));
         } else {
             for suggestion in &result.suggestions {
                 let misspelled = word.clone();
                 result_row = result_row.push(
-                    button(
-                        text(suggestion.clone()).size(11).color(Theme::TEXT_ACCENT),
-                    )
-                    .on_press(Message::SpellCheckReplace(
-                        position,
-                        misspelled,
-                        suggestion.clone(),
-                    ))
-                    .padding(Padding::from([1, 4])),
+                    button(text(suggestion.clone()).size(11).color(Theme::TEXT_ACCENT))
+                        .on_press(Message::SpellCheckReplace(position, misspelled, suggestion.clone()))
+                        .padding(Padding::from([1, 4])),
                 );
             }
         }
 
         result_row = result_row.push(Space::with_width(Length::Fill));
         result_row = result_row.push(
-            button(
-                text("+ Dict").size(10).color(Theme::TEXT_SECONDARY),
-            )
-            .on_press(Message::SpellCheckAddWord(word))
-            .padding(Padding::from([1, 6])),
+            button(text("+ Dict").size(10).color(Theme::TEXT_SECONDARY))
+                .on_press(Message::SpellCheckAddWord(word))
+                .padding(Padding::from([1, 6])),
         );
 
         result_list = result_list.push(result_row);
@@ -150,11 +134,9 @@ pub fn view(
         for word in user_dict_words.iter().take(15) {
             let w = word.clone();
             dict_row = dict_row.push(
-                button(
-                    text(format!("{} \u{f00d}", word)).size(9).color(Theme::TEXT_MUTED),
-                )
-                .on_press(Message::SpellCheckRemoveWord(w))
-                .padding(Padding::from([0, 3])),
+                button(text(format!("{} \u{f00d}", word)).size(9).color(Theme::TEXT_MUTED))
+                    .on_press(Message::SpellCheckRemoveWord(w))
+                    .padding(Padding::from([0, 3])),
             );
         }
 
@@ -168,11 +150,9 @@ pub fn view(
 
         dict_row = dict_row.push(Space::with_width(Length::Fill));
         dict_row = dict_row.push(
-            button(
-                text("Clear all").size(9).color(Theme::ERROR),
-            )
-            .on_press(Message::SpellCheckClearDict)
-            .padding(Padding::from([0, 4])),
+            button(text("Clear all").size(9).color(Theme::ERROR))
+                .on_press(Message::SpellCheckClearDict)
+                .padding(Padding::from([0, 4])),
         );
 
         dict_row.into()
@@ -185,9 +165,7 @@ pub fn view(
             .size(9)
             .color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
-        text("Shortcut: F7")
-            .size(9)
-            .color(Theme::TEXT_MUTED),
+        text("Shortcut: F7").size(9).color(Theme::TEXT_MUTED),
     ];
 
     let content = column![
@@ -203,10 +181,7 @@ pub fn view(
     ]
     .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }
 
 fn format_number(n: usize) -> String {

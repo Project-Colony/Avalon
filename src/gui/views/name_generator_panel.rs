@@ -13,9 +13,7 @@ pub fn view(generated_names: &[String]) -> Element<'static, Message> {
     };
 
     let header = row![
-        text("NAME GENERATOR")
-            .size(11)
-            .color(Theme::TEXT_SECONDARY),
+        text("NAME GENERATOR").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(Length::Fill),
         text(count_text).size(10).color(Theme::TEXT_MUTED),
     ];
@@ -80,11 +78,9 @@ pub fn view(generated_names: &[String]) -> Element<'static, Message> {
                 .width(Length::Fixed(24.0)),
             text(name_owned.clone()).size(13).color(Theme::TEXT_PRIMARY),
             Space::with_width(Length::Fill),
-            button(
-                text("Insert").size(10).color(Theme::TEXT_ACCENT),
-            )
-            .on_press(Message::InsertSynonym(name_owned))
-            .padding(Padding::from([2, 6])),
+            button(text("Insert").size(10).color(Theme::TEXT_ACCENT),)
+                .on_press(Message::InsertSynonym(name_owned))
+                .padding(Padding::from([2, 6])),
         ]
         .align_y(iced::Alignment::Center);
         names_list = names_list.push(name_row);
@@ -111,17 +107,12 @@ pub fn view(generated_names: &[String]) -> Element<'static, Message> {
     ]
     .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }
 
 fn gen_button(label: &str, message: Message) -> Element<'static, Message> {
-    button(
-        text(label.to_string()).size(11).color(Theme::TEXT_PRIMARY),
-    )
-    .on_press(message)
-    .padding(Padding::from([3, 7]))
-    .into()
+    button(text(label.to_string()).size(11).color(Theme::TEXT_PRIMARY))
+        .on_press(message)
+        .padding(Padding::from([3, 7]))
+        .into()
 }

@@ -1,6 +1,6 @@
 #![allow(dead_code)] // Methods used by test code
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 /// Colors for revision passes (Scrivener uses 5 distinct colors).
@@ -8,11 +8,11 @@ use uuid::Uuid;
 /// can visually distinguish which edits belong to which editing round.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RevisionColor {
-    Red,      // Pass 1
-    Blue,     // Pass 2
-    Green,    // Pass 3
-    Orange,   // Pass 4
-    Purple,   // Pass 5
+    Red,    // Pass 1
+    Blue,   // Pass 2
+    Green,  // Pass 3
+    Orange, // Pass 4
+    Purple, // Pass 5
 }
 
 impl RevisionColor {
@@ -71,9 +71,9 @@ impl RevisionColor {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RevisionPass {
     pub id: Uuid,
-    pub number: usize,        // Pass 1, 2, 3, etc.
+    pub number: usize, // Pass 1, 2, 3, etc.
     pub color: RevisionColor,
-    pub label: String,         // e.g., "First Draft Review", "Copy Edit"
+    pub label: String, // e.g., "First Draft Review", "Copy Edit"
     pub created_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
     pub notes: String,
@@ -198,10 +198,7 @@ impl RevisionTracker {
     /// if no pass is active.
     pub fn active_pass_color(&self) -> Option<RevisionColor> {
         let active_id = self.active_pass.as_ref()?;
-        self.passes
-            .iter()
-            .find(|p| &p.id == active_id)
-            .map(|p| p.color)
+        self.passes.iter().find(|p| &p.id == active_id).map(|p| p.color)
     }
 
     /// Add a revision mark (tracked change) to the currently active pass.
@@ -241,10 +238,7 @@ impl RevisionTracker {
 
     /// Return all marks whose ranges overlap with the given `[start, end)` range.
     pub fn marks_in_range(&self, start: usize, end: usize) -> Vec<&RevisionMark> {
-        self.marks
-            .iter()
-            .filter(|m| m.start < end && m.end > start)
-            .collect()
+        self.marks.iter().filter(|m| m.start < end && m.end > start).collect()
     }
 
     /// Accept a single mark by removing it from the tracker.
@@ -429,9 +423,7 @@ mod tests {
     #[test]
     fn test_start_multiple_passes_color_cycle() {
         let mut tracker = RevisionTracker::new();
-        let labels = [
-            "Pass 1", "Pass 2", "Pass 3", "Pass 4", "Pass 5", "Pass 6",
-        ];
+        let labels = ["Pass 1", "Pass 2", "Pass 3", "Pass 4", "Pass 5", "Pass 6"];
         let expected_colors = [
             RevisionColor::Red,
             RevisionColor::Blue,
@@ -529,13 +521,7 @@ mod tests {
         let mut tracker = RevisionTracker::new();
         tracker.start_new_pass("Edit");
 
-        let mark_id = tracker.add_mark(
-            RevisionMarkKind::Insertion,
-            10,
-            10,
-            "",
-            "inserted text",
-        );
+        let mark_id = tracker.add_mark(RevisionMarkKind::Insertion, 10, 10, "", "inserted text");
         assert!(mark_id.is_some());
         assert_eq!(tracker.mark_count(), 1);
     }
@@ -544,13 +530,7 @@ mod tests {
     fn test_add_mark_without_active_pass() {
         let mut tracker = RevisionTracker::new();
         // Revision mode is off and no active pass
-        let mark_id = tracker.add_mark(
-            RevisionMarkKind::Insertion,
-            0,
-            0,
-            "",
-            "text",
-        );
+        let mark_id = tracker.add_mark(RevisionMarkKind::Insertion, 0, 0, "", "text");
         assert!(mark_id.is_none());
         assert_eq!(tracker.mark_count(), 0);
     }
@@ -561,13 +541,7 @@ mod tests {
         tracker.start_new_pass("Edit");
         tracker.toggle_revision_mode(); // Turn off
 
-        let mark_id = tracker.add_mark(
-            RevisionMarkKind::Deletion,
-            5,
-            15,
-            "deleted",
-            "",
-        );
+        let mark_id = tracker.add_mark(RevisionMarkKind::Deletion, 5, 15, "deleted", "");
         assert!(mark_id.is_none());
     }
 

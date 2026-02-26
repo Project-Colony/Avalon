@@ -1,31 +1,30 @@
+use chrono::{NaiveDate, Utc};
+use iced::keyboard;
+use iced::widget::{column, container, row, stack, text, Space};
+use iced::window;
+use iced::{Element, Length, Padding, Subscription, Task as IcedTask};
 use std::collections::HashMap;
 use std::fmt::Write;
-use std::path::PathBuf;
-use iced::keyboard;
-use iced::widget::{column, container, row, stack, text, text_editor, Space};
-use iced::{Element, Length, Padding, Subscription, Task as IcedTask};
-use iced::window;
 use uuid::Uuid;
-use chrono::{NaiveDate, Utc};
 
-use crate::core::{PROJECTS_DIR_NAME, OUTPUT_DIR_NAME, IMPORT_DIR_NAME};
 use crate::core::binder::{BinderItem, BinderItemKind};
 use crate::core::find_replace::{self, FindReplaceOptions};
 use crate::core::integrations::ProjectState;
 use crate::core::project::Project;
 use crate::core::search::{self, SearchOptions};
 use crate::core::stats::{SessionStats, Statistics};
+use crate::core::{IMPORT_DIR_NAME, OUTPUT_DIR_NAME, PROJECTS_DIR_NAME};
 use crate::editor::EditorState;
 use crate::export::compiler::{CompileOptions, OutputFormat, SeparatorType};
 use crate::spelling::SpellChecker;
 use crate::thesaurus::Thesaurus;
 
+use super::helpers;
 use super::theme::Theme;
 use super::views;
-use super::helpers;
 
 // Re-export message types from the extracted module
-pub use super::messages::{Message, ViewMode, BottomPanel, ToolbarMenu, SettingsTab};
+pub use super::messages::{BottomPanel, Message, SettingsTab, ToolbarMenu, ViewMode};
 
 // ========== Timing constants ==========
 /// How often (in auto-save ticks) to check word count milestones
@@ -293,26 +292,24 @@ impl ScrineverApp {
 
     /// Get the current total word count for session tracking
     fn current_word_count(&self) -> usize {
-        self.project.as_ref()
-            .map_or(0, |p| p.binder.total_word_count())
+        self.project.as_ref().map_or(0, |p| p.binder.total_word_count())
     }
 
     /// Insert markdown-style wrapping markup (e.g., ** for bold)
     fn insert_markdown_wrap(&mut self, marker: &str) {
         let wrap = format!("{}text{}", marker, marker);
-        self.editor.content.perform(
-            iced::widget::text_editor::Action::Edit(
-                iced::widget::text_editor::Edit::Paste(
-                    std::sync::Arc::new(wrap)
-                )
-            )
-        );
+        self.editor.content.perform(iced::widget::text_editor::Action::Edit(
+            iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(wrap)),
+        ));
         self.editor.mark_dirty();
     }
 
     pub fn update(&mut self, message: Message) -> IcedTask<Message> {
         // Close toolbar menu on any action except menu toggle itself and ticks
-        if !matches!(message, Message::ToggleToolbarMenu(_) | Message::CloseToolbarMenu | Message::Tick | Message::EscapePressed) {
+        if !matches!(
+            message,
+            Message::ToggleToolbarMenu(_) | Message::CloseToolbarMenu | Message::Tick | Message::EscapePressed
+        ) {
             self.active_toolbar_menu = None;
         }
 
@@ -358,7 +355,9 @@ impl ScrineverApp {
                         if let Ok(entries) = std::fs::read_dir(&projects_dir) {
                             for entry in entries.flatten() {
                                 let path = entry.path();
-                                if path.is_dir() && path.extension().is_some_and(|e| e == crate::core::PROJECT_EXTENSION) {
+                                if path.is_dir()
+                                    && path.extension().is_some_and(|e| e == crate::core::PROJECT_EXTENSION)
+                                {
                                     if let Ok(p) = Project::load(&path) {
                                         return Box::new(Some(p));
                                     }
@@ -401,16 +400,15 @@ impl ScrineverApp {
                     // Initialize word count milestone to current project word count
                     let total_words = p.binder.total_word_count();
                     let milestones = [1000, 5000, 10000, 25000, 50000, 75000, 100000, 150000, 200000];
-                    self.last_milestone = milestones.iter().rev()
+                    self.last_milestone = milestones
+                        .iter()
+                        .rev()
                         .find(|&&m| total_words >= m)
                         .copied()
                         .unwrap_or(0);
                     // Initialize project subsystems (search index, file watcher)
                     self.project_state = ProjectState::new();
-                    self.project_state.on_project_load(
-                        &p.binder,
-                        p.path.as_deref(),
-                    );
+                    self.project_state.on_project_load(&p.binder, p.path.as_deref());
                     let title = p.title.clone();
                     self.project = Some(p);
                     self.selected_item = None;
@@ -420,7 +418,8 @@ impl ScrineverApp {
                 } else {
                     self.notification = Some(format!(
                         "No .{} projects found in ~/{}/",
-                        crate::core::PROJECT_EXTENSION, PROJECTS_DIR_NAME
+                        crate::core::PROJECT_EXTENSION,
+                        PROJECTS_DIR_NAME
                     ));
                 }
             }
@@ -543,9 +542,16 @@ impl ScrineverApp {
                 }
             }
 
-            Message::MoveItem { item_id, target_id, position } => {
+            Message::MoveItem {
+                item_id,
+                target_id,
+                position,
+            } => {
                 if let Some(ref mut project) = self.project {
-                    if let Some(item) = project.binder.draft.remove_child(&item_id)
+                    if let Some(item) = project
+                        .binder
+                        .draft
+                        .remove_child(&item_id)
                         .or_else(|| project.binder.research.remove_child(&item_id))
                     {
                         if let Some(target) = project.binder.find_item_mut(&target_id) {
@@ -603,7 +609,9 @@ impl ScrineverApp {
                 self.sync_editor_to_project();
                 if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
                     let split_content = {
-                        project.binder.find_item(&item_id)
+                        project
+                            .binder
+                            .find_item(&item_id)
                             .and_then(|item| item.document.as_ref())
                             .map(|doc| doc.content.clone())
                     };
@@ -612,8 +620,7 @@ impl ScrineverApp {
                         // Find a char-boundary-safe midpoint
                         let byte_mid = content.len() / 2;
                         let mid = content.ceil_char_boundary(byte_mid);
-                        let split_pos = content[mid..].find("\n\n")
-                            .map_or(mid, |p| p + mid);
+                        let split_pos = content[mid..].find("\n\n").map_or(mid, |p| p + mid);
 
                         if split_pos > 0 && split_pos < content.len() {
                             let first_half = content[..split_pos].to_string();
@@ -646,7 +653,9 @@ impl ScrineverApp {
             Message::MergeIntoParent => {
                 if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
                     let merged = {
-                        project.binder.find_item(&item_id)
+                        project
+                            .binder
+                            .find_item(&item_id)
                             .filter(|item| item.kind == BinderItemKind::Folder && !item.children.is_empty())
                             .map(|item| (item.title.clone(), item.merge_children_content()))
                     };
@@ -708,11 +717,15 @@ impl ScrineverApp {
                             // Record revision marks when revision mode is active
                             if delta > 0 {
                                 self.project_state.record_insertion(
-                                    cursor_before, cursor_before + delta as usize, &new_text[cursor_before..cursor_before + delta as usize],
+                                    cursor_before,
+                                    cursor_before + delta as usize,
+                                    &new_text[cursor_before..cursor_before + delta as usize],
                                 );
                             } else if delta < 0 {
                                 self.project_state.record_deletion(
-                                    cursor_before, cursor_before + (-delta) as usize, "",
+                                    cursor_before,
+                                    cursor_before + (-delta) as usize,
+                                    "",
                                 );
                             }
 
@@ -721,7 +734,8 @@ impl ScrineverApp {
                             let content = item.document.as_ref().map_or("", |d| d.content.as_str()).to_string();
                             let notes = item.document.as_ref().map_or("", |d| d.notes.as_str()).to_string();
                             let synopsis = item.synopsis.clone();
-                            self.project_state.on_document_edit(item_id, &title, &content, &notes, &synopsis);
+                            self.project_state
+                                .on_document_edit(item_id, &title, &content, &notes, &synopsis);
                         }
                     }
                 }
@@ -732,7 +746,8 @@ impl ScrineverApp {
                 // Set up corkboard layout when switching to corkboard view
                 if *mode == ViewMode::Corkboard {
                     if let Some(ref project) = self.project {
-                        let parent = self.selected_item
+                        let parent = self
+                            .selected_item
                             .and_then(|id| project.binder.find_item(&id))
                             .unwrap_or(&project.binder.draft);
                         let item_ids: Vec<Uuid> = parent.children.iter().map(|c| c.id).collect();
@@ -832,10 +847,7 @@ impl ScrineverApp {
                     use crate::export::integrations;
 
                     // Generate compile stats for logging
-                    let compile_result = integrations::compile_with_stats(
-                        &project.binder,
-                        &self.compile_options,
-                    );
+                    let compile_result = integrations::compile_with_stats(&project.binder, &self.compile_options);
                     log::info!(
                         "Compile: {} words, {} sections, {} validation issues",
                         compile_result.statistics.total_words,
@@ -968,7 +980,7 @@ impl ScrineverApp {
                     };
 
                     let mut count = 0;
-                    for item in project.binder.all_items_mut() {
+                    project.binder.for_each_item_mut(|item| {
                         if let Some(ref mut doc) = item.document {
                             let (new_content, replacements) = find_replace::replace_in_text(&doc.content, &options);
                             if replacements > 0 {
@@ -976,7 +988,7 @@ impl ScrineverApp {
                                 doc.content = new_content;
                             }
                         }
-                    }
+                    });
 
                     // Reload current editor
                     if let Some(item_id) = self.selected_item {
@@ -1013,13 +1025,9 @@ impl ScrineverApp {
             }
 
             Message::InsertSynonym(word) => {
-                self.editor.content.perform(
-                    iced::widget::text_editor::Action::Edit(
-                        iced::widget::text_editor::Edit::Paste(
-                            std::sync::Arc::new(word)
-                        )
-                    )
-                );
+                self.editor.content.perform(iced::widget::text_editor::Action::Edit(
+                    iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(word)),
+                ));
                 self.editor.mark_dirty();
             }
 
@@ -1066,9 +1074,7 @@ impl ScrineverApp {
                         if label_name == "None" {
                             item.metadata.label = None;
                         } else {
-                            let label = project.settings.labels.iter()
-                                .find(|l| l.name == label_name)
-                                .cloned();
+                            let label = project.settings.labels.iter().find(|l| l.name == label_name).cloned();
                             item.metadata.label = label;
                         }
                     }
@@ -1100,7 +1106,12 @@ impl ScrineverApp {
             Message::HideSettings | Message::CloseSettingsWindow => {
                 // Persist settings by saving the project
                 if let Some(ref mut project) = self.project {
-                    if let Some(parent) = project.path.as_deref().and_then(|p| p.parent()).map(|p| p.to_path_buf()) {
+                    if let Some(parent) = project
+                        .path
+                        .as_deref()
+                        .and_then(|p| p.parent())
+                        .map(|p| p.to_path_buf())
+                    {
                         if let Err(e) = project.save(&parent) {
                             self.notification = Some(format!("Settings save failed: {}", e));
                         }
@@ -1309,10 +1320,12 @@ impl ScrineverApp {
 
             Message::SettingsSetUIScale(val) => {
                 if let Ok(scale) = val.parse::<f32>() {
-                    if (0.5..=3.0).contains(&scale) {
-                        if let Some(ref mut project) = self.project {
-                            project.settings.ui_scale = scale;
-                        }
+                    let clamped = scale.clamp(0.5, 3.0);
+                    if let Some(ref mut project) = self.project {
+                        project.settings.ui_scale = clamped;
+                    }
+                    if (clamped - scale).abs() > f32::EPSILON {
+                        log::warn!("UI scale {:.2} clamped to {:.2}", scale, clamped);
                     }
                 }
             }
@@ -1424,11 +1437,9 @@ impl ScrineverApp {
                             for entry in entries.flatten() {
                                 let path = entry.path();
                                 if path.is_file() {
-                                    let ext = path.extension()
-                                        .and_then(|e| e.to_str())
-                                        .unwrap_or("")
-                                        .to_lowercase();
-                                    let title = path.file_stem()
+                                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                                    let title = path
+                                        .file_stem()
                                         .and_then(|s| s.to_str())
                                         .unwrap_or("Imported")
                                         .to_string();
@@ -1436,7 +1447,8 @@ impl ScrineverApp {
                                         "md" | "markdown" => {
                                             if let Ok(content) = std::fs::read_to_string(&path) {
                                                 // Use structured Markdown import (headings -> folders/docs)
-                                                match crate::export::markdown_import::import_markdown(&content, &title) {
+                                                match crate::export::markdown_import::import_markdown(&content, &title)
+                                                {
                                                     Ok(items) => {
                                                         for item in items {
                                                             project.binder.draft.add_child(item);
@@ -1477,7 +1489,8 @@ impl ScrineverApp {
                                                     }
                                                     _ => {
                                                         // Fallback to plain text conversion
-                                                        let plain = crate::export::web_import::html_to_plain_text(&content);
+                                                        let plain =
+                                                            crate::export::web_import::html_to_plain_text(&content);
                                                         let mut item = BinderItem::new_text(&title);
                                                         if let Some(ref mut doc) = item.document {
                                                             doc.content = plain;
@@ -1545,7 +1558,8 @@ impl ScrineverApp {
                                                     }
                                                     project.binder.draft.add_child(item);
                                                     count += 1;
-                                                    self.notification = Some(format!("DOCX import error for '{}': {}", title, e));
+                                                    self.notification =
+                                                        Some(format!("DOCX import error for '{}': {}", title, e));
                                                 }
                                             }
                                         }
@@ -1553,25 +1567,19 @@ impl ScrineverApp {
                                     }
                                 } else if path.is_dir() {
                                     // Handle directory-based formats (e.g. Scrivener .scriv packages)
-                                    let ext = path.extension()
-                                        .and_then(|e| e.to_str())
-                                        .unwrap_or("")
-                                        .to_lowercase();
-                                    match ext.as_str() {
-                                        "scriv" => {
-                                            match crate::export::scriv_import::import_scriv(&path) {
-                                                Ok((_info, items)) => {
-                                                    for item in items {
-                                                        project.binder.draft.add_child(item);
-                                                        count += 1;
-                                                    }
-                                                }
-                                                Err(e) => {
-                                                    self.notification = Some(format!("Scrivener import error: {}", e));
+                                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+                                    if ext.as_str() == "scriv" {
+                                        match crate::export::scriv_import::import_scriv(&path) {
+                                            Ok((_info, items)) => {
+                                                for item in items {
+                                                    project.binder.draft.add_child(item);
+                                                    count += 1;
                                                 }
                                             }
+                                            Err(e) => {
+                                                self.notification = Some(format!("Scrivener import error: {}", e));
+                                            }
                                         }
-                                        _ => {}
                                     }
                                 }
                             }
@@ -1583,7 +1591,12 @@ impl ScrineverApp {
                         }
                     } else {
                         match std::fs::create_dir_all(&import_dir) {
-                            Ok(_) => self.notification = Some(format!("Created ~/{0}/ — place files there and import again.", IMPORT_DIR_NAME)),
+                            Ok(_) => {
+                                self.notification = Some(format!(
+                                    "Created ~/{0}/ — place files there and import again.",
+                                    IMPORT_DIR_NAME
+                                ))
+                            }
                             Err(e) => self.notification = Some(format!("Failed to create import dir: {}", e)),
                         }
                     }
@@ -1655,7 +1668,9 @@ impl ScrineverApp {
             // ========== Bookmarks ==========
             Message::ToggleBookmark(item_id) => {
                 if let Some(ref mut project) = self.project {
-                    let name = project.binder.find_item(&item_id)
+                    let name = project
+                        .binder
+                        .find_item(&item_id)
                         .map_or_else(String::new, |i| i.title.clone());
                     project.bookmarks.toggle(item_id, &name);
                 }
@@ -1672,7 +1687,9 @@ impl ScrineverApp {
                         if let Some(item) = project.binder.find_item_mut(&item_id) {
                             if let Some(ref mut doc) = item.document {
                                 // Use selection range if available, otherwise use cursor position
-                                let (start, end) = self.editor.selection_range()
+                                let (start, end) = self
+                                    .editor
+                                    .selection_range()
                                     .unwrap_or((self.editor.cursor, self.editor.cursor));
                                 let mut ann = crate::core::annotation::Annotation::with_color(
                                     start,
@@ -1848,23 +1865,21 @@ impl ScrineverApp {
             }
 
             // ========== Recent projects ==========
-            Message::OpenRecentProject(path) => {
-                match Project::load(&path) {
-                    Ok(p) => {
-                        self.compile_options.title = p.title.clone();
-                        self.project_notes_text = p.project_notes.clone();
-                        self.generated_names.clear();
-                        self.recent_projects.add(&p.title, path);
-                        self.recent_projects.save();
-                        self.project = Some(p);
-                        self.selected_item = None;
-                        self.editor = EditorState::new();
-                    }
-                    Err(e) => {
-                        self.notification = Some(format!("Load error: {}", e));
-                    }
+            Message::OpenRecentProject(path) => match Project::load(&path) {
+                Ok(p) => {
+                    self.compile_options.title = p.title.clone();
+                    self.project_notes_text = p.project_notes.clone();
+                    self.generated_names.clear();
+                    self.recent_projects.add(&p.title, path);
+                    self.recent_projects.save();
+                    self.project = Some(p);
+                    self.selected_item = None;
+                    self.editor = EditorState::new();
                 }
-            }
+                Err(e) => {
+                    self.notification = Some(format!("Load error: {}", e));
+                }
+            },
 
             // ========== Keywords ==========
             Message::SetItemKeywords(id, keywords_str) => {
@@ -1966,7 +1981,8 @@ impl ScrineverApp {
                                     use_regex: self.doc_find_use_regex,
                                     ..Default::default()
                                 };
-                                if let Some((new_text, _loc)) = find_replace::replace_next(&doc.content, &options, pos) {
+                                if let Some((new_text, _loc)) = find_replace::replace_next(&doc.content, &options, pos)
+                                {
                                     doc.content = new_text;
                                     self.editor.load_document(doc);
                                     self.editor.mark_dirty();
@@ -1974,13 +1990,13 @@ impl ScrineverApp {
                                     let matches = find_replace::find_in_text(&doc.content, &options);
                                     self.doc_find_positions = matches.iter().map(|m| m.start).collect();
                                     self.doc_find_match_count = self.doc_find_positions.len();
-                                    if self.doc_find_current_match >= self.doc_find_positions.len() && !self.doc_find_positions.is_empty() {
+                                    if self.doc_find_current_match >= self.doc_find_positions.len()
+                                        && !self.doc_find_positions.is_empty()
+                                    {
                                         self.doc_find_current_match = 0;
                                     }
-                                    self.notification = Some(format!(
-                                        "Replaced match. {} remaining",
-                                        self.doc_find_positions.len()
-                                    ));
+                                    self.notification =
+                                        Some(format!("Replaced match. {} remaining", self.doc_find_positions.len()));
                                 }
                             }
                         }
@@ -2063,10 +2079,11 @@ impl ScrineverApp {
                 } else {
                     self.current_script_element = None;
                 }
-                self.notification = Some(
-                    if self.script_mode { "Script mode enabled".to_string() }
-                    else { "Script mode disabled".to_string() }
-                );
+                self.notification = Some(if self.script_mode {
+                    "Script mode enabled".to_string()
+                } else {
+                    "Script mode disabled".to_string()
+                });
             }
 
             Message::SetScriptElement(element_name) => {
@@ -2101,13 +2118,9 @@ impl ScrineverApp {
                 if let Some(ref project) = self.project {
                     if let Some(target_item) = project.binder.find_item(&target_id) {
                         let link_text = format!("[[{}]]", target_item.title);
-                        self.editor.content.perform(
-                            iced::widget::text_editor::Action::Edit(
-                                iced::widget::text_editor::Edit::Paste(
-                                    std::sync::Arc::new(link_text)
-                                )
-                            )
-                        );
+                        self.editor.content.perform(iced::widget::text_editor::Action::Edit(
+                            iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(link_text)),
+                        ));
                         self.editor.mark_dirty();
                         self.notification = Some(format!("Linked to '{}'", target_item.title));
                     }
@@ -2134,37 +2147,25 @@ impl ScrineverApp {
             Message::InsertHeading(level) => {
                 let prefix = "#".repeat(level as usize);
                 let markup = format!("{} ", prefix);
-                self.editor.content.perform(
-                    iced::widget::text_editor::Action::Edit(
-                        iced::widget::text_editor::Edit::Paste(
-                            std::sync::Arc::new(markup)
-                        )
-                    )
-                );
+                self.editor.content.perform(iced::widget::text_editor::Action::Edit(
+                    iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(markup)),
+                ));
                 self.editor.mark_dirty();
             }
 
             Message::InsertBlockQuote => {
-                self.editor.content.perform(
-                    iced::widget::text_editor::Action::Edit(
-                        iced::widget::text_editor::Edit::Paste(
-                            std::sync::Arc::new("> ".to_string())
-                        )
-                    )
-                );
+                self.editor.content.perform(iced::widget::text_editor::Action::Edit(
+                    iced::widget::text_editor::Edit::Paste(std::sync::Arc::new("> ".to_string())),
+                ));
                 self.editor.mark_dirty();
             }
 
             Message::InsertFootnote => {
                 self.footnote_counter += 1;
                 let marker = format!("[^{}]", self.footnote_counter);
-                self.editor.content.perform(
-                    iced::widget::text_editor::Action::Edit(
-                        iced::widget::text_editor::Edit::Paste(
-                            std::sync::Arc::new(marker.clone())
-                        )
-                    )
-                );
+                self.editor.content.perform(iced::widget::text_editor::Action::Edit(
+                    iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(marker.clone())),
+                ));
                 self.editor.mark_dirty();
                 // Add footnote to document
                 if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
@@ -2182,13 +2183,9 @@ impl ScrineverApp {
             }
 
             Message::InsertHRule => {
-                self.editor.content.perform(
-                    iced::widget::text_editor::Action::Edit(
-                        iced::widget::text_editor::Edit::Paste(
-                            std::sync::Arc::new("\n---\n".to_string())
-                        )
-                    )
-                );
+                self.editor.content.perform(iced::widget::text_editor::Action::Edit(
+                    iced::widget::text_editor::Edit::Paste(std::sync::Arc::new("\n---\n".to_string())),
+                ));
                 self.editor.mark_dirty();
             }
 
@@ -2250,10 +2247,11 @@ impl ScrineverApp {
             // ========== Composition Mode ==========
             Message::ToggleCompositionMode => {
                 self.composition_mode = !self.composition_mode;
-                self.notification = Some(
-                    if self.composition_mode { "Composition mode enabled".to_string() }
-                    else { "Composition mode disabled".to_string() }
-                );
+                self.notification = Some(if self.composition_mode {
+                    "Composition mode enabled".to_string()
+                } else {
+                    "Composition mode disabled".to_string()
+                });
             }
 
             // ========== Copy special ==========
@@ -2280,7 +2278,8 @@ impl ScrineverApp {
                             let html = format!(
                                 "<html><body><h1>{}</h1>\n{}</body></html>",
                                 item.title,
-                                doc.content.split("\n\n")
+                                doc.content
+                                    .split("\n\n")
                                     .map(|p| format!("<p>{}</p>", p.replace('\n', "<br>")))
                                     .collect::<Vec<_>>()
                                     .join("\n")
@@ -2334,7 +2333,10 @@ impl ScrineverApp {
                     if let Some(ref path) = project.path {
                         match crate::core::backup::BackupManager::create_backup(path) {
                             Ok(backup_path) => {
-                                self.notification = Some(format!("Backup created: {:?}", backup_path.file_name().unwrap_or_default()));
+                                self.notification = Some(format!(
+                                    "Backup created: {:?}",
+                                    backup_path.file_name().unwrap_or_default()
+                                ));
                             }
                             Err(e) => {
                                 self.notification = Some(format!("Backup error: {}", e));
@@ -2385,10 +2387,7 @@ impl ScrineverApp {
                             for entry in entries.flatten() {
                                 let path = entry.path();
                                 if path.is_file() {
-                                    let ext = path.extension()
-                                        .and_then(|e| e.to_str())
-                                        .unwrap_or("")
-                                        .to_lowercase();
+                                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
                                     if ext == "opml" {
                                         if let Ok(content) = std::fs::read_to_string(&path) {
                                             match crate::export::opml::import_opml(&content) {
@@ -2417,7 +2416,8 @@ impl ScrineverApp {
                                         }
                                     } else if ext == "html" || ext == "htm" {
                                         if let Ok(content) = std::fs::read_to_string(&path) {
-                                            let title = path.file_stem()
+                                            let title = path
+                                                .file_stem()
                                                 .and_then(|s| s.to_str())
                                                 .unwrap_or("Imported HTML")
                                                 .to_string();
@@ -2441,7 +2441,12 @@ impl ScrineverApp {
                         }
                     } else {
                         match std::fs::create_dir_all(&import_dir) {
-                            Ok(_) => self.notification = Some(format!("Created ~/{0}/ — place files there and import again.", IMPORT_DIR_NAME)),
+                            Ok(_) => {
+                                self.notification = Some(format!(
+                                    "Created ~/{0}/ — place files there and import again.",
+                                    IMPORT_DIR_NAME
+                                ))
+                            }
                             Err(e) => self.notification = Some(format!("Failed to create import dir: {}", e)),
                         }
                     }
@@ -2489,16 +2494,14 @@ impl ScrineverApp {
                     let output_path = output_dir.join(&filename);
 
                     match crate::export::opml::export_opml(&project.binder, &project.title) {
-                        Ok(opml_content) => {
-                            match std::fs::write(&output_path, opml_content) {
-                                Ok(_) => {
-                                    self.notification = Some(format!("OPML exported to {:?}", output_path));
-                                }
-                                Err(e) => {
-                                    self.notification = Some(format!("Export error: {}", e));
-                                }
+                        Ok(opml_content) => match std::fs::write(&output_path, opml_content) {
+                            Ok(_) => {
+                                self.notification = Some(format!("OPML exported to {:?}", output_path));
                             }
-                        }
+                            Err(e) => {
+                                self.notification = Some(format!("Export error: {}", e));
+                            }
+                        },
                         Err(e) => {
                             self.notification = Some(format!("OPML error: {}", e));
                         }
@@ -2521,7 +2524,10 @@ impl ScrineverApp {
                                 depth: 0,
                             }];
 
-                            let opts = CompileOptions { title: item.title.clone(), ..CompileOptions::default() };
+                            let opts = CompileOptions {
+                                title: item.title.clone(),
+                                ..CompileOptions::default()
+                            };
                             let home = crate::core::home_dir_or_cwd();
                             let print_path = home.join(PROJECTS_DIR_NAME).join("print.pdf");
                             if let Some(parent) = print_path.parent() {
@@ -2548,11 +2554,13 @@ impl ScrineverApp {
                     let mut opts = self.compile_options.clone();
                     opts.format = crate::export::compiler::OutputFormat::Pdf;
                     let home = crate::core::home_dir_or_cwd();
-                    let print_path = home.join(PROJECTS_DIR_NAME).join(format!("{}_print.pdf", project.title));
+                    let print_path = home
+                        .join(PROJECTS_DIR_NAME)
+                        .join(format!("{}_print.pdf", project.title));
                     if let Some(parent) = print_path.parent() {
                         if let Err(e) = std::fs::create_dir_all(parent) {
-                                    log::warn!("Failed to create directory {:?}: {}", parent, e);
-                                }
+                            log::warn!("Failed to create directory {:?}: {}", parent, e);
+                        }
                     }
                     match crate::export::compiler::Compiler::save_to_file(&project.binder, &opts, &print_path) {
                         Ok(_) => {
@@ -2586,7 +2594,8 @@ impl ScrineverApp {
 
             Message::SpellCheckAddWord(word) => {
                 self.spell_checker.add_to_dictionary(&word);
-                self.spell_check_results.retain(|r| r.word.to_lowercase() != word.to_lowercase());
+                self.spell_check_results
+                    .retain(|r| r.word.to_lowercase() != word.to_lowercase());
                 if let Err(e) = self.spell_checker.save_user_dictionary() {
                     self.notification = Some(format!("Added \"{}\" but failed to save dictionary: {}", word, e));
                 } else {
@@ -2607,26 +2616,23 @@ impl ScrineverApp {
                                 doc.content.ceil_char_boundary(position.min(doc.content.len()))
                             };
                             if safe_pos < doc.content.len() {
-                            if let Some(start) = doc.content[safe_pos..].find(&misspelled) {
-                                let actual_pos = safe_pos + start;
-                                let end_pos = actual_pos + misspelled.len();
-                                doc.content = format!(
-                                    "{}{}{}",
-                                    &doc.content[..actual_pos],
-                                    replacement,
-                                    &doc.content[end_pos..]
-                                );
-                                // Reload editor with updated content
-                                self.editor.load_document(doc);
-                                self.notification = Some(format!(
-                                    "Replaced \"{}\" with \"{}\"",
-                                    misspelled, replacement
-                                ));
-                                // Remove this entry from results
-                                self.spell_check_results.retain(|r| {
-                                    !(r.word == misspelled && r.position == position)
-                                });
-                            }
+                                if let Some(start) = doc.content[safe_pos..].find(&misspelled) {
+                                    let actual_pos = safe_pos + start;
+                                    let end_pos = actual_pos + misspelled.len();
+                                    doc.content = format!(
+                                        "{}{}{}",
+                                        &doc.content[..actual_pos],
+                                        replacement,
+                                        &doc.content[end_pos..]
+                                    );
+                                    // Reload editor with updated content
+                                    self.editor.load_document(doc);
+                                    self.notification =
+                                        Some(format!("Replaced \"{}\" with \"{}\"", misspelled, replacement));
+                                    // Remove this entry from results
+                                    self.spell_check_results
+                                        .retain(|r| !(r.word == misspelled && r.position == position));
+                                }
                             } // safe_pos < doc.content.len()
                         }
                     }
@@ -2673,7 +2679,8 @@ impl ScrineverApp {
             Message::AddCustomField(id, field_name) => {
                 if let Some(ref mut project) = self.project {
                     if let Some(item) = project.binder.find_item_mut(&id) {
-                        if !field_name.is_empty() && !item.metadata.custom_metadata.iter().any(|f| f.name == field_name) {
+                        if !field_name.is_empty() && !item.metadata.custom_metadata.iter().any(|f| f.name == field_name)
+                        {
                             item.metadata.custom_metadata.push(crate::core::metadata::CustomField {
                                 name: field_name.clone(),
                                 value: crate::core::metadata::CustomFieldValue::Text(String::new()),
@@ -2708,7 +2715,12 @@ impl ScrineverApp {
                 if let Some(ref mut project) = self.project {
                     let mut updates = Vec::new();
                     for (i, coll) in project.collections.iter().enumerate() {
-                        if let crate::core::collection::CollectionKind::Search { ref query, case_sensitive, whole_word } = coll.kind {
+                        if let crate::core::collection::CollectionKind::Search {
+                            ref query,
+                            case_sensitive,
+                            whole_word,
+                        } = coll.kind
+                        {
                             let options = crate::core::search::SearchOptions {
                                 query: query.clone(),
                                 case_sensitive,
@@ -2826,13 +2838,9 @@ impl ScrineverApp {
                     "checkbox" => "- [ ] ",
                     _ => "- ",
                 };
-                self.editor.content.perform(
-                    iced::widget::text_editor::Action::Edit(
-                        iced::widget::text_editor::Edit::Paste(
-                            std::sync::Arc::new(format!("\n{}", prefix))
-                        )
-                    )
-                );
+                self.editor.content.perform(iced::widget::text_editor::Action::Edit(
+                    iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(format!("\n{}", prefix))),
+                ));
                 self.editor.mark_dirty();
             }
 
@@ -2858,13 +2866,9 @@ impl ScrineverApp {
                     }
                     table.push('\n');
                 }
-                self.editor.content.perform(
-                    iced::widget::text_editor::Action::Edit(
-                        iced::widget::text_editor::Edit::Paste(
-                            std::sync::Arc::new(table)
-                        )
-                    )
-                );
+                self.editor.content.perform(iced::widget::text_editor::Action::Edit(
+                    iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(table)),
+                ));
                 self.editor.mark_dirty();
             }
 
@@ -2874,35 +2878,25 @@ impl ScrineverApp {
                 } else {
                     format!("\n```{}\n\n```\n", lang)
                 };
-                self.editor.content.perform(
-                    iced::widget::text_editor::Action::Edit(
-                        iced::widget::text_editor::Edit::Paste(
-                            std::sync::Arc::new(block)
-                        )
-                    )
-                );
+                self.editor.content.perform(iced::widget::text_editor::Action::Edit(
+                    iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(block)),
+                ));
                 self.editor.mark_dirty();
             }
 
             Message::InsertPageBreak => {
-                self.editor.content.perform(
-                    iced::widget::text_editor::Action::Edit(
-                        iced::widget::text_editor::Edit::Paste(
-                            std::sync::Arc::new("\n\n---\n\n<!-- page break -->\n\n".to_string())
-                        )
-                    )
-                );
+                self.editor.content.perform(iced::widget::text_editor::Action::Edit(
+                    iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(
+                        "\n\n---\n\n<!-- page break -->\n\n".to_string(),
+                    )),
+                ));
                 self.editor.mark_dirty();
             }
 
             Message::InsertComment => {
-                self.editor.content.perform(
-                    iced::widget::text_editor::Action::Edit(
-                        iced::widget::text_editor::Edit::Paste(
-                            std::sync::Arc::new("<!-- comment -->".to_string())
-                        )
-                    )
-                );
+                self.editor.content.perform(iced::widget::text_editor::Action::Edit(
+                    iced::widget::text_editor::Edit::Paste(std::sync::Arc::new("<!-- comment -->".to_string())),
+                ));
                 self.editor.mark_dirty();
             }
 
@@ -2915,37 +2909,25 @@ impl ScrineverApp {
                     _ => DateTimeFormat::DateOnly,
                 };
                 let text = fmt.format_now();
-                self.editor.content.perform(
-                    iced::widget::text_editor::Action::Edit(
-                        iced::widget::text_editor::Edit::Paste(
-                            std::sync::Arc::new(text)
-                        )
-                    )
-                );
+                self.editor.content.perform(iced::widget::text_editor::Action::Edit(
+                    iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(text)),
+                ));
                 self.editor.mark_dirty();
             }
 
             Message::InsertLink => {
                 let link_text = "[link text](url)";
-                self.editor.content.perform(
-                    iced::widget::text_editor::Action::Edit(
-                        iced::widget::text_editor::Edit::Paste(
-                            std::sync::Arc::new(link_text.to_string())
-                        )
-                    )
-                );
+                self.editor.content.perform(iced::widget::text_editor::Action::Edit(
+                    iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(link_text.to_string())),
+                ));
                 self.editor.mark_dirty();
             }
 
             Message::InsertImage => {
                 let image_text = "![alt text](image_path)";
-                self.editor.content.perform(
-                    iced::widget::text_editor::Action::Edit(
-                        iced::widget::text_editor::Edit::Paste(
-                            std::sync::Arc::new(image_text.to_string())
-                        )
-                    )
-                );
+                self.editor.content.perform(iced::widget::text_editor::Action::Edit(
+                    iced::widget::text_editor::Edit::Paste(std::sync::Arc::new(image_text.to_string())),
+                ));
                 self.editor.mark_dirty();
             }
 
@@ -3037,9 +3019,7 @@ impl ScrineverApp {
             }
             Message::GenerateWritingPromptCategory(cat_name) => {
                 use crate::core::writing_prompts::PromptCategory;
-                let category = PromptCategory::all().iter()
-                    .find(|c| c.label() == cat_name)
-                    .copied();
+                let category = PromptCategory::all().iter().find(|c| c.label() == cat_name).copied();
                 if let Some(cat) = category {
                     self.writing_prompts_data.generate_prompt(Some(cat));
                 } else {
@@ -3079,152 +3059,7 @@ impl ScrineverApp {
             // ========== Linguistic analysis ==========
             // ========== Misc ==========
             Message::Tick => {
-                // Auto-save
-                if self.project.is_some() && self.editor.dirty {
-                    self.auto_save_counter += 1;
-                    let interval = self.project.as_ref()
-                        .map(|p| p.settings.auto_save_seconds)
-                        .unwrap_or(30);
-                    if interval > 0 && self.auto_save_counter >= interval {
-                        self.auto_save_counter = 0;
-                        self.sync_editor_to_project();
-                        if let Some(ref mut project) = self.project {
-                            let home = crate::core::home_dir_or_cwd();
-                            let save_dir = home.join(PROJECTS_DIR_NAME);
-                            if project.save(&save_dir).is_ok() {
-                                self.editor.mark_clean();
-                                // Auto-backup on save (every 10th auto-save)
-                                if let Some(ref path) = project.path {
-                                    if let Err(e) = crate::core::backup::BackupManager::create_backup(path) {
-                                        log::warn!("Auto-backup failed: {}", e);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Word count milestone detection
-                if self.auto_save_counter % MILESTONE_CHECK_INTERVAL == 0 {
-                    if let Some(ref project) = self.project {
-                        let total_words = project.binder.total_word_count();
-                        let milestones = [1000, 5000, 10000, 25000, 50000, 75000, 100000, 150000, 200000];
-                        for &m in &milestones {
-                            if total_words >= m && self.last_milestone < m {
-                                self.last_milestone = m;
-                                let label = if m >= 1000 { format!("{}k", m / 1000) } else { m.to_string() };
-                                self.notification = Some(format!(
-                                    "\u{f005} Milestone: {} words! Keep writing!",
-                                    label
-                                ));
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                // Writing session timer
-                if self.session_active {
-                    let current_words = self.current_word_count();
-                    let word_delta = current_words as i64 - self.session_start_word_count as i64;
-                    let prev_words = self.session_stats.words_written;
-                    self.session_stats.update(word_delta, self.session_stats.time_elapsed_seconds + 1);
-
-                    // Check session goal milestone
-                    if self.session_goal > 0 {
-                        let new_words = self.session_stats.words_written;
-                        let goal = self.session_goal as i64;
-                        // Just crossed the goal threshold
-                        if prev_words < goal && new_words >= goal {
-                            self.notification = Some(format!(
-                                "\u{f00c} Session goal of {} words reached! Keep going!",
-                                self.session_goal
-                            ));
-                        }
-                    }
-
-                    // Check daily goal milestone
-                    if self.daily_goal > 0 && self.session_stats.time_elapsed_seconds % DAILY_GOAL_CHECK_INTERVAL == 0 {
-                        let words_today = self.session_stats.words_written;
-                        let daily_goal = self.daily_goal as i64;
-                        if words_today >= daily_goal && (words_today - DAILY_GOAL_CHECK_INTERVAL as i64) < daily_goal {
-                            self.notification = Some(format!(
-                                "\u{f00c} Daily goal of {} words reached!",
-                                self.daily_goal
-                            ));
-                        }
-                    }
-
-                    // Record writing history periodically
-                    if self.session_stats.time_elapsed_seconds % HISTORY_RECORD_INTERVAL == 0 {
-                        if let Some(ref mut project) = self.project {
-                            project.writing_history.record(current_words, HISTORY_RECORD_INTERVAL);
-                        }
-                    }
-
-                    // Pomodoro break reminder at 25 min
-                    if self.session_stats.time_elapsed_seconds == POMODORO_BREAK_SECONDS && self.notification.is_none() {
-                        self.notification = Some(
-                            "\u{f0f4} 25 minutes of writing! Consider a short break.".to_string()
-                        );
-                    }
-                }
-
-                // Writing focus timer tick
-                if self.writing_timer.is_running()
-                    && self.writing_timer.tick() {
-                        // Timer completed - auto-stop and record session
-                        let word_count = self.current_word_count();
-                        self.writing_timer.stop(word_count);
-                        let summary = self.writing_timer.summary();
-                        self.notification = Some(format!(
-                            "\u{f00c} Timer completed! {} | Great writing session!",
-                            summary
-                        ));
-                    }
-
-                // Auto-refresh smart collections every 30 seconds when collections panel is open
-                if self.bottom_panel == BottomPanel::Collections && self.auto_save_counter % COLLECTION_REFRESH_INTERVAL == 0 {
-                    if let Some(ref mut project) = self.project {
-                        for coll in &mut project.collections {
-                            if let crate::core::collection::CollectionKind::Search { ref query, case_sensitive, whole_word } = coll.kind {
-                                let options = crate::core::search::SearchOptions {
-                                    query: query.clone(),
-                                    case_sensitive,
-                                    whole_word,
-                                    regex: false,
-                                    search_titles: true,
-                                    search_content: true,
-                                    search_notes: false,
-                                    search_synopsis: true,
-                                    ..Default::default()
-                                };
-                                let results = crate::core::search::search_binder(&project.binder, &options);
-                                let item_ids: Vec<Uuid> = results.iter().map(|r| r.item_id).collect();
-                                coll.item_ids = item_ids;
-                            }
-                        }
-                    }
-                }
-
-                // Poll file watcher for external changes
-                if self.project_state.poll_external_changes() {
-                    self.notification = Some(
-                        "External changes detected. Consider reloading.".to_string()
-                    );
-                    self.project_state.clear_external_changes();
-                }
-
-                // Auto-dismiss notification after 8 seconds
-                if self.notification.is_some() {
-                    self.notification_timer = self.notification_timer.saturating_add(1);
-                    if self.notification_timer >= 8 {
-                        self.notification = None;
-                        self.notification_timer = 0;
-                    }
-                } else {
-                    self.notification_timer = 0;
-                }
+                self.handle_tick();
             }
 
             Message::DismissNotification => {
@@ -3280,7 +3115,9 @@ impl ScrineverApp {
             }
             // No project open — show placeholder
             return container(
-                text("Open a project first to access settings.").size(14).color(super::theme::Theme::TEXT_MUTED),
+                text("Open a project first to access settings.")
+                    .size(14)
+                    .color(super::theme::Theme::TEXT_MUTED),
             )
             .width(Length::Fill)
             .height(Length::Fill)
@@ -3329,22 +3166,26 @@ impl ScrineverApp {
                 avg_words_per_day: project.writing_history.average_words_per_day(),
                 total_writing_days: project.writing_history.entries.len(),
                 current_streak: project.writing_history.current_streak(),
-                best_day_words: project.writing_history.best_day()
-                    .map(|d| d.words_written)
-                    .unwrap_or(0),
+                best_day_words: project.writing_history.best_day().map(|d| d.words_written).unwrap_or(0),
                 total_time_hours: project.writing_history.total_time_seconds() as f64 / 3600.0,
                 reading_time_minutes: stats.word_count as f64 / crate::core::READING_WPM,
                 speaking_time_minutes: stats.word_count as f64 / crate::core::SPEAKING_WPM,
                 target_words: project.settings.target_word_count,
                 deadline: project.settings.target_deadline.clone(),
-                days_remaining: project.settings.target_deadline.as_ref()
+                days_remaining: project
+                    .settings
+                    .target_deadline
+                    .as_ref()
                     .and_then(|d| NaiveDate::parse_from_str(d, crate::core::DATE_FORMAT).ok())
                     .map(|target_date| {
                         let today = Utc::now().date_naive();
                         (target_date - today).num_days()
                     }),
                 words_per_day_needed: {
-                    let days_remaining = project.settings.target_deadline.as_ref()
+                    let days_remaining = project
+                        .settings
+                        .target_deadline
+                        .as_ref()
                         .and_then(|d| NaiveDate::parse_from_str(d, crate::core::DATE_FORMAT).ok())
                         .map(|target_date| {
                             let today = Utc::now().date_naive();
@@ -3368,18 +3209,24 @@ impl ScrineverApp {
 
         // Composition mode (distraction-free writing)
         if self.composition_mode {
-            let title = self.selected_item
+            let title = self
+                .selected_item
                 .and_then(|id| project.binder.find_item(&id))
                 .map(|item| item.title.as_str())
                 .unwrap_or("");
             let word_count = self.editor.document.word_count();
-            let session_words = if self.session_active { self.session_stats.words_written } else { 0 };
+            let session_words = if self.session_active {
+                self.session_stats.words_written
+            } else {
+                0
+            };
             return views::editor_view::view_composition(&self.editor, title, word_count, session_words);
         }
 
         // Fullscreen editor mode
         if self.fullscreen_editor {
-            let title = self.selected_item
+            let title = self
+                .selected_item
                 .and_then(|id| project.binder.find_item(&id))
                 .map(|item| item.title.as_str())
                 .unwrap_or("");
@@ -3409,18 +3256,23 @@ impl ScrineverApp {
         // Main content area
         let main_content: Element<'_, Message> = match self.view_mode {
             ViewMode::Editor => {
-                let title = self.selected_item
+                let title = self
+                    .selected_item
                     .and_then(|id| project.binder.find_item(&id))
                     .map(|item| item.title.as_str())
                     .unwrap_or("No document selected");
 
                 // Check for split editor mode
                 if let Some(split_id) = self.split_editor_item {
-                    let secondary_content = project.binder.find_item(&split_id)
+                    let secondary_content = project
+                        .binder
+                        .find_item(&split_id)
                         .and_then(|item| item.document.as_ref())
                         .map(|doc| doc.content.as_str())
                         .unwrap_or("");
-                    let secondary_title = project.binder.find_item(&split_id)
+                    let secondary_title = project
+                        .binder
+                        .find_item(&split_id)
                         .map(|item| item.title.as_str())
                         .unwrap_or("Reference");
                     views::split_editor_view::view(&self.editor, title, secondary_content, secondary_title)
@@ -3447,16 +3299,17 @@ impl ScrineverApp {
                 };
                 views::corkboard_view::view(&items, &parent_title)
             }
-            ViewMode::Outliner => {
-                views::outliner_view::view(&project.binder.draft, &self.item_targets, &self.project_state.outliner.expanded)
-            }
+            ViewMode::Outliner => views::outliner_view::view(
+                &project.binder.draft,
+                &self.item_targets,
+                &self.project_state.outliner.expanded,
+            ),
             ViewMode::Scrivenings => {
                 let (items, parent_title) = if let Some(id) = self.selected_item {
                     if let Some(item) = project.binder.find_item(&id) {
                         if item.kind == BinderItemKind::Folder {
-                            let children: Vec<&BinderItem> = item.children.iter()
-                                .filter(|c| c.document.is_some())
-                                .collect();
+                            let children: Vec<&BinderItem> =
+                                item.children.iter().filter(|c| c.document.is_some()).collect();
                             (children, item.title.clone())
                         } else {
                             (vec![item], item.title.clone())
@@ -3465,7 +3318,11 @@ impl ScrineverApp {
                         (vec![], "Select a folder".to_string())
                     }
                 } else {
-                    let children: Vec<&BinderItem> = project.binder.draft.children.iter()
+                    let children: Vec<&BinderItem> = project
+                        .binder
+                        .draft
+                        .children
+                        .iter()
                         .filter(|c| c.document.is_some())
                         .collect();
                     (children, project.binder.draft.title.clone())
@@ -3508,16 +3365,22 @@ impl ScrineverApp {
                 &self.thesaurus_results,
             )),
             BottomPanel::Snapshots => {
-                let snapshots = self.selected_item
+                let snapshots = self
+                    .selected_item
                     .and_then(|id| project.binder.find_item(&id))
                     .map(|item| item.snapshots.as_slice())
                     .unwrap_or(&[]);
-                let current_content = self.selected_item
+                let current_content = self
+                    .selected_item
                     .and_then(|id| project.binder.find_item(&id))
                     .and_then(|item| item.document.as_ref())
                     .map(|doc| doc.content.as_str())
                     .unwrap_or("");
-                Some(views::snapshot_panel::view(snapshots, current_content, self.selected_snapshot))
+                Some(views::snapshot_panel::view(
+                    snapshots,
+                    current_content,
+                    self.selected_snapshot,
+                ))
             }
             BottomPanel::Session => {
                 let session_data = views::session_panel::SessionData {
@@ -3531,16 +3394,20 @@ impl ScrineverApp {
                 Some(views::session_panel::view(&session_data))
             }
             BottomPanel::History => {
-                let history = self.project.as_ref()
+                let history = self
+                    .project
+                    .as_ref()
                     .map(|p| &p.writing_history)
                     .cloned()
                     .unwrap_or_default();
                 Some(views::history_panel::view(&history))
             }
             BottomPanel::TextStats => {
-                let text_content = self.selected_item
+                let text_content = self
+                    .selected_item
                     .and_then(|id| {
-                        self.project.as_ref()
+                        self.project
+                            .as_ref()
                             .and_then(|p| p.binder.find_item(&id))
                             .and_then(|item| item.document.as_ref())
                             .map(|doc| doc.content.as_str())
@@ -3549,12 +3416,8 @@ impl ScrineverApp {
                 let analysis = crate::core::stats::TextAnalysis::from_text(text_content);
                 Some(views::text_stats_panel::view(&analysis, text_content))
             }
-            BottomPanel::NameGen => {
-                Some(views::name_generator_panel::view(&self.generated_names))
-            }
-            BottomPanel::ProjectNotes => {
-                Some(views::project_notes_panel::view(&self.project_notes_text))
-            }
+            BottomPanel::NameGen => Some(views::name_generator_panel::view(&self.generated_names)),
+            BottomPanel::ProjectNotes => Some(views::project_notes_panel::view(&self.project_notes_text)),
             BottomPanel::Collections => {
                 let data = views::collections_panel::CollectionsData {
                     collections: project.collections.clone(),
@@ -3563,11 +3426,10 @@ impl ScrineverApp {
                 };
                 Some(views::collections_panel::view(&data))
             }
-            BottomPanel::Bookmarks => {
-                Some(views::bookmarks_panel::view(&project.bookmarks))
-            }
+            BottomPanel::Bookmarks => Some(views::bookmarks_panel::view(&project.bookmarks)),
             BottomPanel::Annotations => {
-                let annotations = self.selected_item
+                let annotations = self
+                    .selected_item
                     .and_then(|id| project.binder.find_item(&id))
                     .and_then(|item| item.document.as_ref())
                     .map(|doc| doc.annotations.as_slice())
@@ -3577,7 +3439,10 @@ impl ScrineverApp {
             BottomPanel::Targets => {
                 let current_words = project.binder.total_word_count();
                 let deadline = project.settings.target_deadline.clone().unwrap_or_default();
-                let days_remaining = project.settings.target_deadline.as_ref()
+                let days_remaining = project
+                    .settings
+                    .target_deadline
+                    .as_ref()
                     .and_then(|d| NaiveDate::parse_from_str(d, crate::core::DATE_FORMAT).ok())
                     .map(|target_date| {
                         let today = Utc::now().date_naive();
@@ -3591,13 +3456,12 @@ impl ScrineverApp {
                 };
                 // Build per-document target progress
                 let word_counts = crate::core::integrations::ProjectState::word_count_map(&project.binder);
-                let doc_progress: Vec<(String, _)> = self.project_state.targets
+                let doc_progress: Vec<(String, _)> = self
+                    .project_state
+                    .targets
                     .all_progress(&word_counts)
                     .into_iter()
-                    .filter_map(|p| {
-                        project.binder.find_item(&p.doc_id)
-                            .map(|item| (item.title.clone(), p))
-                    })
+                    .filter_map(|p| project.binder.find_item(&p.doc_id).map(|item| (item.title.clone(), p)))
                     .collect();
                 let data = views::targets_panel::TargetsData {
                     project_target: project.settings.target_word_count,
@@ -3613,7 +3477,8 @@ impl ScrineverApp {
             }
             BottomPanel::QuickRef => {
                 if let Some(ref_id) = self.quick_ref_item {
-                    self.project.as_ref()
+                    self.project
+                        .as_ref()
                         .and_then(|p| p.binder.find_item(&ref_id))
                         .map(|item| {
                             let data = views::quick_reference_panel::QuickRefData::from_item(item);
@@ -3639,15 +3504,15 @@ impl ScrineverApp {
                 let words_today = if self.session_active {
                     self.session_stats.words_written
                 } else {
-                    project.writing_history.entries.last()
+                    project
+                        .writing_history
+                        .entries
+                        .last()
                         .filter(|e| e.date == Utc::now().date_naive())
                         .map(|e| e.words_written)
                         .unwrap_or(0)
                 };
-                let words_this_week: i64 = project.writing_history.recent(7)
-                    .iter()
-                    .map(|e| e.words_written)
-                    .sum();
+                let words_this_week: i64 = project.writing_history.recent(7).iter().map(|e| e.words_written).sum();
                 let data = views::writing_goals_panel::WritingGoalsData {
                     daily_goal: self.daily_goal,
                     daily_goal_text: self.daily_goal_text.clone(),
@@ -3666,7 +3531,8 @@ impl ScrineverApp {
                 let mut outgoing = Vec::new();
                 let mut incoming = Vec::new();
                 let mut broken = Vec::new();
-                let current_title = self.selected_item
+                let current_title = self
+                    .selected_item
                     .and_then(|id| project.binder.find_item(&id))
                     .map(|item| item.title.clone())
                     .unwrap_or_default();
@@ -3688,10 +3554,8 @@ impl ScrineverApp {
                                     }
                                 }
                                 crate::core::links::LinkStatus::Broken => {
-                                    let suggestions = crate::core::links::suggest_link_targets(
-                                        &v.link.link_text,
-                                        &project.binder,
-                                    );
+                                    let suggestions =
+                                        crate::core::links::suggest_link_targets(&v.link.link_text, &project.binder);
                                     broken.push(views::doc_links_panel::BrokenDocLink {
                                         link_text: v.link.link_text.clone(),
                                         status: views::doc_links_panel::BrokenLinkStatus::Broken,
@@ -3711,7 +3575,9 @@ impl ScrineverApp {
 
                     // Find incoming links (docs that link to current)
                     for other_item in project.binder.all_items() {
-                        if other_item.id == item_id { continue; }
+                        if other_item.id == item_id {
+                            continue;
+                        }
                         if let Some(ref doc) = other_item.document {
                             let links = crate::core::links::extract_links(&doc.content);
                             for link in &links {
@@ -3730,7 +3596,9 @@ impl ScrineverApp {
                 }
 
                 // Available docs for quick insertion
-                let available: Vec<(uuid::Uuid, String)> = project.binder.all_items()
+                let available: Vec<(uuid::Uuid, String)> = project
+                    .binder
+                    .all_items()
                     .iter()
                     .filter(|i| i.document.is_some() && Some(i.id) != self.selected_item)
                     .map(|i| (i.id, i.title.clone()))
@@ -3739,33 +3607,26 @@ impl ScrineverApp {
                 Some(views::doc_links_panel::view(&outgoing, &incoming, &broken, &available))
             }
             BottomPanel::Backups => {
-                let backups = crate::core::backup::BackupManager::list_backups(
-                    &project.title.replace(' ', "_")
-                ).unwrap_or_default();
+                let backups = crate::core::backup::BackupManager::list_backups(&project.title.replace(' ', "_"))
+                    .unwrap_or_default();
                 Some(views::backup_panel::view(&backups, &project.title))
             }
-            BottomPanel::SpellCheck => {
-                Some(views::spell_check_panel::view(
-                    &self.spell_check_results,
-                    self.spell_checker.active,
-                    self.spell_checker.dictionary_size(),
-                    self.spell_checker.user_words(),
-                ))
-            }
+            BottomPanel::SpellCheck => Some(views::spell_check_panel::view(
+                &self.spell_check_results,
+                self.spell_checker.active,
+                self.spell_checker.dictionary_size(),
+                self.spell_checker.user_words(),
+            )),
             BottomPanel::Timer => {
                 let wc = self.current_word_count();
                 Some(views::timer_panel::view(&self.writing_timer, wc))
             }
-            BottomPanel::Validation => {
-                Some(views::validation_panel::view(self.validation_result.as_ref()))
-            }
+            BottomPanel::Validation => Some(views::validation_panel::view(self.validation_result.as_ref())),
             BottomPanel::Templates => {
                 let templates = crate::core::doc_templates::builtin_templates();
                 Some(views::templates_panel::view(&templates))
             }
-            BottomPanel::WritingPrompts => {
-                Some(views::writing_prompts_panel::view(&self.writing_prompts_data))
-            }
+            BottomPanel::WritingPrompts => Some(views::writing_prompts_panel::view(&self.writing_prompts_data)),
             BottomPanel::None => None,
         };
 
@@ -3777,18 +3638,18 @@ impl ScrineverApp {
             String::new()
         };
         let streak = project.writing_history.current_streak();
-        let status_bar = views::status_bar::view(
-            &stats,
-            project.settings.target_word_count,
-            self.editor.dirty,
-            &project.title,
-            self.session_active,
-            self.editor.current_line(),
-            self.editor.current_column(),
-            self.writing_timer.is_running(),
-            &timer_remaining,
-            streak,
-        );
+        let status_bar = views::status_bar::view(&views::status_bar::StatusBarParams {
+            stats: &stats,
+            target_words: project.settings.target_word_count,
+            is_dirty: self.editor.dirty,
+            project_title: &project.title,
+            session_active: self.session_active,
+            cursor_line: self.editor.current_line(),
+            cursor_col: self.editor.current_column(),
+            timer_running: self.writing_timer.is_running(),
+            timer_remaining: &timer_remaining,
+            writing_streak: streak,
+        });
 
         // Notification bar
         let notification_bar: Option<Element<'_, Message>> = self.notification.as_ref().map(|msg| {
@@ -3796,11 +3657,11 @@ impl ScrineverApp {
                 row![
                     text(msg.clone()).size(12).color(Theme::WARNING),
                     iced::widget::Space::with_width(Length::Fill),
-                    iced::widget::button(
-                        text("x").size(12).color(Theme::TEXT_MUTED),
-                    ).on_press(Message::DismissNotification).padding(Padding::from([2, 8])),
+                    iced::widget::button(text("x").size(12).color(Theme::TEXT_MUTED),)
+                        .on_press(Message::DismissNotification)
+                        .padding(Padding::from([2, 8])),
                 ]
-                .padding(Padding::from([4, 12]))
+                .padding(Padding::from([4, 12])),
             )
             .width(Length::Fill)
             .into()
@@ -3840,10 +3701,7 @@ impl ScrineverApp {
             .height(Length::Fill)
             .into()
         } else {
-            container(layout)
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .into()
+            container(layout).width(Length::Fill).height(Length::Fill).into()
         }
     }
 
@@ -3922,12 +3780,8 @@ impl ScrineverApp {
                 }
             } else if alt {
                 match key {
-                    keyboard::Key::Named(keyboard::key::Named::ArrowUp) => {
-                        Some(Message::MoveLineUp)
-                    }
-                    keyboard::Key::Named(keyboard::key::Named::ArrowDown) => {
-                        Some(Message::MoveLineDown)
-                    }
+                    keyboard::Key::Named(keyboard::key::Named::ArrowUp) => Some(Message::MoveLineUp),
+                    keyboard::Key::Named(keyboard::key::Named::ArrowDown) => Some(Message::MoveLineDown),
                     keyboard::Key::Character(c) => {
                         let c = c.as_str();
                         match c {
@@ -3942,37 +3796,22 @@ impl ScrineverApp {
                 }
             } else {
                 match key {
-                    keyboard::Key::Named(keyboard::key::Named::Escape) => {
-                        Some(Message::EscapePressed)
-                    }
-                    keyboard::Key::Named(keyboard::key::Named::F11) => {
-                        Some(Message::ToggleFullscreen)
-                    }
-                    keyboard::Key::Named(keyboard::key::Named::F5) => {
-                        Some(Message::ToggleCompositionMode)
-                    }
-                    keyboard::Key::Named(keyboard::key::Named::F7) => {
-                        Some(Message::RunSpellCheck)
-                    }
-                    keyboard::Key::Named(keyboard::key::Named::F3) => {
-                        Some(Message::DocFindNext)
-                    }
+                    keyboard::Key::Named(keyboard::key::Named::Escape) => Some(Message::EscapePressed),
+                    keyboard::Key::Named(keyboard::key::Named::F11) => Some(Message::ToggleFullscreen),
+                    keyboard::Key::Named(keyboard::key::Named::F5) => Some(Message::ToggleCompositionMode),
+                    keyboard::Key::Named(keyboard::key::Named::F7) => Some(Message::RunSpellCheck),
+                    keyboard::Key::Named(keyboard::key::Named::F3) => Some(Message::DocFindNext),
                     keyboard::Key::Named(keyboard::key::Named::F6) => {
                         Some(Message::ShowBottomPanel(BottomPanel::Search))
                     }
-                    keyboard::Key::Named(keyboard::key::Named::F8) => {
-                        Some(Message::ShowValidation)
-                    }
-                    keyboard::Key::Named(keyboard::key::Named::F9) => {
-                        Some(Message::CreateSnapshot)
-                    }
+                    keyboard::Key::Named(keyboard::key::Named::F8) => Some(Message::ShowValidation),
+                    keyboard::Key::Named(keyboard::key::Named::F9) => Some(Message::CreateSnapshot),
                     _ => None,
                 }
             }
         });
 
-        let tick_sub = iced::time::every(std::time::Duration::from_secs(1))
-            .map(|_| Message::Tick);
+        let tick_sub = iced::time::every(std::time::Duration::from_secs(1)).map(|_| Message::Tick);
 
         let close_sub = window::close_events().map(Message::WindowClosed);
 
@@ -3982,6 +3821,164 @@ impl ScrineverApp {
     /// Dark theme
     pub fn theme(&self, _window_id: window::Id) -> iced::Theme {
         iced::Theme::Dark
+    }
+
+    // ========== Extracted handler methods (reduce update() size) ==========
+
+    /// Handle the per-second tick: auto-save, milestones, session timers,
+    /// collection refresh, external change polling, and notification dismissal.
+    fn handle_tick(&mut self) {
+        // Auto-save
+        if self.project.is_some() && self.editor.dirty {
+            self.auto_save_counter += 1;
+            let interval = self
+                .project
+                .as_ref()
+                .map(|p| p.settings.auto_save_seconds)
+                .unwrap_or(30);
+            if interval > 0 && self.auto_save_counter >= interval {
+                self.auto_save_counter = 0;
+                self.sync_editor_to_project();
+                if let Some(ref mut project) = self.project {
+                    let home = crate::core::home_dir_or_cwd();
+                    let save_dir = home.join(PROJECTS_DIR_NAME);
+                    if project.save(&save_dir).is_ok() {
+                        self.editor.mark_clean();
+                        if let Some(ref path) = project.path {
+                            if let Err(e) = crate::core::backup::BackupManager::create_backup(path) {
+                                log::warn!("Auto-backup failed: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Word count milestone detection
+        if self.auto_save_counter.is_multiple_of(MILESTONE_CHECK_INTERVAL) {
+            if let Some(ref project) = self.project {
+                let total_words = project.binder.total_word_count();
+                let milestones = [1000, 5000, 10000, 25000, 50000, 75000, 100000, 150000, 200000];
+                for &m in &milestones {
+                    if total_words >= m && self.last_milestone < m {
+                        self.last_milestone = m;
+                        let label = if m >= 1000 {
+                            format!("{}k", m / 1000)
+                        } else {
+                            m.to_string()
+                        };
+                        self.notification = Some(format!("\u{f005} Milestone: {} words! Keep writing!", label));
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Writing session timer
+        if self.session_active {
+            let current_words = self.current_word_count();
+            let word_delta = current_words as i64 - self.session_start_word_count as i64;
+            let prev_words = self.session_stats.words_written;
+            self.session_stats
+                .update(word_delta, self.session_stats.time_elapsed_seconds + 1);
+
+            if self.session_goal > 0 {
+                let new_words = self.session_stats.words_written;
+                let goal = self.session_goal as i64;
+                if prev_words < goal && new_words >= goal {
+                    self.notification = Some(format!(
+                        "\u{f00c} Session goal of {} words reached! Keep going!",
+                        self.session_goal
+                    ));
+                }
+            }
+
+            if self.daily_goal > 0
+                && self
+                    .session_stats
+                    .time_elapsed_seconds
+                    .is_multiple_of(DAILY_GOAL_CHECK_INTERVAL)
+            {
+                let words_today = self.session_stats.words_written;
+                let daily_goal = self.daily_goal as i64;
+                if words_today >= daily_goal && (words_today - DAILY_GOAL_CHECK_INTERVAL as i64) < daily_goal {
+                    self.notification = Some(format!("\u{f00c} Daily goal of {} words reached!", self.daily_goal));
+                }
+            }
+
+            if self
+                .session_stats
+                .time_elapsed_seconds
+                .is_multiple_of(HISTORY_RECORD_INTERVAL)
+            {
+                if let Some(ref mut project) = self.project {
+                    project.writing_history.record(current_words, HISTORY_RECORD_INTERVAL);
+                }
+            }
+
+            if self.session_stats.time_elapsed_seconds == POMODORO_BREAK_SECONDS && self.notification.is_none() {
+                self.notification = Some("\u{f0f4} 25 minutes of writing! Consider a short break.".to_string());
+            }
+        }
+
+        // Writing focus timer tick
+        if self.writing_timer.is_running() && self.writing_timer.tick() {
+            let word_count = self.current_word_count();
+            self.writing_timer.stop(word_count);
+            let summary = self.writing_timer.summary();
+            self.notification = Some(format!(
+                "\u{f00c} Timer completed! {} | Great writing session!",
+                summary
+            ));
+        }
+
+        // Auto-refresh smart collections
+        if self.bottom_panel == BottomPanel::Collections
+            && self.auto_save_counter.is_multiple_of(COLLECTION_REFRESH_INTERVAL)
+        {
+            if let Some(ref mut project) = self.project {
+                for coll in &mut project.collections {
+                    if let crate::core::collection::CollectionKind::Search {
+                        ref query,
+                        case_sensitive,
+                        whole_word,
+                    } = coll.kind
+                    {
+                        let options = crate::core::search::SearchOptions {
+                            query: query.clone(),
+                            case_sensitive,
+                            whole_word,
+                            regex: false,
+                            search_titles: true,
+                            search_content: true,
+                            search_notes: false,
+                            search_synopsis: true,
+                            ..Default::default()
+                        };
+                        let results = crate::core::search::search_binder(&project.binder, &options);
+                        let item_ids: Vec<Uuid> = results.iter().map(|r| r.item_id).collect();
+                        coll.item_ids = item_ids;
+                    }
+                }
+            }
+        }
+
+        // Poll file watcher for external changes
+        if self.project_state.poll_external_changes() {
+            self.notification = Some("External changes detected. Consider reloading.".to_string());
+            self.project_state.clear_external_changes();
+        }
+
+        // Auto-dismiss notification after 8 seconds
+        if self.notification.is_some() {
+            self.notification_timer = self.notification_timer.saturating_add(1);
+            if self.notification_timer >= 8 {
+                self.notification = None;
+                self.notification_timer = 0;
+            }
+        } else {
+            self.notification_timer = 0;
+        }
     }
 }
 

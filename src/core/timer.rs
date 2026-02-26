@@ -62,8 +62,11 @@ impl TimerPreset {
             TimerPreset::HourSession => "Hour (60 min)".to_string(),
             TimerPreset::Custom(secs) => {
                 let mins = secs / 60;
-                if mins > 0 { format!("Custom ({} min)", mins) }
-                else { format!("Custom ({} sec)", secs) }
+                if mins > 0 {
+                    format!("Custom ({} min)", mins)
+                } else {
+                    format!("Custom ({} sec)", secs)
+                }
             }
         }
     }
@@ -109,7 +112,11 @@ pub struct TimerSession {
 impl TimerSession {
     pub fn words_per_minute(&self) -> f64 {
         let minutes = self.duration.as_secs_f64() / 60.0;
-        if minutes > 0.0 { self.words_written as f64 / minutes } else { 0.0 }
+        if minutes > 0.0 {
+            self.words_written as f64 / minutes
+        } else {
+            0.0
+        }
     }
 
     /// Whether this session produced meaningful output
@@ -130,7 +137,10 @@ impl TimerSession {
         let status = if self.completed { "completed" } else { "stopped" };
         format!(
             "{} min, {} words, {:.1} WPM ({})",
-            mins, self.words_written, self.words_per_minute(), status
+            mins,
+            self.words_written,
+            self.words_per_minute(),
+            status
         )
     }
 }
@@ -197,11 +207,10 @@ impl WritingTimer {
 
     /// Check the timer (call on tick) — returns true if timer just completed
     pub fn tick(&mut self) -> bool {
-        if self.state == TimerState::Running
-            && self.elapsed().as_secs() >= self.duration_secs {
-                self.state = TimerState::Completed;
-                return true;
-            }
+        if self.state == TimerState::Running && self.elapsed().as_secs() >= self.duration_secs {
+            self.state = TimerState::Completed;
+            return true;
+        }
         false
     }
 
@@ -214,9 +223,7 @@ impl WritingTimer {
     /// Get elapsed time
     pub fn elapsed(&self) -> Duration {
         match &self.state {
-            TimerState::Running => {
-                self.start_time.map(|t| t.elapsed()).unwrap_or_default()
-            }
+            TimerState::Running => self.start_time.map(|t| t.elapsed()).unwrap_or_default(),
             TimerState::Paused(d) => *d,
             TimerState::Completed => Duration::from_secs(self.duration_secs),
             TimerState::Idle => Duration::ZERO,
@@ -230,7 +237,11 @@ impl WritingTimer {
         }
         let elapsed = self.elapsed();
         let total = Duration::from_secs(self.duration_secs);
-        if elapsed >= total { Duration::ZERO } else { total - elapsed }
+        if elapsed >= total {
+            Duration::ZERO
+        } else {
+            total - elapsed
+        }
     }
 
     /// Format remaining time as MM:SS
@@ -324,15 +335,22 @@ impl WritingTimer {
 
     /// Progress as a fraction (0.0 - 1.0)
     pub fn progress(&self) -> f64 {
-        if self.duration_secs == 0 { return 0.0; }
+        if self.duration_secs == 0 {
+            return 0.0;
+        }
         (self.elapsed().as_secs_f64() / self.duration_secs as f64).min(1.0)
     }
 
     /// Get the best session (most words per minute)
     pub fn best_session(&self) -> Option<&TimerSession> {
-        self.completed_sessions.iter()
+        self.completed_sessions
+            .iter()
             .filter(|s| s.duration.as_secs() >= 60)
-            .max_by(|a, b| a.words_per_minute().partial_cmp(&b.words_per_minute()).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.words_per_minute()
+                    .partial_cmp(&b.words_per_minute())
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
     }
 
     /// Get the session with most words written
@@ -356,18 +374,14 @@ impl WritingTimer {
     /// Get a progress bar string for display
     pub fn progress_bar(&self) -> String {
         let pct = self.progress();
-        let filled = (pct * 20.0).round() as usize;
-        let empty = 20 - filled.min(20);
-        format!("[{}{}] {:.0}%", "#".repeat(filled.min(20)), "-".repeat(empty), pct * 100.0)
+        let filled = (pct * 20.0).round().clamp(0.0, 20.0) as usize;
+        let empty = 20 - filled;
+        format!("[{}{}] {:.0}%", "#".repeat(filled), "-".repeat(empty), pct * 100.0)
     }
 
     /// Count of consecutive completed sessions from the end
     pub fn streak_count(&self) -> usize {
-        self.completed_sessions
-            .iter()
-            .rev()
-            .take_while(|s| s.completed)
-            .count()
+        self.completed_sessions.iter().rev().take_while(|s| s.completed).count()
     }
 
     /// Get the longest session by duration
@@ -485,8 +499,11 @@ mod tests {
         timer.start(0);
         let display = timer.remaining_display();
         // Should be close to 10:00 (600 seconds)
-        assert!(display == "10:00" || display.starts_with("09:5"),
-            "Expected ~10:00 but got {}", display);
+        assert!(
+            display == "10:00" || display.starts_with("09:5"),
+            "Expected ~10:00 but got {}",
+            display
+        );
     }
 
     #[test]

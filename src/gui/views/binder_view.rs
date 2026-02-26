@@ -23,9 +23,7 @@ pub fn view(
         row![
             text(Icons::BOOK).size(13).color(Theme::TEXT_ACCENT),
             Space::with_width(8),
-            text("Binder")
-                .size(12)
-                .color(Theme::TEXT_SECONDARY),
+            text("Binder").size(12).color(Theme::TEXT_SECONDARY),
         ]
         .align_y(iced::Alignment::Center),
     )
@@ -34,27 +32,9 @@ pub fn view(
     .width(Length::Fill);
 
     // ── Section trees ───────────────────────────────────
-    let draft_tree = render_section(
-        "Draft",
-        Icons::PENCIL_SQUARE,
-        DRAFT_ACCENT,
-        draft,
-        selected_id,
-    );
-    let research_tree = render_section(
-        "Research",
-        Icons::SEARCH,
-        RESEARCH_ACCENT,
-        research,
-        selected_id,
-    );
-    let trash_tree = render_section(
-        "Trash",
-        Icons::BAN,
-        TRASH_ACCENT,
-        trash,
-        selected_id,
-    );
+    let draft_tree = render_section("Draft", Icons::PENCIL_SQUARE, DRAFT_ACCENT, draft, selected_id);
+    let research_tree = render_section("Research", Icons::SEARCH, RESEARCH_ACCENT, research, selected_id);
+    let trash_tree = render_section("Trash", Icons::BAN, TRASH_ACCENT, trash, selected_id);
 
     // ── Empty trash button ──────────────────────────────
     let trash_actions: Element<'static, Message> = if !trash.children.is_empty() {
@@ -64,8 +44,7 @@ pub fn view(
                 row![
                     text(Icons::TIMES).size(11).color(Theme::ERROR),
                     Space::with_width(6),
-                    text(format!("Empty Trash ({})", trash_count))
-                        .size(11),
+                    text(format!("Empty Trash ({})", trash_count)).size(11),
                 ]
                 .align_y(iced::Alignment::Center),
             )
@@ -74,7 +53,12 @@ pub fn view(
             .padding(Padding::from([5, 10]))
             .width(Length::Fill),
         )
-        .padding(Padding { top: 0.0, right: 8.0, bottom: 4.0, left: 8.0 })
+        .padding(Padding {
+            top: 0.0,
+            right: 8.0,
+            bottom: 4.0,
+            left: 8.0,
+        })
         .into()
     } else {
         Space::with_height(0).into()
@@ -105,12 +89,8 @@ pub fn view(
     // ── Bottom action bar ───────────────────────────────
     let action_bar = build_action_bar(selected_id);
 
-    let content = column![
-        header,
-        scrollable(tree_content).height(Length::Fill),
-        action_bar,
-    ]
-    .width(Length::Fixed(250.0));
+    let content =
+        column![header, scrollable(tree_content).height(Length::Fill), action_bar,].width(Length::Fixed(250.0));
 
     container(content)
         .style(theme::sidebar_style)
@@ -151,12 +131,10 @@ fn render_section(
             doc_count.to_string()
         };
 
-        container(
-            text(badge_text).size(9).color(Theme::TEXT_MUTED),
-        )
-        .style(theme::binder_badge_style)
-        .padding(Padding::from([2, 6]))
-        .into()
+        container(text(badge_text).size(9).color(Theme::TEXT_MUTED))
+            .style(theme::binder_badge_style)
+            .padding(Padding::from([2, 6]))
+            .into()
     } else {
         Space::with_width(0).into()
     };
@@ -207,11 +185,7 @@ fn count_docs(item: &BinderItem) -> usize {
 }
 
 /// Render a single binder item and its children
-fn render_item(
-    item: &BinderItem,
-    selected_id: Option<Uuid>,
-    depth: usize,
-) -> Element<'static, Message> {
+fn render_item(item: &BinderItem, selected_id: Option<Uuid>, depth: usize) -> Element<'static, Message> {
     let mut col = column![];
 
     let is_selected = selected_id == Some(item.id);
@@ -220,7 +194,11 @@ fn render_item(
     // ── Icon ────────────────────────────────────────────
     let (icon_str, icon_color) = match item.kind {
         BinderItemKind::Folder => {
-            let ic = if item.expanded { Icons::FOLDER_OPEN } else { Icons::FOLDER };
+            let ic = if item.expanded {
+                Icons::FOLDER_OPEN
+            } else {
+                Icons::FOLDER
+            };
             (ic, Color::from_rgb(0.75, 0.65, 0.40))
         }
         BinderItemKind::Text => (Icons::FILE_TEXT, Color::from_rgb(0.55, 0.70, 0.85)),
@@ -231,7 +209,11 @@ fn render_item(
 
     // ── Folder chevron ──────────────────────────────────
     let chevron: Element<'static, Message> = if item.kind == BinderItemKind::Folder {
-        let ch = if item.expanded { Icons::CARET_DOWN } else { Icons::CARET_RIGHT };
+        let ch = if item.expanded {
+            Icons::CARET_DOWN
+        } else {
+            Icons::CARET_RIGHT
+        };
         text(ch).size(9).color(Theme::TEXT_MUTED).into()
     } else {
         Space::with_width(9).into()
@@ -254,10 +236,7 @@ fn render_item(
         if let Some(ref d) = item.document {
             let wc = d.word_count();
             if wc > 0 {
-                text(wc.to_string())
-                    .size(9)
-                    .color(Theme::TEXT_MUTED)
-                    .into()
+                text(wc.to_string()).size(9).color(Theme::TEXT_MUTED).into()
             } else {
                 Space::with_width(0).into()
             }
@@ -339,10 +318,7 @@ fn render_item(
         .padding(Padding::from([4, 4]))
         .width(Length::Fill);
 
-    col = col.push(
-        container(item_btn)
-            .padding(Padding::from([0, 4]))
-    );
+    col = col.push(container(item_btn).padding(Padding::from([0, 4])));
 
     // ── Render children if expanded ─────────────────────
     if item.expanded && !item.children.is_empty() {
@@ -362,11 +338,7 @@ fn build_action_bar(selected_id: Option<Uuid>) -> Element<'static, Message> {
     let add_doc = action_btn(Icons::FILE_TEXT, "New Doc", Message::NewDocument);
     let add_folder = action_btn(Icons::FOLDER, "New Folder", Message::NewFolder);
 
-    let primary_row = row![
-        add_doc,
-        Space::with_width(4),
-        add_folder,
-    ];
+    let primary_row = row![add_doc, Space::with_width(4), add_folder,];
 
     // Context actions (only if item selected)
     let context_row: Element<'static, Message> = if let Some(sel_id) = selected_id {
@@ -390,17 +362,11 @@ fn build_action_bar(selected_id: Option<Uuid>) -> Element<'static, Message> {
         Space::with_height(0).into()
     };
 
-    container(
-        column![
-            primary_row,
-            context_row,
-        ]
-        .spacing(4),
-    )
-    .style(theme::binder_action_bar_style)
-    .padding(Padding::from([8, 10]))
-    .width(Length::Fill)
-    .into()
+    container(column![primary_row, context_row,].spacing(4))
+        .style(theme::binder_action_bar_style)
+        .padding(Padding::from([8, 10]))
+        .width(Length::Fill)
+        .into()
 }
 
 /// Action button with icon + label
@@ -421,22 +387,18 @@ fn action_btn(icon: &str, label: &str, message: Message) -> Element<'static, Mes
 
 /// Small icon-only button
 fn icon_btn(icon: &str, message: Message) -> Element<'static, Message> {
-    button(
-        text(icon.to_string()).size(12).color(Theme::TEXT_SECONDARY),
-    )
-    .on_press(message)
-    .style(theme::binder_action_btn_style)
-    .padding(Padding::from([4, 7]))
-    .into()
+    button(text(icon.to_string()).size(12).color(Theme::TEXT_SECONDARY))
+        .on_press(message)
+        .style(theme::binder_action_btn_style)
+        .padding(Padding::from([4, 7]))
+        .into()
 }
 
 /// Small icon-only button (danger variant)
 fn danger_icon_btn(icon: &str, message: Message) -> Element<'static, Message> {
-    button(
-        text(icon.to_string()).size(12).color(Theme::ERROR),
-    )
-    .on_press(message)
-    .style(theme::binder_danger_btn_style)
-    .padding(Padding::from([4, 7]))
-    .into()
+    button(text(icon.to_string()).size(12).color(Theme::ERROR))
+        .on_press(message)
+        .style(theme::binder_danger_btn_style)
+        .padding(Padding::from([4, 7]))
+        .into()
 }

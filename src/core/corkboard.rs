@@ -445,7 +445,14 @@ mod tests {
         state.arrange_grid(&ids);
 
         let action = state.move_card(ids[0], 999.0, 888.0).unwrap();
-        assert!(matches!(action, CorkboardAction::MoveCard { new_x: 999.0, new_y: 888.0, .. }));
+        assert!(matches!(
+            action,
+            CorkboardAction::MoveCard {
+                new_x: 999.0,
+                new_y: 888.0,
+                ..
+            }
+        ));
 
         let card = state.get_card(&ids[0]).unwrap();
         assert_eq!(card.x, 999.0);
@@ -626,5 +633,4 @@ mod tests {
             panic!("Expected MoveCard action");
         }
     }
-
 }

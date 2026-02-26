@@ -1,6 +1,6 @@
-use std::collections::HashSet;
 use iced::widget::{button, column, container, row, scrollable, text, text_input, Space};
 use iced::{Element, Length, Padding};
+use std::collections::HashSet;
 use uuid::Uuid;
 
 use crate::core::collection::{Collection, CollectionKind};
@@ -30,7 +30,9 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
 
     // Count unique items across all collections
     let unique_items: usize = {
-        let all: HashSet<Uuid> = data.collections.iter()
+        let all: HashSet<Uuid> = data
+            .collections
+            .iter()
             .flat_map(|c| c.item_ids.iter().copied())
             .collect();
         all.len()
@@ -43,9 +45,7 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
     };
 
     let header = row![
-        text("COLLECTIONS")
-            .size(11)
-            .color(Theme::TEXT_SECONDARY),
+        text("COLLECTIONS").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(8),
         text(format!(
             "{} manual, {} smart | {} items{}",
@@ -54,11 +54,9 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
         .size(10)
         .color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
-        button(
-            text("Refresh Smart").size(10).color(Theme::TEXT_ACCENT),
-        )
-        .on_press(Message::RefreshSmartCollections)
-        .padding(Padding::from([2, 6])),
+        button(text("Refresh Smart").size(10).color(Theme::TEXT_ACCENT),)
+            .on_press(Message::RefreshSmartCollections)
+            .padding(Padding::from([2, 6])),
     ];
 
     // New collection input
@@ -68,14 +66,11 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
         .padding(4)
         .width(Length::FillPortion(3));
 
-    let add_btn = button(
-        text("+ Add").size(11).color(Theme::TEXT_ACCENT),
-    )
-    .on_press(Message::CreateCollection)
-    .padding(Padding::from([4, 10]));
+    let add_btn = button(text("+ Add").size(11).color(Theme::TEXT_ACCENT))
+        .on_press(Message::CreateCollection)
+        .padding(Padding::from([4, 10]));
 
-    let input_row = row![new_input, Space::with_width(4), add_btn]
-        .align_y(iced::Alignment::Center);
+    let input_row = row![new_input, Space::with_width(4), add_btn].align_y(iced::Alignment::Center);
 
     // Collection list
     let mut list = column![].spacing(2);
@@ -114,21 +109,17 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
                 .width(Length::Fixed(36.0)),
             text(kind_icon).size(11).color(Theme::TEXT_MUTED),
             Space::with_width(4),
-            button(
-                text(coll.name.clone()).size(12).color(name_color),
-            )
-            .on_press(Message::SelectCollection(coll_id))
-            .padding(Padding::from([2, 6])),
+            button(text(coll.name.clone()).size(12).color(name_color),)
+                .on_press(Message::SelectCollection(coll_id))
+                .padding(Padding::from([2, 6])),
             Space::with_width(Length::Fill),
             text(format!("{} ({} items)", kind_detail, coll.item_ids.len()))
                 .size(10)
                 .color(Theme::TEXT_MUTED),
             Space::with_width(4),
-            button(
-                text("\u{f00d}").size(10).color(Theme::ERROR),
-            )
-            .on_press(Message::DeleteCollection(coll_id))
-            .padding(Padding::from([1, 4])),
+            button(text("\u{f00d}").size(10).color(Theme::ERROR),)
+                .on_press(Message::DeleteCollection(coll_id))
+                .padding(Padding::from([1, 4])),
         ]
         .align_y(iced::Alignment::Center);
 
@@ -148,9 +139,7 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
             .size(9)
             .color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
-        text("Shortcut: Ctrl+Shift+C")
-            .size(9)
-            .color(Theme::TEXT_MUTED),
+        text("Shortcut: Ctrl+Shift+C").size(9).color(Theme::TEXT_MUTED),
     ];
 
     let content = column![
@@ -164,8 +153,5 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
     ]
     .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }

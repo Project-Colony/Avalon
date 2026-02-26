@@ -1,17 +1,17 @@
-use std::path::{Path, PathBuf};
-use std::fs;
-use serde::{Deserialize, Serialize};
-use chrono::{DateTime, Utc};
-use uuid::Uuid;
 use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
+use uuid::Uuid;
 
 use super::binder::Binder;
 use super::bookmark::BookmarkList;
 use super::collection::Collection;
 use super::document::Document;
 use super::history::WritingHistory;
-use super::snapshot::Snapshot;
 use super::metadata::ProjectSettings;
+use super::snapshot::Snapshot;
 use crate::export::compiler::CompileOptions;
 
 /// A Scrinever project — the top-level container for all writing data.
@@ -73,16 +73,13 @@ impl Project {
     /// Save the project to disk
     pub fn save(&mut self, base_path: &Path) -> Result<()> {
         let project_dir = base_path.join(format!("{}.{}", self.title, super::PROJECT_EXTENSION));
-        fs::create_dir_all(&project_dir)
-            .context("Failed to create project directory")?;
+        fs::create_dir_all(&project_dir).context("Failed to create project directory")?;
 
         // Save project metadata
         let meta_path = project_dir.join("project.json");
         self.modified_at = Utc::now();
-        let json = serde_json::to_string_pretty(self)
-            .context("Failed to serialize project")?;
-        fs::write(&meta_path, json)
-            .context("Failed to write project metadata")?;
+        let json = serde_json::to_string_pretty(self).context("Failed to serialize project")?;
+        fs::write(&meta_path, json).context("Failed to write project metadata")?;
 
         // Save documents
         let docs_dir = project_dir.join("docs");
@@ -114,10 +111,8 @@ impl Project {
     /// Load a project from disk
     pub fn load(project_dir: &Path) -> Result<Self> {
         let meta_path = project_dir.join("project.json");
-        let json = fs::read_to_string(&meta_path)
-            .context("Failed to read project metadata")?;
-        let mut project: Project = serde_json::from_str(&json)
-            .context("Failed to parse project metadata")?;
+        let json = fs::read_to_string(&meta_path).context("Failed to read project metadata")?;
+        let mut project: Project = serde_json::from_str(&json).context("Failed to parse project metadata")?;
 
         // Load documents
         let docs_dir = project_dir.join("docs");
@@ -286,7 +281,11 @@ impl Project {
                 research.children.push(BinderItem::new_folder("World Building"));
                 research.children.push(BinderItem::new_text("Notes"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             "short_story" => {
                 let mut draft = BinderItem::new_folder("Story");
@@ -299,7 +298,11 @@ impl Project {
                 research.children.push(BinderItem::new_text("Character Sketches"));
                 research.children.push(BinderItem::new_text("Notes"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             "poetry" => {
                 let mut draft = BinderItem::new_folder("Collection");
@@ -315,7 +318,11 @@ impl Project {
                 research.children.push(BinderItem::new_text("Inspirations"));
                 research.children.push(BinderItem::new_text("Notes"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             "stage_play" => {
                 let mut draft = BinderItem::new_folder("Play");
@@ -335,7 +342,11 @@ impl Project {
                 research.children.push(BinderItem::new_folder("Set Design"));
                 research.children.push(BinderItem::new_text("Notes"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             "nonfiction" => {
                 let mut draft = BinderItem::new_folder("Book");
@@ -356,7 +367,11 @@ impl Project {
                 research.children.push(BinderItem::new_folder("Interviews"));
                 research.children.push(BinderItem::new_text("Notes"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             "essay" => {
                 let mut draft = BinderItem::new_folder("Essay");
@@ -368,7 +383,11 @@ impl Project {
                 research.children.push(BinderItem::new_text("Sources"));
                 research.children.push(BinderItem::new_text("Notes"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             "research_proposal" => {
                 let mut draft = BinderItem::new_folder("Proposal");
@@ -386,7 +405,11 @@ impl Project {
                 research.children.push(BinderItem::new_folder("Prior Work"));
                 research.children.push(BinderItem::new_text("Notes"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             "thesis" => {
                 let mut draft = BinderItem::new_folder("Thesis");
@@ -420,7 +443,11 @@ impl Project {
                 research.children.push(BinderItem::new_folder("Figures"));
                 research.children.push(BinderItem::new_text("Notes"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             "recipes" => {
                 let mut draft = BinderItem::new_folder("Recipe Book");
@@ -441,7 +468,11 @@ impl Project {
                 research.children.push(BinderItem::new_text("Ingredient Notes"));
                 research.children.push(BinderItem::new_text("Technique Notes"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             "journal" => {
                 let mut draft = BinderItem::new_folder("Journal");
@@ -456,7 +487,11 @@ impl Project {
                 research.children.push(BinderItem::new_text("Reflections"));
                 research.children.push(BinderItem::new_text("Goals"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             "blog" => {
                 let mut draft = BinderItem::new_folder("Blog");
@@ -472,7 +507,11 @@ impl Project {
                 research.children.push(BinderItem::new_text("Topic Ideas"));
                 research.children.push(BinderItem::new_text("Style Guide"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             "comic_script" => {
                 let mut draft = BinderItem::new_folder("Comic");
@@ -491,7 +530,11 @@ impl Project {
                 research.children.push(BinderItem::new_folder("World"));
                 research.children.push(BinderItem::new_text("Art References"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             "radio_drama" => {
                 let mut draft = BinderItem::new_folder("Radio Drama");
@@ -507,7 +550,11 @@ impl Project {
                 research.children.push(BinderItem::new_text("Sound Effects Notes"));
                 research.children.push(BinderItem::new_text("Music Cues"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             "documentary" => {
                 let mut draft = BinderItem::new_folder("Documentary");
@@ -529,7 +576,11 @@ impl Project {
                 research.children.push(BinderItem::new_folder("Sources"));
                 research.children.push(BinderItem::new_text("Shot List"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             "mla_paper" => {
                 let mut draft = BinderItem::new_folder("Paper");
@@ -544,7 +595,11 @@ impl Project {
                 research.children.push(BinderItem::new_text("Notes"));
                 research.children.push(BinderItem::new_text("Outline"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             "chicago_essay" => {
                 let mut draft = BinderItem::new_folder("Essay");
@@ -560,7 +615,11 @@ impl Project {
                 research.children.push(BinderItem::new_folder("Secondary Sources"));
                 research.children.push(BinderItem::new_text("Notes"));
 
-                self.binder = Binder { draft, research, trash: BinderItem::new_folder("Trash") };
+                self.binder = Binder {
+                    draft,
+                    research,
+                    trash: BinderItem::new_folder("Trash"),
+                };
             }
             _ => {} // Keep default structure
         }
@@ -577,6 +636,48 @@ impl Project {
         Ok(())
     }
 
+    /// Load a single document from disk by item ID.
+    /// Useful for on-demand loading when navigating to a document.
+    #[allow(dead_code)]
+    pub fn load_document(&mut self, item_id: &Uuid) -> Result<bool> {
+        let project_dir = match &self.path {
+            Some(p) => p.clone(),
+            None => return Ok(false),
+        };
+        let docs_dir = project_dir.join("docs");
+        let doc_path = docs_dir.join(format!("{}.json", item_id));
+        if !doc_path.exists() {
+            return Ok(false);
+        }
+        let json = fs::read_to_string(&doc_path).context("Failed to read document file")?;
+        let doc: Document = serde_json::from_str(&json).context("Failed to parse document file")?;
+        if let Some(item) = self.binder.find_item_mut(item_id) {
+            item.document = Some(doc);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Save the project to disk asynchronously (runs I/O on a blocking thread).
+    /// Use from iced `Task` or other async contexts to avoid blocking the UI thread.
+    #[allow(dead_code)]
+    pub async fn save_async(mut self, base_path: PathBuf) -> Result<Self> {
+        tokio::task::spawn_blocking(move || {
+            self.save(&base_path)?;
+            Ok(self)
+        })
+        .await
+        .context("Save task panicked")?
+    }
+
+    /// Load a project from disk asynchronously (runs I/O on a blocking thread).
+    #[allow(dead_code)]
+    pub async fn load_async(project_dir: PathBuf) -> Result<Self> {
+        tokio::task::spawn_blocking(move || Self::load(&project_dir))
+            .await
+            .context("Load task panicked")?
+    }
 }
 
 #[cfg(test)]
@@ -677,8 +778,8 @@ mod tests {
 
     #[test]
     fn test_save_and_load_snapshots() {
-        use tempfile::tempdir;
         use crate::core::binder::BinderItem;
+        use tempfile::tempdir;
 
         let dir = tempdir().unwrap();
         let mut project = Project::new("SnapshotTest");
@@ -692,7 +793,9 @@ mod tests {
 
         // Create a snapshot
         let item_id = project.binder.draft.children.last().unwrap().id;
-        project.create_snapshot(&item_id, "First Draft").expect("snapshot should succeed in test");
+        project
+            .create_snapshot(&item_id, "First Draft")
+            .expect("snapshot should succeed in test");
 
         // Verify snapshot exists in memory
         let item = project.binder.find_item(&item_id).unwrap();
@@ -716,21 +819,25 @@ mod tests {
 
     #[test]
     fn test_save_and_load_compile_presets() {
-        use tempfile::tempdir;
         use crate::export::compiler::{CompileOptions, OutputFormat};
+        use tempfile::tempdir;
 
         let dir = tempdir().unwrap();
         let mut project = Project::new("PresetTest");
 
         // Add compile presets
-        let mut opts = CompileOptions::default();
-        opts.title = "My Book".to_string();
-        opts.format = OutputFormat::Html;
+        let opts = CompileOptions {
+            title: "My Book".to_string(),
+            format: OutputFormat::Html,
+            ..Default::default()
+        };
         project.compile_presets.push(("HTML Export".to_string(), opts));
 
-        let mut opts2 = CompileOptions::default();
-        opts2.format = OutputFormat::Latex;
-        opts2.font_size = 14.0;
+        let opts2 = CompileOptions {
+            format: OutputFormat::Latex,
+            font_size: 14.0,
+            ..Default::default()
+        };
         project.compile_presets.push(("LaTeX Export".to_string(), opts2));
 
         // Save project
@@ -750,9 +857,9 @@ mod tests {
 
     #[test]
     fn test_save_and_load_annotations() {
-        use tempfile::tempdir;
-        use crate::core::binder::BinderItem;
         use crate::core::annotation::Annotation;
+        use crate::core::binder::BinderItem;
+        use tempfile::tempdir;
 
         let dir = tempdir().unwrap();
         let mut project = Project::new("AnnotationTest");
@@ -782,5 +889,4 @@ mod tests {
         assert_eq!(doc.annotations[0].end, 19);
         assert_eq!(doc.annotations[1].text, "Consider stronger word");
     }
-
 }

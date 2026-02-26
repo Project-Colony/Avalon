@@ -7,9 +7,7 @@ use crate::gui::theme::Theme;
 
 /// Render the compile/export dialog
 pub fn view(options: &CompileOptions, presets: &[(String, CompileOptions)]) -> Element<'static, Message> {
-    let header = text("Compile Project")
-        .size(20)
-        .color(Theme::TEXT_PRIMARY);
+    let header = text("Compile Project").size(20).color(Theme::TEXT_PRIMARY);
 
     // Format selection
     let format_label = text("Output Format").size(12).color(Theme::TEXT_MUTED);
@@ -18,12 +16,8 @@ pub fn view(options: &CompileOptions, presets: &[(String, CompileOptions)]) -> E
         .map(|f| f.display_name().to_string())
         .collect();
     let current_format = options.format.display_name().to_string();
-    let format_picker = pick_list(
-        format_options,
-        Some(current_format),
-        Message::CompileSetFormat,
-    )
-    .width(Length::Fixed(200.0));
+    let format_picker =
+        pick_list(format_options, Some(current_format), Message::CompileSetFormat).width(Length::Fixed(200.0));
 
     // Title
     let title_label = text("Title").size(12).color(Theme::TEXT_MUTED);
@@ -79,12 +73,8 @@ pub fn view(options: &CompileOptions, presets: &[(String, CompileOptions)]) -> E
         SeparatorType::None => "None",
         SeparatorType::Custom(_) => "Custom",
     };
-    let sep_picker = pick_list(
-        sep_options,
-        Some(current_sep.to_string()),
-        Message::CompileSetSeparator,
-    )
-    .width(Length::Fixed(200.0));
+    let sep_picker =
+        pick_list(sep_options, Some(current_sep.to_string()), Message::CompileSetSeparator).width(Length::Fixed(200.0));
 
     // Options
     let front_matter_toggle = toggler(options.include_front_matter)
@@ -108,17 +98,13 @@ pub fn view(options: &CompileOptions, presets: &[(String, CompileOptions)]) -> E
         .on_toggle(Message::CompileSetPlaceholders);
 
     // Buttons
-    let compile_btn = button(
-        text("  Compile  ").size(14).color(Theme::TEXT_PRIMARY),
-    )
-    .on_press(Message::DoCompile)
-    .padding(Padding::from([8, 20]));
+    let compile_btn = button(text("  Compile  ").size(14).color(Theme::TEXT_PRIMARY))
+        .on_press(Message::DoCompile)
+        .padding(Padding::from([8, 20]));
 
-    let cancel_btn = button(
-        text("  Cancel  ").size(14).color(Theme::TEXT_SECONDARY),
-    )
-    .on_press(Message::HideCompileDialog)
-    .padding(Padding::from([8, 20]));
+    let cancel_btn = button(text("  Cancel  ").size(14).color(Theme::TEXT_SECONDARY))
+        .on_press(Message::HideCompileDialog)
+        .padding(Padding::from([8, 20]));
 
     // Presets section
     let presets_label = text("Compile Presets").size(12).color(Theme::TEXT_MUTED);
@@ -131,29 +117,23 @@ pub fn view(options: &CompileOptions, presets: &[(String, CompileOptions)]) -> E
     for (name, _) in &built_in_presets {
         let n = name.clone();
         presets_row = presets_row.push(
-            button(
-                text(name.clone()).size(10).color(Theme::TEXT_SECONDARY),
-            )
-            .on_press(Message::LoadCompilePreset(n))
-            .padding(Padding::from([2, 6]))
+            button(text(name.clone()).size(10).color(Theme::TEXT_SECONDARY))
+                .on_press(Message::LoadCompilePreset(n))
+                .padding(Padding::from([2, 6])),
         );
     }
     for (name, _) in presets {
         let n = name.clone();
         presets_row = presets_row.push(
-            button(
-                text(name.clone()).size(10).color(Theme::TEXT_ACCENT),
-            )
-            .on_press(Message::LoadCompilePreset(n))
-            .padding(Padding::from([2, 6]))
+            button(text(name.clone()).size(10).color(Theme::TEXT_ACCENT))
+                .on_press(Message::LoadCompilePreset(n))
+                .padding(Padding::from([2, 6])),
         );
     }
 
-    let save_preset_btn = button(
-        text("Save Current as Preset").size(10).color(Theme::TEXT_ACCENT),
-    )
-    .on_press(Message::SaveCompilePreset("Custom".to_string()))
-    .padding(Padding::from([2, 8]));
+    let save_preset_btn = button(text("Save Current as Preset").size(10).color(Theme::TEXT_ACCENT))
+        .on_press(Message::SaveCompilePreset("Custom".to_string()))
+        .padding(Padding::from([2, 8]));
 
     let content = column![
         header,
@@ -191,11 +171,7 @@ pub fn view(options: &CompileOptions, presets: &[(String, CompileOptions)]) -> E
         Space::with_height(6),
         placeholders_toggle,
         Space::with_height(24),
-        row![
-            compile_btn,
-            Space::with_width(8),
-            cancel_btn,
-        ],
+        row![compile_btn, Space::with_width(8), cancel_btn,],
     ]
     .padding(24)
     .max_width(500);

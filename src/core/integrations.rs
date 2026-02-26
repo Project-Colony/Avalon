@@ -14,8 +14,8 @@ use super::binder::Binder;
 use super::comments::CommentManager;
 use super::corkboard::{CorkboardSettings, CorkboardState};
 use super::indexer::SearchIndex;
-use super::links;
 use super::linguistic;
+use super::links;
 use super::outliner::{self, OutlinerItem, OutlinerSettings, OutlinerState};
 use super::revision::RevisionTracker;
 use super::search::SearchManager;
@@ -99,16 +99,10 @@ impl ProjectState {
 
     /// Called after a document is edited. Keeps the search index up-to-date
     /// and shifts comment anchors if needed.
-    pub fn on_document_edit(
-        &mut self,
-        doc_id: Uuid,
-        title: &str,
-        content: &str,
-        notes: &str,
-        synopsis: &str,
-    ) {
+    pub fn on_document_edit(&mut self, doc_id: Uuid, title: &str, content: &str, notes: &str, synopsis: &str) {
         // Update the search index entry for this document
-        self.search_index.update_document(doc_id, title, content, notes, synopsis);
+        self.search_index
+            .update_document(doc_id, title, content, notes, synopsis);
 
         // Mark index as stale so background re-indexing can happen if needed
         self.search_index.mark_stale();
@@ -136,7 +130,7 @@ impl ProjectState {
 
     /// Get or create a CommentManager for a specific document.
     pub fn comments_for(&mut self, doc_id: Uuid) -> &mut CommentManager {
-        self.comments.entry(doc_id).or_insert_with(CommentManager::new)
+        self.comments.entry(doc_id).or_default()
     }
 
     /// Get a read-only reference to comments for a document, if any exist.
@@ -149,13 +143,8 @@ impl ProjectState {
     /// Record an insertion in the current revision pass (if revision mode is active).
     pub fn record_insertion(&mut self, start: usize, end: usize, new_text: &str) {
         if self.revision_tracker.is_active() {
-            self.revision_tracker.add_mark(
-                super::revision::RevisionMarkKind::Insertion,
-                start,
-                end,
-                "",
-                new_text,
-            );
+            self.revision_tracker
+                .add_mark(super::revision::RevisionMarkKind::Insertion, start, end, "", new_text);
         }
     }
 
@@ -173,13 +162,7 @@ impl ProjectState {
     }
 
     /// Record a replacement in the current revision pass (if revision mode is active).
-    pub fn record_replacement(
-        &mut self,
-        start: usize,
-        end: usize,
-        original_text: &str,
-        new_text: &str,
-    ) {
+    pub fn record_replacement(&mut self, start: usize, end: usize, original_text: &str, new_text: &str) {
         if self.revision_tracker.is_active() {
             self.revision_tracker.add_mark(
                 super::revision::RevisionMarkKind::Replacement,
@@ -216,10 +199,7 @@ impl ProjectState {
         map
     }
 
-    fn collect_word_counts(
-        item: &super::binder::BinderItem,
-        map: &mut HashMap<Uuid, usize>,
-    ) {
+    fn collect_word_counts(item: &super::binder::BinderItem, map: &mut HashMap<Uuid, usize>) {
         if let Some(ref doc) = item.document {
             map.insert(item.id, doc.word_count());
         }
@@ -231,16 +211,14 @@ impl ProjectState {
     // === Outliner ===
 
     /// Build outliner items from a binder item's children.
-    pub fn build_outliner_items(
-        items: &[super::binder::BinderItem],
-        _targets: &DocumentTargets,
-    ) -> Vec<OutlinerItem> {
-        items.iter().map(|item| {
-            OutlinerItem {
+    pub fn build_outliner_items(items: &[super::binder::BinderItem], _targets: &DocumentTargets) -> Vec<OutlinerItem> {
+        items
+            .iter()
+            .map(|item| OutlinerItem {
                 id: item.id,
                 children: Self::build_outliner_items(&item.children, _targets),
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     // === Search ===
@@ -252,7 +230,11 @@ impl ProjectState {
 
     /// Get search suggestions based on prefix.
     pub fn search_suggestions(&self, prefix: &str) -> Vec<String> {
-        self.search_manager.suggest(prefix).into_iter().map(|s| s.to_string()).collect()
+        self.search_manager
+            .suggest(prefix)
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect()
     }
 
     // === Corkboard ===
@@ -303,5 +285,113 @@ impl ProjectState {
     /// Auto-fix issues in the binder.
     pub fn auto_fix(binder: &mut Binder) -> validation::AutoFixResult {
         validation::auto_fix(binder)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::binder::{Binder, BinderItem};
+
+    #[test]
+    fn test_project_state_new() {
+        let state = ProjectState::new();
+        assert!(state.comments.is_empty());
+        assert!(state.watcher.is_none());
+        assert!(!state.revision_tracker.is_active());
+    }
+
+    #[test]
+    fn test_comments_for_creates_entry() {
+        let mut state = ProjectState::new();
+        let id = Uuid::new_v4();
+        let _ = state.comments_for(id);
+        assert!(state.comments.contains_key(&id));
+    }
+
+    #[test]
+    fn test_comments_ref_returns_none() {
+        let state = ProjectState::new();
+        let id = Uuid::new_v4();
+        assert!(state.comments_ref(&id).is_none());
+    }
+
+    #[test]
+    fn test_comments_ref_returns_some() {
+        let mut state = ProjectState::new();
+        let id = Uuid::new_v4();
+        let _ = state.comments_for(id);
+        assert!(state.comments_ref(&id).is_some());
+    }
+
+    #[test]
+    fn test_set_target_and_remove() {
+        let mut state = ProjectState::new();
+        let id = Uuid::new_v4();
+        state.set_target(id, 1000);
+        assert!(state.targets.get_target(&id).is_some());
+        state.set_target(id, 0);
+        assert!(state.targets.get_target(&id).is_none());
+    }
+
+    #[test]
+    fn test_word_count_map() {
+        let mut binder = Binder::default_structure();
+        let item = BinderItem::new_text("Test Doc");
+        binder.draft.children.push(item);
+        let map = ProjectState::word_count_map(&binder);
+        // The text document has empty content, so word count = 0
+        assert!(map.values().all(|&v| v == 0));
+    }
+
+    #[test]
+    fn test_build_outliner_items() {
+        let items = vec![BinderItem::new_text("Doc 1"), BinderItem::new_folder("Folder 1")];
+        let targets = DocumentTargets::new();
+        let outliner_items = ProjectState::build_outliner_items(&items, &targets);
+        assert_eq!(outliner_items.len(), 2);
+    }
+
+    #[test]
+    fn test_record_search() {
+        let mut state = ProjectState::new();
+        state.record_search("hello");
+        let suggestions = state.search_suggestions("hel");
+        assert!(suggestions.iter().any(|s| s.contains("hello")));
+    }
+
+    #[test]
+    fn test_on_project_load_builds_index() {
+        let mut state = ProjectState::new();
+        let binder = Binder::default_structure();
+        state.on_project_load(&binder, None);
+        // Should not panic, watcher should stay None
+        assert!(state.watcher.is_none());
+    }
+
+    #[test]
+    fn test_poll_external_changes_no_watcher() {
+        let mut state = ProjectState::new();
+        assert!(!state.poll_external_changes());
+    }
+
+    #[test]
+    fn test_clear_external_changes() {
+        let mut state = ProjectState::new();
+        state.clear_external_changes(); // should not panic
+    }
+
+    #[test]
+    fn test_analyze_writing() {
+        let analysis = ProjectState::analyze_writing("Hello world. This is a test.");
+        assert!(analysis.readability.word_count > 0);
+    }
+
+    #[test]
+    fn test_validate_project() {
+        let binder = Binder::default_structure();
+        let result = ProjectState::validate_project(&binder);
+        // Default binder should have no issues
+        assert!(result.issues.is_empty());
     }
 }

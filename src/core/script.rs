@@ -56,7 +56,10 @@ impl ScriptElement {
 
     /// Check if this element type is typically uppercase
     pub fn is_uppercase(&self) -> bool {
-        matches!(self, ScriptElement::SceneHeading | ScriptElement::Character | ScriptElement::Transition)
+        matches!(
+            self,
+            ScriptElement::SceneHeading | ScriptElement::Character | ScriptElement::Transition
+        )
     }
 
     /// Expected indentation level for Fountain format
@@ -146,18 +149,27 @@ impl AutoCorrection {
 
     /// Check if any correction is enabled
     pub fn any_enabled(&self) -> bool {
-        self.smart_quotes || self.em_dashes || self.ellipsis
-            || self.capitalize_sentences || self.superscript_ordinals
+        self.smart_quotes || self.em_dashes || self.ellipsis || self.capitalize_sentences || self.superscript_ordinals
     }
 
     /// Get a summary of active corrections
     pub fn active_list(&self) -> Vec<&str> {
         let mut active = Vec::new();
-        if self.smart_quotes { active.push("Smart Quotes"); }
-        if self.em_dashes { active.push("Em Dashes"); }
-        if self.ellipsis { active.push("Ellipsis"); }
-        if self.capitalize_sentences { active.push("Auto-Capitalize"); }
-        if self.superscript_ordinals { active.push("Ordinals"); }
+        if self.smart_quotes {
+            active.push("Smart Quotes");
+        }
+        if self.em_dashes {
+            active.push("Em Dashes");
+        }
+        if self.ellipsis {
+            active.push("Ellipsis");
+        }
+        if self.capitalize_sentences {
+            active.push("Auto-Capitalize");
+        }
+        if self.superscript_ordinals {
+            active.push("Ordinals");
+        }
         active
     }
 
@@ -193,11 +205,11 @@ pub enum RevisionLevel {
 impl RevisionLevel {
     pub fn color_hex(&self) -> &str {
         match self {
-            RevisionLevel::First => "#e74c3c",   // Red
-            RevisionLevel::Second => "#3498db",   // Blue
-            RevisionLevel::Third => "#2ecc71",    // Green
-            RevisionLevel::Fourth => "#e67e22",   // Orange
-            RevisionLevel::Fifth => "#9b59b6",    // Purple
+            RevisionLevel::First => "#e74c3c",  // Red
+            RevisionLevel::Second => "#3498db", // Blue
+            RevisionLevel::Third => "#2ecc71",  // Green
+            RevisionLevel::Fourth => "#e67e22", // Orange
+            RevisionLevel::Fifth => "#9b59b6",  // Purple
         }
     }
 
@@ -279,9 +291,18 @@ mod tests {
 
     #[test]
     fn test_next_element_on_enter() {
-        assert!(matches!(ScriptElement::SceneHeading.next_element_on_enter(), ScriptElement::Action));
-        assert!(matches!(ScriptElement::Character.next_element_on_enter(), ScriptElement::Dialogue));
-        assert!(matches!(ScriptElement::Dialogue.next_element_on_enter(), ScriptElement::Character));
+        assert!(matches!(
+            ScriptElement::SceneHeading.next_element_on_enter(),
+            ScriptElement::Action
+        ));
+        assert!(matches!(
+            ScriptElement::Character.next_element_on_enter(),
+            ScriptElement::Dialogue
+        ));
+        assert!(matches!(
+            ScriptElement::Dialogue.next_element_on_enter(),
+            ScriptElement::Character
+        ));
     }
 
     #[test]
@@ -501,11 +522,17 @@ mod tests {
 
     #[test]
     fn test_next_element_transition() {
-        assert!(matches!(ScriptElement::Transition.next_element_on_enter(), ScriptElement::Action));
+        assert!(matches!(
+            ScriptElement::Transition.next_element_on_enter(),
+            ScriptElement::Action
+        ));
     }
 
     #[test]
     fn test_next_element_parenthetical() {
-        assert!(matches!(ScriptElement::Parenthetical.next_element_on_enter(), ScriptElement::Dialogue));
+        assert!(matches!(
+            ScriptElement::Parenthetical.next_element_on_enter(),
+            ScriptElement::Dialogue
+        ));
     }
 }

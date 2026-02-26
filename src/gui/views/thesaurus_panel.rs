@@ -6,10 +6,7 @@ use crate::gui::theme::{self, Theme};
 use crate::thesaurus::ThesaurusEntry;
 
 /// Render the thesaurus panel (bottom panel)
-pub fn view(
-    query: &str,
-    results: &[ThesaurusEntry],
-) -> Element<'static, Message> {
+pub fn view(query: &str, results: &[ThesaurusEntry]) -> Element<'static, Message> {
     let result_count = if results.is_empty() {
         String::new()
     } else {
@@ -18,9 +15,7 @@ pub fn view(
     };
 
     let header = row![
-        text("THESAURUS")
-            .size(11)
-            .color(Theme::TEXT_SECONDARY),
+        text("THESAURUS").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(8),
         text(result_count).size(10).color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
@@ -36,14 +31,11 @@ pub fn view(
         .padding(6)
         .width(Length::Fixed(300.0));
 
-    let lookup_btn = button(
-        text("Look Up").size(12).color(Theme::TEXT_PRIMARY),
-    )
-    .on_press(Message::DoThesaurusLookup)
-    .padding(Padding::from([4, 12]));
+    let lookup_btn = button(text("Look Up").size(12).color(Theme::TEXT_PRIMARY))
+        .on_press(Message::DoThesaurusLookup)
+        .padding(Padding::from([4, 12]));
 
-    let input_row = row![input, Space::with_width(4), lookup_btn]
-        .align_y(iced::Alignment::Center);
+    let input_row = row![input, Space::with_width(4), lookup_btn].align_y(iced::Alignment::Center);
 
     let mut entries = column![].spacing(8);
 
@@ -72,11 +64,9 @@ pub fn view(
         let mut synonyms_row = row![].spacing(4);
         for syn in entry.synonyms.iter().take(10) {
             let word_insert = syn.clone();
-            let syn_btn = button(
-                text(syn.clone()).size(11).color(Theme::TEXT_ACCENT),
-            )
-            .on_press(Message::InsertSynonym(word_insert))
-            .padding(Padding::from([2, 6]));
+            let syn_btn = button(text(syn.clone()).size(11).color(Theme::TEXT_ACCENT))
+                .on_press(Message::InsertSynonym(word_insert))
+                .padding(Padding::from([2, 6]));
             synonyms_row = synonyms_row.push(syn_btn);
         }
         if entry.synonyms.len() > 10 {
@@ -89,16 +79,9 @@ pub fn view(
 
         // Antonyms row (if any)
         let antonyms_widget: Element<'static, Message> = if !entry.antonyms.is_empty() {
-            let mut ant_row = row![
-                text("Antonyms: ").size(10).color(Theme::TEXT_MUTED),
-            ]
-            .spacing(4);
+            let mut ant_row = row![text("Antonyms: ").size(10).color(Theme::TEXT_MUTED),].spacing(4);
             for ant in entry.antonyms.iter().take(6) {
-                ant_row = ant_row.push(
-                    text(ant.clone())
-                        .size(11)
-                        .color(iced::Color::from_rgb(0.8, 0.4, 0.4)),
-                );
+                ant_row = ant_row.push(text(ant.clone()).size(11).color(iced::Color::from_rgb(0.8, 0.4, 0.4)));
             }
             ant_row.into()
         } else {
@@ -111,10 +94,7 @@ pub fn view(
                 Space::with_width(8),
                 text(def_text).size(12).color(Theme::TEXT_SECONDARY),
             ],
-            row![
-                text("Synonyms: ").size(10).color(Theme::TEXT_MUTED),
-                synonyms_row,
-            ],
+            row![text("Synonyms: ").size(10).color(Theme::TEXT_MUTED), synonyms_row,],
             antonyms_widget,
         ]
         .spacing(2);
@@ -127,9 +107,7 @@ pub fn view(
             .size(9)
             .color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
-        text("Shortcut: Ctrl+Shift+T")
-            .size(9)
-            .color(Theme::TEXT_MUTED),
+        text("Shortcut: Ctrl+Shift+T").size(9).color(Theme::TEXT_MUTED),
     ];
 
     let content = column![
@@ -143,8 +121,5 @@ pub fn view(
     ]
     .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }

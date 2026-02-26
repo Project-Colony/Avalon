@@ -1,12 +1,16 @@
 use iced::widget::{button, column, container, row, scrollable, text, Space};
 use iced::{Element, Length, Padding};
 
-use crate::core::snapshot::{DiffChunk, DiffStats, Snapshot, format_unified_diff, inline_diff};
+use crate::core::snapshot::{format_unified_diff, inline_diff, DiffChunk, DiffStats, Snapshot};
 use crate::gui::app::Message;
 use crate::gui::theme::{self, Theme};
 
 /// Render the snapshot panel (bottom panel)
-pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Option<usize>) -> Element<'static, Message> {
+pub fn view(
+    snapshots: &[Snapshot],
+    current_content: &str,
+    selected_snapshot: Option<usize>,
+) -> Element<'static, Message> {
     let header_row = row![
         text("SNAPSHOTS").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(8),
@@ -14,15 +18,11 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
             .size(10)
             .color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
-        text("Shortcut: Ctrl+5")
-            .size(9)
-            .color(Theme::TEXT_MUTED),
+        text("Shortcut: Ctrl+5").size(9).color(Theme::TEXT_MUTED),
         Space::with_width(8),
-        button(
-            text("\u{f030} Take Snapshot").size(12).color(Theme::TEXT_ACCENT),
-        )
-        .on_press(Message::CreateSnapshot)
-        .padding(Padding::from([4, 12])),
+        button(text("\u{f030} Take Snapshot").size(12).color(Theme::TEXT_ACCENT),)
+            .on_press(Message::CreateSnapshot)
+            .padding(Padding::from([4, 12])),
     ];
 
     // Snapshot list
@@ -49,9 +49,13 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
         // Calculate similarity to current content
         let similarity = snapshot.similarity(current_content);
         let sim_pct = (similarity * 100.0) as usize;
-        let sim_color = if sim_pct >= 90 { Theme::SUCCESS }
-            else if sim_pct >= 50 { Theme::WARNING }
-            else { Theme::ERROR };
+        let sim_color = if sim_pct >= 90 {
+            Theme::SUCCESS
+        } else if sim_pct >= 50 {
+            Theme::WARNING
+        } else {
+            Theme::ERROR
+        };
         let sim_text = format!("{}% sim", sim_pct);
 
         let is_selected = selected_snapshot == Some(i);
@@ -71,12 +75,10 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
                     .size(10)
                     .color(Theme::TEXT_MUTED)
                     .width(Length::Fixed(36.0)),
-                button(
-                    text(snapshot.title.clone()).size(12).color(text_color),
-                )
-                .on_press(Message::SelectSnapshot(i))
-                .padding(Padding::from([2, 4]))
-                .width(Length::FillPortion(3)),
+                button(text(snapshot.title.clone()).size(12).color(text_color),)
+                    .on_press(Message::SelectSnapshot(i))
+                    .padding(Padding::from([2, 4]))
+                    .width(Length::FillPortion(3)),
                 if is_latest {
                     text("LATEST").size(9).color(Theme::SUCCESS)
                 } else {
@@ -91,20 +93,16 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
                 Space::with_width(4),
                 text(sim_text).size(9).color(sim_color),
                 Space::with_width(8),
-                button(
-                    text("\u{f0e2} Restore").size(10).color(Theme::TEXT_ACCENT),
-                )
-                .on_press(Message::RestoreSnapshot(i))
-                .padding(Padding::from([2, 6])),
+                button(text("\u{f0e2} Restore").size(10).color(Theme::TEXT_ACCENT),)
+                    .on_press(Message::RestoreSnapshot(i))
+                    .padding(Padding::from([2, 6])),
                 Space::with_width(4),
-                button(
-                    text("\u{f07e} Diff").size(10).color(Theme::WARNING),
-                )
-                .on_press(Message::CompareSnapshot(i))
-                .padding(Padding::from([2, 6])),
+                button(text("\u{f07e} Diff").size(10).color(Theme::WARNING),)
+                    .on_press(Message::CompareSnapshot(i))
+                    .padding(Padding::from([2, 6])),
             ]
             .spacing(4)
-            .align_y(iced::Alignment::Center)
+            .align_y(iced::Alignment::Center),
         )
         .padding(Padding::from([2, 8]));
 
@@ -118,28 +116,24 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
             let stats = DiffStats::from_chunks(&diff);
             let current_words = current_content.split_whitespace().count();
 
-            let mut diff_col = column![
-                row![
-                    text(format!("Comparing: \"{}\" vs Current", snapshot.title))
-                        .size(11)
-                        .color(Theme::TEXT_SECONDARY),
-                    Space::with_width(Length::Fill),
-                    text(format!("Snapshot: {} words | Current: {} words",
-                        snapshot.word_count,
-                        current_words
-                    ))
-                    .size(10)
-                    .color(Theme::TEXT_MUTED),
-                ],
-            ]
+            let mut diff_col = column![row![
+                text(format!("Comparing: \"{}\" vs Current", snapshot.title))
+                    .size(11)
+                    .color(Theme::TEXT_SECONDARY),
+                Space::with_width(Length::Fill),
+                text(format!(
+                    "Snapshot: {} words | Current: {} words",
+                    snapshot.word_count, current_words
+                ))
+                .size(10)
+                .color(Theme::TEXT_MUTED),
+            ],]
             .spacing(1);
 
             // Show unified diff header
             let unified = format_unified_diff(&diff, &snapshot.title, "Current");
             for line in unified.lines().take(3) {
-                diff_col = diff_col.push(
-                    text(line.to_string()).size(9).color(Theme::TEXT_MUTED),
-                );
+                diff_col = diff_col.push(text(line.to_string()).size(9).color(Theme::TEXT_MUTED));
             }
 
             let total_chunks = diff.len();
@@ -154,17 +148,9 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
                         pending_removed = None;
                         shown_equal += 1;
                         if shown_equal <= 2 || total_chunks <= 30 {
-                            diff_col = diff_col.push(
-                                text(format!("  {}", line))
-                                    .size(10)
-                                    .color(Theme::TEXT_MUTED),
-                            );
+                            diff_col = diff_col.push(text(format!("  {}", line)).size(10).color(Theme::TEXT_MUTED));
                         } else if shown_equal == 3 {
-                            diff_col = diff_col.push(
-                                text("  ...")
-                                    .size(10)
-                                    .color(Theme::TEXT_MUTED),
-                            );
+                            diff_col = diff_col.push(text("  ...").size(10).color(Theme::TEXT_MUTED));
                         }
                     }
                     DiffChunk::Added(line) => {
@@ -172,32 +158,18 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
                         // Show inline diff if we have a paired removed line
                         if let Some(ref old_line) = pending_removed {
                             let inline_chunks = inline_diff(old_line, line);
-                            let marked: String = inline_chunks.iter()
-                                .map(|c| c.to_marked_string())
-                                .collect();
-                            diff_col = diff_col.push(
-                                text(format!("~ {}", marked))
-                                    .size(10)
-                                    .color(Theme::WARNING),
-                            );
+                            let marked: String = inline_chunks.iter().map(|c| c.to_marked_string()).collect();
+                            diff_col = diff_col.push(text(format!("~ {}", marked)).size(10).color(Theme::WARNING));
                             pending_removed = None;
                         } else {
-                            diff_col = diff_col.push(
-                                text(format!("+ {}", line))
-                                    .size(10)
-                                    .color(Theme::SUCCESS),
-                            );
+                            diff_col = diff_col.push(text(format!("+ {}", line)).size(10).color(Theme::SUCCESS));
                         }
                     }
                     DiffChunk::Removed(line) => {
                         shown_equal = 0;
                         // If we already have a pending removed, flush it
                         if let Some(ref old) = pending_removed {
-                            diff_col = diff_col.push(
-                                text(format!("- {}", old))
-                                    .size(10)
-                                    .color(Theme::ERROR),
-                            );
+                            diff_col = diff_col.push(text(format!("- {}", old)).size(10).color(Theme::ERROR));
                         }
                         pending_removed = Some(line.clone());
                     }
@@ -205,24 +177,20 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
             }
             // Flush any remaining pending removed line
             if let Some(ref old) = pending_removed {
-                diff_col = diff_col.push(
-                    text(format!("- {}", old))
-                        .size(10)
-                        .color(Theme::ERROR),
-                );
+                diff_col = diff_col.push(text(format!("- {}", old)).size(10).color(Theme::ERROR));
             }
 
-            diff_col = diff_col.push(
-                row![
-                    text(stats.summary())
-                        .size(10)
-                        .color(Theme::TEXT_SECONDARY),
-                    Space::with_width(8),
-                    text(format!("{:.0}% changed", stats.change_percentage()))
-                        .size(10)
-                        .color(if stats.change_percentage() > 50.0 { Theme::WARNING } else { Theme::TEXT_MUTED }),
-                ],
-            );
+            diff_col = diff_col.push(row![
+                text(stats.summary()).size(10).color(Theme::TEXT_SECONDARY),
+                Space::with_width(8),
+                text(format!("{:.0}% changed", stats.change_percentage()))
+                    .size(10)
+                    .color(if stats.change_percentage() > 50.0 {
+                        Theme::WARNING
+                    } else {
+                        Theme::TEXT_MUTED
+                    }),
+            ]);
 
             scrollable(diff_col).height(Length::Fixed(80.0)).into()
         } else {
@@ -241,8 +209,5 @@ pub fn view(snapshots: &[Snapshot], current_content: &str, selected_snapshot: Op
     ]
     .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }

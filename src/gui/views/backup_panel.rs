@@ -14,15 +14,18 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
     let header = row![
         text("BACKUP MANAGEMENT").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(Length::Fill),
-        text(format!("{} backup{} ({})", backup_count, if backup_count == 1 { "" } else { "s" }, total_size_str))
-            .size(10)
-            .color(Theme::TEXT_MUTED),
+        text(format!(
+            "{} backup{} ({})",
+            backup_count,
+            if backup_count == 1 { "" } else { "s" },
+            total_size_str
+        ))
+        .size(10)
+        .color(Theme::TEXT_MUTED),
         Space::with_width(8),
-        button(
-            text("\u{f067} Create Backup").size(11).color(Theme::TEXT_ACCENT),
-        )
-        .on_press(Message::CreateBackup)
-        .padding(Padding::from([4, 10])),
+        button(text("\u{f067} Create Backup").size(11).color(Theme::TEXT_ACCENT),)
+            .on_press(Message::CreateBackup)
+            .padding(Padding::from([4, 10])),
     ];
 
     let subtitle = row![
@@ -39,15 +42,14 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
 
     if backups.is_empty() {
         list = list.push(
-            container(
-                column![
-                    text("No backups found.").size(12).color(Theme::TEXT_MUTED),
-                    Space::with_height(4),
-                    text("Click 'Create Backup' to save a snapshot of your entire project.")
-                        .size(10)
-                        .color(Theme::TEXT_MUTED),
-                ]
-            ).padding(Padding::from([8, 0]))
+            container(column![
+                text("No backups found.").size(12).color(Theme::TEXT_MUTED),
+                Space::with_height(4),
+                text("Click 'Create Backup' to save a snapshot of your entire project.")
+                    .size(10)
+                    .color(Theme::TEXT_MUTED),
+            ])
+            .padding(Padding::from([8, 0])),
         );
     }
 
@@ -59,7 +61,11 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
         // Parse timestamp string (YYYYMMDD_HHMMSS format) for age calculation
         let age_str = parse_age_from_timestamp(&entry.timestamp);
 
-        let label_color = if is_latest { Theme::TEXT_ACCENT } else { Theme::TEXT_PRIMARY };
+        let label_color = if is_latest {
+            Theme::TEXT_ACCENT
+        } else {
+            Theme::TEXT_PRIMARY
+        };
         let latest_tag: Element<'static, Message> = if is_latest {
             text("LATEST").size(8).color(Theme::SUCCESS).into()
         } else {
@@ -68,22 +74,30 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
 
         let entry_row = container(
             row![
-                text(format!("{}.", i + 1)).size(10).color(Theme::TEXT_MUTED).width(Length::Fixed(22.0)),
-                text(entry.display_timestamp()).size(11).color(label_color)
+                text(format!("{}.", i + 1))
+                    .size(10)
+                    .color(Theme::TEXT_MUTED)
+                    .width(Length::Fixed(22.0)),
+                text(entry.display_timestamp())
+                    .size(11)
+                    .color(label_color)
                     .width(Length::FillPortion(3)),
                 latest_tag,
                 Space::with_width(4),
-                text(age_str).size(9).color(Theme::TEXT_MUTED).width(Length::Fixed(50.0)),
-                text(entry.display_size()).size(10).color(Theme::TEXT_MUTED)
+                text(age_str)
+                    .size(9)
+                    .color(Theme::TEXT_MUTED)
+                    .width(Length::Fixed(50.0)),
+                text(entry.display_size())
+                    .size(10)
+                    .color(Theme::TEXT_MUTED)
                     .width(Length::Fixed(60.0)),
-                button(
-                    text("Restore").size(10).color(Theme::WARNING),
-                )
-                .on_press(Message::RestoreBackup(path))
-                .padding(Padding::from([2, 6])),
+                button(text("Restore").size(10).color(Theme::WARNING),)
+                    .on_press(Message::RestoreBackup(path))
+                    .padding(Padding::from([2, 6])),
             ]
             .spacing(4)
-            .align_y(iced::Alignment::Center)
+            .align_y(iced::Alignment::Center),
         )
         .padding(Padding::from([2, 8]));
 
@@ -97,9 +111,7 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
             .size(9)
             .color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
-        text("Ctrl+Shift+B: quick backup")
-            .size(9)
-            .color(Theme::TEXT_MUTED),
+        text("Ctrl+Shift+B: quick backup").size(9).color(Theme::TEXT_MUTED),
     ];
 
     let content = column![
@@ -112,10 +124,7 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
     ]
     .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }
 
 /// Parse a YYYYMMDD_HHMMSS timestamp string and return age as human readable string
@@ -123,15 +132,13 @@ fn parse_age_from_timestamp(ts: &str) -> String {
     if ts.len() < 15 {
         return ts.to_string();
     }
-    let year = ts[0..4].parse::<i32>().unwrap_or(2020);
-    let month = ts[4..6].parse::<u32>().unwrap_or(1);
-    let day = ts[6..8].parse::<u32>().unwrap_or(1);
-    let hour = ts[9..11].parse::<u32>().unwrap_or(0);
-    let min = ts[11..13].parse::<u32>().unwrap_or(0);
+    let year = ts.get(0..4).and_then(|s| s.parse::<i32>().ok()).unwrap_or(2020);
+    let month = ts.get(4..6).and_then(|s| s.parse::<u32>().ok()).unwrap_or(1);
+    let day = ts.get(6..8).and_then(|s| s.parse::<u32>().ok()).unwrap_or(1);
+    let hour = ts.get(9..11).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
+    let min = ts.get(11..13).and_then(|s| s.parse::<u32>().ok()).unwrap_or(0);
 
-    if let Some(dt) = chrono::NaiveDate::from_ymd_opt(year, month, day)
-        .and_then(|d| d.and_hms_opt(hour, min, 0))
-    {
+    if let Some(dt) = chrono::NaiveDate::from_ymd_opt(year, month, day).and_then(|d| d.and_hms_opt(hour, min, 0)) {
         let backup_time = chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(dt, chrono::Utc);
         let age = chrono::Utc::now().signed_duration_since(backup_time);
         if age.num_days() > 0 {
@@ -147,4 +154,3 @@ fn parse_age_from_timestamp(ts: &str) -> String {
         ts.to_string()
     }
 }
-

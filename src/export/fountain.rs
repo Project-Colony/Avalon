@@ -1,5 +1,5 @@
-use std::fmt::Write as _;
 use anyhow::Result;
+use std::fmt::Write as _;
 
 use super::compiler::{CompileContent, CompileOptions};
 
@@ -10,11 +10,16 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
 
     // Title page metadata
     if options.include_front_matter {
-        let _ = writeln!(output,"Title: {}", options.title);
+        writeln!(output, "Title: {}", options.title).unwrap();
         if !options.author.is_empty() {
-            let _ = writeln!(output,"Author: {}", options.author);
+            writeln!(output, "Author: {}", options.author).unwrap();
         }
-        let _ = writeln!(output,"Draft date: {}", chrono::Utc::now().format(crate::core::DATE_FORMAT));
+        writeln!(
+            output,
+            "Draft date: {}",
+            chrono::Utc::now().format(crate::core::DATE_FORMAT)
+        )
+        .unwrap();
         output.push_str("Contact:\n");
         output.push('\n');
     }
@@ -25,7 +30,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
             if i > 0 {
                 output.push_str("\n\n");
             }
-            let _ = write!(output,"# {}\n\n", content.title.to_uppercase());
+            write!(output, "# {}\n\n", content.title.to_uppercase()).unwrap();
         } else {
             // Try to detect Fountain formatting, otherwise convert prose
             if !content.text.is_empty() {
@@ -111,4 +116,72 @@ fn is_scene_heading(line: &str) -> bool {
         || upper.starts_with("I/E.")
         || upper.starts_with("I/E ")
         || line.starts_with('.')
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::compiler::{CompileContent, CompileOptions};
+    use super::*;
+
+    fn default_options() -> CompileOptions {
+        CompileOptions {
+            include_front_matter: false,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_compile_basic() {
+        let contents = vec![
+            CompileContent {
+                title: "ACT ONE".into(),
+                text: String::new(),
+                depth: 0,
+                is_folder: true,
+            },
+            CompileContent {
+                title: "Scene 1".into(),
+                text: "Dialogue here.".into(),
+                depth: 1,
+                is_folder: false,
+            },
+        ];
+        let output = compile(&contents, &default_options()).unwrap();
+        assert!(output.contains("# ACT ONE"));
+        assert!(output.contains("Dialogue here."));
+    }
+
+    #[test]
+    fn test_compile_with_front_matter() {
+        let mut opts = default_options();
+        opts.include_front_matter = true;
+        opts.title = "My Screenplay".into();
+        opts.author = "Writer".into();
+        let output = compile(&[], &opts).unwrap();
+        assert!(output.contains("Title: My Screenplay"));
+        assert!(output.contains("Author: Writer"));
+    }
+
+    #[test]
+    fn test_is_scene_heading() {
+        assert!(is_scene_heading("INT. OFFICE - DAY"));
+        assert!(is_scene_heading("EXT. PARK - NIGHT"));
+        assert!(is_scene_heading(".FORCED HEADING"));
+        assert!(!is_scene_heading("Regular line"));
+    }
+
+    #[test]
+    fn test_parse_fountain_sections() {
+        let input = "INT. OFFICE - DAY\n\nBob sits.\n\nEXT. PARK - NIGHT\n\nAlice runs.";
+        let sections = parse_fountain(input);
+        assert_eq!(sections.len(), 2);
+        assert!(sections[0].0.contains("INT. OFFICE"));
+        assert!(sections[1].0.contains("EXT. PARK"));
+    }
+
+    #[test]
+    fn test_parse_fountain_empty() {
+        let sections = parse_fountain("");
+        assert!(sections.is_empty());
+    }
 }

@@ -9,10 +9,7 @@ pub fn view(notes: &str) -> Element<'static, Message> {
     let word_count = notes.split_whitespace().count();
     let char_count = notes.len();
     let line_count = if notes.is_empty() { 0 } else { notes.lines().count() };
-    let sentence_count = notes
-        .chars()
-        .filter(|c| *c == '.' || *c == '!' || *c == '?')
-        .count();
+    let sentence_count = notes.chars().filter(|c| *c == '.' || *c == '!' || *c == '?').count();
     let paragraph_count = if notes.is_empty() {
         0
     } else {
@@ -56,9 +53,7 @@ pub fn view(notes: &str) -> Element<'static, Message> {
     };
 
     let hint = row![
-        text(hint_text)
-            .size(9)
-            .color(Theme::TEXT_MUTED),
+        text(hint_text).size(9).color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
         text(reading_display).size(9).color(Theme::TEXT_MUTED),
         Space::with_width(8),
@@ -67,17 +62,8 @@ pub fn view(notes: &str) -> Element<'static, Message> {
             .color(Theme::TEXT_MUTED),
     ];
 
-    let content = column![
-        header,
-        Space::with_height(4),
-        notes_input,
-        Space::with_height(2),
-        hint,
-    ]
-    .padding(Padding::from([8, 12]));
+    let content = column![header, Space::with_height(4), notes_input, Space::with_height(2), hint,]
+        .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }

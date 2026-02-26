@@ -3,7 +3,6 @@ use iced::window;
 use uuid::Uuid;
 
 use crate::core::project::Project;
-use crate::export::compiler::CompileOptions;
 
 /// The active view mode
 #[derive(Debug, Clone, PartialEq)]
@@ -89,7 +88,11 @@ pub enum Message {
     DeleteItem(Uuid),
     RenameItem(Uuid, String),
     UpdateSynopsis(Uuid, String),
-    MoveItem { item_id: Uuid, target_id: Uuid, position: usize },
+    MoveItem {
+        item_id: Uuid,
+        target_id: Uuid,
+        position: usize,
+    },
     MoveItemUp(Uuid),
     MoveItemDown(Uuid),
     DuplicateItem(Uuid),

@@ -9,12 +9,10 @@ mod thesaurus;
 use gui::ScrineverApp;
 
 /// JetBrains Mono Nerd Font — Regular weight (embedded)
-const JETBRAINS_MONO_REGULAR: &[u8] =
-    include_bytes!("../assets/fonts/JetBrainsMonoNerdFont-Regular.ttf");
+const JETBRAINS_MONO_REGULAR: &[u8] = include_bytes!("../assets/fonts/JetBrainsMonoNerdFont-Regular.ttf");
 
 /// JetBrains Mono Nerd Font — Bold weight (embedded)
-const JETBRAINS_MONO_BOLD: &[u8] =
-    include_bytes!("../assets/fonts/JetBrainsMonoNerdFont-Bold.ttf");
+const JETBRAINS_MONO_BOLD: &[u8] = include_bytes!("../assets/fonts/JetBrainsMonoNerdFont-Bold.ttf");
 
 fn main() -> iced::Result {
     env_logger::init();

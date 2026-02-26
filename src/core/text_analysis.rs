@@ -7,12 +7,10 @@ use std::collections::HashMap;
 
 /// Common English stop words (~50 entries) used for filtering frequency lists.
 const STOP_WORDS: &[&str] = &[
-    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
-    "of", "with", "by", "from", "is", "it", "was", "were", "are", "be",
-    "been", "being", "have", "has", "had", "do", "does", "did", "will",
-    "would", "shall", "should", "may", "might", "must", "can", "could",
-    "that", "this", "these", "those", "he", "she", "they", "we", "you",
-    "not", "no", "so", "if", "as", "its", "i", "me", "my", "his", "her",
+    "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "from", "is", "it", "was",
+    "were", "are", "be", "been", "being", "have", "has", "had", "do", "does", "did", "will", "would", "shall",
+    "should", "may", "might", "must", "can", "could", "that", "this", "these", "those", "he", "she", "they", "we",
+    "you", "not", "no", "so", "if", "as", "its", "i", "me", "my", "his", "her",
 ];
 
 // ---------------------------------------------------------------------------
@@ -184,9 +182,7 @@ fn split_paragraphs(text: &str) -> Vec<String> {
 /// Handles silent 'e' at end of word, consecutive vowels counted as one group,
 /// and the consonant-le pattern. Returns a minimum of 1.
 pub fn syllable_count(word: &str) -> usize {
-    let lower = word
-        .trim_matches(|c: char| !c.is_alphabetic())
-        .to_lowercase();
+    let lower = word.trim_matches(|c: char| !c.is_alphabetic()).to_lowercase();
     if lower.is_empty() {
         return 1;
     }
@@ -276,12 +272,10 @@ pub fn compute_readability(text: &str) -> ReadabilityScores {
     let syllables_per_word = total_syllables as f64 / word_count as f64;
 
     // Flesch Reading Ease: 206.835 - 1.015 * (words/sentences) - 84.6 * (syllables/words)
-    let flesch_reading_ease =
-        206.835 - 1.015 * words_per_sentence - 84.6 * syllables_per_word;
+    let flesch_reading_ease = 206.835 - 1.015 * words_per_sentence - 84.6 * syllables_per_word;
 
     // Flesch-Kincaid Grade Level: 0.39 * (words/sentences) + 11.8 * (syllables/words) - 15.59
-    let flesch_kincaid_grade =
-        0.39 * words_per_sentence + 11.8 * syllables_per_word - 15.59;
+    let flesch_kincaid_grade = 0.39 * words_per_sentence + 11.8 * syllables_per_word - 15.59;
 
     // Gunning Fog: 0.4 * (words/sentences + 100 * complex_words/words)
     let complex_pct = complex_word_count as f64 / word_count as f64 * 100.0;
@@ -295,14 +289,11 @@ pub fn compute_readability(text: &str) -> ReadabilityScores {
     let coleman_liau = 0.0588 * l - 0.296 * s - 15.8;
 
     // Automated Readability Index: 4.71 * (chars/words) + 0.5 * (words/sentences) - 21.43
-    let ari = 4.71 * (total_chars as f64 / word_count as f64)
-        + 0.5 * words_per_sentence
-        - 21.43;
+    let ari = 4.71 * (total_chars as f64 / word_count as f64) + 0.5 * words_per_sentence - 21.43;
 
     // SMOG: 1.0430 * sqrt(complex_words * 30 / sentences) + 3.1291
     let smog = if sentence_count >= 3 {
-        1.0430 * (complex_word_count as f64 * 30.0 / sentence_count as f64).sqrt()
-            + 3.1291
+        1.0430 * (complex_word_count as f64 * 30.0 / sentence_count as f64).sqrt() + 3.1291
     } else {
         // Fallback for very short texts
         flesch_kincaid_grade
@@ -440,11 +431,7 @@ pub fn sentence_lengths(text: &str) -> Vec<SentenceInfo> {
                 .iter()
                 .map(|w| w.chars().filter(|c| c.is_alphanumeric()).count())
                 .sum();
-            let avg_wl = if wc > 0 {
-                total_char_len as f64 / wc as f64
-            } else {
-                0.0
-            };
+            let avg_wl = if wc > 0 { total_char_len as f64 / wc as f64 } else { 0.0 };
             SentenceInfo {
                 text: s,
                 word_count: wc,
@@ -566,8 +553,7 @@ pub fn analyze_text(text: &str) -> TextAnalysis {
 
     let paragraph_count = para_infos.len();
     let avg_paragraph_length = if paragraph_count > 0 {
-        para_infos.iter().map(|p| p.word_count).sum::<usize>() as f64
-            / paragraph_count as f64
+        para_infos.iter().map(|p| p.word_count).sum::<usize>() as f64 / paragraph_count as f64
     } else {
         0.0
     };
@@ -670,9 +656,7 @@ mod tests {
 
     #[test]
     fn test_readability_simple_text() {
-        let scores = compute_readability(
-            "The cat sat on the mat. The dog ran in the yard. It was a nice day.",
-        );
+        let scores = compute_readability("The cat sat on the mat. The dog ran in the yard. It was a nice day.");
         // Simple text should have high reading ease
         assert!(scores.flesch_reading_ease > 60.0);
         // And low grade level

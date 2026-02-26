@@ -10,72 +10,72 @@ pub struct Icons;
 
 impl Icons {
     // ── File & document ──────────────────────────────────────
-    pub const FOLDER: &str = "\u{f07b}";          // nf-fa-folder
-    pub const FOLDER_OPEN: &str = "\u{f07c}";     // nf-fa-folder_open
-    pub const FILE_TEXT: &str = "\u{f15c}";        // nf-fa-file_text
-    pub const FILE_PDF: &str = "\u{f1c1}";         // nf-fa-file_pdf_o
-    pub const FILE_IMAGE: &str = "\u{f1c5}";       // nf-fa-file_image_o
-    pub const FILE_CODE: &str = "\u{f1c9}";        // nf-fa-file_code_o
-    pub const CLIPBOARD: &str = "\u{f0ea}";        // nf-fa-clipboard
-    pub const SAVE: &str = "\u{f0c7}";             // nf-fa-floppy_o
-    pub const BOOK: &str = "\u{f02d}";             // nf-fa-book
-    pub const BOOK_OPEN: &str = "\u{f518}";        // nf-fa-book_open (FA5)
-    pub const GLOBE: &str = "\u{f0ac}";            // nf-fa-globe
-    pub const LINK: &str = "\u{f0c1}";             // nf-fa-link
-    pub const TAG: &str = "\u{f02b}";              // nf-fa-tag
+    pub const FOLDER: &str = "\u{f07b}"; // nf-fa-folder
+    pub const FOLDER_OPEN: &str = "\u{f07c}"; // nf-fa-folder_open
+    pub const FILE_TEXT: &str = "\u{f15c}"; // nf-fa-file_text
+    pub const FILE_PDF: &str = "\u{f1c1}"; // nf-fa-file_pdf_o
+    pub const FILE_IMAGE: &str = "\u{f1c5}"; // nf-fa-file_image_o
+    pub const FILE_CODE: &str = "\u{f1c9}"; // nf-fa-file_code_o
+    pub const CLIPBOARD: &str = "\u{f0ea}"; // nf-fa-clipboard
+    pub const SAVE: &str = "\u{f0c7}"; // nf-fa-floppy_o
+    pub const BOOK: &str = "\u{f02d}"; // nf-fa-book
+    pub const BOOK_OPEN: &str = "\u{f518}"; // nf-fa-book_open (FA5)
+    pub const GLOBE: &str = "\u{f0ac}"; // nf-fa-globe
+    pub const LINK: &str = "\u{f0c1}"; // nf-fa-link
+    pub const TAG: &str = "\u{f02b}"; // nf-fa-tag
 
     // ── Actions ──────────────────────────────────────────────
-    pub const PLUS: &str = "\u{f067}";             // nf-fa-plus
-    pub const SEARCH: &str = "\u{f002}";           // nf-fa-search
-    pub const PENCIL: &str = "\u{f040}";           // nf-fa-pencil
-    pub const CAMERA: &str = "\u{f030}";           // nf-fa-camera
-    pub const UNDO: &str = "\u{f0e2}";             // nf-fa-undo
-    pub const REFRESH: &str = "\u{f021}";          // nf-fa-refresh
-    pub const BAN: &str = "\u{f05e}";              // nf-fa-ban
+    pub const PLUS: &str = "\u{f067}"; // nf-fa-plus
+    pub const SEARCH: &str = "\u{f002}"; // nf-fa-search
+    pub const PENCIL: &str = "\u{f040}"; // nf-fa-pencil
+    pub const CAMERA: &str = "\u{f030}"; // nf-fa-camera
+    pub const UNDO: &str = "\u{f0e2}"; // nf-fa-undo
+    pub const REFRESH: &str = "\u{f021}"; // nf-fa-refresh
+    pub const BAN: &str = "\u{f05e}"; // nf-fa-ban
 
     // ── Status / feedback ────────────────────────────────────
-    pub const CHECK: &str = "\u{f00c}";            // nf-fa-check
-    pub const CHECK_CIRCLE: &str = "\u{f058}";     // nf-fa-check_circle
-    pub const TIMES: &str = "\u{f00d}";            // nf-fa-times
-    pub const WARNING: &str = "\u{f071}";          // nf-fa-warning
-    pub const INFO_CIRCLE: &str = "\u{f05a}";      // nf-fa-info_circle
-    pub const COMMENT: &str = "\u{f075}";          // nf-fa-comment
-    pub const STAR: &str = "\u{f005}";             // nf-fa-star
-    pub const STAR_O: &str = "\u{f006}";           // nf-fa-star_o
+    pub const CHECK: &str = "\u{f00c}"; // nf-fa-check
+    pub const CHECK_CIRCLE: &str = "\u{f058}"; // nf-fa-check_circle
+    pub const TIMES: &str = "\u{f00d}"; // nf-fa-times
+    pub const WARNING: &str = "\u{f071}"; // nf-fa-warning
+    pub const INFO_CIRCLE: &str = "\u{f05a}"; // nf-fa-info_circle
+    pub const COMMENT: &str = "\u{f075}"; // nf-fa-comment
+    pub const STAR: &str = "\u{f005}"; // nf-fa-star
+    pub const STAR_O: &str = "\u{f006}"; // nf-fa-star_o
 
     // ── Media / playback ─────────────────────────────────────
-    pub const PLAY: &str = "\u{f04b}";             // nf-fa-play
-    pub const PAUSE: &str = "\u{f04c}";            // nf-fa-pause
-    pub const STOP: &str = "\u{f04d}";             // nf-fa-stop
-    pub const CLOCK: &str = "\u{f017}";            // nf-fa-clock_o
-    pub const COFFEE: &str = "\u{f0f4}";           // nf-fa-coffee
-    pub const FIRE: &str = "\u{f06d}";             // nf-fa-fire
-    pub const BOLT: &str = "\u{f0e7}";             // nf-fa-bolt
+    pub const PLAY: &str = "\u{f04b}"; // nf-fa-play
+    pub const PAUSE: &str = "\u{f04c}"; // nf-fa-pause
+    pub const STOP: &str = "\u{f04d}"; // nf-fa-stop
+    pub const CLOCK: &str = "\u{f017}"; // nf-fa-clock_o
+    pub const COFFEE: &str = "\u{f0f4}"; // nf-fa-coffee
+    pub const FIRE: &str = "\u{f06d}"; // nf-fa-fire
+    pub const BOLT: &str = "\u{f0e7}"; // nf-fa-bolt
 
     // ── Navigation / arrows ──────────────────────────────────
-    pub const ARROW_RIGHT: &str = "\u{f061}";      // nf-fa-arrow_right
-    pub const ARROW_LEFT: &str = "\u{f060}";       // nf-fa-arrow_left
-    pub const ARROW_UP: &str = "\u{f062}";         // nf-fa-arrow_up
-    pub const ARROW_DOWN: &str = "\u{f063}";       // nf-fa-arrow_down
-    pub const CARET_RIGHT: &str = "\u{f0da}";      // nf-fa-caret_right
-    pub const CARET_DOWN: &str = "\u{f0d7}";       // nf-fa-caret_down
-    pub const ARROWS_H: &str = "\u{f07e}";         // nf-fa-arrows_h
+    pub const ARROW_RIGHT: &str = "\u{f061}"; // nf-fa-arrow_right
+    pub const ARROW_LEFT: &str = "\u{f060}"; // nf-fa-arrow_left
+    pub const ARROW_UP: &str = "\u{f062}"; // nf-fa-arrow_up
+    pub const ARROW_DOWN: &str = "\u{f063}"; // nf-fa-arrow_down
+    pub const CARET_RIGHT: &str = "\u{f0da}"; // nf-fa-caret_right
+    pub const CARET_DOWN: &str = "\u{f0d7}"; // nf-fa-caret_down
+    pub const ARROWS_H: &str = "\u{f07e}"; // nf-fa-arrows_h
 
     // ── Shapes ───────────────────────────────────────────────
-    pub const CIRCLE: &str = "\u{f111}";           // nf-fa-circle
-    pub const CIRCLE_O: &str = "\u{f10c}";         // nf-fa-circle_o
-    pub const BARS: &str = "\u{f0c9}";             // nf-fa-bars
+    pub const CIRCLE: &str = "\u{f111}"; // nf-fa-circle
+    pub const CIRCLE_O: &str = "\u{f10c}"; // nf-fa-circle_o
+    pub const BARS: &str = "\u{f0c9}"; // nf-fa-bars
 
     // ── Categories (template icons) ──────────────────────────
-    pub const FILM: &str = "\u{f008}";             // nf-fa-film
-    pub const GRADUATION: &str = "\u{f19d}";       // nf-fa-graduation_cap
-    pub const NEWSPAPER: &str = "\u{f1ea}";        // nf-fa-newspaper_o
-    pub const CALENDAR: &str = "\u{f073}";         // nf-fa-calendar
-    pub const LIGHTBULB: &str = "\u{f0eb}";        // nf-fa-lightbulb_o
-    pub const TROPHY: &str = "\u{f091}";           // nf-fa-trophy
-    pub const PAINT_BRUSH: &str = "\u{f1fc}";      // nf-fa-paint_brush
-    pub const STICKY_NOTE: &str = "\u{f249}";      // nf-fa-sticky_note
-    pub const PENCIL_SQUARE: &str = "\u{f044}";    // nf-fa-pencil_square_o
+    pub const FILM: &str = "\u{f008}"; // nf-fa-film
+    pub const GRADUATION: &str = "\u{f19d}"; // nf-fa-graduation_cap
+    pub const NEWSPAPER: &str = "\u{f1ea}"; // nf-fa-newspaper_o
+    pub const CALENDAR: &str = "\u{f073}"; // nf-fa-calendar
+    pub const LIGHTBULB: &str = "\u{f0eb}"; // nf-fa-lightbulb_o
+    pub const TROPHY: &str = "\u{f091}"; // nf-fa-trophy
+    pub const PAINT_BRUSH: &str = "\u{f1fc}"; // nf-fa-paint_brush
+    pub const STICKY_NOTE: &str = "\u{f249}"; // nf-fa-sticky_note
+    pub const PENCIL_SQUARE: &str = "\u{f044}"; // nf-fa-pencil_square_o
 }
 
 /// Color palette for the Scrinever UI
@@ -844,10 +844,5 @@ pub fn format_compact(n: usize) -> String {
 pub fn progress_bar_text(pct: f64, width: usize) -> String {
     let filled = ((pct / 100.0) * width as f64).round() as usize;
     let empty = width.saturating_sub(filled);
-    format!(
-        "{}{}",
-        "\u{2588}".repeat(filled),
-        "\u{2591}".repeat(empty),
-    )
+    format!("{}{}", "\u{2588}".repeat(filled), "\u{2591}".repeat(empty),)
 }
-

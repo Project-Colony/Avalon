@@ -1,7 +1,7 @@
 #![allow(dead_code)] // Methods used by test code
-use std::collections::HashSet;
-use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 /// Entry in the recent projects list
@@ -28,12 +28,12 @@ impl RecentProject {
             format!("{}h ago", hours)
         } else {
             let days = duration.num_days();
-            if days < 7 {
+            if days < 14 {
                 format!("{}d ago", days)
             } else if days < 30 {
-                format!("{}w ago", days / 7)
+                format!("{}w ago", (days + 3) / 7)
             } else {
-                format!("{}mo ago", days / 30)
+                format!("{}mo ago", (days + 15) / 30)
             }
         }
     }
@@ -77,11 +77,14 @@ impl RecentProjects {
         self.projects.retain(|p| p.path != path);
 
         // Add at the beginning
-        self.projects.insert(0, RecentProject {
-            title: title.to_string(),
-            path,
-            last_opened: Utc::now(),
-        });
+        self.projects.insert(
+            0,
+            RecentProject {
+                title: title.to_string(),
+                path,
+                last_opened: Utc::now(),
+            },
+        );
 
         // Keep only last 20
         self.projects.truncate(20);
@@ -105,9 +108,7 @@ impl RecentProjects {
     /// Find a project by title (case-insensitive)
     pub fn find_by_title(&self, title: &str) -> Option<&RecentProject> {
         let lower = title.to_lowercase();
-        self.projects
-            .iter()
-            .find(|p| p.title.to_lowercase() == lower)
+        self.projects.iter().find(|p| p.title.to_lowercase() == lower)
     }
 
     /// Number of recent projects
@@ -132,12 +133,10 @@ impl RecentProjects {
         };
         if path.exists() {
             match std::fs::read_to_string(&path) {
-                Ok(data) => {
-                    match serde_json::from_str(&data) {
-                        Ok(recent) => return recent,
-                        Err(e) => log::warn!("Failed to parse recent projects file: {}", e),
-                    }
-                }
+                Ok(data) => match serde_json::from_str(&data) {
+                    Ok(recent) => return recent,
+                    Err(e) => log::warn!("Failed to parse recent projects file: {}", e),
+                },
                 Err(e) => log::warn!("Failed to read recent projects file: {}", e),
             }
         }
@@ -179,10 +178,7 @@ impl RecentProjects {
 
     /// Get the total number of unique project paths
     pub fn unique_paths(&self) -> usize {
-        self.projects.iter()
-            .map(|p| &p.path)
-            .collect::<HashSet<_>>()
-            .len()
+        self.projects.iter().map(|p| &p.path).collect::<HashSet<_>>().len()
     }
 
     /// Sort projects by title alphabetically

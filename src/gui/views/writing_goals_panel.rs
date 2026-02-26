@@ -19,9 +19,7 @@ pub struct WritingGoalsData {
 
 /// Render the writing goals panel
 pub fn view(data: &WritingGoalsData) -> Element<'static, Message> {
-    let header = text("WRITING GOALS")
-        .size(11)
-        .color(Theme::TEXT_SECONDARY);
+    let header = text("WRITING GOALS").size(11).color(Theme::TEXT_SECONDARY);
 
     // Daily goal
     let daily_label = text("Daily Goal").size(11).color(Theme::TEXT_MUTED);
@@ -33,26 +31,33 @@ pub fn view(data: &WritingGoalsData) -> Element<'static, Message> {
 
     let daily_progress = if data.daily_goal > 0 {
         let pct = (data.words_today as f64 / data.daily_goal as f64 * 100.0).min(100.0);
-        let color = if pct >= 100.0 { Theme::SUCCESS }
-        else if pct >= 50.0 { Theme::WARNING }
-        else { Theme::TEXT_SECONDARY };
+        let color = if pct >= 100.0 {
+            Theme::SUCCESS
+        } else if pct >= 50.0 {
+            Theme::WARNING
+        } else {
+            Theme::TEXT_SECONDARY
+        };
         let bar = progress_bar(pct);
         let remaining = (data.daily_goal as i64 - data.words_today).max(0);
         column![
             text(format!("{}/{} words ({:.0}%)", data.words_today, data.daily_goal, pct))
-                .size(11).color(color),
+                .size(11)
+                .color(color),
             text(bar).size(10).color(color),
             if pct >= 100.0 {
                 text("Goal reached!").size(9).color(Theme::SUCCESS)
             } else {
-                text(format!("{} words remaining", remaining)).size(9).color(Theme::TEXT_MUTED)
+                text(format!("{} words remaining", remaining))
+                    .size(9)
+                    .color(Theme::TEXT_MUTED)
             },
-        ].spacing(1)
-    } else {
-        column![
-            text(format!("{} words today", data.words_today))
-                .size(11).color(Theme::TEXT_SECONDARY),
         ]
+        .spacing(1)
+    } else {
+        column![text(format!("{} words today", data.words_today))
+            .size(11)
+            .color(Theme::TEXT_SECONDARY),]
     };
 
     // Weekly goal
@@ -65,36 +70,56 @@ pub fn view(data: &WritingGoalsData) -> Element<'static, Message> {
 
     let weekly_progress = if data.weekly_goal > 0 {
         let pct = (data.words_this_week as f64 / data.weekly_goal as f64 * 100.0).min(100.0);
-        let color = if pct >= 100.0 { Theme::SUCCESS }
-        else if pct >= 50.0 { Theme::WARNING }
-        else { Theme::TEXT_SECONDARY };
+        let color = if pct >= 100.0 {
+            Theme::SUCCESS
+        } else if pct >= 50.0 {
+            Theme::WARNING
+        } else {
+            Theme::TEXT_SECONDARY
+        };
         let bar = progress_bar(pct);
         let days_left = 7_usize.saturating_sub(data.days_this_week);
         let remaining = (data.weekly_goal as i64 - data.words_this_week).max(0);
-        let daily_needed = if days_left > 0 { remaining / days_left as i64 } else { remaining };
+        let daily_needed = if days_left > 0 {
+            remaining / days_left as i64
+        } else {
+            remaining
+        };
         column![
-            text(format!("{}/{} words ({:.0}%)", data.words_this_week, data.weekly_goal, pct))
-                .size(11).color(color),
+            text(format!(
+                "{}/{} words ({:.0}%)",
+                data.words_this_week, data.weekly_goal, pct
+            ))
+            .size(11)
+            .color(color),
             text(bar).size(10).color(color),
             if pct >= 100.0 {
                 text("Weekly goal reached!").size(9).color(Theme::SUCCESS)
             } else {
-                text(format!("{} needed | ~{}/day for {} days left", remaining, daily_needed, days_left))
-                    .size(9).color(Theme::TEXT_MUTED)
+                text(format!(
+                    "{} needed | ~{}/day for {} days left",
+                    remaining, daily_needed, days_left
+                ))
+                .size(9)
+                .color(Theme::TEXT_MUTED)
             },
-        ].spacing(1)
-    } else {
-        column![
-            text(format!("{} words this week", data.words_this_week))
-                .size(11).color(Theme::TEXT_SECONDARY),
         ]
+        .spacing(1)
+    } else {
+        column![text(format!("{} words this week", data.words_this_week))
+            .size(11)
+            .color(Theme::TEXT_SECONDARY),]
     };
 
     // Streak visualization
     let streak_vis = streak_display(data.streak);
-    let streak_color = if data.streak >= 7 { Theme::SUCCESS }
-        else if data.streak >= 3 { Theme::WARNING }
-        else { Theme::TEXT_SECONDARY };
+    let streak_color = if data.streak >= 7 {
+        Theme::SUCCESS
+    } else if data.streak >= 3 {
+        Theme::WARNING
+    } else {
+        Theme::TEXT_SECONDARY
+    };
 
     // Stats
     let stats = row![
@@ -118,11 +143,9 @@ pub fn view(data: &WritingGoalsData) -> Element<'static, Message> {
     ]
     .align_y(iced::Alignment::Center);
 
-    let reset_btn = button(
-        text("Reset Goals").size(10).color(Theme::TEXT_MUTED),
-    )
-    .on_press(Message::ResetGoals)
-    .padding(Padding::from([2, 6]));
+    let reset_btn = button(text("Reset Goals").size(10).color(Theme::TEXT_MUTED))
+        .on_press(Message::ResetGoals)
+        .padding(Padding::from([2, 6]));
 
     let content = column![
         header,
@@ -141,10 +164,7 @@ pub fn view(data: &WritingGoalsData) -> Element<'static, Message> {
     ]
     .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }
 
 fn stat_item(label: &str, value: &str) -> Element<'static, Message> {

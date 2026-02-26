@@ -144,9 +144,11 @@ mod tests {
 
     #[test]
     fn test_serialization_roundtrip() {
-        let mut config = AppConfig::default();
-        config.daily_goal = 1000;
-        config.composition_mode = true;
+        let config = AppConfig {
+            daily_goal: 1000,
+            composition_mode: true,
+            ..Default::default()
+        };
 
         let json = serde_json::to_string(&config).unwrap();
         let parsed: AppConfig = serde_json::from_str(&json).unwrap();

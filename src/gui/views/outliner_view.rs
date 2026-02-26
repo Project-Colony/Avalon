@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use std::collections::HashSet;
 use iced::widget::{button, column, container, row, scrollable, text, Space};
 use iced::{Element, Length, Padding};
+use std::collections::HashMap;
+use std::collections::HashSet;
 use uuid::Uuid;
 
 use crate::core::binder::{BinderItem, BinderItemKind};
@@ -10,35 +10,70 @@ use crate::gui::theme::Theme;
 
 /// Render the outliner view — a hierarchical table with section numbering.
 /// `expanded_ids` comes from the OutlinerState and tracks which folders are expanded.
-pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>, expanded_ids: &HashSet<Uuid>) -> Element<'static, Message> {
+pub fn view(
+    draft: &BinderItem,
+    targets: &HashMap<Uuid, usize>,
+    expanded_ids: &HashSet<Uuid>,
+) -> Element<'static, Message> {
     let total_words = draft.total_word_count();
     let doc_count = count_text_items(draft);
 
     let header_info = container(
         row![
-            text(format!("\u{f0ea} Outliner: {} docs | {} words | {:.1} pages",
-                doc_count, total_words, total_words as f64 / crate::core::WORDS_PER_PAGE as f64))
-                .size(12)
-                .color(Theme::TEXT_SECONDARY),
+            text(format!(
+                "\u{f0ea} Outliner: {} docs | {} words | {:.1} pages",
+                doc_count,
+                total_words,
+                total_words as f64 / crate::core::WORDS_PER_PAGE as f64
+            ))
+            .size(12)
+            .color(Theme::TEXT_SECONDARY),
             Space::with_width(Length::Fill),
         ]
-        .padding(Padding::from([4, 16]))
+        .padding(Padding::from([4, 16])),
     )
     .width(Length::Fill);
 
     let header_row = container(
         row![
-            text("#").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
-            text("Title").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(4)),
-            text("Synopsis").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(3)),
-            text("Status").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(2)),
-            text("Label").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(2)),
-            text("Words").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
-            text("Target (%)").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(2)),
-            text("Pgs").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
-            text("Compile").size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
+            text("#")
+                .size(11)
+                .color(Theme::TEXT_SECONDARY)
+                .width(Length::FillPortion(1)),
+            text("Title")
+                .size(11)
+                .color(Theme::TEXT_SECONDARY)
+                .width(Length::FillPortion(4)),
+            text("Synopsis")
+                .size(11)
+                .color(Theme::TEXT_SECONDARY)
+                .width(Length::FillPortion(3)),
+            text("Status")
+                .size(11)
+                .color(Theme::TEXT_SECONDARY)
+                .width(Length::FillPortion(2)),
+            text("Label")
+                .size(11)
+                .color(Theme::TEXT_SECONDARY)
+                .width(Length::FillPortion(2)),
+            text("Words")
+                .size(11)
+                .color(Theme::TEXT_SECONDARY)
+                .width(Length::FillPortion(1)),
+            text("Target (%)")
+                .size(11)
+                .color(Theme::TEXT_SECONDARY)
+                .width(Length::FillPortion(2)),
+            text("Pgs")
+                .size(11)
+                .color(Theme::TEXT_SECONDARY)
+                .width(Length::FillPortion(1)),
+            text("Compile")
+                .size(11)
+                .color(Theme::TEXT_SECONDARY)
+                .width(Length::FillPortion(1)),
         ]
-        .spacing(6)
+        .spacing(6),
     )
     .padding(Padding::from([8, 16]));
 
@@ -53,7 +88,8 @@ pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>, expanded_ids: &H
 
     // Summary footer with target completion stats
     let targeted_count = targets.len();
-    let completed_targets = targets.iter()
+    let completed_targets = targets
+        .iter()
         .filter(|(id, target)| {
             if let Some(item) = draft.find(id) {
                 item.total_word_count() >= **target && **target > 0
@@ -65,29 +101,23 @@ pub fn view(draft: &BinderItem, targets: &HashMap<Uuid, usize>, expanded_ids: &H
 
     let compile_count = count_compile_items(draft);
 
-    let footer = container(
-        row![
-            text(format!("{} docs | {} words | {:.1} pg | {}/{} targets met | {}/{} compile",
-                doc_count, total_words, total_words as f64 / crate::core::WORDS_PER_PAGE as f64,
-                completed_targets, targeted_count,
-                compile_count, doc_count))
-                .size(10)
-                .color(Theme::TEXT_MUTED),
-        ]
-    )
+    let footer = container(row![text(format!(
+        "{} docs | {} words | {:.1} pg | {}/{} targets met | {}/{} compile",
+        doc_count,
+        total_words,
+        total_words as f64 / crate::core::WORDS_PER_PAGE as f64,
+        completed_targets,
+        targeted_count,
+        compile_count,
+        doc_count
+    ))
+    .size(10)
+    .color(Theme::TEXT_MUTED),])
     .padding(Padding::from([6, 16]));
 
-    let content = column![
-        header_info,
-        header_row,
-        scrollable(rows).height(Length::Fill),
-        footer,
-    ];
+    let content = column![header_info, header_row, scrollable(rows).height(Length::Fill), footer,];
 
-    container(content)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+    container(content).width(Length::Fill).height(Length::Fill).into()
 }
 
 fn count_text_items(item: &BinderItem) -> usize {
@@ -97,7 +127,11 @@ fn count_text_items(item: &BinderItem) -> usize {
 }
 
 fn count_compile_items(item: &BinderItem) -> usize {
-    let own = if item.kind == BinderItemKind::Text && item.include_in_compile { 1 } else { 0 };
+    let own = if item.kind == BinderItemKind::Text && item.include_in_compile {
+        1
+    } else {
+        0
+    };
     let children: usize = item.children.iter().map(count_compile_items).sum();
     own + children
 }
@@ -114,7 +148,9 @@ fn collect_outline_rows(
 
     // Build section number
     let section_num = if depth > 0 {
-        if let Some(c) = counter.last_mut() { *c += 1; }
+        if let Some(c) = counter.last_mut() {
+            *c += 1;
+        }
         let nums: Vec<String> = counter.iter().map(|c| c.to_string()).collect();
         nums.join(".")
     } else {
@@ -123,7 +159,13 @@ fn collect_outline_rows(
 
     let is_expanded = expanded_ids.contains(&item.id) || (depth == 0);
     let icon = match item.kind {
-        BinderItemKind::Folder => if is_expanded { "\u{f0d7} " } else { "\u{f0da} " },
+        BinderItemKind::Folder => {
+            if is_expanded {
+                "\u{f0d7} "
+            } else {
+                "\u{f0da} "
+            }
+        }
         BinderItemKind::Text => "\u{2022} ",
         _ => "  ",
     };
@@ -131,22 +173,29 @@ fn collect_outline_rows(
     let title_text = format!("{}{}", icon, item.title);
     let word_count = item.total_word_count();
 
-    let status = item.metadata.status.as_ref()
+    let status = item
+        .metadata
+        .status
+        .as_ref()
         .map(|s| s.name.clone())
         .unwrap_or_else(|| "-".to_string());
 
-    let label = item.metadata.label.as_ref()
+    let label = item
+        .metadata
+        .label
+        .as_ref()
         .map(|l| l.name.clone())
         .unwrap_or_else(|| "-".to_string());
 
-    let label_color = item.metadata.label.as_ref()
+    let label_color = item
+        .metadata
+        .label
+        .as_ref()
         .map(|l| l.color.to_iced_color())
         .unwrap_or(Theme::TEXT_SECONDARY);
 
     let target = targets.get(&item.id);
-    let target_text = target
-        .map(|t| t.to_string())
-        .unwrap_or_else(|| "-".to_string());
+    let target_text = target.map(|t| t.to_string()).unwrap_or_else(|| "-".to_string());
 
     let progress_text = match target {
         Some(t) if *t > 0 => {
@@ -184,12 +233,10 @@ fn collect_outline_rows(
     } else {
         Message::SelectBinderItem(id)
     };
-    let title_btn = button(
-        row![
-            Space::with_width(indent),
-            text(title_text).size(13).color(Theme::TEXT_PRIMARY),
-        ]
-    )
+    let title_btn = button(row![
+        Space::with_width(indent),
+        text(title_text).size(13).color(Theme::TEXT_PRIMARY),
+    ])
     .on_press(click_msg)
     .padding(0)
     .width(Length::FillPortion(4));
@@ -212,15 +259,36 @@ fn collect_outline_rows(
     };
 
     let row_content = row![
-        text(section_num).size(10).color(Theme::TEXT_MUTED).width(Length::FillPortion(1)),
+        text(section_num)
+            .size(10)
+            .color(Theme::TEXT_MUTED)
+            .width(Length::FillPortion(1)),
         title_btn,
-        text(synopsis).size(10).color(Theme::TEXT_MUTED).width(Length::FillPortion(3)),
-        text(status).size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(2)),
+        text(synopsis)
+            .size(10)
+            .color(Theme::TEXT_MUTED)
+            .width(Length::FillPortion(3)),
+        text(status)
+            .size(11)
+            .color(Theme::TEXT_SECONDARY)
+            .width(Length::FillPortion(2)),
         text(label).size(11).color(label_color).width(Length::FillPortion(2)),
-        text(word_count.to_string()).size(11).color(Theme::TEXT_SECONDARY).width(Length::FillPortion(1)),
-        text(format!("{} ({})", target_text, progress_text)).size(11).color(progress_color).width(Length::FillPortion(2)),
-        text(pages_text).size(11).color(Theme::TEXT_MUTED).width(Length::FillPortion(1)),
-        text(compile_text).size(11).color(compile_color).width(Length::FillPortion(1)),
+        text(word_count.to_string())
+            .size(11)
+            .color(Theme::TEXT_SECONDARY)
+            .width(Length::FillPortion(1)),
+        text(format!("{} ({})", target_text, progress_text))
+            .size(11)
+            .color(progress_color)
+            .width(Length::FillPortion(2)),
+        text(pages_text)
+            .size(11)
+            .color(Theme::TEXT_MUTED)
+            .width(Length::FillPortion(1)),
+        text(compile_text)
+            .size(11)
+            .color(compile_color)
+            .width(Length::FillPortion(1)),
     ]
     .spacing(6);
 

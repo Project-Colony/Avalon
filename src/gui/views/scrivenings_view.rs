@@ -6,21 +6,22 @@ use crate::gui::app::Message;
 use crate::gui::theme::Theme;
 
 /// Render a composite Scrivenings view showing multiple documents concatenated
-pub fn view<'a>(
-    items: &[&BinderItem],
-    parent_title: &str,
-) -> Element<'a, Message> {
-    let (total_words, total_chars, total_sentences) = items.iter()
-        .filter_map(|i| i.document.as_ref())
-        .fold((0usize, 0usize, 0usize), |(w, c, s), d| {
-            (
-                w + d.word_count(),
-                c + d.char_count(),
-                s + d.content.chars()
-                    .filter(|ch| *ch == '.' || *ch == '!' || *ch == '?')
-                    .count(),
-            )
-        });
+pub fn view<'a>(items: &[&BinderItem], parent_title: &str) -> Element<'a, Message> {
+    let (total_words, total_chars, total_sentences) =
+        items
+            .iter()
+            .filter_map(|i| i.document.as_ref())
+            .fold((0usize, 0usize, 0usize), |(w, c, s), d| {
+                (
+                    w + d.word_count(),
+                    c + d.char_count(),
+                    s + d
+                        .content
+                        .chars()
+                        .filter(|ch| *ch == '.' || *ch == '!' || *ch == '?')
+                        .count(),
+                )
+            });
 
     // Reading time
     let reading_min = total_words as f64 / crate::core::READING_WPM;
@@ -38,12 +39,17 @@ pub fn view<'a>(
                 .size(14)
                 .color(Theme::TEXT_SECONDARY),
             Space::with_width(Length::Fill),
-            text(format!("{} docs | {} words | {:.1} pg | {}",
-                items.len(), total_words, total_words as f64 / crate::core::WORDS_PER_PAGE as f64, reading_display))
-                .size(11)
-                .color(Theme::TEXT_MUTED),
+            text(format!(
+                "{} docs | {} words | {:.1} pg | {}",
+                items.len(),
+                total_words,
+                total_words as f64 / crate::core::WORDS_PER_PAGE as f64,
+                reading_display
+            ))
+            .size(11)
+            .color(Theme::TEXT_MUTED),
         ]
-        .padding(Padding::from([8, 16]))
+        .padding(Padding::from([8, 16])),
     )
     .width(Length::Fill);
 
@@ -62,21 +68,19 @@ pub fn view<'a>(
                         .size(12)
                         .color(Theme::TEXT_MUTED),
                 ]
-                .align_x(iced::Alignment::Center)
+                .align_x(iced::Alignment::Center),
             )
             .padding(24)
-            .center_x(Length::Fill)
+            .center_x(Length::Fill),
         );
     } else {
         let mut cumulative_words: usize = 0;
 
         for (i, item) in items.iter().enumerate() {
-            let words = item.document.as_ref()
-                .map_or(0, |d| d.word_count());
+            let words = item.document.as_ref().map_or(0, |d| d.word_count());
             cumulative_words += words;
 
-            let chars = item.document.as_ref()
-                .map_or(0, |d| d.char_count());
+            let chars = item.document.as_ref().map_or(0, |d| d.char_count());
 
             // Progress through the composite document
             let progress_pct = if total_words > 0 {
@@ -86,13 +90,22 @@ pub fn view<'a>(
             };
 
             // Document title header with section number, status, and label
-            let status_text = item.metadata.status.as_ref()
+            let status_text = item
+                .metadata
+                .status
+                .as_ref()
                 .map_or_else(String::new, |s| format!(" [{}]", s.name));
 
-            let label_indicator = item.metadata.label.as_ref()
+            let label_indicator = item
+                .metadata
+                .label
+                .as_ref()
                 .map_or_else(String::new, |l| format!(" \u{f111} {}", l.name));
 
-            let label_color = item.metadata.label.as_ref()
+            let label_color = item
+                .metadata
+                .label
+                .as_ref()
                 .map_or(Theme::TEXT_ACCENT, |l| l.color.to_iced_color());
 
             // Section marker
@@ -100,23 +113,17 @@ pub fn view<'a>(
 
             let doc_header = container(
                 row![
-                    text(section_marker)
-                        .size(12)
-                        .color(Theme::TEXT_ACCENT),
+                    text(section_marker).size(12).color(Theme::TEXT_ACCENT),
                     Space::with_width(6),
-                    text(item.title.clone())
-                        .size(13)
-                        .color(label_color),
+                    text(item.title.clone()).size(13).color(label_color),
                     Space::with_width(8),
-                    text(label_indicator)
-                        .size(10)
-                        .color(label_color),
+                    text(label_indicator).size(10).color(label_color),
                     Space::with_width(Length::Fill),
                     text(format!("{} w | {} ch{}", words, chars, status_text))
                         .size(10)
                         .color(Theme::TEXT_MUTED),
                 ]
-                .align_y(iced::Alignment::Center)
+                .align_y(iced::Alignment::Center),
             )
             .padding(Padding::from([12, 24]))
             .width(Length::Fill);
@@ -125,16 +132,12 @@ pub fn view<'a>(
 
             // Synopsis (if any)
             if !item.synopsis.is_empty() {
-                let synopsis = container(
-                    row![
-                        Space::with_width(28),
-                        text("\u{f0da}").size(10).color(Theme::TEXT_MUTED),
-                        Space::with_width(4),
-                        text(item.synopsis.clone())
-                            .size(10)
-                            .color(Theme::TEXT_MUTED),
-                    ]
-                )
+                let synopsis = container(row![
+                    Space::with_width(28),
+                    text("\u{f0da}").size(10).color(Theme::TEXT_MUTED),
+                    Space::with_width(4),
+                    text(item.synopsis.clone()).size(10).color(Theme::TEXT_MUTED),
+                ])
                 .padding(Padding::from([0, 24]))
                 .width(Length::Fill);
                 content_col = content_col.push(synopsis);
@@ -142,31 +145,27 @@ pub fn view<'a>(
 
             // Snapshot indicator
             if item.has_snapshots() {
-                let snap_text = container(
-                    row![
-                        Space::with_width(28),
-                        text(format!("\u{f030} {} snapshot{}", item.snapshot_count(),
-                            if item.snapshot_count() == 1 { "" } else { "s" }))
-                            .size(9)
-                            .color(Theme::TEXT_MUTED),
-                    ]
-                )
+                let snap_text = container(row![
+                    Space::with_width(28),
+                    text(format!(
+                        "\u{f030} {} snapshot{}",
+                        item.snapshot_count(),
+                        if item.snapshot_count() == 1 { "" } else { "s" }
+                    ))
+                    .size(9)
+                    .color(Theme::TEXT_MUTED),
+                ])
                 .padding(Padding::from([0, 24]))
                 .width(Length::Fill);
                 content_col = content_col.push(snap_text);
             }
 
             // Document content
-            let doc_content = item.document.as_ref()
-                .map_or("", |d| d.content.as_str());
+            let doc_content = item.document.as_ref().map_or("", |d| d.content.as_str());
 
-            let doc_text = container(
-                text(doc_content.to_string())
-                    .size(14)
-                    .color(Theme::TEXT_PRIMARY),
-            )
-            .padding(Padding::from([4, 24]))
-            .width(Length::Fill);
+            let doc_text = container(text(doc_content.to_string()).size(14).color(Theme::TEXT_PRIMARY))
+                .padding(Padding::from([4, 24]))
+                .width(Length::Fill);
 
             content_col = content_col.push(doc_text);
 
@@ -176,29 +175,26 @@ pub fn view<'a>(
                 let bar_width: usize = 20;
                 let filled = ((progress_pct as f64 / 100.0) * bar_width as f64) as usize;
                 let empty = bar_width.saturating_sub(filled);
-                let bar = format!(
-                    "{}{}",
-                    "\u{2501}".repeat(filled),
-                    "\u{2500}".repeat(empty)
-                );
+                let bar = format!("{}{}", "\u{2501}".repeat(filled), "\u{2500}".repeat(empty));
 
                 let separator = container(
                     row![
                         Space::with_width(24),
-                        text(bar)
-                            .size(8)
-                            .color(Theme::BORDER),
+                        text(bar).size(8).color(Theme::BORDER),
                         Space::with_width(8),
-                        text(format!("{}% | {} of {} words", progress_pct, cumulative_words, total_words))
-                            .size(9)
-                            .color(Theme::TEXT_MUTED),
+                        text(format!(
+                            "{}% | {} of {} words",
+                            progress_pct, cumulative_words, total_words
+                        ))
+                        .size(9)
+                        .color(Theme::TEXT_MUTED),
                         Space::with_width(Length::Fill),
                         text(format!("{} of {} docs", i + 1, items.len()))
                             .size(9)
                             .color(Theme::TEXT_MUTED),
                         Space::with_width(24),
                     ]
-                    .align_y(iced::Alignment::Center)
+                    .align_y(iced::Alignment::Center),
                 )
                 .padding(Padding::from([8, 0]))
                 .width(Length::Fill);
@@ -217,28 +213,26 @@ pub fn view<'a>(
 
     let footer = container(
         row![
-            text(format!("Total: {} words | {} chars | {} sentences | {:.1} pages | {} read",
-                total_words, total_chars, total_sentences,
-                total_words as f64 / crate::core::WORDS_PER_PAGE as f64, reading_display))
-                .size(10)
-                .color(Theme::TEXT_MUTED),
+            text(format!(
+                "Total: {} words | {} chars | {} sentences | {:.1} pages | {} read",
+                total_words,
+                total_chars,
+                total_sentences,
+                total_words as f64 / crate::core::WORDS_PER_PAGE as f64,
+                reading_display
+            ))
+            .size(10)
+            .color(Theme::TEXT_MUTED),
             Space::with_width(Length::Fill),
             text(format!("Avg: {} words/doc", avg_words))
                 .size(10)
                 .color(Theme::TEXT_MUTED),
         ]
-        .padding(Padding::from([4, 16]))
+        .padding(Padding::from([4, 16])),
     )
     .width(Length::Fill);
 
-    let layout = column![
-        header,
-        scrollable(content_col).height(Length::Fill),
-        footer,
-    ];
+    let layout = column![header, scrollable(content_col).height(Length::Fill), footer,];
 
-    container(layout)
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+    container(layout).width(Length::Fill).height(Length::Fill).into()
 }

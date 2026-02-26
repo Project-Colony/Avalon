@@ -1,10 +1,14 @@
-use std::fmt::Write;
-use anyhow::Result;
 use super::compiler::{CompileContent, CompileOptions, SeparatorType};
+use anyhow::Result;
+use std::fmt::Write;
 
 /// Compile to RTF (Rich Text Format)
 pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<String> {
-    let estimated_size: usize = contents.iter().map(|c| c.text.len() + c.title.len() + 60).sum::<usize>() + 512;
+    let estimated_size: usize = contents
+        .iter()
+        .map(|c| c.text.len() + c.title.len() + 60)
+        .sum::<usize>()
+        + 512;
     let mut rtf = String::with_capacity(estimated_size);
 
     // RTF header
@@ -12,7 +16,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
 
     // Font table
     rtf.push_str("{\\fonttbl\n");
-    let _ = writeln!(rtf, "{{\\f0\\froman\\fcharset0 {};}}", rtf_escape(&options.font_family));
+    writeln!(rtf, "{{\\f0\\froman\\fcharset0 {};}}", rtf_escape(&options.font_family)).unwrap();
     rtf.push_str("{\\f1\\fswiss\\fcharset0 Arial;}\n");
     rtf.push_str("{\\f2\\fmodern\\fcharset0 Courier New;}\n");
     rtf.push_str("}\n");
@@ -22,14 +26,20 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
 
     // Default font size (in half-points)
     let fs = (options.font_size * 2.0) as u32;
-    let _ = writeln!(rtf, "\\f0\\fs{}", fs);
+    writeln!(rtf, "\\f0\\fs{}", fs).unwrap();
 
     // Title page
     if options.include_front_matter && !options.title.is_empty() {
         let title_fs = fs * 2;
-        let _ = writeln!(rtf, "\\pard\\qc\\fs{} \\b {}\\b0\\par", title_fs, rtf_escape(&options.title));
+        writeln!(
+            rtf,
+            "\\pard\\qc\\fs{} \\b {}\\b0\\par",
+            title_fs,
+            rtf_escape(&options.title)
+        )
+        .unwrap();
         if !options.author.is_empty() {
-            let _ = writeln!(rtf, "\\pard\\qc\\fs{} \\i {}\\i0\\par", fs, rtf_escape(&options.author));
+            writeln!(rtf, "\\pard\\qc\\fs{} \\i {}\\i0\\par", fs, rtf_escape(&options.author)).unwrap();
         }
         rtf.push_str("\\page\n");
     }
@@ -50,7 +60,13 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                 2 => (fs as f32 * 1.1) as u32,
                 _ => fs,
             };
-            let _ = writeln!(rtf, "\\pard\\sb240\\sa120\\fs{} \\b {}\\b0\\par", heading_fs, rtf_escape(&content.title));
+            writeln!(
+                rtf,
+                "\\pard\\sb240\\sa120\\fs{} \\b {}\\b0\\par",
+                heading_fs,
+                rtf_escape(&content.title)
+            )
+            .unwrap();
             prev_was_text = false;
         } else {
             // Separator between consecutive text docs
@@ -69,7 +85,7 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                 // Handle blockquotes
                 if let Some(quoted) = trimmed.strip_prefix("> ") {
                     let quote_text = convert_basic_markdown(quoted);
-                    let _ = writeln!(rtf, "\\pard\\li720\\ri720\\sa60\\fs{} \\i {}\\i0\\par", fs, quote_text);
+                    writeln!(rtf, "\\pard\\li720\\ri720\\sa60\\fs{} \\i {}\\i0\\par", fs, quote_text).unwrap();
                     continue;
                 }
 
@@ -82,13 +98,19 @@ pub fn compile(contents: &[CompileContent], options: &CompileOptions) -> Result<
                         2 => (fs as f32 * 1.3) as u32,
                         _ => (fs as f32 * 1.1) as u32,
                     };
-                    let _ = writeln!(rtf, "\\pard\\sb120\\sa60\\fs{} \\b {}\\b0\\par", h_fs, rtf_escape(heading_text));
+                    writeln!(
+                        rtf,
+                        "\\pard\\sb120\\sa60\\fs{} \\b {}\\b0\\par",
+                        h_fs,
+                        rtf_escape(heading_text)
+                    )
+                    .unwrap();
                     continue;
                 }
 
                 // Handle basic markdown inline formatting
                 let text = convert_basic_markdown(trimmed);
-                let _ = writeln!(rtf, "\\pard\\fi360\\sa60\\fs{} {}\\par", fs, text);
+                writeln!(rtf, "\\pard\\fi360\\sa60\\fs{} {}\\par", fs, text).unwrap();
             }
             prev_was_text = true;
         }
@@ -102,9 +124,7 @@ fn separator_rtf(sep: &SeparatorType) -> String {
     match sep {
         SeparatorType::EmptyLine => "\\par\\par\n".to_string(),
         SeparatorType::PageBreak => "\\page\n".to_string(),
-        SeparatorType::SectionBreak => {
-            "\\pard\\qc\\sa120\\sb120 * * *\\par\n".to_string()
-        }
+        SeparatorType::SectionBreak => "\\pard\\qc\\sa120\\sb120 * * *\\par\n".to_string(),
         SeparatorType::Custom(s) => {
             format!("\\pard\\qc\\sa120\\sb120 {}\\par\n", rtf_escape(s))
         }
@@ -121,7 +141,7 @@ fn rtf_escape(text: &str) -> String {
             '{' => result.push_str("\\{"),
             '}' => result.push_str("\\}"),
             c if c as u32 > 127 => {
-                let _ = write!(result, "\\u{}?", c as i32);
+                write!(result, "\\u{}?", c as i32).unwrap();
             }
             c => result.push(c),
         }
@@ -171,4 +191,77 @@ fn convert_basic_markdown(text: &str) -> String {
     }
 
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::compiler::{CompileContent, CompileOptions};
+    use super::*;
+
+    fn default_options() -> CompileOptions {
+        CompileOptions {
+            include_front_matter: false,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_compile_basic_structure() {
+        let contents = vec![
+            CompileContent {
+                title: "Ch1".into(),
+                text: String::new(),
+                depth: 0,
+                is_folder: true,
+            },
+            CompileContent {
+                title: "Scene".into(),
+                text: "Hello.".into(),
+                depth: 1,
+                is_folder: false,
+            },
+        ];
+        let output = compile(&contents, &default_options()).unwrap();
+        assert!(output.starts_with("{\\rtf1\\ansi"));
+        assert!(output.ends_with("}\n"));
+        assert!(output.contains("Ch1"));
+        assert!(output.contains("Hello."));
+    }
+
+    #[test]
+    fn test_compile_with_front_matter() {
+        let mut opts = default_options();
+        opts.include_front_matter = true;
+        opts.title = "My Book".into();
+        opts.author = "Author".into();
+        let output = compile(&[], &opts).unwrap();
+        assert!(output.contains("My Book"));
+        assert!(output.contains("Author"));
+        assert!(output.contains("\\page"));
+    }
+
+    #[test]
+    fn test_rtf_escape() {
+        assert_eq!(rtf_escape("a\\b{c}"), "a\\\\b\\{c\\}");
+    }
+
+    #[test]
+    fn test_rtf_escape_unicode() {
+        let result = rtf_escape("café");
+        assert!(result.contains("\\u"));
+    }
+
+    #[test]
+    fn test_convert_basic_markdown_bold() {
+        let result = convert_basic_markdown("**bold** text");
+        assert!(result.contains("\\b "));
+        assert!(result.contains("\\b0 "));
+    }
+
+    #[test]
+    fn test_convert_basic_markdown_italic() {
+        let result = convert_basic_markdown("*italic* text");
+        assert!(result.contains("\\i "));
+        assert!(result.contains("\\i0 "));
+    }
 }

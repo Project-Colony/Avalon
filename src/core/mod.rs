@@ -48,45 +48,45 @@ pub fn format_bytes(bytes: u64) -> String {
 }
 
 // Core data structures
-pub mod project;
 pub mod binder;
+pub mod collection;
 pub mod document;
 pub mod metadata;
-pub mod collection;
+pub mod project;
 
 // Editor features
-pub mod search;
-pub mod indexer;
-pub mod find_replace;
-pub mod links;
 pub mod annotation;
 pub mod comments;
+pub mod find_replace;
+pub mod indexer;
+pub mod links;
 pub mod revision;
+pub mod search;
 
 // Document management
-pub mod snapshot;
 pub mod autosave;
 pub mod backup;
 pub mod doc_templates;
-pub mod watcher;
 pub mod media_import;
+pub mod snapshot;
+pub mod watcher;
 
 // Writing tools
-pub mod stats;
-pub mod targets;
-pub mod timer;
 pub mod history;
 pub mod linguistic;
-pub mod text_analysis;
-pub mod validation;
-pub mod writing_prompts;
 pub mod namegen;
 pub mod script;
+pub mod stats;
+pub mod targets;
+pub mod text_analysis;
+pub mod timer;
+pub mod validation;
+pub mod writing_prompts;
 
 // Views & navigation
+pub mod bookmark;
 pub mod corkboard;
 pub mod outliner;
-pub mod bookmark;
 pub mod recent;
 
 // Application-level configuration

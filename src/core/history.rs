@@ -1,6 +1,6 @@
 #![allow(dead_code)] // Methods used by test code
-use serde::{Deserialize, Serialize};
 use chrono::{NaiveDate, Utc};
+use serde::{Deserialize, Serialize};
 
 /// Tracks daily writing history for the project
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -127,7 +127,9 @@ impl WritingHistory {
             return 0.0;
         }
         let avg = self.average_words_per_day();
-        let sum_sq: f64 = self.entries.iter()
+        let sum_sq: f64 = self
+            .entries
+            .iter()
             .map(|e| {
                 let diff = e.words_written as f64 - avg;
                 diff * diff
@@ -156,11 +158,17 @@ impl WritingHistory {
     /// Consistency label based on score
     pub fn consistency_label(&self) -> &str {
         let score = self.consistency_score();
-        if score >= 80.0 { "Very Consistent" }
-        else if score >= 60.0 { "Consistent" }
-        else if score >= 40.0 { "Moderate" }
-        else if score >= 20.0 { "Irregular" }
-        else { "Very Irregular" }
+        if score >= 80.0 {
+            "Very Consistent"
+        } else if score >= 60.0 {
+            "Consistent"
+        } else if score >= 40.0 {
+            "Moderate"
+        } else if score >= 20.0 {
+            "Irregular"
+        } else {
+            "Very Irregular"
+        }
     }
 
     /// Average time per word in seconds
@@ -195,21 +203,30 @@ impl WritingHistory {
         }
         let recent_7: i64 = self.recent(7).iter().map(|e| e.words_written.max(0)).sum();
         let len = self.entries.len();
-        let prev_7: i64 = self.entries[len - 14..len - 7].iter()
+        let prev_7: i64 = self.entries[len - 14..len - 7]
+            .iter()
             .map(|e| e.words_written.max(0))
             .sum();
-        if prev_7 == 0 { return 1.0; }
+        if prev_7 == 0 {
+            return 1.0;
+        }
         recent_7 as f64 / prev_7 as f64
     }
 
     /// Productivity trend label
     pub fn trend_label(&self) -> &str {
         let trend = self.productivity_trend();
-        if trend >= 1.5 { "Accelerating" }
-        else if trend >= 1.1 { "Improving" }
-        else if trend >= 0.9 { "Stable" }
-        else if trend >= 0.5 { "Declining" }
-        else { "Stalling" }
+        if trend >= 1.5 {
+            "Accelerating"
+        } else if trend >= 1.1 {
+            "Improving"
+        } else if trend >= 0.9 {
+            "Stable"
+        } else if trend >= 0.5 {
+            "Declining"
+        } else {
+            "Stalling"
+        }
     }
 }
 
@@ -268,62 +285,78 @@ mod tests {
     #[test]
     fn test_total_words_written() {
         let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 500, 3600));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 300, 1800));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 500, 3600));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 300, 1800));
         assert_eq!(history.total_words_written(), 800);
     }
 
     #[test]
     fn test_average_words_per_day() {
         let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 400, 3600));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 1800));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 400, 3600));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 1800));
         assert!((history.average_words_per_day() - 300.0).abs() < 0.01);
     }
 
     #[test]
     fn test_current_streak() {
         let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 0, 0));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 200, 120));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 4).unwrap(), 150, 90));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 0, 0));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 200, 120));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 4).unwrap(), 150, 90));
         assert_eq!(history.current_streak(), 2);
     }
 
     #[test]
     fn test_longest_streak() {
         let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 60));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 300, 60));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 4).unwrap(), 0, 0));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 5).unwrap(), 100, 60));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 60));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 300, 60));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 4).unwrap(), 0, 0));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 5).unwrap(), 100, 60));
         assert_eq!(history.longest_streak(), 3);
     }
 
     #[test]
     fn test_best_day() {
         let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 500, 120));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 200, 90));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 500, 120));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 200, 90));
         let best = history.best_day().unwrap();
         assert_eq!(best.words_written, 500);
     }
@@ -333,7 +366,10 @@ mod tests {
         let mut history = WritingHistory::new();
         for i in 1..=10 {
             history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), i as i64 * 100, 60));
+                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(),
+                i as i64 * 100,
+                60,
+            ));
         }
         let recent = history.recent(3);
         assert_eq!(recent.len(), 3);
@@ -343,36 +379,39 @@ mod tests {
     #[test]
     fn test_active_days() {
         let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 0, 0));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 200, 60));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 0, 0));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 3).unwrap(), 200, 60));
         assert_eq!(history.active_days(), 2);
     }
 
     #[test]
     fn test_activity_ratio() {
         let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 0, 0));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 0, 0));
         assert!((history.activity_ratio() - 0.5).abs() < 0.01);
     }
 
     #[test]
     fn test_daily_entry_wpm() {
-        let entry = make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 300, 600);
+        let entry = make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 300, 600);
         assert!((entry.wpm() - 30.0).abs() < 0.01);
     }
 
     #[test]
     fn test_daily_entry_time_display() {
-        let entry = make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 5400);
+        let entry = make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 5400);
         assert_eq!(entry.time_display(), "1h 30m");
     }
 
@@ -380,23 +419,22 @@ mod tests {
     fn test_words_this_week() {
         let mut history = WritingHistory::new();
         for i in 1..=7 {
-            history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
+            history
+                .entries
+                .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
         }
         assert_eq!(history.words_this_week(), 700);
     }
 
     #[test]
     fn test_daily_entry_wpm_zero_time() {
-        let entry = make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 300, 30);
+        let entry = make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 300, 30);
         assert_eq!(entry.wpm(), 0.0); // Less than 60 seconds
     }
 
     #[test]
     fn test_daily_entry_time_display_short() {
-        let entry = make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 300);
+        let entry = make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 300);
         assert_eq!(entry.time_display(), "5m");
     }
 
@@ -409,20 +447,24 @@ mod tests {
     #[test]
     fn test_activity_ratio_all_active() {
         let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 60));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 60));
         assert!((history.activity_ratio() - 1.0).abs() < 0.01);
     }
 
     #[test]
     fn test_total_time_seconds() {
         let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 3600));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 1800));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 3600));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 200, 1800));
         assert_eq!(history.total_time_seconds(), 5400);
     }
 
@@ -442,8 +484,9 @@ mod tests {
     fn test_streak_all_positive() {
         let mut history = WritingHistory::new();
         for i in 1..=5 {
-            history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
+            history
+                .entries
+                .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
         }
         assert_eq!(history.current_streak(), 5);
         assert_eq!(history.longest_streak(), 5);
@@ -454,8 +497,9 @@ mod tests {
         let mut history = WritingHistory::new();
         // All same = 0 variance
         for i in 1..=5 {
-            history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
+            history
+                .entries
+                .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
         }
         assert!((history.daily_variance()).abs() < 0.01);
     }
@@ -463,10 +507,12 @@ mod tests {
     #[test]
     fn test_daily_variance_different() {
         let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 500, 60));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 2).unwrap(), 500, 60));
         assert!(history.daily_variance() > 0.0);
     }
 
@@ -474,8 +520,9 @@ mod tests {
     fn test_daily_std_dev() {
         let mut history = WritingHistory::new();
         for i in 1..=3 {
-            history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
+            history
+                .entries
+                .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
         }
         assert!((history.daily_std_dev()).abs() < 0.01);
     }
@@ -484,8 +531,9 @@ mod tests {
     fn test_consistency_score_perfect() {
         let mut history = WritingHistory::new();
         for i in 1..=10 {
-            history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
+            history
+                .entries
+                .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
         }
         assert!((history.consistency_score() - 100.0).abs() < 0.01);
     }
@@ -500,8 +548,9 @@ mod tests {
     fn test_consistency_label() {
         let mut history = WritingHistory::new();
         for i in 1..=10 {
-            history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
+            history
+                .entries
+                .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
         }
         assert_eq!(history.consistency_label(), "Very Consistent");
     }
@@ -509,8 +558,9 @@ mod tests {
     #[test]
     fn test_avg_seconds_per_word() {
         let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 600));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 600));
         // 600 seconds / 100 words = 6 seconds per word
         assert!((history.avg_seconds_per_word() - 6.0).abs() < 0.01);
     }
@@ -525,8 +575,9 @@ mod tests {
     fn test_estimated_days_to_target() {
         let mut history = WritingHistory::new();
         for i in 1..=10 {
-            history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
+            history
+                .entries
+                .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
         }
         // Average: 100 words/day, need 500 more to reach 1500 from 1000
         let days = history.estimated_days_to_target(1500, 1000).unwrap();
@@ -536,8 +587,9 @@ mod tests {
     #[test]
     fn test_estimated_days_to_target_already_met() {
         let mut history = WritingHistory::new();
-        history.entries.push(make_entry(
-            NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
+        history
+            .entries
+            .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, 1).unwrap(), 100, 60));
         assert!(history.estimated_days_to_target(1000, 1500).is_none());
     }
 
@@ -551,8 +603,9 @@ mod tests {
     fn test_words_in_last_n_days() {
         let mut history = WritingHistory::new();
         for i in 1..=10 {
-            history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
+            history
+                .entries
+                .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
         }
         assert_eq!(history.words_in_last_n_days(5), 500);
         assert_eq!(history.words_in_last_n_days(3), 300);
@@ -562,8 +615,9 @@ mod tests {
     fn test_productivity_trend_stable() {
         let mut history = WritingHistory::new();
         for i in 1..=14 {
-            history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
+            history
+                .entries
+                .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
         }
         assert!((history.productivity_trend() - 1.0).abs() < 0.01);
         assert_eq!(history.trend_label(), "Stable");
@@ -573,8 +627,9 @@ mod tests {
     fn test_productivity_trend_insufficient_data() {
         let mut history = WritingHistory::new();
         for i in 1..=5 {
-            history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
+            history
+                .entries
+                .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 100, 60));
         }
         assert!((history.productivity_trend() - 1.0).abs() < 0.01);
     }
@@ -584,13 +639,15 @@ mod tests {
         let mut history = WritingHistory::new();
         // Prev 7 days: 50 words/day
         for i in 1..=7 {
-            history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 50, 60));
+            history
+                .entries
+                .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 50, 60));
         }
         // Recent 7 days: 200 words/day
         for i in 8..=14 {
-            history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 200, 60));
+            history
+                .entries
+                .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 200, 60));
         }
         assert!(history.productivity_trend() > 1.5);
         assert_eq!(history.trend_label(), "Accelerating");
@@ -601,13 +658,15 @@ mod tests {
         let mut history = WritingHistory::new();
         // Prev 7 days: 200 words/day
         for i in 1..=7 {
-            history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 200, 60));
+            history
+                .entries
+                .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 200, 60));
         }
         // Recent 7 days: 50 words/day
         for i in 8..=14 {
-            history.entries.push(make_entry(
-                NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 50, 60));
+            history
+                .entries
+                .push(make_entry(NaiveDate::from_ymd_opt(2024, 1, i).unwrap(), 50, 60));
         }
         assert!(history.productivity_trend() < 0.5);
         assert_eq!(history.trend_label(), "Stalling");

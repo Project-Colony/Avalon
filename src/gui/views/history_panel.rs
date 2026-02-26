@@ -42,7 +42,12 @@ pub fn view(history: &WritingHistory) -> Element<'static, Message> {
         stat_item("Streak", &format!("{} d", streak)),
         stat_item("Time", &format!("{}h {}m", total_hours, total_mins)),
         stat_item("WPM", &wpm),
-        stat_item("Best", &best.map(|e| format_number(e.words_written as u64)).unwrap_or_else(|| "-".to_string())),
+        stat_item(
+            "Best",
+            &best
+                .map(|e| format_number(e.words_written as u64))
+                .unwrap_or_else(|| "-".to_string())
+        ),
     ]
     .spacing(12);
 
@@ -59,11 +64,7 @@ pub fn view(history: &WritingHistory) -> Element<'static, Message> {
     }
 
     // Find max words in recent for bar scaling
-    let max_words = recent.iter()
-        .map(|e| e.words_written.max(0))
-        .max()
-        .unwrap_or(1)
-        .max(1) as f64;
+    let max_words = recent.iter().map(|e| e.words_written.max(0)).max().unwrap_or(1).max(1) as f64;
 
     for entry in recent.iter().rev() {
         let date_str = entry.date.format("%a %m-%d").to_string();
@@ -91,9 +92,15 @@ pub fn view(history: &WritingHistory) -> Element<'static, Message> {
         let bar = format!("{}{}", filled, empty);
 
         let entry_row = row![
-            text(date_str).size(11).color(Theme::TEXT_MUTED).width(Length::Fixed(65.0)),
+            text(date_str)
+                .size(11)
+                .color(Theme::TEXT_MUTED)
+                .width(Length::Fixed(65.0)),
             text(words_str).size(11).color(words_color).width(Length::Fixed(55.0)),
-            text(format!("{}m", time_mins)).size(11).color(Theme::TEXT_SECONDARY).width(Length::Fixed(35.0)),
+            text(format!("{}m", time_mins))
+                .size(11)
+                .color(Theme::TEXT_SECONDARY)
+                .width(Length::Fixed(35.0)),
             text(bar).size(9).color(Theme::TEXT_ACCENT),
         ]
         .spacing(6);
@@ -103,9 +110,13 @@ pub fn view(history: &WritingHistory) -> Element<'static, Message> {
 
     // Activity ratio indicator
     let activity = history.activity_ratio();
-    let activity_color = if activity >= 0.8 { Theme::SUCCESS }
-    else if activity >= 0.5 { Theme::WARNING }
-    else { Theme::TEXT_MUTED };
+    let activity_color = if activity >= 0.8 {
+        Theme::SUCCESS
+    } else if activity >= 0.5 {
+        Theme::WARNING
+    } else {
+        Theme::TEXT_MUTED
+    };
     let activity_pct = format!("{:.0}% active", activity * 100.0);
 
     let longest = history.longest_streak();
@@ -114,21 +125,32 @@ pub fn view(history: &WritingHistory) -> Element<'static, Message> {
     // Productivity trend and consistency
     let trend = history.productivity_trend();
     let trend_label = history.trend_label();
-    let trend_color = if trend >= 1.1 { Theme::SUCCESS }
-    else if trend >= 0.9 { Theme::TEXT_ACCENT }
-    else { Theme::WARNING };
+    let trend_color = if trend >= 1.1 {
+        Theme::SUCCESS
+    } else if trend >= 0.9 {
+        Theme::TEXT_ACCENT
+    } else {
+        Theme::WARNING
+    };
 
     let consistency = history.consistency_score();
     let cons_label = history.consistency_label();
-    let cons_color = if consistency >= 60.0 { Theme::SUCCESS }
-    else if consistency >= 40.0 { Theme::WARNING }
-    else { Theme::TEXT_MUTED };
+    let cons_color = if consistency >= 60.0 {
+        Theme::SUCCESS
+    } else if consistency >= 40.0 {
+        Theme::WARNING
+    } else {
+        Theme::TEXT_MUTED
+    };
 
     let extra_stats = row![
-        text(format!("Longest streak: {}d", longest)).size(10).color(Theme::TEXT_MUTED),
+        text(format!("Longest streak: {}d", longest))
+            .size(10)
+            .color(Theme::TEXT_MUTED),
         Space::with_width(12),
         text(format!("This week: {}", format_number(week_words.max(0) as u64)))
-            .size(10).color(Theme::TEXT_ACCENT),
+            .size(10)
+            .color(Theme::TEXT_ACCENT),
         Space::with_width(12),
         text(activity_pct).size(10).color(activity_color),
         Space::with_width(12),
@@ -148,10 +170,7 @@ pub fn view(history: &WritingHistory) -> Element<'static, Message> {
     ]
     .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }
 
 fn stat_item(label: &str, value: &str) -> Element<'static, Message> {

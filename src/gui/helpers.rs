@@ -53,8 +53,11 @@ pub fn strip_html_tags(html: &str) -> String {
             // Convert block elements to newlines
             if i + 2 < lower_chars.len() {
                 let next_two: String = lower_chars[i + 1..i + 3.min(lower_chars.len())].iter().collect();
-                if next_two.starts_with('p') || next_two.starts_with('b') || next_two.starts_with('h')
-                    || next_two.starts_with('l') || next_two.starts_with('d')
+                if next_two.starts_with('p')
+                    || next_two.starts_with('b')
+                    || next_two.starts_with('h')
+                    || next_two.starts_with('l')
+                    || next_two.starts_with('d')
                     || next_two.starts_with('t')
                 {
                     result.push('\n');
@@ -120,9 +123,14 @@ pub fn strip_latex_commands(latex: &str) -> String {
                         i += 1; // skip {
                         let mut depth = 1;
                         while i < chars.len() && depth > 0 {
-                            if chars[i] == '{' { depth += 1; }
-                            else if chars[i] == '}' { depth -= 1; }
-                            if depth > 0 { result.push(chars[i]); }
+                            if chars[i] == '{' {
+                                depth += 1;
+                            } else if chars[i] == '}' {
+                                depth -= 1;
+                            }
+                            if depth > 0 {
+                                result.push(chars[i]);
+                            }
                             i += 1;
                         }
                     }
@@ -134,9 +142,14 @@ pub fn strip_latex_commands(latex: &str) -> String {
                         i += 1;
                         let mut depth = 1;
                         while i < chars.len() && depth > 0 {
-                            if chars[i] == '{' { depth += 1; }
-                            else if chars[i] == '}' { depth -= 1; }
-                            if depth > 0 { result.push(chars[i]); }
+                            if chars[i] == '{' {
+                                depth += 1;
+                            } else if chars[i] == '}' {
+                                depth -= 1;
+                            }
+                            if depth > 0 {
+                                result.push(chars[i]);
+                            }
                             i += 1;
                         }
                     }
@@ -150,7 +163,9 @@ pub fn strip_latex_commands(latex: &str) -> String {
                             env.push(chars[i]);
                             i += 1;
                         }
-                        if i < chars.len() { i += 1; } // skip }
+                        if i < chars.len() {
+                            i += 1;
+                        } // skip }
                         if env == "itemize" || env == "enumerate" || env == "description" {
                             result.push('\n');
                         }
@@ -169,8 +184,11 @@ pub fn strip_latex_commands(latex: &str) -> String {
                         let mut depth = 1;
                         i += 1;
                         while i < chars.len() && depth > 0 {
-                            if chars[i] == '{' { depth += 1; }
-                            else if chars[i] == '}' { depth -= 1; }
+                            if chars[i] == '{' {
+                                depth += 1;
+                            } else if chars[i] == '}' {
+                                depth -= 1;
+                            }
                             i += 1;
                         }
                     }
@@ -194,14 +212,18 @@ pub fn strip_latex_commands(latex: &str) -> String {
                     result.push(chars[i]);
                     i += 1;
                 }
-                if i + 1 < chars.len() { i += 2; }
+                if i + 1 < chars.len() {
+                    i += 2;
+                }
             } else {
                 // Inline math $...$
                 while i < chars.len() && chars[i] != '$' {
                     result.push(chars[i]);
                     i += 1;
                 }
-                if i < chars.len() { i += 1; }
+                if i < chars.len() {
+                    i += 1;
+                }
             }
         } else {
             result.push(chars[i]);
@@ -226,4 +248,120 @@ pub fn strip_latex_commands(latex: &str) -> String {
     }
 
     cleaned.trim().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- title_case tests ---
+
+    #[test]
+    fn test_title_case_basic() {
+        assert_eq!(title_case("hello world"), "Hello World");
+    }
+
+    #[test]
+    fn test_title_case_empty() {
+        assert_eq!(title_case(""), "");
+    }
+
+    #[test]
+    fn test_title_case_single_word() {
+        assert_eq!(title_case("rust"), "Rust");
+    }
+
+    #[test]
+    fn test_title_case_already_cased() {
+        assert_eq!(title_case("HELLO WORLD"), "Hello World");
+    }
+
+    #[test]
+    fn test_title_case_mixed() {
+        assert_eq!(title_case("the QUICK brown FOX"), "The Quick Brown Fox");
+    }
+
+    // --- strip_html_tags tests ---
+
+    #[test]
+    fn test_strip_html_simple() {
+        assert_eq!(strip_html_tags("<p>Hello</p>").trim(), "Hello");
+    }
+
+    #[test]
+    fn test_strip_html_nested() {
+        let result = strip_html_tags("<div><b>Bold</b> text</div>");
+        assert!(result.contains("Bold"));
+        assert!(result.contains("text"));
+    }
+
+    #[test]
+    fn test_strip_html_entities() {
+        let result = strip_html_tags("Tom &amp; Jerry &lt;3&gt;");
+        assert!(result.contains("Tom & Jerry <3>"));
+    }
+
+    #[test]
+    fn test_strip_html_script() {
+        let input = "<p>Keep</p><script>var x = 1;</script><p>Also keep</p>";
+        let result = strip_html_tags(input);
+        assert!(result.contains("Keep"));
+        assert!(result.contains("Also keep"));
+        assert!(!result.contains("var x"));
+    }
+
+    #[test]
+    fn test_strip_html_empty() {
+        assert_eq!(strip_html_tags(""), "");
+    }
+
+    #[test]
+    fn test_strip_html_no_tags() {
+        assert_eq!(strip_html_tags("plain text"), "plain text");
+    }
+
+    // --- strip_latex_commands tests ---
+
+    #[test]
+    fn test_strip_latex_textbf() {
+        let result = strip_latex_commands("\\textbf{bold}");
+        assert_eq!(result.trim(), "bold");
+    }
+
+    #[test]
+    fn test_strip_latex_section() {
+        let result = strip_latex_commands("\\section{My Section}");
+        assert!(result.contains("My Section"));
+    }
+
+    #[test]
+    fn test_strip_latex_item() {
+        let result = strip_latex_commands("\\begin{itemize}\n\\item First\n\\item Second\n\\end{itemize}");
+        assert!(result.contains("First"));
+        assert!(result.contains("Second"));
+    }
+
+    #[test]
+    fn test_strip_latex_comment() {
+        let result = strip_latex_commands("text % comment\nnext line");
+        assert!(result.contains("text"));
+        assert!(result.contains("next line"));
+        assert!(!result.contains("comment"));
+    }
+
+    #[test]
+    fn test_strip_latex_empty() {
+        assert_eq!(strip_latex_commands("").trim(), "");
+    }
+
+    #[test]
+    fn test_strip_latex_plain_text() {
+        assert_eq!(strip_latex_commands("just text").trim(), "just text");
+    }
+
+    #[test]
+    fn test_strip_latex_math() {
+        let result = strip_latex_commands("$x + y$");
+        assert!(result.contains("x + y"));
+    }
 }

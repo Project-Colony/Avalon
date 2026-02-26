@@ -1,8 +1,8 @@
-use iced::widget::{button, column, container, row, scrollable, text, Space};
-use iced::{Element, Length, Padding};
 use crate::core::bookmark::BookmarkList;
 use crate::gui::app::Message;
 use crate::gui::theme::{self, Theme};
+use iced::widget::{button, column, container, row, scrollable, text, Space};
+use iced::{Element, Length, Padding};
 
 /// Render the bookmarks panel (bottom panel)
 pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
@@ -21,15 +21,14 @@ pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
 
     if bookmarks.bookmarks.is_empty() {
         list = list.push(
-            container(
-                column![
-                    text("No bookmarks yet.").size(12).color(Theme::TEXT_MUTED),
-                    Space::with_height(4),
-                    text("Use the \u{f005} star icon in the inspector to bookmark documents for quick access.")
-                        .size(10)
-                        .color(Theme::TEXT_MUTED),
-                ]
-            ).padding(Padding::from([8, 0]))
+            container(column![
+                text("No bookmarks yet.").size(12).color(Theme::TEXT_MUTED),
+                Space::with_height(4),
+                text("Use the \u{f005} star icon in the inspector to bookmark documents for quick access.")
+                    .size(10)
+                    .color(Theme::TEXT_MUTED),
+            ])
+            .padding(Padding::from([8, 0])),
         );
     }
 
@@ -55,29 +54,26 @@ pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
         };
 
         let bm_row = row![
-            text(index_str).size(10).color(Theme::TEXT_MUTED).width(Length::Fixed(20.0)),
+            text(index_str)
+                .size(10)
+                .color(Theme::TEXT_MUTED)
+                .width(Length::Fixed(20.0)),
             text("\u{f005}").size(10).color(Theme::WARNING),
             Space::with_width(4),
             color_indicator,
-            button(
-                text(bm.name.clone()).size(12).color(Theme::TEXT_PRIMARY),
-            )
-            .on_press(Message::SelectBinderItem(item_id))
-            .padding(Padding::from([2, 6])),
+            button(text(bm.name.clone()).size(12).color(Theme::TEXT_PRIMARY),)
+                .on_press(Message::SelectBinderItem(item_id))
+                .padding(Padding::from([2, 6])),
             Space::with_width(Length::Fill),
-            text(age_str)
-                .size(9)
-                .color(Theme::TEXT_MUTED),
+            text(age_str).size(9).color(Theme::TEXT_MUTED),
             Space::with_width(4),
             text(bm.created_at.format("%m-%d").to_string())
                 .size(9)
                 .color(Theme::TEXT_MUTED),
             Space::with_width(4),
-            button(
-                text("\u{f00d}").size(10).color(Theme::ERROR),
-            )
-            .on_press(Message::ToggleBookmark(item_id))
-            .padding(Padding::from([1, 4])),
+            button(text("\u{f00d}").size(10).color(Theme::ERROR),)
+                .on_press(Message::ToggleBookmark(item_id))
+                .padding(Padding::from([1, 4])),
         ]
         .align_y(iced::Alignment::Center);
 
@@ -89,9 +85,7 @@ pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
                 Some((byte_idx, _)) => format!("  {} ...", &note[..byte_idx]),
                 None => format!("  {}", note),
             };
-            list = list.push(
-                text(note_display).size(9).color(Theme::TEXT_MUTED)
-            );
+            list = list.push(text(note_display).size(9).color(Theme::TEXT_MUTED));
         }
     }
 
@@ -104,9 +98,7 @@ pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
     };
 
     let hint = row![
-        text("Ctrl+D: bookmark selected item")
-            .size(9)
-            .color(Theme::TEXT_MUTED),
+        text("Ctrl+D: bookmark selected item").size(9).color(Theme::TEXT_MUTED),
         Space::with_width(Length::Fill),
         text(format!("Drag to reorder{}", note_info))
             .size(9)
@@ -122,8 +114,5 @@ pub fn view(bookmarks: &BookmarkList) -> Element<'static, Message> {
     ]
     .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }

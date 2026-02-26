@@ -36,9 +36,7 @@ pub struct ProjectStatsData {
 
 /// Render the project statistics dialog
 pub fn view(data: &ProjectStatsData) -> Element<'static, Message> {
-    let header = text("Project Statistics")
-        .size(20)
-        .color(Theme::TEXT_PRIMARY);
+    let header = text("Project Statistics").size(20).color(Theme::TEXT_PRIMARY);
 
     let subtitle = text(format!("\"{}\"", data.title))
         .size(14)
@@ -66,38 +64,45 @@ pub fn view(data: &ProjectStatsData) -> Element<'static, Message> {
     ];
 
     // Document metrics
-    let doc_section = section("Document Metrics", vec![
-        stat("Total Words", &format_number(data.word_count)),
-        stat("Characters (with spaces)", &format_number(data.char_count)),
-        stat("Characters (no spaces)", &format_number(data.char_no_spaces)),
-        stat("Paragraphs", &format_number(data.paragraph_count)),
-        stat("Sentences", &format_number(data.sentence_count)),
-        stat("Pages (est.)", &format!("{:.1}", data.page_count)),
-        stat("Documents", &data.document_count.to_string()),
-        stat("Folders", &data.folder_count.to_string()),
-        stat("Avg Words/Doc", &format!("{:.0}", data.avg_words_per_doc)),
-    ]);
+    let doc_section = section(
+        "Document Metrics",
+        vec![
+            stat("Total Words", &format_number(data.word_count)),
+            stat("Characters (with spaces)", &format_number(data.char_count)),
+            stat("Characters (no spaces)", &format_number(data.char_no_spaces)),
+            stat("Paragraphs", &format_number(data.paragraph_count)),
+            stat("Sentences", &format_number(data.sentence_count)),
+            stat("Pages (est.)", &format!("{:.1}", data.page_count)),
+            stat("Documents", &data.document_count.to_string()),
+            stat("Folders", &data.folder_count.to_string()),
+            stat("Avg Words/Doc", &format!("{:.0}", data.avg_words_per_doc)),
+        ],
+    );
 
     // Time estimates
-    let time_section = section("Time Estimates", vec![
-        stat("Reading Time", &format_time(data.reading_time_minutes)),
-        stat("Speaking Time", &format_time(data.speaking_time_minutes)),
-    ]);
+    let time_section = section(
+        "Time Estimates",
+        vec![
+            stat("Reading Time", &format_time(data.reading_time_minutes)),
+            stat("Speaking Time", &format_time(data.speaking_time_minutes)),
+        ],
+    );
 
     // Writing habits
-    let habits_section = section("Writing Habits", vec![
-        stat("Avg Words/Day", &format!("{:.0}", data.avg_words_per_day)),
-        stat("Writing Days", &data.total_writing_days.to_string()),
-        stat("Current Streak", &format!("{} days", data.current_streak)),
-        stat("Best Day", &format!("{} words", data.best_day_words)),
-        stat("Total Time", &format!("{:.1} hours", data.total_time_hours)),
-    ]);
+    let habits_section = section(
+        "Writing Habits",
+        vec![
+            stat("Avg Words/Day", &format!("{:.0}", data.avg_words_per_day)),
+            stat("Writing Days", &data.total_writing_days.to_string()),
+            stat("Current Streak", &format!("{} days", data.current_streak)),
+            stat("Best Day", &format!("{} words", data.best_day_words)),
+            stat("Total Time", &format!("{:.1} hours", data.total_time_hours)),
+        ],
+    );
 
     // Readability
     let readability_section: Element<'static, Message> = if let Some(score) = data.flesch_score {
-        let mut items = vec![
-            stat("Flesch Reading Ease", &format!("{:.1}", score)),
-        ];
+        let mut items = vec![stat("Flesch Reading Ease", &format!("{:.1}", score))];
         if let Some(ref label) = data.flesch_label {
             items.push(stat("Reading Level", label));
         }
@@ -136,16 +141,21 @@ pub fn view(data: &ProjectStatsData) -> Element<'static, Message> {
         // Progress bar
         let bar_width = 200.0;
         let filled = (pct / 100.0 * bar_width) as u16;
-        let bar_color = if pct >= 100.0 { Theme::SUCCESS }
-        else if pct >= 75.0 { Theme::WARNING }
-        else { Theme::TEXT_ACCENT };
+        let bar_color = if pct >= 100.0 {
+            Theme::SUCCESS
+        } else if pct >= 75.0 {
+            Theme::WARNING
+        } else {
+            Theme::TEXT_ACCENT
+        };
 
-        let progress_bar = row![
-            text(format!("[{}{}]",
-                "=".repeat(filled as usize / 5),
-                " ".repeat(((bar_width as u16 - filled) / 5) as usize),
-            )).size(12).color(bar_color),
-        ];
+        let progress_bar = row![text(format!(
+            "[{}{}]",
+            "=".repeat(filled as usize / 5),
+            " ".repeat(((bar_width as u16 - filled) / 5) as usize),
+        ))
+        .size(12)
+        .color(bar_color),];
 
         let s = section("Target Progress", items);
         column![s, progress_bar].spacing(4).into()
@@ -153,11 +163,9 @@ pub fn view(data: &ProjectStatsData) -> Element<'static, Message> {
         Space::with_height(0).into()
     };
 
-    let close_btn = button(
-        text("  Close  ").size(14).color(Theme::TEXT_SECONDARY),
-    )
-    .on_press(Message::HideProjectStats)
-    .padding(Padding::from([8, 20]));
+    let close_btn = button(text("  Close  ").size(14).color(Theme::TEXT_SECONDARY))
+        .on_press(Message::HideProjectStats)
+        .padding(Padding::from([8, 20]));
 
     let content = column![
         header,
@@ -189,9 +197,7 @@ pub fn view(data: &ProjectStatsData) -> Element<'static, Message> {
 }
 
 fn section(title: &str, items: Vec<Element<'static, Message>>) -> Element<'static, Message> {
-    let header = text(title.to_string())
-        .size(14)
-        .color(Theme::TEXT_ACCENT);
+    let header = text(title.to_string()).size(14).color(Theme::TEXT_ACCENT);
 
     let mut col = column![header].spacing(2);
     for item in items {
@@ -202,8 +208,14 @@ fn section(title: &str, items: Vec<Element<'static, Message>>) -> Element<'stati
 
 fn stat(label: &str, value: &str) -> Element<'static, Message> {
     row![
-        text(label.to_string()).size(12).color(Theme::TEXT_MUTED).width(Length::FillPortion(2)),
-        text(value.to_string()).size(12).color(Theme::TEXT_PRIMARY).width(Length::FillPortion(1)),
+        text(label.to_string())
+            .size(12)
+            .color(Theme::TEXT_MUTED)
+            .width(Length::FillPortion(2)),
+        text(value.to_string())
+            .size(12)
+            .color(Theme::TEXT_PRIMARY)
+            .width(Length::FillPortion(1)),
     ]
     .spacing(8)
     .into()

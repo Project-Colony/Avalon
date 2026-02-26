@@ -1,6 +1,6 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 use super::document::Document;
 use super::metadata::Metadata;
@@ -30,7 +30,8 @@ impl Binder {
 
     /// Find an item by ID anywhere in the binder
     pub fn find_item(&self, id: &Uuid) -> Option<&BinderItem> {
-        self.draft.find(id)
+        self.draft
+            .find(id)
             .or_else(|| self.research.find(id))
             .or_else(|| self.trash.find(id))
     }
@@ -55,15 +56,6 @@ impl Binder {
         self.draft.collect_all(&mut items);
         self.research.collect_all(&mut items);
         self.trash.collect_all(&mut items);
-        items
-    }
-
-    /// Get all items as mutable flat list
-    pub fn all_items_mut(&mut self) -> Vec<&mut BinderItem> {
-        let mut items = Vec::new();
-        self.draft.collect_all_mut(&mut items);
-        self.research.collect_all_mut(&mut items);
-        self.trash.collect_all_mut(&mut items);
         items
     }
 
@@ -130,15 +122,23 @@ impl Binder {
 
     /// Move an item up in its parent's children list
     pub fn move_item_up(&mut self, id: &Uuid) -> bool {
-        if self.draft.move_child_up(id) { return true; }
-        if self.research.move_child_up(id) { return true; }
+        if self.draft.move_child_up(id) {
+            return true;
+        }
+        if self.research.move_child_up(id) {
+            return true;
+        }
         self.trash.move_child_up(id)
     }
 
     /// Move an item down in its parent's children list
     pub fn move_item_down(&mut self, id: &Uuid) -> bool {
-        if self.draft.move_child_down(id) { return true; }
-        if self.research.move_child_down(id) { return true; }
+        if self.draft.move_child_down(id) {
+            return true;
+        }
+        if self.research.move_child_down(id) {
+            return true;
+        }
         self.trash.move_child_down(id)
     }
 
@@ -149,7 +149,8 @@ impl Binder {
 
     /// Duplicate an item (creates a copy next to the original)
     pub fn duplicate_item(&mut self, id: &Uuid) -> Option<Uuid> {
-        self.draft.duplicate_child(id)
+        self.draft
+            .duplicate_child(id)
             .or_else(|| self.research.duplicate_child(id))
     }
 
@@ -314,28 +315,6 @@ impl BinderItem {
         }
     }
 
-    /// Collect all items into a mutable flat list.
-    ///
-    /// This uses raw pointers because Rust's borrow checker cannot express
-    /// simultaneous `&mut item` and `&mut item.children` across function
-    /// boundaries. Prefer `visit_mut` or `for_each_item_mut` when possible.
-    ///
-    /// # Safety invariant
-    /// Each node in the binder tree appears exactly once (it is a tree, not a DAG),
-    /// so no aliasing occurs between the mutable references produced.
-    pub fn collect_all_mut<'a>(&'a mut self, items: &mut Vec<&'a mut BinderItem>) {
-        let mut stack: Vec<*mut BinderItem> = vec![self as *mut BinderItem];
-        while let Some(ptr) = stack.pop() {
-            // SAFETY: Each node in the tree appears exactly once, so no aliasing.
-            // The pointers all originate from `&'a mut self` and its children.
-            let node = unsafe { &mut *ptr };
-            for child in node.children.iter_mut().rev() {
-                stack.push(child as *mut BinderItem);
-            }
-            items.push(node);
-        }
-    }
-
     /// Add a child item
     pub fn add_child(&mut self, item: BinderItem) {
         self.children.push(item);
@@ -352,9 +331,7 @@ impl BinderItem {
     /// Get the total word count for this item and all children
     pub fn total_word_count(&self) -> usize {
         let own_count = self.document.as_ref().map_or(0, |d| d.word_count());
-        let children_count: usize = self.children.iter()
-            .map(|c| c.total_word_count())
-            .sum();
+        let children_count: usize = self.children.iter().map(|c| c.total_word_count()).sum();
         own_count + children_count
     }
 
@@ -477,9 +454,6 @@ pub enum BinderItemKind {
     Pdf,
     WebPage,
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
@@ -996,5 +970,4 @@ mod tests {
         found.title = "Renamed".to_string();
         assert_eq!(binder.find_item(&id).unwrap().title, "Renamed");
     }
-
 }

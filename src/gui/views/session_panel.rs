@@ -21,12 +21,14 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
     } else {
         "\u{f04c} PAUSED"
     };
-    let status_color = if data.is_active { Theme::SUCCESS } else { Theme::TEXT_MUTED };
+    let status_color = if data.is_active {
+        Theme::SUCCESS
+    } else {
+        Theme::TEXT_MUTED
+    };
 
     let header = row![
-        text("WRITING SESSION")
-            .size(11)
-            .color(Theme::TEXT_SECONDARY),
+        text("WRITING SESSION").size(11).color(Theme::TEXT_SECONDARY),
         Space::with_width(8),
         text(status_indicator).size(10).color(status_color),
     ];
@@ -41,40 +43,35 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
         format!("{:02}:{:02}", minutes, seconds)
     };
 
-    let timer_display = text(timer_text)
-        .size(28)
-        .color(if data.is_active { Theme::TEXT_PRIMARY } else { Theme::TEXT_MUTED });
+    let timer_display = text(timer_text).size(28).color(if data.is_active {
+        Theme::TEXT_PRIMARY
+    } else {
+        Theme::TEXT_MUTED
+    });
 
     // Start/Stop button
     let toggle_btn = if data.is_active {
-        button(
-            text("\u{f04c}  Pause  ").size(13).color(Theme::WARNING),
-        )
-        .on_press(Message::SessionToggle)
-        .padding(Padding::from([6, 16]))
+        button(text("\u{f04c}  Pause  ").size(13).color(Theme::WARNING))
+            .on_press(Message::SessionToggle)
+            .padding(Padding::from([6, 16]))
     } else {
-        button(
-            text("\u{f04b}  Start  ").size(13).color(Theme::SUCCESS),
-        )
-        .on_press(Message::SessionToggle)
-        .padding(Padding::from([6, 16]))
+        button(text("\u{f04b}  Start  ").size(13).color(Theme::SUCCESS))
+            .on_press(Message::SessionToggle)
+            .padding(Padding::from([6, 16]))
     };
 
-    let reset_btn = button(
-        text("\u{f021} Reset").size(12).color(Theme::TEXT_MUTED),
-    )
-    .on_press(Message::SessionReset)
-    .padding(Padding::from([4, 12]));
+    let reset_btn = button(text("\u{f021} Reset").size(12).color(Theme::TEXT_MUTED))
+        .on_press(Message::SessionReset)
+        .padding(Padding::from([4, 12]));
 
-    let controls = row![
-        toggle_btn,
-        Space::with_width(8),
-        reset_btn,
-    ]
-    .align_y(iced::Alignment::Center);
+    let controls = row![toggle_btn, Space::with_width(8), reset_btn,].align_y(iced::Alignment::Center);
 
     // Stats
-    let words_color = if data.words_written >= 0 { Theme::SUCCESS } else { Theme::ERROR };
+    let words_color = if data.words_written >= 0 {
+        Theme::SUCCESS
+    } else {
+        Theme::ERROR
+    };
     let words_text = if data.words_written >= 0 {
         format!("+{} words", data.words_written)
     } else {
@@ -85,7 +82,10 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
 
     // Estimated pages
     let pages = if data.words_written > 0 {
-        format!("~{:.1} pages", data.words_written as f64 / crate::core::WORDS_PER_PAGE as f64)
+        format!(
+            "~{:.1} pages",
+            data.words_written as f64 / crate::core::WORDS_PER_PAGE as f64
+        )
     } else {
         String::from("0 pages")
     };
@@ -133,17 +133,14 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
         let bar_width: usize = 20;
         let filled = ((pct / 100.0) * bar_width as f64) as usize;
         let empty = bar_width.saturating_sub(filled);
-        let bar = format!(
-            "{}{} {:.0}%",
-            "\u{2588}".repeat(filled),
-            "\u{2591}".repeat(empty),
-            pct
-        );
+        let bar = format!("{}{} {:.0}%", "\u{2588}".repeat(filled), "\u{2591}".repeat(empty), pct);
 
         let completion_icon = if pct >= 100.0 { "\u{f00c} " } else { "" };
 
         column![
-            text(format!("{}{}", completion_icon, bar)).size(11).color(progress_color),
+            text(format!("{}{}", completion_icon, bar))
+                .size(11)
+                .color(progress_color),
             text(format!("{} words remaining", remaining))
                 .size(10)
                 .color(Theme::TEXT_MUTED),
@@ -151,10 +148,7 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
         .spacing(1)
         .into()
     } else {
-        text("(no goal set)")
-            .size(10)
-            .color(Theme::TEXT_MUTED)
-            .into()
+        text("(no goal set)").size(10).color(Theme::TEXT_MUTED).into()
     };
 
     let goal_row = row![
@@ -193,19 +187,9 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
         .spacing(2)
         .width(Length::Fixed(200.0)),
         Space::with_width(20),
-        column![
-            stats_row,
-            Space::with_height(6),
-            goal_row,
-            Space::with_height(4),
-            tip,
-        ]
-        .spacing(4),
+        column![stats_row, Space::with_height(6), goal_row, Space::with_height(4), tip,].spacing(4),
     ]
     .padding(Padding::from([8, 12]));
 
-    container(content)
-        .style(theme::panel_style)
-        .width(Length::Fill)
-        .into()
+    container(content).style(theme::panel_style).width(Length::Fill).into()
 }
