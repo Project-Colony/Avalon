@@ -84,11 +84,12 @@ pub fn extract_links(content: &str) -> Vec<DocLink> {
     links
 }
 
-/// Build a title-to-IDs index for O(1) link resolution
-fn build_title_index(all_items: &[&BinderItem]) -> HashMap<String, Vec<Uuid>> {
-    let mut index: HashMap<String, Vec<Uuid>> = HashMap::new();
+/// Build a title-to-IDs index for O(1) link resolution.
+/// Uses borrowed keys (`&str`) to avoid cloning every title.
+fn build_title_index<'a>(all_items: &[&'a BinderItem]) -> HashMap<&'a str, Vec<Uuid>> {
+    let mut index: HashMap<&'a str, Vec<Uuid>> = HashMap::with_capacity(all_items.len());
     for item in all_items {
-        index.entry(item.title.clone()).or_default().push(item.id);
+        index.entry(&item.title).or_default().push(item.id);
     }
     index
 }
@@ -109,13 +110,13 @@ pub fn validate_document_links(
 /// Use this when validating multiple documents to avoid rebuilding the index each time.
 pub fn validate_document_links_cached(
     item: &BinderItem,
-    title_index: &HashMap<String, Vec<Uuid>>,
+    title_index: &HashMap<&str, Vec<Uuid>>,
 ) -> Vec<LinkValidation> {
     validate_document_links_with_index(item, title_index)
 }
 
 /// Build a title index suitable for passing to `validate_document_links_cached`.
-pub fn build_title_index_from_binder(binder: &Binder) -> HashMap<String, Vec<Uuid>> {
+pub fn build_title_index_from_binder(binder: &Binder) -> HashMap<&str, Vec<Uuid>> {
     let all_items = binder.all_items();
     build_title_index(&all_items)
 }
@@ -123,7 +124,7 @@ pub fn build_title_index_from_binder(binder: &Binder) -> HashMap<String, Vec<Uui
 /// Validate all links in a single document using a pre-built title index (avoids repeated traversals)
 fn validate_document_links_with_index(
     item: &BinderItem,
-    title_index: &HashMap<String, Vec<Uuid>>,
+    title_index: &HashMap<&str, Vec<Uuid>>,
 ) -> Vec<LinkValidation> {
     let doc = match &item.document {
         Some(d) => d,
@@ -134,7 +135,7 @@ fn validate_document_links_with_index(
 
     links.into_iter().map(|link| {
         let matches: Vec<Uuid> = title_index
-            .get(&link.link_text)
+            .get(link.link_text.as_str())
             .map(|ids| ids.iter().copied().filter(|id| *id != item.id).collect())
             .unwrap_or_default();
 

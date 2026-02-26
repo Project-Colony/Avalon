@@ -32,12 +32,13 @@ impl Statistics {
             }
 
             if let Some(ref doc) = item.document {
-                stats.word_count += doc.word_count();
-                stats.char_count += doc.char_count();
-                stats.char_count_no_spaces += doc.char_count_no_spaces();
-                stats.paragraph_count += doc.paragraph_count();
-                stats.sentence_count += doc.sentence_count();
-                stats.line_count += doc.line_count();
+                let ts = doc.stats();
+                stats.word_count += ts.word_count;
+                stats.char_count += ts.char_count;
+                stats.char_count_no_spaces += ts.char_count_no_spaces;
+                stats.paragraph_count += ts.paragraph_count;
+                stats.sentence_count += ts.sentence_count;
+                stats.line_count += ts.line_count;
             }
         });
 
@@ -889,6 +890,7 @@ impl TrendDirection {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
 

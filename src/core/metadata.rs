@@ -44,6 +44,9 @@ impl LabelColor {
 
     pub fn to_iced_color(&self) -> iced::Color {
         let hex = self.to_hex().trim_start_matches('#');
+        if hex.len() < 6 {
+            return iced::Color::from_rgb(0.5, 0.5, 0.5);
+        }
         let r = u8::from_str_radix(&hex[0..2], 16).unwrap_or(128) as f32 / 255.0;
         let g = u8::from_str_radix(&hex[2..4], 16).unwrap_or(128) as f32 / 255.0;
         let b = u8::from_str_radix(&hex[4..6], 16).unwrap_or(128) as f32 / 255.0;

@@ -3,7 +3,6 @@ use iced::window;
 use uuid::Uuid;
 
 use crate::core::project::Project;
-use crate::export::compiler::CompileOptions;
 
 /// The active view mode
 #[derive(Debug, Clone, PartialEq)]

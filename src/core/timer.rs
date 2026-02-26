@@ -356,9 +356,9 @@ impl WritingTimer {
     /// Get a progress bar string for display
     pub fn progress_bar(&self) -> String {
         let pct = self.progress();
-        let filled = (pct * 20.0).round() as usize;
-        let empty = 20 - filled.min(20);
-        format!("[{}{}] {:.0}%", "#".repeat(filled.min(20)), "-".repeat(empty), pct * 100.0)
+        let filled = (pct * 20.0).round().clamp(0.0, 20.0) as usize;
+        let empty = 20 - filled;
+        format!("[{}{}] {:.0}%", "#".repeat(filled), "-".repeat(empty), pct * 100.0)
     }
 
     /// Count of consecutive completed sessions from the end

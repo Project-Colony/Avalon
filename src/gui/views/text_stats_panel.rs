@@ -188,7 +188,7 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
         text(format!("Longest: {} words",
             longest.first().map_or(0, |s| s.word_count)
         )).size(10).color(
-            if longest.first().map_or(false, |s| s.word_count > 40) { Theme::WARNING }
+            if longest.first().is_some_and(|s| s.word_count > 40) { Theme::WARNING }
             else { Theme::TEXT_SECONDARY }
         ),
     ]

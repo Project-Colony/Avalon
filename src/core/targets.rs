@@ -163,7 +163,9 @@ impl DocumentTargets {
 
         let words_per_day_needed = match (words_remaining > 0, days_remaining) {
             (true, Some(days)) if days > 0 => {
-                Some((words_remaining as usize) / days as usize)
+                let wr = words_remaining.unsigned_abs() as usize;
+                let d = days.unsigned_abs() as usize;
+                Some(wr / d)
             }
             _ => None,
         };
@@ -289,8 +291,8 @@ impl TargetProgress {
 
     /// Get a progress bar string (10 chars wide)
     pub fn progress_bar(&self) -> String {
-        let filled = (self.percentage / 10.0).round() as usize;
-        let empty = 10 - filled.min(10);
+        let filled = (self.percentage / 10.0).round().clamp(0.0, 10.0) as usize;
+        let empty = 10 - filled;
         format!(
             "[{}{}] {:.0}%",
             "#".repeat(filled.min(10)),

@@ -181,11 +181,9 @@ impl Comment {
                 self.anchor_start = self.anchor_start.saturating_add(off);
                 self.anchor_end = self.anchor_end.saturating_add(off);
             }
-        } else {
-            if let Ok(off) = usize::try_from(offset.saturating_abs()) {
-                self.anchor_start = self.anchor_start.saturating_sub(off);
-                self.anchor_end = self.anchor_end.saturating_sub(off);
-            }
+        } else if let Ok(off) = usize::try_from(offset.saturating_abs()) {
+            self.anchor_start = self.anchor_start.saturating_sub(off);
+            self.anchor_end = self.anchor_end.saturating_sub(off);
         }
     }
 
@@ -870,7 +868,7 @@ mod tests {
     #[test]
     fn test_open_and_resolved_comments() {
         let mut mgr = CommentManager::new();
-        let mut c1 = Comment::new(0, 10, "Open", "Alice");
+        let c1 = Comment::new(0, 10, "Open", "Alice");
         let mut c2 = Comment::new(10, 20, "Resolved", "Bob");
         c2.resolve("Carol");
         mgr.add_comment(c1);
@@ -904,7 +902,7 @@ mod tests {
     #[test]
     fn test_by_priority() {
         let mut mgr = CommentManager::new();
-        let mut c1 = Comment::new(0, 10, "Normal", "Alice");
+        let c1 = Comment::new(0, 10, "Normal", "Alice");
         let mut c2 = Comment::new(10, 20, "Critical", "Bob");
         c2.priority = CommentPriority::Critical;
         mgr.add_comment(c1);

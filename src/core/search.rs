@@ -1,8 +1,30 @@
 #![allow(dead_code)] // Methods used by test code
+use std::sync::Mutex;
 use uuid::Uuid;
 use regex::Regex;
 
 use super::binder::Binder;
+
+/// Simple single-entry regex cache: avoids recompilation when the user
+/// triggers repeated searches with the same pattern (e.g., live search
+/// while typing, or scrolling through results).
+static REGEX_CACHE: Mutex<Option<(String, Regex)>> = Mutex::new(None);
+
+fn get_or_compile_regex(pattern: &str) -> Option<Regex> {
+    let mut cache = REGEX_CACHE.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((ref cached_pat, ref cached_re)) = *cache {
+        if cached_pat == pattern {
+            return Some(cached_re.clone());
+        }
+    }
+    match Regex::new(pattern) {
+        Ok(re) => {
+            *cache = Some((pattern.to_string(), re.clone()));
+            Some(re)
+        }
+        Err(_) => None,
+    }
+}
 
 /// Search result from a project-wide search
 #[derive(Debug, Clone)]
@@ -58,9 +80,9 @@ pub fn search_binder(binder: &Binder, options: &SearchOptions) -> Vec<SearchResu
     }
 
     let pattern = build_pattern(options);
-    let regex = match Regex::new(&pattern) {
-        Ok(r) => r,
-        Err(_) => return results,
+    let regex = match get_or_compile_regex(&pattern) {
+        Some(r) => r,
+        None => return results,
     };
 
     let max = options.max_results;
@@ -84,7 +106,7 @@ pub fn search_binder(binder: &Binder, options: &SearchOptions) -> Vec<SearchResu
         // Search content
         if options.search_content {
             if let Some(ref doc) = item.document {
-                for (_line_num, line) in doc.content.lines().enumerate() {
+                for line in doc.content.lines() {
                     for _m in regex.find_iter(line) {
                         matches.push(SearchMatch {
                             context: line.to_string(),

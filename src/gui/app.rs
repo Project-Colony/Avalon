@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 use std::fmt::Write;
-use std::path::PathBuf;
 use iced::keyboard;
-use iced::widget::{column, container, row, stack, text, text_editor, Space};
+use iced::widget::{column, container, row, stack, text, Space};
 use iced::{Element, Length, Padding, Subscription, Task as IcedTask};
 use iced::window;
 use uuid::Uuid;
@@ -968,7 +967,7 @@ impl ScrineverApp {
                     };
 
                     let mut count = 0;
-                    for item in project.binder.all_items_mut() {
+                    project.binder.for_each_item_mut(|item| {
                         if let Some(ref mut doc) = item.document {
                             let (new_content, replacements) = find_replace::replace_in_text(&doc.content, &options);
                             if replacements > 0 {
@@ -976,7 +975,7 @@ impl ScrineverApp {
                                 doc.content = new_content;
                             }
                         }
-                    }
+                    });
 
                     // Reload current editor
                     if let Some(item_id) = self.selected_item {
@@ -1557,21 +1556,18 @@ impl ScrineverApp {
                                         .and_then(|e| e.to_str())
                                         .unwrap_or("")
                                         .to_lowercase();
-                                    match ext.as_str() {
-                                        "scriv" => {
-                                            match crate::export::scriv_import::import_scriv(&path) {
-                                                Ok((_info, items)) => {
-                                                    for item in items {
-                                                        project.binder.draft.add_child(item);
-                                                        count += 1;
-                                                    }
-                                                }
-                                                Err(e) => {
-                                                    self.notification = Some(format!("Scrivener import error: {}", e));
+                                    if ext.as_str() == "scriv" {
+                                        match crate::export::scriv_import::import_scriv(&path) {
+                                            Ok((_info, items)) => {
+                                                for item in items {
+                                                    project.binder.draft.add_child(item);
+                                                    count += 1;
                                                 }
                                             }
+                                            Err(e) => {
+                                                self.notification = Some(format!("Scrivener import error: {}", e));
+                                            }
                                         }
-                                        _ => {}
                                     }
                                 }
                             }
@@ -3079,152 +3075,7 @@ impl ScrineverApp {
             // ========== Linguistic analysis ==========
             // ========== Misc ==========
             Message::Tick => {
-                // Auto-save
-                if self.project.is_some() && self.editor.dirty {
-                    self.auto_save_counter += 1;
-                    let interval = self.project.as_ref()
-                        .map(|p| p.settings.auto_save_seconds)
-                        .unwrap_or(30);
-                    if interval > 0 && self.auto_save_counter >= interval {
-                        self.auto_save_counter = 0;
-                        self.sync_editor_to_project();
-                        if let Some(ref mut project) = self.project {
-                            let home = crate::core::home_dir_or_cwd();
-                            let save_dir = home.join(PROJECTS_DIR_NAME);
-                            if project.save(&save_dir).is_ok() {
-                                self.editor.mark_clean();
-                                // Auto-backup on save (every 10th auto-save)
-                                if let Some(ref path) = project.path {
-                                    if let Err(e) = crate::core::backup::BackupManager::create_backup(path) {
-                                        log::warn!("Auto-backup failed: {}", e);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Word count milestone detection
-                if self.auto_save_counter % MILESTONE_CHECK_INTERVAL == 0 {
-                    if let Some(ref project) = self.project {
-                        let total_words = project.binder.total_word_count();
-                        let milestones = [1000, 5000, 10000, 25000, 50000, 75000, 100000, 150000, 200000];
-                        for &m in &milestones {
-                            if total_words >= m && self.last_milestone < m {
-                                self.last_milestone = m;
-                                let label = if m >= 1000 { format!("{}k", m / 1000) } else { m.to_string() };
-                                self.notification = Some(format!(
-                                    "\u{f005} Milestone: {} words! Keep writing!",
-                                    label
-                                ));
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                // Writing session timer
-                if self.session_active {
-                    let current_words = self.current_word_count();
-                    let word_delta = current_words as i64 - self.session_start_word_count as i64;
-                    let prev_words = self.session_stats.words_written;
-                    self.session_stats.update(word_delta, self.session_stats.time_elapsed_seconds + 1);
-
-                    // Check session goal milestone
-                    if self.session_goal > 0 {
-                        let new_words = self.session_stats.words_written;
-                        let goal = self.session_goal as i64;
-                        // Just crossed the goal threshold
-                        if prev_words < goal && new_words >= goal {
-                            self.notification = Some(format!(
-                                "\u{f00c} Session goal of {} words reached! Keep going!",
-                                self.session_goal
-                            ));
-                        }
-                    }
-
-                    // Check daily goal milestone
-                    if self.daily_goal > 0 && self.session_stats.time_elapsed_seconds % DAILY_GOAL_CHECK_INTERVAL == 0 {
-                        let words_today = self.session_stats.words_written;
-                        let daily_goal = self.daily_goal as i64;
-                        if words_today >= daily_goal && (words_today - DAILY_GOAL_CHECK_INTERVAL as i64) < daily_goal {
-                            self.notification = Some(format!(
-                                "\u{f00c} Daily goal of {} words reached!",
-                                self.daily_goal
-                            ));
-                        }
-                    }
-
-                    // Record writing history periodically
-                    if self.session_stats.time_elapsed_seconds % HISTORY_RECORD_INTERVAL == 0 {
-                        if let Some(ref mut project) = self.project {
-                            project.writing_history.record(current_words, HISTORY_RECORD_INTERVAL);
-                        }
-                    }
-
-                    // Pomodoro break reminder at 25 min
-                    if self.session_stats.time_elapsed_seconds == POMODORO_BREAK_SECONDS && self.notification.is_none() {
-                        self.notification = Some(
-                            "\u{f0f4} 25 minutes of writing! Consider a short break.".to_string()
-                        );
-                    }
-                }
-
-                // Writing focus timer tick
-                if self.writing_timer.is_running()
-                    && self.writing_timer.tick() {
-                        // Timer completed - auto-stop and record session
-                        let word_count = self.current_word_count();
-                        self.writing_timer.stop(word_count);
-                        let summary = self.writing_timer.summary();
-                        self.notification = Some(format!(
-                            "\u{f00c} Timer completed! {} | Great writing session!",
-                            summary
-                        ));
-                    }
-
-                // Auto-refresh smart collections every 30 seconds when collections panel is open
-                if self.bottom_panel == BottomPanel::Collections && self.auto_save_counter % COLLECTION_REFRESH_INTERVAL == 0 {
-                    if let Some(ref mut project) = self.project {
-                        for coll in &mut project.collections {
-                            if let crate::core::collection::CollectionKind::Search { ref query, case_sensitive, whole_word } = coll.kind {
-                                let options = crate::core::search::SearchOptions {
-                                    query: query.clone(),
-                                    case_sensitive,
-                                    whole_word,
-                                    regex: false,
-                                    search_titles: true,
-                                    search_content: true,
-                                    search_notes: false,
-                                    search_synopsis: true,
-                                    ..Default::default()
-                                };
-                                let results = crate::core::search::search_binder(&project.binder, &options);
-                                let item_ids: Vec<Uuid> = results.iter().map(|r| r.item_id).collect();
-                                coll.item_ids = item_ids;
-                            }
-                        }
-                    }
-                }
-
-                // Poll file watcher for external changes
-                if self.project_state.poll_external_changes() {
-                    self.notification = Some(
-                        "External changes detected. Consider reloading.".to_string()
-                    );
-                    self.project_state.clear_external_changes();
-                }
-
-                // Auto-dismiss notification after 8 seconds
-                if self.notification.is_some() {
-                    self.notification_timer = self.notification_timer.saturating_add(1);
-                    if self.notification_timer >= 8 {
-                        self.notification = None;
-                        self.notification_timer = 0;
-                    }
-                } else {
-                    self.notification_timer = 0;
-                }
+                self.handle_tick();
             }
 
             Message::DismissNotification => {
@@ -3777,18 +3628,18 @@ impl ScrineverApp {
             String::new()
         };
         let streak = project.writing_history.current_streak();
-        let status_bar = views::status_bar::view(
-            &stats,
-            project.settings.target_word_count,
-            self.editor.dirty,
-            &project.title,
-            self.session_active,
-            self.editor.current_line(),
-            self.editor.current_column(),
-            self.writing_timer.is_running(),
-            &timer_remaining,
-            streak,
-        );
+        let status_bar = views::status_bar::view(&views::status_bar::StatusBarParams {
+            stats: &stats,
+            target_words: project.settings.target_word_count,
+            is_dirty: self.editor.dirty,
+            project_title: &project.title,
+            session_active: self.session_active,
+            cursor_line: self.editor.current_line(),
+            cursor_col: self.editor.current_column(),
+            timer_running: self.writing_timer.is_running(),
+            timer_remaining: &timer_remaining,
+            writing_streak: streak,
+        });
 
         // Notification bar
         let notification_bar: Option<Element<'_, Message>> = self.notification.as_ref().map(|msg| {
@@ -3982,6 +3833,151 @@ impl ScrineverApp {
     /// Dark theme
     pub fn theme(&self, _window_id: window::Id) -> iced::Theme {
         iced::Theme::Dark
+    }
+
+    // ========== Extracted handler methods (reduce update() size) ==========
+
+    /// Handle the per-second tick: auto-save, milestones, session timers,
+    /// collection refresh, external change polling, and notification dismissal.
+    fn handle_tick(&mut self) {
+        // Auto-save
+        if self.project.is_some() && self.editor.dirty {
+            self.auto_save_counter += 1;
+            let interval = self.project.as_ref()
+                .map(|p| p.settings.auto_save_seconds)
+                .unwrap_or(30);
+            if interval > 0 && self.auto_save_counter >= interval {
+                self.auto_save_counter = 0;
+                self.sync_editor_to_project();
+                if let Some(ref mut project) = self.project {
+                    let home = crate::core::home_dir_or_cwd();
+                    let save_dir = home.join(PROJECTS_DIR_NAME);
+                    if project.save(&save_dir).is_ok() {
+                        self.editor.mark_clean();
+                        if let Some(ref path) = project.path {
+                            if let Err(e) = crate::core::backup::BackupManager::create_backup(path) {
+                                log::warn!("Auto-backup failed: {}", e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Word count milestone detection
+        if self.auto_save_counter.is_multiple_of(MILESTONE_CHECK_INTERVAL) {
+            if let Some(ref project) = self.project {
+                let total_words = project.binder.total_word_count();
+                let milestones = [1000, 5000, 10000, 25000, 50000, 75000, 100000, 150000, 200000];
+                for &m in &milestones {
+                    if total_words >= m && self.last_milestone < m {
+                        self.last_milestone = m;
+                        let label = if m >= 1000 { format!("{}k", m / 1000) } else { m.to_string() };
+                        self.notification = Some(format!(
+                            "\u{f005} Milestone: {} words! Keep writing!",
+                            label
+                        ));
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Writing session timer
+        if self.session_active {
+            let current_words = self.current_word_count();
+            let word_delta = current_words as i64 - self.session_start_word_count as i64;
+            let prev_words = self.session_stats.words_written;
+            self.session_stats.update(word_delta, self.session_stats.time_elapsed_seconds + 1);
+
+            if self.session_goal > 0 {
+                let new_words = self.session_stats.words_written;
+                let goal = self.session_goal as i64;
+                if prev_words < goal && new_words >= goal {
+                    self.notification = Some(format!(
+                        "\u{f00c} Session goal of {} words reached! Keep going!",
+                        self.session_goal
+                    ));
+                }
+            }
+
+            if self.daily_goal > 0 && self.session_stats.time_elapsed_seconds.is_multiple_of(DAILY_GOAL_CHECK_INTERVAL) {
+                let words_today = self.session_stats.words_written;
+                let daily_goal = self.daily_goal as i64;
+                if words_today >= daily_goal && (words_today - DAILY_GOAL_CHECK_INTERVAL as i64) < daily_goal {
+                    self.notification = Some(format!(
+                        "\u{f00c} Daily goal of {} words reached!",
+                        self.daily_goal
+                    ));
+                }
+            }
+
+            if self.session_stats.time_elapsed_seconds.is_multiple_of(HISTORY_RECORD_INTERVAL) {
+                if let Some(ref mut project) = self.project {
+                    project.writing_history.record(current_words, HISTORY_RECORD_INTERVAL);
+                }
+            }
+
+            if self.session_stats.time_elapsed_seconds == POMODORO_BREAK_SECONDS && self.notification.is_none() {
+                self.notification = Some(
+                    "\u{f0f4} 25 minutes of writing! Consider a short break.".to_string()
+                );
+            }
+        }
+
+        // Writing focus timer tick
+        if self.writing_timer.is_running() && self.writing_timer.tick() {
+            let word_count = self.current_word_count();
+            self.writing_timer.stop(word_count);
+            let summary = self.writing_timer.summary();
+            self.notification = Some(format!(
+                "\u{f00c} Timer completed! {} | Great writing session!",
+                summary
+            ));
+        }
+
+        // Auto-refresh smart collections
+        if self.bottom_panel == BottomPanel::Collections && self.auto_save_counter.is_multiple_of(COLLECTION_REFRESH_INTERVAL) {
+            if let Some(ref mut project) = self.project {
+                for coll in &mut project.collections {
+                    if let crate::core::collection::CollectionKind::Search { ref query, case_sensitive, whole_word } = coll.kind {
+                        let options = crate::core::search::SearchOptions {
+                            query: query.clone(),
+                            case_sensitive,
+                            whole_word,
+                            regex: false,
+                            search_titles: true,
+                            search_content: true,
+                            search_notes: false,
+                            search_synopsis: true,
+                            ..Default::default()
+                        };
+                        let results = crate::core::search::search_binder(&project.binder, &options);
+                        let item_ids: Vec<Uuid> = results.iter().map(|r| r.item_id).collect();
+                        coll.item_ids = item_ids;
+                    }
+                }
+            }
+        }
+
+        // Poll file watcher for external changes
+        if self.project_state.poll_external_changes() {
+            self.notification = Some(
+                "External changes detected. Consider reloading.".to_string()
+            );
+            self.project_state.clear_external_changes();
+        }
+
+        // Auto-dismiss notification after 8 seconds
+        if self.notification.is_some() {
+            self.notification_timer = self.notification_timer.saturating_add(1);
+            if self.notification_timer >= 8 {
+                self.notification = None;
+                self.notification_timer = 0;
+            }
+        } else {
+            self.notification_timer = 0;
+        }
     }
 }
 

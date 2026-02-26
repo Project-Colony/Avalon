@@ -136,7 +136,7 @@ impl ProjectState {
 
     /// Get or create a CommentManager for a specific document.
     pub fn comments_for(&mut self, doc_id: Uuid) -> &mut CommentManager {
-        self.comments.entry(doc_id).or_insert_with(CommentManager::new)
+        self.comments.entry(doc_id).or_default()
     }
 
     /// Get a read-only reference to comments for a document, if any exist.

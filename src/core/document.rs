@@ -102,6 +102,7 @@ impl Document {
     }
 
     /// Get character count (without spaces)
+    #[allow(dead_code)]
     pub fn char_count_no_spaces(&self) -> usize {
         self.content.chars().filter(|c| !c.is_whitespace()).count()
     }
@@ -123,6 +124,7 @@ impl Document {
     }
 
     /// Get line count
+    #[allow(dead_code)]
     pub fn line_count(&self) -> usize {
         if self.content.is_empty() {
             return 0;

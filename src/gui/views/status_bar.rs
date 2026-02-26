@@ -17,24 +17,40 @@ pub fn view_mode_label(mode: &str) -> &str {
     }
 }
 
+/// Parameters for the status bar view, bundled to avoid too many function arguments.
+pub struct StatusBarParams<'a> {
+    pub stats: &'a Statistics,
+    pub target_words: Option<usize>,
+    pub is_dirty: bool,
+    pub project_title: &'a str,
+    pub session_active: bool,
+    pub cursor_line: usize,
+    pub cursor_col: usize,
+    pub timer_running: bool,
+    pub timer_remaining: &'a str,
+    pub writing_streak: usize,
+}
+
 /// Render the status bar at the bottom of the application
-pub fn view(
-    stats: &Statistics,
-    target_words: Option<usize>,
-    is_dirty: bool,
-    project_title: &str,
-    session_active: bool,
-    cursor_line: usize,
-    cursor_col: usize,
-    timer_running: bool,
-    timer_remaining: &str,
-    writing_streak: usize,
-) -> Element<'static, Message> {
-    let dirty_indicator = if is_dirty { " \u{2022}" } else { "" };
-    let dirty_color = if is_dirty { Theme::WARNING } else { Theme::TEXT_SECONDARY };
+pub fn view(params: &StatusBarParams<'_>) -> Element<'static, Message> {
+    let StatusBarParams {
+        stats,
+        target_words,
+        is_dirty,
+        project_title,
+        session_active,
+        cursor_line,
+        cursor_col,
+        timer_running,
+        timer_remaining,
+        writing_streak,
+    } = params;
+
+    let dirty_indicator = if *is_dirty { " \u{2022}" } else { "" };
+    let dirty_color = if *is_dirty { Theme::WARNING } else { Theme::TEXT_SECONDARY };
     let project_info = format!("{}{}", project_title, dirty_indicator);
 
-    let progress = stats.progress_string(target_words);
+    let progress = stats.progress_string(*target_words);
 
     // Reading time estimate
     let reading_min = stats.word_count as f64 / crate::core::READING_WPM;
@@ -58,7 +74,7 @@ pub fn view(
     );
 
     // Session indicator
-    let session_indicator: Element<'static, Message> = if session_active {
+    let session_indicator: Element<'static, Message> = if *session_active {
         row![
             Space::with_width(4),
             text("\u{f017}").size(10),
@@ -70,7 +86,7 @@ pub fn view(
     };
 
     // Timer indicator
-    let timer_indicator: Element<'static, Message> = if timer_running {
+    let timer_indicator: Element<'static, Message> = if *timer_running {
         row![
             Space::with_width(4),
             text("\u{f017}").size(10),
@@ -86,8 +102,8 @@ pub fn view(
 
     // Target progress (if set)
     let target_info: Element<'static, Message> = if let Some(target) = target_words {
-        if target > 0 {
-            let pct = (stats.word_count as f64 / target as f64 * 100.0).min(999.9);
+        if *target > 0 {
+            let pct = (stats.word_count as f64 / *target as f64 * 100.0).min(999.9);
             let remaining = target.saturating_sub(stats.word_count);
             let color = if pct >= 100.0 {
                 Theme::SUCCESS
@@ -135,11 +151,11 @@ pub fn view(
     );
 
     // Writing streak indicator
-    let streak_indicator: Element<'static, Message> = if writing_streak > 0 {
-        let streak_color = if writing_streak >= 7 { Theme::SUCCESS }
-        else if writing_streak >= 3 { Theme::WARNING }
+    let streak_indicator: Element<'static, Message> = if *writing_streak > 0 {
+        let streak_color = if *writing_streak >= 7 { Theme::SUCCESS }
+        else if *writing_streak >= 3 { Theme::WARNING }
         else { Theme::TEXT_MUTED };
-        let streak_icon = if writing_streak >= 7 { "\u{f06d}" } else { "\u{f0e7}" };
+        let streak_icon = if *writing_streak >= 7 { "\u{f06d}" } else { "\u{f0e7}" };
         row![
             Space::with_width(4),
             text(format!("{} {}d", streak_icon, writing_streak)).size(9).color(streak_color),

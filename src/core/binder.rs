@@ -58,14 +58,6 @@ impl Binder {
         items
     }
 
-    /// Get all items as mutable flat list
-    pub fn all_items_mut(&mut self) -> Vec<&mut BinderItem> {
-        let mut items = Vec::new();
-        self.draft.collect_all_mut(&mut items);
-        self.research.collect_all_mut(&mut items);
-        self.trash.collect_all_mut(&mut items);
-        items
-    }
 
     /// Move an item to trash
     pub fn move_to_trash(&mut self, id: &Uuid) -> bool {
@@ -84,6 +76,7 @@ impl Binder {
     }
 
     /// Visit each item mutably in the binder tree without allocating a Vec.
+    #[allow(dead_code)]
     pub fn for_each_item_mut<F: FnMut(&mut BinderItem)>(&mut self, mut f: F) {
         self.draft.visit_mut(&mut f);
         self.research.visit_mut(&mut f);
@@ -287,6 +280,7 @@ impl BinderItem {
 
     /// Visit this item and all descendants mutably without allocating a Vec.
     /// Safe because `f(self)` releases its borrow before we access `self.children`.
+    #[allow(dead_code)]
     pub fn visit_mut<F: FnMut(&mut BinderItem)>(&mut self, f: &mut F) {
         f(self);
         for child in &mut self.children {
@@ -311,28 +305,6 @@ impl BinderItem {
         items.push(self);
         for child in &self.children {
             child.collect_all(items);
-        }
-    }
-
-    /// Collect all items into a mutable flat list.
-    ///
-    /// This uses raw pointers because Rust's borrow checker cannot express
-    /// simultaneous `&mut item` and `&mut item.children` across function
-    /// boundaries. Prefer `visit_mut` or `for_each_item_mut` when possible.
-    ///
-    /// # Safety invariant
-    /// Each node in the binder tree appears exactly once (it is a tree, not a DAG),
-    /// so no aliasing occurs between the mutable references produced.
-    pub fn collect_all_mut<'a>(&'a mut self, items: &mut Vec<&'a mut BinderItem>) {
-        let mut stack: Vec<*mut BinderItem> = vec![self as *mut BinderItem];
-        while let Some(ptr) = stack.pop() {
-            // SAFETY: Each node in the tree appears exactly once, so no aliasing.
-            // The pointers all originate from `&'a mut self` and its children.
-            let node = unsafe { &mut *ptr };
-            for child in node.children.iter_mut().rev() {
-                stack.push(child as *mut BinderItem);
-            }
-            items.push(node);
         }
     }
 

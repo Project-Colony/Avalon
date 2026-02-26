@@ -577,6 +577,50 @@ impl Project {
         Ok(())
     }
 
+    /// Load a single document from disk by item ID.
+    /// Useful for on-demand loading when navigating to a document.
+    #[allow(dead_code)]
+    pub fn load_document(&mut self, item_id: &Uuid) -> Result<bool> {
+        let project_dir = match &self.path {
+            Some(p) => p.clone(),
+            None => return Ok(false),
+        };
+        let docs_dir = project_dir.join("docs");
+        let doc_path = docs_dir.join(format!("{}.json", item_id));
+        if !doc_path.exists() {
+            return Ok(false);
+        }
+        let json = fs::read_to_string(&doc_path)
+            .context("Failed to read document file")?;
+        let doc: Document = serde_json::from_str(&json)
+            .context("Failed to parse document file")?;
+        if let Some(item) = self.binder.find_item_mut(item_id) {
+            item.document = Some(doc);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Save the project to disk asynchronously (runs I/O on a blocking thread).
+    /// Use from iced `Task` or other async contexts to avoid blocking the UI thread.
+    #[allow(dead_code)]
+    pub async fn save_async(mut self, base_path: PathBuf) -> Result<Self> {
+        tokio::task::spawn_blocking(move || {
+            self.save(&base_path)?;
+            Ok(self)
+        })
+        .await
+        .context("Save task panicked")?
+    }
+
+    /// Load a project from disk asynchronously (runs I/O on a blocking thread).
+    #[allow(dead_code)]
+    pub async fn load_async(project_dir: PathBuf) -> Result<Self> {
+        tokio::task::spawn_blocking(move || Self::load(&project_dir))
+            .await
+            .context("Load task panicked")?
+    }
 }
 
 #[cfg(test)]
@@ -723,14 +767,10 @@ mod tests {
         let mut project = Project::new("PresetTest");
 
         // Add compile presets
-        let mut opts = CompileOptions::default();
-        opts.title = "My Book".to_string();
-        opts.format = OutputFormat::Html;
+        let opts = CompileOptions { title: "My Book".to_string(), format: OutputFormat::Html, ..Default::default() };
         project.compile_presets.push(("HTML Export".to_string(), opts));
 
-        let mut opts2 = CompileOptions::default();
-        opts2.format = OutputFormat::Latex;
-        opts2.font_size = 14.0;
+        let opts2 = CompileOptions { format: OutputFormat::Latex, font_size: 14.0, ..Default::default() };
         project.compile_presets.push(("LaTeX Export".to_string(), opts2));
 
         // Save project

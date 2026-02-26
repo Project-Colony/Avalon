@@ -44,6 +44,7 @@ impl InspectorData {
         is_bookmarked: bool,
     ) -> Self {
         let is_document = item.document.is_some();
+        let doc_stats = item.document.as_ref().map(|d| d.stats());
         Self {
             id: item.id,
             title: item.title.clone(),
@@ -55,21 +56,11 @@ impl InspectorData {
             label: item.metadata.label.as_ref()
                 .map(|l| l.name.clone())
                 .unwrap_or_else(|| "None".to_string()),
-            word_count: item.document.as_ref()
-                .map(|d| format!("{}", d.word_count()))
-                .unwrap_or_default(),
-            char_count: item.document.as_ref()
-                .map(|d| format!("{}", d.char_count()))
-                .unwrap_or_default(),
-            paragraph_count: item.document.as_ref()
-                .map(|d| format!("{}", d.paragraph_count()))
-                .unwrap_or_default(),
-            sentence_count: item.document.as_ref()
-                .map(|d| format!("{}", d.sentence_count()))
-                .unwrap_or_default(),
-            page_count: item.document.as_ref()
-                .map(|d| format!("{:.1}", d.page_count()))
-                .unwrap_or_default(),
+            word_count: { let s = doc_stats.as_ref(); s.map(|s| format!("{}", s.word_count)).unwrap_or_default() },
+            char_count: { let s = doc_stats.as_ref(); s.map(|s| format!("{}", s.char_count)).unwrap_or_default() },
+            paragraph_count: { let s = doc_stats.as_ref(); s.map(|s| format!("{}", s.paragraph_count)).unwrap_or_default() },
+            sentence_count: { let s = doc_stats.as_ref(); s.map(|s| format!("{}", s.sentence_count)).unwrap_or_default() },
+            page_count: { let s = doc_stats.as_ref(); s.map(|s| format!("{:.1}", s.page_count)).unwrap_or_default() },
             children_count: format!("{}", item.children.len()),
             total_word_count: format!("{}", item.total_word_count()),
             snapshot_count: format!("{} snapshot(s)", item.snapshots.len()),
