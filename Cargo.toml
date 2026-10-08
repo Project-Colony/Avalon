@@ -2,6 +2,7 @@
 name = "avalon"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.91"
 authors = ["MotherSphere"]
 description = "A writing studio for novels and long-form projects, built in Rust with iced"
 license = "GPL-3.0-or-later"
@@ -10,56 +11,56 @@ readme = "README.md"
 
 [dependencies]
 # GUI Framework
-iced = { version = "0.14.0", features = ["canvas", "tokio", "svg", "image", "advanced"] }
+iced = { version = "0.14.0", features = ["tokio"] }
 
 # Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-toml = "0.8"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+toml = "0.8.23"
 
 # File system
-dirs = "5"
-walkdir = "2"
-notify = "7"
+dirs = "5.0.1"
+walkdir = "2.5.0"
+notify = "7.0.0"
 
 # Rich text / document processing
-pulldown-cmark = "0.12"
-pulldown-cmark-to-cmark = "17"
+pulldown-cmark = "0.12.2"
+pulldown-cmark-to-cmark = "17.0.0"
 
 # Export formats
-printpdf = "0.7"
-docx-rs = "0.4"
-zip = "2"
+printpdf = "0.7.0"
+docx-rs = "0.4.22"
+zip = "2.4.2"
 
 # Spell checking
 # hunspell-rs requires system libhunspell — disabled by default
 # hunspell-rs = "0.4"
 
 # Date/time
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { version = "0.4.45", features = ["serde"] }
 
 # Unique IDs
-uuid = { version = "1", features = ["v4", "serde"] }
+uuid = { version = "1.27.0", features = ["v4", "serde"] }
 
 # Logging
-log = "0.4"
-env_logger = "0.11"
+log = "0.4.34"
+env_logger = "0.11.11"
 
 # Error handling
-thiserror = "2"
-anyhow = "1"
+thiserror = "2.0.21"
+anyhow = "1.0.104"
 
 # Async runtime (for iced)
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1.53.2", features = ["full"] }
 
 # Regex for search
-regex = "1"
+regex = "1.13.1"
 
 # Clipboard
-arboard = "3"
+arboard = "3.6.1"
 
 # Temp files (used by print module)
-tempfile = "3"
+tempfile = "3.27.0"
 
 [dev-dependencies]
 
