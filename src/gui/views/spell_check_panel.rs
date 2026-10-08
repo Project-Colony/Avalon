@@ -89,7 +89,7 @@ pub fn view(
                 .size(10)
                 .color(Theme::TEXT_MUTED)
                 .width(Length::Fixed(24.0)),
-            text(format!("\"{}\"", &result.word))
+            text(format!("\"{}\"", result.word))
                 .size(12)
                 .color(iced::Color::from_rgb(0.9, 0.3, 0.3)),
             Space::with_width(2),

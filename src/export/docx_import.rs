@@ -162,10 +162,7 @@ fn find_tag_start(xml: &str, tag_name: &str) -> Option<usize> {
     let mut search_from = 0;
 
     loop {
-        let pos = match xml[search_from..].find(&open) {
-            Some(p) => search_from + p,
-            None => return None,
-        };
+        let pos = search_from + xml[search_from..].find(&open)?;
 
         // The character right after the tag name must be '>' or whitespace
         // (for attributes) to avoid matching `<w:pPr>` when looking for `<w:p>`.

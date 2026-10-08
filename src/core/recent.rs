@@ -184,7 +184,7 @@ impl RecentProjects {
     /// Sort projects by title alphabetically
     pub fn sorted_by_title(&self) -> Vec<&RecentProject> {
         let mut sorted: Vec<&RecentProject> = self.projects.iter().collect();
-        sorted.sort_by(|a, b| a.title.to_lowercase().cmp(&b.title.to_lowercase()));
+        sorted.sort_by_key(|a| a.title.to_lowercase());
         sorted
     }
 }
