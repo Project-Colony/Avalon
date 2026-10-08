@@ -3,8 +3,9 @@ name = "avalon"
 version = "0.1.0"
 edition = "2021"
 authors = ["MotherSphere"]
-description = "A free, open-source writing studio inspired by Scrivener, built in Rust"
-license = "MIT"
+description = "A writing studio for novels and long-form projects, built in Rust with iced"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/Project-Colony/Avalon"
 readme = "README.md"
 
 [dependencies]
