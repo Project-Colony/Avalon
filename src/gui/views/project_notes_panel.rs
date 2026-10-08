@@ -18,7 +18,7 @@ pub fn view(notes: &str) -> Element<'static, Message> {
 
     let header = row![
         text("PROJECT NOTES").size(11).color(Theme::TEXT_SECONDARY),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text(format!(
             "{} words | {} chars | {} lines | {} sentences | {} para",
             word_count, char_count, line_count, sentence_count, paragraph_count
@@ -54,16 +54,22 @@ pub fn view(notes: &str) -> Element<'static, Message> {
 
     let hint = row![
         text(hint_text).size(9).color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text(reading_display).size(9).color(Theme::TEXT_MUTED),
-        Space::with_width(8),
+        Space::new().width(8),
         text("\u{f0c7} Auto-saved with project")
             .size(9)
             .color(Theme::TEXT_MUTED),
     ];
 
-    let content = column![header, Space::with_height(4), notes_input, Space::with_height(2), hint,]
-        .padding(Padding::from([8, 12]));
+    let content = column![
+        header,
+        Space::new().height(4),
+        notes_input,
+        Space::new().height(2),
+        hint,
+    ]
+    .padding(Padding::from([8, 12]));
 
     container(content).style(theme::panel_style).width(Length::Fill).into()
 }

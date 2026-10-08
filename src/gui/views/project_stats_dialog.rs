@@ -57,7 +57,7 @@ pub fn view(data: &ProjectStatsData) -> Element<'static, Message> {
         text(format!("\u{f02d} {}", size_label))
             .size(13)
             .color(Theme::TEXT_ACCENT),
-        Space::with_width(8),
+        Space::new().width(8),
         text(format!("({} words)", format_number(data.word_count)))
             .size(11)
             .color(Theme::TEXT_MUTED),
@@ -114,7 +114,7 @@ pub fn view(data: &ProjectStatsData) -> Element<'static, Message> {
         }
         section("Readability", items)
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Target progress (if target set)
@@ -160,7 +160,7 @@ pub fn view(data: &ProjectStatsData) -> Element<'static, Message> {
         let s = section("Target Progress", items);
         column![s, progress_bar].spacing(4).into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     let close_btn = button(text("  Close  ").size(14).color(Theme::TEXT_SECONDARY))
@@ -170,19 +170,19 @@ pub fn view(data: &ProjectStatsData) -> Element<'static, Message> {
     let content = column![
         header,
         subtitle,
-        Space::with_height(8),
+        Space::new().height(8),
         classification,
-        Space::with_height(12),
+        Space::new().height(12),
         doc_section,
-        Space::with_height(8),
+        Space::new().height(8),
         time_section,
-        Space::with_height(8),
+        Space::new().height(8),
         habits_section,
-        Space::with_height(8),
+        Space::new().height(8),
         readability_section,
-        Space::with_height(8),
+        Space::new().height(8),
         target_section,
-        Space::with_height(16),
+        Space::new().height(16),
         close_btn,
     ]
     .padding(24)

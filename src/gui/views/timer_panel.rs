@@ -9,9 +9,9 @@ use crate::gui::theme::{self, Theme};
 pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static, Message> {
     let header = row![
         text("WRITING TIMER").size(11).color(Theme::TEXT_SECONDARY),
-        Space::with_width(4),
+        Space::new().width(4),
         text("\u{f017}").size(10),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text(format!(
             "{} session{} completed",
             timer.completed_count(),
@@ -64,7 +64,7 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
         .color(bar_color)
         .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Controls
@@ -77,7 +77,7 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
             button(text("\u{f04c} Pause").size(13).color(Theme::WARNING),)
                 .on_press(Message::TimerPause)
                 .padding(Padding::from([6, 16])),
-            Space::with_width(8),
+            Space::new().width(8),
             button(text("\u{f04d} Stop").size(12).color(Theme::TEXT_MUTED),)
                 .on_press(Message::TimerStop)
                 .padding(Padding::from([4, 12])),
@@ -87,7 +87,7 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
             button(text("\u{f04b} Resume").size(13).color(Theme::SUCCESS),)
                 .on_press(Message::TimerResume)
                 .padding(Padding::from([6, 16])),
-            Space::with_width(8),
+            Space::new().width(8),
             button(text("\u{f04d} Stop").size(12).color(Theme::TEXT_MUTED),)
                 .on_press(Message::TimerStop)
                 .padding(Padding::from([4, 12])),
@@ -150,7 +150,7 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
         .spacing(4)
         .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Elapsed time display when running
@@ -160,7 +160,7 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
             .color(Theme::TEXT_SECONDARY)
             .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Session history (show past sessions with WPM)
@@ -183,19 +183,19 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
                     .color(Theme::TEXT_MUTED)
                     .width(Length::Fixed(16.0)),
                 text(status_icon).size(9).color(status_color),
-                Space::with_width(4),
+                Space::new().width(4),
                 text(session.preset.label().to_string())
                     .size(9)
                     .color(Theme::TEXT_MUTED),
-                Space::with_width(4),
+                Space::new().width(4),
                 text(format!("{:.1}m", duration_mins))
                     .size(9)
                     .color(Theme::TEXT_SECONDARY),
-                Space::with_width(4),
+                Space::new().width(4),
                 text(format!("{} words", session.words_written))
                     .size(9)
                     .color(Theme::TEXT_SECONDARY),
-                Space::with_width(4),
+                Space::new().width(4),
                 text(format!("{:.1} wpm", wpm)).size(9).color(if wpm > 20.0 {
                     Theme::SUCCESS
                 } else if wpm > 10.0 {
@@ -229,52 +229,52 @@ pub fn view(timer: &WritingTimer, _current_word_count: usize) -> Element<'static
             text(format!("Total: {:.0}m", total_mins))
                 .size(10)
                 .color(Theme::TEXT_MUTED),
-            Space::with_width(8),
+            Space::new().width(8),
             text(format!("{} words", timer.total_words()))
                 .size(10)
                 .color(Theme::TEXT_MUTED),
-            Space::with_width(8),
+            Space::new().width(8),
             text(format!("Avg: {:.1} wpm", timer.avg_wpm()))
                 .size(10)
                 .color(Theme::TEXT_ACCENT),
         ]
         .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     let hint = row![
         text("Shortcut: Ctrl+J to toggle timer panel")
             .size(9)
             .color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text(timer.summary()).size(9).color(Theme::TEXT_MUTED),
     ];
 
     let content = row![
         column![
             header,
-            Space::with_height(4),
+            Space::new().height(4),
             timer_display,
-            Space::with_height(2),
+            Space::new().height(2),
             status,
-            Space::with_height(4),
+            Space::new().height(4),
             progress,
-            Space::with_height(4),
+            Space::new().height(4),
             controls,
         ]
         .spacing(2)
         .width(Length::Fixed(220.0)),
-        Space::with_width(20),
+        Space::new().width(20),
         column![
             presets,
-            Space::with_height(4),
+            Space::new().height(4),
             elapsed_display,
-            Space::with_height(4),
+            Space::new().height(4),
             scrollable(history_section).height(Length::Fixed(80.0)),
-            Space::with_height(4),
+            Space::new().height(4),
             aggregate_stats,
-            Space::with_height(2),
+            Space::new().height(2),
             hint,
         ]
         .spacing(2),

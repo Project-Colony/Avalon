@@ -46,14 +46,14 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
 
     let header = row![
         text("COLLECTIONS").size(11).color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
+        Space::new().width(8),
         text(format!(
             "{} manual, {} smart | {} items{}",
             manual_count, smart_count, total_items, overlap_info
         ))
         .size(10)
         .color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         button(text("Refresh Smart").size(10).color(Theme::TEXT_ACCENT),)
             .on_press(Message::RefreshSmartCollections)
             .padding(Padding::from([2, 6])),
@@ -70,7 +70,7 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
         .on_press(Message::CreateCollection)
         .padding(Padding::from([4, 10]));
 
-    let input_row = row![new_input, Space::with_width(4), add_btn].align_y(iced::Alignment::Center);
+    let input_row = row![new_input, Space::new().width(4), add_btn].align_y(iced::Alignment::Center);
 
     // Collection list
     let mut list = column![].spacing(2);
@@ -108,15 +108,15 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
                 .color(Theme::TEXT_MUTED)
                 .width(Length::Fixed(36.0)),
             text(kind_icon).size(11).color(Theme::TEXT_MUTED),
-            Space::with_width(4),
+            Space::new().width(4),
             button(text(coll.name.clone()).size(12).color(name_color),)
                 .on_press(Message::SelectCollection(coll_id))
                 .padding(Padding::from([2, 6])),
-            Space::with_width(Length::Fill),
+            Space::new().width(Length::Fill),
             text(format!("{} ({} items)", kind_detail, coll.item_ids.len()))
                 .size(10)
                 .color(Theme::TEXT_MUTED),
-            Space::with_width(4),
+            Space::new().width(4),
             button(text("\u{f00d}").size(10).color(Theme::ERROR),)
                 .on_press(Message::DeleteCollection(coll_id))
                 .padding(Padding::from([1, 4])),
@@ -138,17 +138,17 @@ pub fn view(data: &CollectionsData) -> Element<'static, Message> {
         text("Tip: Drag binder items into a manual collection")
             .size(9)
             .color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text("Shortcut: Ctrl+Shift+C").size(9).color(Theme::TEXT_MUTED),
     ];
 
     let content = column![
         header,
-        Space::with_height(4),
+        Space::new().height(4),
         input_row,
-        Space::with_height(6),
+        Space::new().height(6),
         scrollable(list).height(Length::Fixed(100.0)),
-        Space::with_height(4),
+        Space::new().height(4),
         footer,
     ]
     .padding(Padding::from([8, 12]));

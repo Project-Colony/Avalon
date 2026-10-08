@@ -80,27 +80,27 @@ pub fn view(params: &StatusBarParams<'_>) -> Element<'static, Message> {
     // Session indicator
     let session_indicator: Element<'static, Message> = if *session_active {
         row![
-            Space::with_width(4),
+            Space::new().width(4),
             text("\u{f017}").size(10),
-            Space::with_width(2),
+            Space::new().width(2),
             text("REC").size(9).color(Theme::SUCCESS),
         ]
         .into()
     } else {
-        Space::with_width(0).into()
+        Space::new().width(0).into()
     };
 
     // Timer indicator
     let timer_indicator: Element<'static, Message> = if *timer_running {
         row![
-            Space::with_width(4),
+            Space::new().width(4),
             text("\u{f017}").size(10),
-            Space::with_width(2),
+            Space::new().width(2),
             text(timer_remaining.to_string()).size(9).color(Theme::TEXT_ACCENT),
         ]
         .into()
     } else {
-        Space::with_width(0).into()
+        Space::new().width(0).into()
     };
 
     // Cursor position
@@ -128,21 +128,21 @@ pub fn view(params: &StatusBarParams<'_>) -> Element<'static, Message> {
             let bar = format!("{}{}", "\u{2588}".repeat(filled), "\u{2591}".repeat(empty));
 
             row![
-                Space::with_width(8),
+                Space::new().width(8),
                 text(bar).size(8).color(color),
-                Space::with_width(4),
+                Space::new().width(4),
                 text(format!("{:.0}%", pct)).size(10).color(color),
-                Space::with_width(4),
+                Space::new().width(4),
                 text(format!("({} left)", format_stat(remaining)))
                     .size(9)
                     .color(Theme::TEXT_MUTED),
             ]
             .into()
         } else {
-            Space::with_width(0).into()
+            Space::new().width(0).into()
         }
     } else {
-        Space::with_width(0).into()
+        Space::new().width(0).into()
     };
 
     // Documents count
@@ -163,14 +163,14 @@ pub fn view(params: &StatusBarParams<'_>) -> Element<'static, Message> {
         };
         let streak_icon = if *writing_streak >= 7 { "\u{f06d}" } else { "\u{f0e7}" };
         row![
-            Space::with_width(4),
+            Space::new().width(4),
             text(format!("{} {}d", streak_icon, writing_streak))
                 .size(9)
                 .color(streak_color),
         ]
         .into()
     } else {
-        Space::with_width(0).into()
+        Space::new().width(0).into()
     };
 
     let content = row![
@@ -178,16 +178,16 @@ pub fn view(params: &StatusBarParams<'_>) -> Element<'static, Message> {
         session_indicator,
         timer_indicator,
         streak_indicator,
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text(progress).size(10).color(Theme::TEXT_PRIMARY),
         target_info,
-        Space::with_width(12),
+        Space::new().width(12),
         text(stats_text).size(10).color(Theme::TEXT_MUTED),
-        Space::with_width(8),
+        Space::new().width(8),
         text(docs_text).size(10).color(Theme::TEXT_MUTED),
-        Space::with_width(8),
+        Space::new().width(8),
         text(cursor_info).size(9).color(Theme::TEXT_MUTED),
-        Space::with_width(4),
+        Space::new().width(4),
         text("UTF-8").size(9).color(Theme::TEXT_MUTED),
     ]
     .padding(Padding::from([3, 12]));

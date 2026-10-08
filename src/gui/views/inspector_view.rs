@@ -131,7 +131,7 @@ impl InspectorData {
 
 /// Thin horizontal separator line
 fn separator() -> Element<'static, Message> {
-    container(Space::with_height(0))
+    container(Space::new().height(0))
         .width(Length::Fill)
         .height(1)
         .style(theme::inspector_separator_style)
@@ -190,7 +190,7 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
             text(format!("{}  INSPECTOR", Icons::INFO_CIRCLE))
                 .size(11)
                 .color(Theme::TEXT_ACCENT),
-            Space::with_width(Length::Fill),
+            Space::new().width(Length::Fill),
             button(
                 text(bookmark_icon)
                     .size(12)
@@ -230,7 +230,7 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
     let doc_info_section = column![
         field_label("Title"),
         title_input,
-        Space::with_height(6),
+        Space::new().height(6),
         field_label("Synopsis"),
         synopsis_input,
     ]
@@ -254,13 +254,13 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
     let metadata_section = section_card(
         column![
             section_header(Icons::TAG, "METADATA"),
-            Space::with_height(6),
+            Space::new().height(6),
             field_label("Status"),
             status_picker,
-            Space::with_height(6),
+            Space::new().height(6),
             field_label("Label"),
             label_picker,
-            Space::with_height(8),
+            Space::new().height(8),
             compile_toggle,
         ]
         .spacing(2),
@@ -281,7 +281,7 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
             let bar_text = theme::progress_bar_text(pct, 18);
 
             column![
-                Space::with_height(4),
+                Space::new().height(4),
                 text(bar_text).size(10).color(progress_color),
                 text(format!("{:.1}%  ({}/{})", pct, words, target))
                     .size(10)
@@ -290,13 +290,13 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
             .spacing(2)
             .into()
         } else {
-            Space::with_height(0).into()
+            Space::new().height(0).into()
         };
 
     let target_section = section_card(
         column![
             section_header(Icons::BOLT, "TARGET"),
-            Space::with_height(6),
+            Space::new().height(6),
             field_label("Word Count Goal"),
             target_input,
             progress_row,
@@ -316,7 +316,7 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
         .spacing(3);
 
         if data.footnote_count > 0 || data.reference_count > 0 {
-            stats = stats.push(Space::with_height(2));
+            stats = stats.push(Space::new().height(2));
             if data.footnote_count > 0 {
                 stats = stats.push(stat_row("Footnotes", format!("{}", data.footnote_count)));
             }
@@ -338,7 +338,7 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
     let stats_section = section_card(
         column![
             section_header(Icons::BARS, "STATISTICS"),
-            Space::with_height(6),
+            Space::new().height(6),
             stats_content,
         ]
         .spacing(0),
@@ -359,7 +359,7 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
     let notes_section = column![
         field_label(&format!("{}  Notes", Icons::PENCIL)),
         notes_input,
-        Space::with_height(8),
+        Space::new().height(8),
         field_label(&format!("{}  Keywords", Icons::TAG)),
         keywords_input,
     ]
@@ -370,7 +370,7 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
     custom_inner = custom_inner.push(
         row![
             section_header(Icons::PENCIL_SQUARE, "CUSTOM METADATA"),
-            Space::with_width(Length::Fill),
+            Space::new().width(Length::Fill),
             button(text(format!("{} Add", Icons::PLUS)).size(9).color(Theme::TEXT_ACCENT),)
                 .on_press(Message::AddCustomField(id, "New Field".to_string()))
                 .style(theme::inspector_inline_btn_style)
@@ -409,10 +409,10 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
     let snapshots_section = section_card(
         column![
             section_header(Icons::CAMERA, "SNAPSHOTS"),
-            Space::with_height(6),
+            Space::new().height(6),
             row![
                 text(data.snapshot_count.clone()).size(11).color(Theme::TEXT_SECONDARY),
-                Space::with_width(Length::Fill),
+                Space::new().width(Length::Fill),
                 button(text(format!("{} Take", Icons::CAMERA)).size(10),)
                     .on_press(Message::CreateSnapshot)
                     .style(theme::inspector_accent_btn_style)
@@ -460,12 +460,12 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
             .width(Length::Fill)
             .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     let actions_section = column![
         section_header(Icons::BOLT, "ACTIONS"),
-        Space::with_height(6),
+        Space::new().height(6),
         quick_ref_btn,
         split_editor_btn,
         convert_btn,
@@ -476,33 +476,33 @@ pub fn view(data: InspectorData) -> Element<'static, Message> {
     // ── Assemble all sections ───────────────────────────────────
     let content = column![
         header,
-        Space::with_height(10),
+        Space::new().height(10),
         doc_info_section,
-        Space::with_height(8),
+        Space::new().height(8),
         separator(),
-        Space::with_height(8),
+        Space::new().height(8),
         metadata_section,
-        Space::with_height(8),
+        Space::new().height(8),
         separator(),
-        Space::with_height(8),
+        Space::new().height(8),
         target_section,
-        Space::with_height(6),
+        Space::new().height(6),
         stats_section,
-        Space::with_height(8),
+        Space::new().height(8),
         separator(),
-        Space::with_height(8),
+        Space::new().height(8),
         notes_section,
-        Space::with_height(8),
+        Space::new().height(8),
         separator(),
-        Space::with_height(8),
+        Space::new().height(8),
         custom_section,
-        Space::with_height(6),
+        Space::new().height(6),
         snapshots_section,
-        Space::with_height(8),
+        Space::new().height(8),
         separator(),
-        Space::with_height(8),
+        Space::new().height(8),
         actions_section,
-        Space::with_height(16),
+        Space::new().height(16),
     ]
     .padding(Padding {
         top: 0.0,

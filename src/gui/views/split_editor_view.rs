@@ -20,9 +20,9 @@ pub fn view<'a>(
     let primary_header = container(
         row![
             text("\u{f040}").size(12).color(Theme::TEXT_ACCENT),
-            Space::with_width(4),
+            Space::new().width(4),
             text(primary_title.to_string()).size(13).color(Theme::TEXT_ACCENT),
-            Space::with_width(Length::Fill),
+            Space::new().width(Length::Fill),
             text("Editing").size(10).color(Theme::SUCCESS),
         ]
         .padding(Padding::from([4, 12])),
@@ -42,7 +42,7 @@ pub fn view<'a>(
         ))
         .size(10)
         .color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text("Ctrl+S: save").size(9).color(Theme::TEXT_MUTED),
     ])
     .padding(Padding::from([4, 12]));
@@ -63,11 +63,11 @@ pub fn view<'a>(
     let secondary_header = container(
         row![
             text("\u{f02d}").size(12),
-            Space::with_width(4),
+            Space::new().width(4),
             text(secondary_title.to_string()).size(13).color(Theme::TEXT_SECONDARY),
-            Space::with_width(Length::Fill),
+            Space::new().width(Length::Fill),
             text("Read-only").size(10).color(Theme::TEXT_MUTED),
-            Space::with_width(8),
+            Space::new().width(8),
             button(text("\u{f00d} Close").size(10).color(Theme::TEXT_MUTED),)
                 .on_press(Message::CloseSplitEditor)
                 .padding(Padding::from([2, 6])),
@@ -101,7 +101,7 @@ pub fn view<'a>(
         ))
         .size(10)
         .color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text("Ctrl+Shift+E: toggle split").size(9).color(Theme::TEXT_MUTED),
     ])
     .padding(Padding::from([4, 12]));

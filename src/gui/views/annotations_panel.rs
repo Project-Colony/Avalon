@@ -15,15 +15,15 @@ pub fn view(annotations: &[Annotation], new_annotation_text: &str) -> Element<'s
 
     let header = row![
         text("ANNOTATIONS").size(11).color(Theme::TEXT_SECONDARY),
-        Space::with_width(4),
+        Space::new().width(4),
         text("\u{f044}").size(10),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text(format!("{} open", open_count)).size(10).color(if open_count > 0 {
             Theme::WARNING
         } else {
             Theme::TEXT_MUTED
         }),
-        Space::with_width(6),
+        Space::new().width(6),
         text(format!("{} resolved", resolved_count))
             .size(10)
             .color(if resolved_count > 0 {
@@ -40,7 +40,7 @@ pub fn view(annotations: &[Annotation], new_annotation_text: &str) -> Element<'s
             .size(12)
             .padding(4)
             .width(Length::FillPortion(3)),
-        Space::with_width(4),
+        Space::new().width(4),
         button(text("\u{f067} Add").size(11).color(Theme::TEXT_ACCENT),)
             .on_press(Message::AddAnnotation)
             .padding(Padding::from([4, 10])),
@@ -54,7 +54,7 @@ pub fn view(annotations: &[Annotation], new_annotation_text: &str) -> Element<'s
         list = list.push(
             container(column![
                 text("No annotations yet.").size(12).color(Theme::TEXT_MUTED),
-                Space::with_height(4),
+                Space::new().height(4),
                 text("Select text in the editor, then add a comment with color and category.")
                     .size(10)
                     .color(Theme::TEXT_MUTED),
@@ -87,7 +87,7 @@ pub fn view(annotations: &[Annotation], new_annotation_text: &str) -> Element<'s
         text("Select text, then add annotation | Click color dot to change color")
             .size(9)
             .color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text(format!("{} total | {} categorized", total, categorized))
             .size(9)
             .color(Theme::TEXT_MUTED),
@@ -95,11 +95,11 @@ pub fn view(annotations: &[Annotation], new_annotation_text: &str) -> Element<'s
 
     let content = column![
         header,
-        Space::with_height(4),
+        Space::new().height(4),
         input_row,
-        Space::with_height(6),
+        Space::new().height(6),
         scrollable(list).height(Length::Fixed(120.0)),
-        Space::with_height(2),
+        Space::new().height(2),
         hint,
     ]
     .padding(Padding::from([8, 12]));
@@ -160,7 +160,7 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
         }
         cat_row.into()
     } else {
-        Space::with_width(0).into()
+        Space::new().width(0).into()
     };
 
     // Edit count
@@ -170,7 +170,7 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
             .color(Theme::TEXT_MUTED)
             .into()
     } else {
-        Space::with_width(0).into()
+        Space::new().width(0).into()
     };
 
     // Author display
@@ -180,7 +180,7 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
             .color(Theme::TEXT_MUTED)
             .into()
     } else {
-        Space::with_width(0).into()
+        Space::new().width(0).into()
     };
 
     // Annotation text display
@@ -194,20 +194,20 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
             row![
                 color_btn,
                 ann_text_el,
-                Space::with_width(4),
+                Space::new().width(4),
                 color_label_el,
-                Space::with_width(Length::Fill),
+                Space::new().width(Length::Fill),
                 text(age).size(9).color(Theme::TEXT_MUTED),
             ],
             row![
                 text(format!("span {}-{}", ann_start, ann_end))
                     .size(9)
                     .color(Theme::TEXT_MUTED),
-                Space::with_width(4),
+                Space::new().width(4),
                 author_display,
-                Space::with_width(4),
+                Space::new().width(4),
                 edit_count,
-                Space::with_width(Length::Fill),
+                Space::new().width(Length::Fill),
                 button(
                     text(if is_resolved { "Reopen" } else { "\u{f00c} Resolve" })
                         .size(9)
@@ -215,7 +215,7 @@ fn render_annotation(ann: &Annotation) -> Element<'static, Message> {
                 )
                 .on_press(Message::ToggleAnnotationResolved(ann_id))
                 .padding(Padding::from([1, 4])),
-                Space::with_width(4),
+                Space::new().width(4),
                 button(text("\u{f00d}").size(9).color(Theme::ERROR),)
                     .on_press(Message::DeleteAnnotation(ann_id))
                     .padding(Padding::from([1, 4])),

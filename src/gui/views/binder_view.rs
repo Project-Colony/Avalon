@@ -22,7 +22,7 @@ pub fn view(
     let header = container(
         row![
             text(Icons::BOOK).size(13).color(Theme::TEXT_ACCENT),
-            Space::with_width(8),
+            Space::new().width(8),
             text("Binder").size(12).color(Theme::TEXT_SECONDARY),
         ]
         .align_y(iced::Alignment::Center),
@@ -43,7 +43,7 @@ pub fn view(
             button(
                 row![
                     text(Icons::TIMES).size(11).color(Theme::ERROR),
-                    Space::with_width(6),
+                    Space::new().width(6),
                     text(format!("Empty Trash ({})", trash_count)).size(11),
                 ]
                 .align_y(iced::Alignment::Center),
@@ -61,12 +61,12 @@ pub fn view(
         })
         .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // ── Separator helper ────────────────────────────────
     let sep = || -> Element<'static, Message> {
-        container(Space::with_height(0))
+        container(Space::new().height(0))
             .style(theme::binder_separator_style)
             .height(1)
             .width(Length::Fill)
@@ -82,7 +82,7 @@ pub fn view(
         sep(),
         trash_tree,
         trash_actions,
-        Space::with_height(8),
+        Space::new().height(8),
     ]
     .width(Length::Fill);
 
@@ -136,7 +136,7 @@ fn render_section(
             .padding(Padding::from([2, 6]))
             .into()
     } else {
-        Space::with_width(0).into()
+        Space::new().width(0).into()
     };
 
     let icon_owned = icon.to_string();
@@ -144,11 +144,11 @@ fn render_section(
 
     let header_row = row![
         text(chevron).size(10).color(Theme::TEXT_MUTED),
-        Space::with_width(6),
+        Space::new().width(6),
         text(icon_owned).size(13).color(accent),
-        Space::with_width(6),
+        Space::new().width(6),
         text(label_owned).size(12).color(Theme::TEXT_PRIMARY),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         badge,
     ]
     .align_y(iced::Alignment::Center);
@@ -216,7 +216,7 @@ fn render_item(item: &BinderItem, selected_id: Option<Uuid>, depth: usize) -> El
         };
         text(ch).size(9).color(Theme::TEXT_MUTED).into()
     } else {
-        Space::with_width(9).into()
+        Space::new().width(9).into()
     };
 
     // ── Label color ─────────────────────────────────────
@@ -238,10 +238,10 @@ fn render_item(item: &BinderItem, selected_id: Option<Uuid>, depth: usize) -> El
             if wc > 0 {
                 text(wc.to_string()).size(9).color(Theme::TEXT_MUTED).into()
             } else {
-                Space::with_width(0).into()
+                Space::new().width(0).into()
             }
         } else {
-            Space::with_width(0).into()
+            Space::new().width(0).into()
         }
     } else if item.kind == BinderItemKind::Folder && !item.children.is_empty() {
         let total = item.total_word_count();
@@ -253,10 +253,10 @@ fn render_item(item: &BinderItem, selected_id: Option<Uuid>, depth: usize) -> El
             };
             text(label).size(9).color(Theme::TEXT_MUTED).into()
         } else {
-            Space::with_width(0).into()
+            Space::new().width(0).into()
         }
     } else {
-        Space::with_width(0).into()
+        Space::new().width(0).into()
     };
 
     // ── Status dot ──────────────────────────────────────
@@ -270,35 +270,35 @@ fn render_item(item: &BinderItem, selected_id: Option<Uuid>, depth: usize) -> El
         };
         text(Icons::CIRCLE).size(6).color(status_color).into()
     } else {
-        Space::with_width(0).into()
+        Space::new().width(0).into()
     };
 
     // ── Compile exclusion indicator ─────────────────────
     let compile_indicator: Element<'static, Message> = if !item.include_in_compile {
         text(Icons::BAN).size(8).color(Theme::TEXT_MUTED).into()
     } else {
-        Space::with_width(0).into()
+        Space::new().width(0).into()
     };
 
     // ── Assemble item row ───────────────────────────────
     let item_row = row![
-        Space::with_width(indent),
+        Space::new().width(f32::from(indent)),
         chevron,
-        Space::with_width(4),
+        Space::new().width(4),
         text(icon_str).size(12).color(if is_selected {
             Theme::lighten(icon_color, 0.15)
         } else {
             icon_color
         }),
-        Space::with_width(6),
+        Space::new().width(6),
         title_text,
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         compile_indicator,
-        Space::with_width(2),
+        Space::new().width(2),
         status_dot,
-        Space::with_width(4),
+        Space::new().width(4),
         word_info,
-        Space::with_width(4),
+        Space::new().width(4),
     ]
     .align_y(iced::Alignment::Center);
 
@@ -338,7 +338,7 @@ fn build_action_bar(selected_id: Option<Uuid>) -> Element<'static, Message> {
     let add_doc = action_btn(Icons::FILE_TEXT, "New Doc", Message::NewDocument);
     let add_folder = action_btn(Icons::FOLDER, "New Folder", Message::NewFolder);
 
-    let primary_row = row![add_doc, Space::with_width(4), add_folder,];
+    let primary_row = row![add_doc, Space::new().width(4), add_folder,];
 
     // Context actions (only if item selected)
     let context_row: Element<'static, Message> = if let Some(sel_id) = selected_id {
@@ -349,17 +349,17 @@ fn build_action_bar(selected_id: Option<Uuid>) -> Element<'static, Message> {
 
         row![
             move_up,
-            Space::with_width(2),
+            Space::new().width(2),
             move_down,
-            Space::with_width(6),
+            Space::new().width(6),
             duplicate,
-            Space::with_width(Length::Fill),
+            Space::new().width(Length::Fill),
             delete,
         ]
         .align_y(iced::Alignment::Center)
         .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     container(column![primary_row, context_row,].spacing(4))
@@ -374,7 +374,7 @@ fn action_btn(icon: &str, label: &str, message: Message) -> Element<'static, Mes
     button(
         row![
             text(icon.to_string()).size(11).color(Theme::TEXT_ACCENT),
-            Space::with_width(5),
+            Space::new().width(5),
             text(label.to_string()).size(11).color(Theme::TEXT_SECONDARY),
         ]
         .align_y(iced::Alignment::Center),

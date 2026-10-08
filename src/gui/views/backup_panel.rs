@@ -13,7 +13,7 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
 
     let header = row![
         text("BACKUP MANAGEMENT").size(11).color(Theme::TEXT_SECONDARY),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text(format!(
             "{} backup{} ({})",
             backup_count,
@@ -22,7 +22,7 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
         ))
         .size(10)
         .color(Theme::TEXT_MUTED),
-        Space::with_width(8),
+        Space::new().width(8),
         button(text("\u{f067} Create Backup").size(11).color(Theme::TEXT_ACCENT),)
             .on_press(Message::CreateBackup)
             .padding(Padding::from([4, 10])),
@@ -32,7 +32,7 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
         text(format!("Project: {}", project_name))
             .size(10)
             .color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text("Auto-backup on save | Last 20 kept")
             .size(9)
             .color(Theme::TEXT_MUTED),
@@ -44,7 +44,7 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
         list = list.push(
             container(column![
                 text("No backups found.").size(12).color(Theme::TEXT_MUTED),
-                Space::with_height(4),
+                Space::new().height(4),
                 text("Click 'Create Backup' to save a snapshot of your entire project.")
                     .size(10)
                     .color(Theme::TEXT_MUTED),
@@ -69,7 +69,7 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
         let latest_tag: Element<'static, Message> = if is_latest {
             text("LATEST").size(8).color(Theme::SUCCESS).into()
         } else {
-            Space::with_width(0).into()
+            Space::new().width(0).into()
         };
 
         let entry_row = container(
@@ -83,7 +83,7 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
                     .color(label_color)
                     .width(Length::FillPortion(3)),
                 latest_tag,
-                Space::with_width(4),
+                Space::new().width(4),
                 text(age_str)
                     .size(9)
                     .color(Theme::TEXT_MUTED)
@@ -106,20 +106,20 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
 
     let note = row![
         text("\u{f07b}").size(10),
-        Space::with_width(4),
+        Space::new().width(4),
         text(format!("Stored in ~/{}/", crate::core::BACKUPS_DIR_NAME))
             .size(9)
             .color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text("Ctrl+Shift+B: quick backup").size(9).color(Theme::TEXT_MUTED),
     ];
 
     let content = column![
         header,
         subtitle,
-        Space::with_height(4),
+        Space::new().height(4),
         scrollable(list).height(Length::Fixed(120.0)),
-        Space::with_height(4),
+        Space::new().height(4),
         note,
     ]
     .padding(Padding::from([8, 12]));

@@ -49,7 +49,7 @@ pub fn view(templates: &[DocumentTemplate]) -> Element<'static, Message> {
     let content = column![
         header,
         hint,
-        Space::with_height(4),
+        Space::new().height(4),
         scrollable(template_list).height(Length::Fixed(140.0)),
     ]
     .spacing(4)

@@ -9,7 +9,7 @@ use crate::gui::theme::{self, Theme};
 pub fn view(history: &WritingHistory) -> Element<'static, Message> {
     let header = row![
         text("WRITING HISTORY").size(11).color(Theme::TEXT_SECONDARY),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text(format!("{} day(s) tracked", history.entries.len()))
             .size(10)
             .color(Theme::TEXT_MUTED),
@@ -147,25 +147,25 @@ pub fn view(history: &WritingHistory) -> Element<'static, Message> {
         text(format!("Longest streak: {}d", longest))
             .size(10)
             .color(Theme::TEXT_MUTED),
-        Space::with_width(12),
+        Space::new().width(12),
         text(format!("This week: {}", format_number(week_words.max(0) as u64)))
             .size(10)
             .color(Theme::TEXT_ACCENT),
-        Space::with_width(12),
+        Space::new().width(12),
         text(activity_pct).size(10).color(activity_color),
-        Space::with_width(12),
+        Space::new().width(12),
         text(format!("Trend: {}", trend_label)).size(10).color(trend_color),
-        Space::with_width(12),
+        Space::new().width(12),
         text(format!("Consistency: {}", cons_label)).size(10).color(cons_color),
     ];
 
     let content = column![
         header,
-        Space::with_height(4),
+        Space::new().height(4),
         summary,
-        Space::with_height(4),
+        Space::new().height(4),
         extra_stats,
-        Space::with_height(6),
+        Space::new().height(6),
         scrollable(entries_col).height(Length::Fixed(120.0)),
     ]
     .padding(Padding::from([8, 12]));

@@ -16,9 +16,9 @@ pub fn view(query: &str, results: &[ThesaurusEntry]) -> Element<'static, Message
 
     let header = row![
         text("THESAURUS").size(11).color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
+        Space::new().width(8),
         text(result_count).size(10).color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text("Tip: Select a word in the editor, then open Thesaurus")
             .size(9)
             .color(Theme::TEXT_MUTED),
@@ -35,7 +35,7 @@ pub fn view(query: &str, results: &[ThesaurusEntry]) -> Element<'static, Message
         .on_press(Message::DoThesaurusLookup)
         .padding(Padding::from([4, 12]));
 
-    let input_row = row![input, Space::with_width(4), lookup_btn].align_y(iced::Alignment::Center);
+    let input_row = row![input, Space::new().width(4), lookup_btn].align_y(iced::Alignment::Center);
 
     let mut entries = column![].spacing(8);
 
@@ -85,13 +85,13 @@ pub fn view(query: &str, results: &[ThesaurusEntry]) -> Element<'static, Message
             }
             ant_row.into()
         } else {
-            Space::with_height(0).into()
+            Space::new().height(0).into()
         };
 
         let entry_widget = column![
             row![
                 text(pos_text).size(11).color(Theme::WARNING),
-                Space::with_width(8),
+                Space::new().width(8),
                 text(def_text).size(12).color(Theme::TEXT_SECONDARY),
             ],
             row![text("Synonyms: ").size(10).color(Theme::TEXT_MUTED), synonyms_row,],
@@ -106,17 +106,17 @@ pub fn view(query: &str, results: &[ThesaurusEntry]) -> Element<'static, Message
         text("Click a synonym to insert it at cursor position")
             .size(9)
             .color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text("Shortcut: Ctrl+Shift+T").size(9).color(Theme::TEXT_MUTED),
     ];
 
     let content = column![
         header,
-        Space::with_height(4),
+        Space::new().height(4),
         input_row,
-        Space::with_height(8),
+        Space::new().height(8),
         scrollable(entries).height(Length::Fixed(140.0)),
-        Space::with_height(4),
+        Space::new().height(4),
         footer,
     ]
     .padding(Padding::from([8, 12]));

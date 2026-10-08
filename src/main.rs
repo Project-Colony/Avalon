@@ -17,7 +17,8 @@ const JETBRAINS_MONO_BOLD: &[u8] = include_bytes!("../assets/fonts/JetBrainsMono
 fn main() -> iced::Result {
     env_logger::init();
 
-    iced::daemon(ScrineverApp::title, ScrineverApp::update, ScrineverApp::view)
+    iced::daemon(ScrineverApp::new, ScrineverApp::update, ScrineverApp::view)
+        .title(ScrineverApp::title)
         .subscription(ScrineverApp::subscription)
         .theme(ScrineverApp::theme)
         .font(JETBRAINS_MONO_REGULAR)
@@ -26,5 +27,5 @@ fn main() -> iced::Result {
             family: iced::font::Family::Name("JetBrainsMono Nerd Font"),
             ..iced::Font::DEFAULT
         })
-        .run_with(ScrineverApp::new)
+        .run()
 }

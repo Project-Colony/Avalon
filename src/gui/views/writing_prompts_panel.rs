@@ -69,25 +69,25 @@ pub fn view(data: &WritingPromptsData) -> Element<'static, Message> {
     let streak = data.streak();
     let header = row![
         text("WRITING PROMPTS").size(11).color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
+        Space::new().width(8),
         if streak > 0 {
             text(format!("{} day streak!", streak)).size(10).color(Theme::SUCCESS)
         } else {
             text("Start your streak!").size(10).color(Theme::TEXT_MUTED)
         },
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         button(text("Random Prompt").size(11).color(Theme::TEXT_ACCENT),)
             .on_press(Message::GenerateWritingPrompt)
             .padding(Padding::from([4, 12])),
-        Space::with_width(4),
+        Space::new().width(4),
         button(text("Character").size(11).color(Theme::TEXT_ACCENT),)
             .on_press(Message::GenerateCharacter)
             .padding(Padding::from([4, 12])),
-        Space::with_width(4),
+        Space::new().width(4),
         button(text("Plot Seed").size(11).color(Theme::TEXT_ACCENT),)
             .on_press(Message::GeneratePlotSeed)
             .padding(Padding::from([4, 12])),
-        Space::with_width(4),
+        Space::new().width(4),
         button(text("Names").size(11).color(Theme::TEXT_ACCENT),)
             .on_press(Message::GenerateWritingNames)
             .padding(Padding::from([4, 12])),
@@ -103,7 +103,7 @@ pub fn view(data: &WritingPromptsData) -> Element<'static, Message> {
             text(format!("Category: {}", data.daily_prompt.category.label()))
                 .size(9)
                 .color(Theme::TEXT_MUTED),
-            Space::with_width(8),
+            Space::new().width(8),
             text(format!("~{} words", data.daily_prompt.estimated_words))
                 .size(9)
                 .color(Theme::TEXT_MUTED),
@@ -128,7 +128,7 @@ pub fn view(data: &WritingPromptsData) -> Element<'static, Message> {
                 text(format!("[{}]", prompt.category.label()))
                     .size(10)
                     .color(Theme::TEXT_ACCENT),
-                Space::with_width(8),
+                Space::new().width(8),
                 text(format!("~{} words", prompt.estimated_words))
                     .size(9)
                     .color(Theme::TEXT_MUTED),
@@ -145,7 +145,7 @@ pub fn view(data: &WritingPromptsData) -> Element<'static, Message> {
         .spacing(2)
         .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Character display
@@ -171,7 +171,7 @@ pub fn view(data: &WritingPromptsData) -> Element<'static, Message> {
         .spacing(1)
         .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Plot seed display
@@ -200,7 +200,7 @@ pub fn view(data: &WritingPromptsData) -> Element<'static, Message> {
         .spacing(1)
         .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Names display
@@ -211,17 +211,17 @@ pub fn view(data: &WritingPromptsData) -> Element<'static, Message> {
                 text(format!("{} {}", name.first_name, name.last_name))
                     .size(11)
                     .color(Theme::TEXT_PRIMARY),
-                Space::with_width(8),
+                Space::new().width(8),
                 text(format!("Origin: {}", name.origin))
                     .size(9)
                     .color(Theme::TEXT_MUTED),
-                Space::with_width(4),
+                Space::new().width(4),
                 text(format!("({})", name.meaning)).size(9).color(Theme::TEXT_SECONDARY),
             ]);
         }
         names_col.into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Exercises section
@@ -231,9 +231,9 @@ pub fn view(data: &WritingPromptsData) -> Element<'static, Message> {
             text(format!("[{}]", ex.category.label()))
                 .size(9)
                 .color(Theme::TEXT_ACCENT),
-            Space::with_width(4),
+            Space::new().width(4),
             text(ex.title.clone()).size(10).color(Theme::TEXT_PRIMARY),
-            Space::with_width(4),
+            Space::new().width(4),
             text(format!("~{} min", ex.duration_minutes))
                 .size(9)
                 .color(Theme::TEXT_MUTED),
@@ -276,20 +276,20 @@ pub fn view(data: &WritingPromptsData) -> Element<'static, Message> {
 
     let content = column![
         header,
-        Space::with_height(4),
+        Space::new().height(4),
         daily_section,
-        Space::with_height(4),
+        Space::new().height(4),
         scrollable(cat_row),
-        Space::with_height(4),
+        Space::new().height(4),
         prompt_section,
-        Space::with_height(4),
+        Space::new().height(4),
         char_section,
         plot_section,
         names_section,
-        Space::with_height(4),
+        Space::new().height(4),
         exercises_col,
         exercise_summary,
-        Space::with_height(2),
+        Space::new().height(2),
         search_hint,
         tag_hint,
         all_prompts_hint,

@@ -42,23 +42,23 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
 
     let readability = row![
         text("Readability:").size(11).color(Theme::TEXT_MUTED),
-        Space::with_width(4),
+        Space::new().width(4),
         text(format!("Flesch: {:.1}", advanced.flesch_reading_ease))
             .size(11)
             .color(readability_color),
-        Space::with_width(8),
+        Space::new().width(8),
         text(format!("FK Grade: {:.1}", advanced.flesch_kincaid_grade))
             .size(11)
             .color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
+        Space::new().width(8),
         text(format!("Fog: {:.1}", advanced.gunning_fog))
             .size(11)
             .color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
+        Space::new().width(8),
         text(format!("Reading: {:.0} min", analysis.reading_time_minutes))
             .size(11)
             .color(Theme::TEXT_MUTED),
-        Space::with_width(8),
+        Space::new().width(8),
         text(format!("Speaking: {:.0} min", analysis.speaking_time_minutes))
             .size(11)
             .color(Theme::TEXT_MUTED),
@@ -68,19 +68,19 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
     // Additional readability formulas
     let readability_extra = row![
         text("Coleman-Liau:").size(10).color(Theme::TEXT_MUTED),
-        Space::with_width(4),
+        Space::new().width(4),
         text(format!("{:.1}", advanced.coleman_liau))
             .size(10)
             .color(Theme::TEXT_SECONDARY),
-        Space::with_width(12),
+        Space::new().width(12),
         text("ARI:").size(10).color(Theme::TEXT_MUTED),
-        Space::with_width(4),
+        Space::new().width(4),
         text(format!("{:.1}", advanced.ari))
             .size(10)
             .color(Theme::TEXT_SECONDARY),
-        Space::with_width(12),
+        Space::new().width(12),
         text("SMOG:").size(10).color(Theme::TEXT_MUTED),
-        Space::with_width(4),
+        Space::new().width(4),
         text(format!("{:.1}", advanced.smog))
             .size(10)
             .color(Theme::TEXT_SECONDARY),
@@ -91,7 +91,7 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
     let vocab = advanced_analysis::vocabulary_metrics(raw_text);
     let vocab_row = row![
         text("Vocabulary:").size(11).color(Theme::TEXT_MUTED),
-        Space::with_width(4),
+        Space::new().width(4),
         text(format!("TTR: {:.1}%", vocab.type_token_ratio * 100.0))
             .size(11)
             .color(if vocab.type_token_ratio >= 0.7 {
@@ -101,11 +101,11 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
             } else {
                 Theme::ERROR
             }),
-        Space::with_width(8),
+        Space::new().width(8),
         text(format!("Hapax: {}", vocab.hapax_legomena))
             .size(10)
             .color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
+        Space::new().width(8),
         text(format!(
             "Pages: {:.1}",
             analysis.word_count as f64 / crate::core::WORDS_PER_PAGE as f64
@@ -121,11 +121,11 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
 
     let mut linguistic_row = row![
         text("Style:").size(11).color(Theme::TEXT_MUTED),
-        Space::with_width(4),
+        Space::new().width(4),
         text(format!("Level: {}", linguistic_level.label()))
             .size(11)
             .color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
+        Space::new().width(8),
     ]
     .spacing(4);
 
@@ -135,7 +135,7 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
                 .size(10)
                 .color(Theme::WARNING),
         );
-        linguistic_row = linguistic_row.push(Space::with_width(8));
+        linguistic_row = linguistic_row.push(Space::new().width(8));
     }
     if !writing.adverbs.is_empty() {
         linguistic_row = linguistic_row.push(
@@ -143,7 +143,7 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
                 .size(10)
                 .color(Theme::WARNING),
         );
-        linguistic_row = linguistic_row.push(Space::with_width(8));
+        linguistic_row = linguistic_row.push(Space::new().width(8));
     }
     if !writing.cliches.is_empty() {
         linguistic_row = linguistic_row.push(
@@ -151,7 +151,7 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
                 .size(10)
                 .color(Theme::ERROR),
         );
-        linguistic_row = linguistic_row.push(Space::with_width(8));
+        linguistic_row = linguistic_row.push(Space::new().width(8));
     }
     if !writing.long_sentences.is_empty() {
         linguistic_row = linguistic_row.push(
@@ -159,7 +159,7 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
                 .size(10)
                 .color(Theme::WARNING),
         );
-        linguistic_row = linguistic_row.push(Space::with_width(8));
+        linguistic_row = linguistic_row.push(Space::new().width(8));
     }
     if !writing.dialog_tags.is_empty() {
         linguistic_row = linguistic_row.push(
@@ -197,7 +197,7 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
         }
         r.into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Sentence analysis
@@ -205,11 +205,11 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
     let avg_len = advanced_analysis::average_sentence_length(raw_text);
     let sentence_row = row![
         text("Sentences:").size(11).color(Theme::TEXT_MUTED),
-        Space::with_width(4),
+        Space::new().width(4),
         text(format!("Avg: {:.1} words", avg_len))
             .size(10)
             .color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
+        Space::new().width(8),
         text(format!(
             "Longest: {} words",
             longest.first().map_or(0, |s| s.word_count)
@@ -227,11 +227,11 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
     let paragraphs = advanced_analysis::paragraph_analysis(raw_text);
     let density_row = row![
         text("Density:").size(11).color(Theme::TEXT_MUTED),
-        Space::with_width(4),
+        Space::new().width(4),
         text(format!("{} paragraphs", paragraphs.len()))
             .size(10)
             .color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
+        Space::new().width(8),
         text(format!(
             "Avg: {:.1} words/para",
             if !paragraphs.is_empty() {
@@ -242,7 +242,7 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
         ))
         .size(10)
         .color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
+        Space::new().width(8),
         text(format!(
             "Avg: {:.1} sentences/para",
             if !paragraphs.is_empty() {
@@ -279,9 +279,9 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
 
     let grade_row = row![
         text("Est. Grade:").size(11).color(Theme::TEXT_MUTED),
-        Space::with_width(4),
+        Space::new().width(4),
         text(format!("{:.1}", est_grade)).size(12).color(grade_color),
-        Space::with_width(4),
+        Space::new().width(4),
         text(format!("({})", est_audience))
             .size(11)
             .color(Theme::TEXT_SECONDARY),
@@ -290,27 +290,27 @@ pub fn view(analysis: &TextAnalysis, raw_text: &str) -> Element<'static, Message
 
     let content = column![
         header,
-        Space::with_height(4),
+        Space::new().height(4),
         basic_stats,
-        Space::with_height(4),
+        Space::new().height(4),
         avg_stats,
-        Space::with_height(4),
+        Space::new().height(4),
         readability,
-        Space::with_height(2),
+        Space::new().height(2),
         readability_extra,
-        Space::with_height(4),
+        Space::new().height(4),
         grade_row,
-        Space::with_height(4),
+        Space::new().height(4),
         vocab_row,
-        Space::with_height(4),
+        Space::new().height(4),
         sentence_row,
-        Space::with_height(4),
+        Space::new().height(4),
         density_row,
-        Space::with_height(4),
+        Space::new().height(4),
         linguistic_row,
-        Space::with_height(2),
+        Space::new().height(2),
         summary_row,
-        Space::with_height(4),
+        Space::new().height(4),
         scrollable(common_words),
         overused_row,
     ]

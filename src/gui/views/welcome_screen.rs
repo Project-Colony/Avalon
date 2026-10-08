@@ -74,7 +74,7 @@ fn template_card_style(_theme: &iced::Theme) -> container::Style {
 fn section_header(label: &str) -> Element<'static, Message> {
     row![
         text(label.to_string()).size(14).color(Theme::TEXT_SECONDARY),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
     ]
     .into()
 }
@@ -86,26 +86,26 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
     // ── Hero section ─────────────────────────────────────────────
     let hero = container(
         column![
-            Space::with_height(28),
+            Space::new().height(28),
             text("Avalon").size(48).color(Theme::TEXT_PRIMARY),
             text("Free Writing Studio").size(15).color(Theme::TEXT_MUTED),
-            Space::with_height(24),
+            Space::new().height(24),
             row![
                 button(
                     row![
                         text(Icons::PLUS).size(16).color(Theme::TEXT_ACCENT),
-                        Space::with_width(8),
+                        Space::new().width(8),
                         text("New Project").size(15).color(Theme::TEXT_PRIMARY),
                     ]
                     .align_y(iced::Alignment::Center)
                 )
                 .on_press(Message::NewProject)
                 .padding(Padding::from([12, 28])),
-                Space::with_width(12),
+                Space::new().width(12),
                 button(
                     row![
                         text(Icons::FOLDER_OPEN).size(14).color(Theme::TEXT_ACCENT),
-                        Space::with_width(8),
+                        Space::new().width(8),
                         text("Open Project").size(15).color(Theme::TEXT_PRIMARY),
                     ]
                     .align_y(iced::Alignment::Center)
@@ -113,7 +113,7 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
                 .on_press(Message::OpenProject)
                 .padding(Padding::from([12, 28])),
             ],
-            Space::with_height(28),
+            Space::new().height(28),
         ]
         .align_x(iced::Alignment::Center),
     )
@@ -126,7 +126,12 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
     let recent_content = build_recent_section(recent_projects);
 
     let recent_card = container(
-        column![section_header("Recent Projects"), Space::with_height(8), recent_content,].width(Length::Fill),
+        column![
+            section_header("Recent Projects"),
+            Space::new().height(8),
+            recent_content,
+        ]
+        .width(Length::Fill),
     )
     .style(card_style)
     .padding(Padding::from([16, 20]))
@@ -138,7 +143,7 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
     let templates_card = container(
         column![
             section_header("Start from Template"),
-            Space::with_height(8),
+            Space::new().height(8),
             templates_content,
         ]
         .width(Length::Fill),
@@ -150,7 +155,7 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
     // ── Two-column layout ────────────────────────────────────────
     let main_content = row![
         container(recent_card).width(Length::FillPortion(1)),
-        Space::with_width(16),
+        Space::new().width(16),
         container(templates_card).width(Length::FillPortion(1)),
     ]
     .width(Length::Fill);
@@ -161,11 +166,11 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
     // ── Assemble everything ──────────────────────────────────────
     let page = column![
         hero,
-        Space::with_height(20),
+        Space::new().height(20),
         main_content,
-        Space::with_height(16),
+        Space::new().height(16),
         footer,
-        Space::with_height(8),
+        Space::new().height(8),
     ]
     .padding(Padding::from([24, 40]));
 
@@ -181,13 +186,13 @@ pub fn view(recent_projects: &RecentProjects) -> Element<'static, Message> {
 fn build_recent_section(recent_projects: &RecentProjects) -> Element<'static, Message> {
     if recent_projects.projects.is_empty() {
         return column![
-            Space::with_height(20),
+            Space::new().height(20),
             text("No recent projects yet.").size(13).color(Theme::TEXT_MUTED),
-            Space::with_height(4),
+            Space::new().height(4),
             text("Create a new project or open an existing one to get started.")
                 .size(12)
                 .color(Theme::TEXT_MUTED),
-            Space::with_height(20),
+            Space::new().height(20),
         ]
         .align_x(iced::Alignment::Center)
         .into();
@@ -253,7 +258,7 @@ fn build_templates_section() -> Element<'static, Message> {
         let cat_name = cat.to_string();
         let cat_header = row![
             text(icon).size(13),
-            Space::with_width(6),
+            Space::new().width(6),
             text(cat_name).size(13).color(Theme::TEXT_ACCENT),
         ];
 
@@ -311,11 +316,11 @@ fn build_footer() -> Element<'static, Message> {
     container(
         row![
             text(Icons::LIGHTBULB).size(11).color(Theme::TEXT_ACCENT),
-            Space::with_width(4),
+            Space::new().width(4),
             text("Tip:").size(11).color(Theme::TEXT_ACCENT),
-            Space::with_width(6),
+            Space::new().width(6),
             text(tips[tip_index]).size(11).color(Theme::TEXT_SECONDARY),
-            Space::with_width(Length::Fill),
+            Space::new().width(Length::Fill),
             text("Avalon v0.1.0").size(10).color(Theme::TEXT_MUTED),
         ]
         .align_y(iced::Alignment::Center),

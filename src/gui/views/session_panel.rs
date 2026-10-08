@@ -29,7 +29,7 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
 
     let header = row![
         text("WRITING SESSION").size(11).color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
+        Space::new().width(8),
         text(status_indicator).size(10).color(status_color),
     ];
 
@@ -64,7 +64,7 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
         .on_press(Message::SessionReset)
         .padding(Padding::from([4, 12]));
 
-    let controls = row![toggle_btn, Space::with_width(8), reset_btn,].align_y(iced::Alignment::Center);
+    let controls = row![toggle_btn, Space::new().width(8), reset_btn,].align_y(iced::Alignment::Center);
 
     // Stats
     let words_color = if data.words_written >= 0 {
@@ -100,11 +100,11 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
 
     let stats_row = row![
         text(words_text).size(14).color(words_color),
-        Space::with_width(16),
+        Space::new().width(16),
         text(wpm_text).size(14).color(Theme::TEXT_SECONDARY),
-        Space::with_width(16),
+        Space::new().width(16),
         text(pages).size(12).color(Theme::TEXT_MUTED),
-        Space::with_width(16),
+        Space::new().width(16),
         text(time_per_word).size(11).color(Theme::TEXT_MUTED),
     ];
 
@@ -153,9 +153,9 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
 
     let goal_row = row![
         goal_label,
-        Space::with_width(8),
+        Space::new().width(8),
         goal_input,
-        Space::with_width(12),
+        Space::new().width(12),
         goal_progress,
     ]
     .align_y(iced::Alignment::Center);
@@ -173,21 +173,21 @@ pub fn view(data: &SessionData) -> Element<'static, Message> {
             .color(Theme::TEXT_MUTED)
             .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     let content = row![
         column![
             header,
-            Space::with_height(4),
+            Space::new().height(4),
             timer_display,
-            Space::with_height(4),
+            Space::new().height(4),
             controls,
         ]
         .spacing(2)
         .width(Length::Fixed(200.0)),
-        Space::with_width(20),
-        column![stats_row, Space::with_height(6), goal_row, Space::with_height(4), tip,].spacing(4),
+        Space::new().width(20),
+        column![stats_row, Space::new().height(6), goal_row, Space::new().height(4), tip,].spacing(4),
     ]
     .padding(Padding::from([8, 12]));
 
