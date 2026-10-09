@@ -338,6 +338,14 @@ fn collect_ids(nodes: &[ScrivNode], ids: &mut Vec<String>) {
     }
 }
 
+/// Whether `id` has the shape of a real Scrivener item ID: a hyphenated UUID
+/// (Scrivener 3) or a decimal number (Scrivener 2). IDs come from the `.scrivx`
+/// XML and are joined into file paths, so anything else (`..`, separators) is
+/// refused.
+fn is_valid_scriv_id(id: &str) -> bool {
+    (id.len() == 36 && uuid::Uuid::try_parse(id).is_ok()) || (!id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()))
+}
+
 /// Build a map from Scrivener item ID to plain-text content by reading files
 /// from the `Files/Data/<ID>/` subdirectories inside the `.scriv` package.
 fn build_content_map(scriv_dir: &Path, nodes: &[ScrivNode]) -> Result<HashMap<String, String>> {
@@ -352,6 +360,11 @@ fn build_content_map(scriv_dir: &Path, nodes: &[ScrivNode]) -> Result<HashMap<St
     let docs_dir = scriv_dir.join("Files").join("Docs");
 
     for id in &ids {
+        if !is_valid_scriv_id(id) {
+            log::warn!("Skipping Scrivener item with malformed ID {:?}", id);
+            continue;
+        }
+
         // Try Scrivener 3 layout first.
         let rtf_path = data_dir.join(id).join("content.rtf");
         let txt_path = data_dir.join(id).join("content.txt");
@@ -396,3 +409,47 @@ fn build_content_map(scriv_dir: &Path, nodes: &[ScrivNode]) -> Result<HashMap<St
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+
+    #[test]
+    fn accepts_only_uuid_and_numeric_ids() {
+        assert!(is_valid_scriv_id("8E1D5C3A-4F2B-4C1D-9A7E-0123456789AB"));
+        assert!(is_valid_scriv_id("42"));
+        assert!(!is_valid_scriv_id(""));
+        assert!(!is_valid_scriv_id("../../etc"));
+        assert!(!is_valid_scriv_id("/etc/passwd"));
+        assert!(!is_valid_scriv_id("..\\..\\x"));
+        assert!(!is_valid_scriv_id("8E1D5C3A4F2B4C1D9A7E0123456789AB"));
+        assert!(!is_valid_scriv_id("urn:uuid:8e1d5c3a-4f2b-4c1d-9a7e-0123456789ab"));
+    }
+
+    #[test]
+    fn forged_id_cannot_read_outside_the_package() {
+        let root = tempfile::tempdir().unwrap();
+        fs::write(root.path().join("secret.txt"), "SECRET").unwrap();
+
+        let scriv = root.path().join("Novel.scriv");
+        let docs = scriv.join("Files").join("Docs");
+        fs::create_dir_all(&docs).unwrap();
+        fs::write(docs.join("1.txt"), "Hello").unwrap();
+        // Files/Docs/../../../secret.txt is the file planted above.
+        fs::write(
+            scriv.join("Novel.scrivx"),
+            r#"<ScrivenerProject><Binder>
+<BinderItem ID="1" Type="Text"><Title>Real</Title></BinderItem>
+<BinderItem ID="../../../secret" Type="Text"><Title>Forged</Title></BinderItem>
+</Binder></ScrivenerProject>"#,
+        )
+        .unwrap();
+
+        let (_, items) = import_scriv(&scriv).unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].document.as_ref().unwrap().content, "Hello");
+        assert_eq!(items[1].title, "Forged");
+        assert_eq!(items[1].document.as_ref().unwrap().content, "");
+    }
+}

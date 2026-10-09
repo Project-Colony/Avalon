@@ -31,6 +31,32 @@ pub fn home_dir_or_cwd() -> std::path::PathBuf {
     })
 }
 
+/// Write `contents` to `path` without ever leaving a half-written file there.
+///
+/// The data goes to `<path>.tmp` first, is flushed to disk, and is then renamed
+/// over `path`, so a crash mid-save keeps the previous version intact. On
+/// failure the temporary file is removed.
+pub fn write_atomic(path: &std::path::Path, contents: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+
+    let mut tmp = path.as_os_str().to_owned();
+    tmp.push(".tmp");
+    let tmp = std::path::PathBuf::from(tmp);
+
+    let result = (|| {
+        {
+            let mut file = std::fs::File::create(&tmp)?;
+            file.write_all(contents)?;
+            file.sync_all()?;
+        }
+        std::fs::rename(&tmp, path)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    result
+}
+
 /// Format a byte count into a human-readable size string (e.g. "1.5 MB").
 pub fn format_bytes(bytes: u64) -> String {
     const KB: u64 = 1024;
