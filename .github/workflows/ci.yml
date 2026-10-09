@@ -7,54 +7,117 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
 
 jobs:
   check:
-    name: Check & Test
-    runs-on: ubuntu-latest
+    name: Check & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install system dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libfontconfig1-dev pkg-config
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable branch
         with:
           components: clippy, rustfmt
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
       - name: Check formatting
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --locked --all-targets -- -D warnings
 
       - name: Build
-        run: cargo build --release
+        run: cargo build --locked --release
 
       - name: Test
-        run: cargo test
+        run: cargo test --locked
 
-  coverage:
-    name: Code Coverage
+  # Cargo.toml declares rust-version. This job is what keeps that promise
+  # true: it builds on exactly that toolchain.
+  msrv:
+    name: MSRV
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y libfontconfig1-dev pkg-config
 
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Read the declared MSRV
+        id: msrv
+        run: |
+          version=$(grep '^rust-version' Cargo.toml | tr -d ' "' | cut -d= -f2)
+          [ -n "$version" ] || { echo "::error::could not read rust-version from Cargo.toml"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable branch
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          key: msrv-${{ steps.msrv.outputs.version }}
+
+      - name: Build on the declared floor
+        run: cargo check --locked --all-targets
+
+  # GitHub's Dependabot alerts only cover advisories that have a GHSA id.
+  # RustSec publishes some that never get one, so cargo audit reads the
+  # RustSec database directly. Vulnerabilities fail the job; unmaintained
+  # and unsound notices are printed as warnings.
+  #
+  # Ignored by id, with the reason:
+  # RUSTSEC-2026-0187 (lopdf 0.31, stack overflow on a deeply nested PDF).
+  # lopdf comes in through printpdf 0.7, which only parses a PDF in its svg
+  # module, behind a feature Avalon does not enable. Avalon writes PDFs and
+  # never reads one. The fixed lopdf needs printpdf 0.8 or later, a rewrite
+  # of the API src/export/pdf.rs uses. Drop the ignore with that upgrade.
+  audit:
+    name: Advisories
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          ignore: RUSTSEC-2026-0187
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev pkg-config
+
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable branch
+
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
       - name: Install cargo-tarpaulin
         run: cargo install cargo-tarpaulin
@@ -63,7 +126,7 @@ jobs:
         run: cargo tarpaulin --out xml --skip-clean
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
-          file: cobertura.xml
+          files: cobertura.xml
           fail_ci_if_error: false
