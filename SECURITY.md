@@ -35,8 +35,9 @@ interest:
   in scope.
 - **Project folders**: `project.json` and the files under `docs/` and
   `snapshots/` of a project you open, including one listed in the recent
-  projects. A project title can never place saved files outside the projects
-  folder; a way around that is in scope.
+  projects. Avalon saves a project only into the folder it was opened from or
+  the one chosen in the save dialog, and a project title never changes where
+  files go; a way around that is in scope.
 
 Out of scope: attacks that need someone who can already run code as you or
 edit Avalon's own configuration, and bugs in the operating system or in the

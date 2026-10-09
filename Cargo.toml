@@ -59,6 +59,10 @@ regex = "1.13.1"
 # Clipboard
 arboard = "3.6.1"
 
+# Native open and save dialogs. On Linux the XDG desktop portal backend talks
+# to D-Bus through libdbus loaded at run time, so the build needs no GTK.
+rfd = { version = "=0.17.2", default-features = false, features = ["xdg-portal"] }
+
 # Temp files (used by print module)
 tempfile = "3.27.0"
 

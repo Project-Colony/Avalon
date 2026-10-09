@@ -2,7 +2,7 @@ use anyhow::{ensure, Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 use super::binder::Binder;
@@ -27,7 +27,7 @@ const MAX_DIR_NAME_BYTES: usize = 200;
 /// trailing dots and spaces, which Windows drops silently. The result is capped
 /// at [`MAX_DIR_NAME_BYTES`], Windows device names such as `CON` or `COM1` get
 /// a `_` prefix, and an empty result becomes `Untitled`.
-fn dir_name_for_title(title: &str) -> String {
+pub fn dir_name_for_title(title: &str) -> String {
     let replaced: String = title
         .chars()
         .map(|c| {
@@ -127,40 +127,46 @@ impl Project {
         project
     }
 
-    /// Save the project to disk, in a directory directly under `base_path`.
+    /// The folder name a project is offered when it is saved for the first
+    /// time: `<title>.scriv`, with the title sanitized first (see
+    /// [`dir_name_for_title`]), so it is always a single plain path component.
+    pub fn default_dir_name(&self) -> String {
+        format!("{}.{}", dir_name_for_title(&self.title), super::PROJECT_EXTENSION)
+    }
+
+    /// Save the project into the folder it was opened from or last saved to.
     ///
-    /// A project already stored directly under `base_path` keeps its folder,
-    /// so a title rename or an older folder name the sanitizer would change
-    /// does not fork it into a second copy. Otherwise the folder is
-    /// `<title>.scriv`, with the title sanitized first (see
-    /// [`dir_name_for_title`]), so no title can place the project anywhere else.
-    pub fn save(&mut self, base_path: &Path) -> Result<()> {
-        let dir_name = match self
+    /// The folder does not depend on the title, so renaming a project keeps
+    /// writing to the same folder. A project that was never saved has no
+    /// folder yet; give it one with [`Project::save_as`].
+    pub fn save(&mut self) -> Result<()> {
+        let project_dir = self
             .path
-            .as_deref()
-            .filter(|path| path.parent() == Some(base_path))
-            .and_then(Path::file_name)
-        {
-            Some(existing) => PathBuf::from(existing),
-            None => PathBuf::from(format!(
-                "{}.{}",
-                dir_name_for_title(&self.title),
-                super::PROJECT_EXTENSION
-            )),
-        };
-        // Path::join replaces the base with an absolute or prefixed path, so
-        // only accept a name that is exactly one plain component.
-        let mut components = dir_name.components();
-        ensure!(
-            matches!(
-                (components.next(), components.next()),
-                (Some(Component::Normal(_)), None)
-            ),
-            "Project directory name {:?} would leave {}",
-            dir_name,
-            base_path.display()
-        );
-        let project_dir = base_path.join(&dir_name);
+            .clone()
+            .context("The project has no folder yet; choose where to save it first")?;
+        self.write_to(&project_dir)
+    }
+
+    /// Save the project into `project_dir` and keep using that folder.
+    ///
+    /// Unless it already is this project's folder, `project_dir` must not
+    /// exist or must be empty, so a project never writes over the files of
+    /// another one.
+    pub fn save_as(&mut self, project_dir: &Path) -> Result<()> {
+        if self.path.as_deref() != Some(project_dir) {
+            let occupied = fs::read_dir(project_dir).is_ok_and(|mut entries| entries.next().is_some());
+            ensure!(
+                !occupied,
+                "{} already exists and is not empty; choose another name",
+                project_dir.display()
+            );
+        }
+        self.write_to(project_dir)
+    }
+
+    /// Write every project file into `project_dir`.
+    fn write_to(&mut self, project_dir: &Path) -> Result<()> {
+        let project_dir = project_dir.to_path_buf();
         fs::create_dir_all(&project_dir).context("Failed to create project directory")?;
 
         // Save project metadata
@@ -199,6 +205,11 @@ impl Project {
     /// Load a project from disk
     pub fn load(project_dir: &Path) -> Result<Self> {
         let meta_path = project_dir.join("project.json");
+        ensure!(
+            meta_path.is_file(),
+            "{} is not an Avalon project: it has no project.json",
+            project_dir.display()
+        );
         let json = fs::read_to_string(&meta_path).context("Failed to read project metadata")?;
         let mut project: Project = serde_json::from_str(&json).context("Failed to parse project metadata")?;
 
@@ -747,20 +758,7 @@ impl Project {
         }
     }
 
-    /// Save the project to disk asynchronously (runs I/O on a blocking thread).
-    /// Use from iced `Task` or other async contexts to avoid blocking the UI thread.
-    #[allow(dead_code)]
-    pub async fn save_async(mut self, base_path: PathBuf) -> Result<Self> {
-        tokio::task::spawn_blocking(move || {
-            self.save(&base_path)?;
-            Ok(self)
-        })
-        .await
-        .context("Save task panicked")?
-    }
-
     /// Load a project from disk asynchronously (runs I/O on a blocking thread).
-    #[allow(dead_code)]
     pub async fn load_async(project_dir: PathBuf) -> Result<Self> {
         tokio::task::spawn_blocking(move || Self::load(&project_dir))
             .await
@@ -892,10 +890,10 @@ mod tests {
         assert_eq!(item.snapshots[0].content, "Hello world");
 
         // Save project
-        project.save(dir.path()).unwrap();
+        let project_dir = dir.path().join("SnapshotTest.scriv");
+        project.save_as(&project_dir).unwrap();
 
         // Load project
-        let project_dir = dir.path().join("SnapshotTest.scriv");
         let loaded = Project::load(&project_dir).unwrap();
 
         // Verify snapshot was persisted
@@ -929,10 +927,10 @@ mod tests {
         project.compile_presets.push(("LaTeX Export".to_string(), opts2));
 
         // Save project
-        project.save(dir.path()).unwrap();
+        let project_dir = dir.path().join("PresetTest.scriv");
+        project.save_as(&project_dir).unwrap();
 
         // Load project
-        let project_dir = dir.path().join("PresetTest.scriv");
         let loaded = Project::load(&project_dir).unwrap();
 
         assert_eq!(loaded.compile_presets.len(), 2);
@@ -969,22 +967,28 @@ mod tests {
     }
 
     #[test]
-    fn test_save_keeps_hostile_titles_inside_base_path() {
+    fn test_default_dir_name_keeps_hostile_titles_inside_base_path() {
         use tempfile::tempdir;
 
         let root = tempdir().unwrap();
         let base = root.path().join("projects");
         for title in ["../x", "/abs/x", "a/b", "CON", "", "..", "C:\\evil"] {
             let mut project = Project::new(title);
-            project.save(&base).unwrap();
-            let dir = project.path.clone().unwrap();
+            let dir = base.join(project.default_dir_name());
             assert_eq!(
                 dir.parent(),
                 Some(base.as_path()),
-                "{title:?} saved to {}",
+                "{title:?} maps to {}",
                 dir.display()
             );
-            assert!(dir.join("project.json").is_file());
+            if dir.exists() {
+                // "" and ".." both map to Untitled.scriv: the second one must
+                // not write into the first one's folder.
+                assert!(project.save_as(&dir).is_err(), "{title:?} took over {}", dir.display());
+            } else {
+                project.save_as(&dir).unwrap();
+                assert!(dir.join("project.json").is_file());
+            }
         }
 
         // Nothing was written next to the base directory.
@@ -996,31 +1000,71 @@ mod tests {
     }
 
     #[test]
-    fn test_save_keeps_existing_folder() {
+    fn test_renamed_project_keeps_its_folder() {
+        use crate::core::binder::BinderItem;
         use tempfile::tempdir;
 
         let base = tempdir().unwrap();
-        // A folder name the sanitizer would change, as an older save wrote it.
-        let legacy = base.path().join(".notes.scriv");
-        let mut project = Project::new(".notes");
-        project.save(base.path()).unwrap();
-        fs::rename(project.path.take().unwrap(), &legacy).unwrap();
+        let mut project = Project::new("First Title");
+        let mut item = BinderItem::new_text("Chapter 1");
+        if let Some(doc) = &mut item.document {
+            doc.content = "It was a dark and stormy night.".to_string();
+        }
+        project.binder.draft.children.push(item);
+        let item_id = project.binder.draft.children.last().unwrap().id;
 
-        let mut project = Project::load(&legacy).unwrap();
-        project.title = "Renamed".to_string();
-        project.save(base.path()).unwrap();
-        assert_eq!(project.path.as_deref(), Some(legacy.as_path()));
-
-        // Saving somewhere else still derives the folder from the title.
-        let other = tempdir().unwrap();
-        project.save(other.path()).unwrap();
-        assert_eq!(project.path, Some(other.path().join("Renamed.scriv")));
+        let project_dir = base.path().join(project.default_dir_name());
+        project.save_as(&project_dir).unwrap();
+        project.title = "Second Title".to_string();
+        project.save().unwrap();
+        project.save().unwrap();
+        assert_eq!(project.path.as_deref(), Some(project_dir.as_path()));
 
         let folders: Vec<_> = fs::read_dir(base.path())
             .unwrap()
             .map(|entry| entry.unwrap().file_name())
             .collect();
-        assert_eq!(folders, [".notes.scriv"]);
+        assert_eq!(folders, ["First Title.scriv"]);
+
+        // Reopening the folder and saving again still writes to it.
+        let mut loaded = Project::load(&project_dir).unwrap();
+        assert_eq!(loaded.title, "Second Title");
+        let doc = loaded.binder.find_item(&item_id).unwrap().document.as_ref().unwrap();
+        assert_eq!(doc.content, "It was a dark and stormy night.");
+        loaded.save().unwrap();
+        assert_eq!(fs::read_dir(base.path()).unwrap().count(), 1);
+    }
+
+    #[test]
+    fn test_save_needs_a_folder_and_never_takes_over_another_one() {
+        use tempfile::tempdir;
+
+        let base = tempdir().unwrap();
+        let mut project = Project::new("Fresh");
+        assert!(project.save().is_err());
+        assert_eq!(project.path, None);
+
+        // A folder that already holds something is refused, untouched.
+        let taken = base.path().join("Taken.scriv");
+        fs::create_dir(&taken).unwrap();
+        fs::write(taken.join("notes.txt"), "keep me").unwrap();
+        assert!(project.save_as(&taken).is_err());
+        assert_eq!(project.path, None);
+        let entries: Vec<_> = fs::read_dir(&taken)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(entries, ["notes.txt"]);
+
+        // An empty folder is fine, and so is saving again to the same one.
+        let empty = base.path().join("Empty.scriv");
+        fs::create_dir(&empty).unwrap();
+        project.save_as(&empty).unwrap();
+        project.save_as(&empty).unwrap();
+        assert_eq!(project.path, Some(empty.clone()));
+
+        // A folder without project.json does not open as a project.
+        assert!(Project::load(&taken).is_err());
     }
 
     #[test]
@@ -1039,11 +1083,11 @@ mod tests {
         project.create_snapshot(&item_id, "Snap").unwrap();
 
         // The second save replaces every file the first one wrote.
-        project.save(dir.path()).unwrap();
+        project.save_as(&dir.path().join("AtomicTest.scriv")).unwrap();
         if let Some(doc) = &mut project.binder.find_item_mut(&item_id).unwrap().document {
             doc.content = "Second version".to_string();
         }
-        project.save(dir.path()).unwrap();
+        project.save().unwrap();
 
         let project_dir = project.path.clone().unwrap();
         for sub in ["", "docs", "snapshots"] {
@@ -1078,10 +1122,10 @@ mod tests {
         let item_id = project.binder.draft.children.last().unwrap().id;
 
         // Save project
-        project.save(dir.path()).unwrap();
+        let project_dir = dir.path().join("AnnotationTest.scriv");
+        project.save_as(&project_dir).unwrap();
 
         // Load project
-        let project_dir = dir.path().join("AnnotationTest.scriv");
         let loaded = Project::load(&project_dir).unwrap();
 
         let loaded_item = loaded.binder.find_item(&item_id).unwrap();

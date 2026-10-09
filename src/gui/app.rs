@@ -5,6 +5,7 @@ use iced::window;
 use iced::{Element, Length, Padding, Subscription, Task as IcedTask};
 use std::collections::HashMap;
 use std::fmt::Write;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 use crate::core::binder::{BinderItem, BinderItemKind};
@@ -13,7 +14,7 @@ use crate::core::integrations::ProjectState;
 use crate::core::project::Project;
 use crate::core::search::{self, SearchOptions};
 use crate::core::stats::{SessionStats, Statistics};
-use crate::core::{IMPORT_DIR_NAME, OUTPUT_DIR_NAME, PROJECTS_DIR_NAME};
+use crate::core::PROJECTS_DIR_NAME;
 use crate::editor::EditorState;
 use crate::export::compiler::{CompileOptions, OutputFormat, SeparatorType};
 use crate::spelling::SpellChecker;
@@ -113,6 +114,10 @@ pub struct ScrineverApp {
 
     // === Recent projects ===
     pub recent_projects: crate::core::recent::RecentProjects,
+
+    // === Folders the import and export dialogs open in ===
+    pub last_import_dir: Option<PathBuf>,
+    pub last_export_dir: Option<PathBuf>,
 
     // === Split editor ===
     pub split_editor_item: Option<Uuid>,
@@ -231,6 +236,8 @@ impl ScrineverApp {
             annotation_text: String::new(),
             annotation_next_color: crate::core::annotation::AnnotationColor::Yellow,
             recent_projects: crate::core::recent::RecentProjects::load(),
+            last_import_dir: None,
+            last_export_dir: None,
             split_editor_item: None,
             doc_find_text: String::new(),
             doc_replace_text: String::new(),
@@ -343,56 +350,50 @@ impl ScrineverApp {
             }
 
             Message::OpenProject => {
-                // Perform file I/O off the GUI thread to prevent UI freezes
-                self.notification = Some("Opening project...".to_string());
+                let projects_dir = crate::core::home_dir_or_cwd().join(PROJECTS_DIR_NAME);
                 return IcedTask::perform(
-                    async {
-                        let home = crate::core::home_dir_or_cwd();
-                        let projects_dir = home.join(PROJECTS_DIR_NAME);
-                        if !projects_dir.exists() {
-                            return Box::new(None);
+                    async move {
+                        let mut dialog = rfd::AsyncFileDialog::new().set_title("Open project");
+                        if projects_dir.is_dir() {
+                            dialog = dialog.set_directory(projects_dir);
                         }
-                        if let Ok(entries) = std::fs::read_dir(&projects_dir) {
-                            for entry in entries.flatten() {
-                                let path = entry.path();
-                                if path.is_dir()
-                                    && path.extension().is_some_and(|e| e == crate::core::PROJECT_EXTENSION)
-                                {
-                                    if let Ok(p) = Project::load(&path) {
-                                        return Box::new(Some(p));
-                                    }
-                                }
-                            }
-                        }
-                        Box::new(None)
+                        let folder = dialog.pick_folder().await?;
+                        Some(load_project(folder.path().to_path_buf()).await)
                     },
-                    Message::ProjectLoaded,
+                    |loaded| Message::ProjectLoaded(Box::new(loaded)),
                 );
             }
 
             Message::SaveProject => {
                 self.sync_editor_to_project();
-                if let Some(ref mut project) = self.project {
-                    let home = crate::core::home_dir_or_cwd();
-                    let save_dir = home.join(PROJECTS_DIR_NAME);
-                    match project.save(&save_dir) {
-                        Ok(_) => {
-                            self.editor.mark_clean();
-                            if let Some(ref path) = project.path {
-                                self.recent_projects.add(&project.title, path.clone());
-                                self.recent_projects.save();
-                            }
-                            self.notification = Some(format!("Project saved to {:?}", save_dir));
+                match &self.project {
+                    Some(project) if project.path.is_none() => {
+                        let projects_dir = crate::core::home_dir_or_cwd().join(PROJECTS_DIR_NAME);
+                        if let Err(e) = std::fs::create_dir_all(&projects_dir) {
+                            log::warn!("Failed to create {}: {}", projects_dir.display(), e);
                         }
-                        Err(e) => {
-                            self.notification = Some(format!("Save error: {}", e));
-                        }
+                        return IcedTask::perform(
+                            pick_save_path("Save project", Some(projects_dir), project.default_dir_name()),
+                            Message::SaveProjectAs,
+                        );
                     }
+                    Some(_) => self.save_project(None),
+                    None => {}
                 }
             }
 
-            Message::ProjectLoaded(project) => {
-                if let Some(p) = *project {
+            Message::SaveProjectAs(Some(project_dir)) => {
+                // Only a project that still has no folder takes the chosen one.
+                if self.project.as_ref().is_some_and(|p| p.path.is_none()) {
+                    self.sync_editor_to_project();
+                    self.save_project(Some(&project_dir));
+                }
+            }
+
+            Message::SaveProjectAs(None) => {}
+
+            Message::ProjectLoaded(loaded) => match *loaded {
+                Some(Ok(p)) => {
                     self.compile_options.title = p.title.clone();
                     self.project_notes_text = p.project_notes.clone();
                     self.compile_presets = p.compile_presets.clone();
@@ -409,20 +410,23 @@ impl ScrineverApp {
                     // Initialize project subsystems (search index, file watcher)
                     self.project_state = ProjectState::new();
                     self.project_state.on_project_load(&p.binder, p.path.as_deref());
+                    if let Some(path) = &p.path {
+                        self.recent_projects.add(&p.title, path.clone());
+                        self.recent_projects.save();
+                    }
                     let title = p.title.clone();
                     self.project = Some(p);
                     self.selected_item = None;
                     self.editor = EditorState::new();
                     self.linguistic_result = None;
                     self.notification = Some(format!("Opened project: {}", title));
-                } else {
-                    self.notification = Some(format!(
-                        "No .{} projects found in ~/{}/",
-                        crate::core::PROJECT_EXTENSION,
-                        PROJECTS_DIR_NAME
-                    ));
                 }
-            }
+                Some(Err(e)) => {
+                    self.notification = Some(format!("Open error: {}", e));
+                }
+                // The open dialog was cancelled.
+                None => {}
+            },
 
             // ========== Binder operations ==========
             Message::SelectBinderItem(id) => {
@@ -841,6 +845,20 @@ impl ScrineverApp {
             }
 
             Message::DoCompile => {
+                if self.project.is_some() {
+                    let file_name = format!(
+                        "{}.{}",
+                        crate::core::project::dir_name_for_title(&self.compile_options.title),
+                        self.compile_options.format.extension()
+                    );
+                    return IcedTask::perform(
+                        pick_save_path("Compile to", self.last_export_dir.clone(), file_name),
+                        Message::CompileTo,
+                    );
+                }
+            }
+
+            Message::CompileTo(Some(output_path)) => {
                 self.sync_editor_to_project();
                 if let Some(ref project) = self.project {
                     use crate::export::compiler::Compiler;
@@ -855,21 +873,10 @@ impl ScrineverApp {
                         compile_result.validation_issues.len(),
                     );
 
-                    let home = crate::core::home_dir_or_cwd();
-                    let output_dir = home.join(OUTPUT_DIR_NAME);
-                    if let Err(e) = std::fs::create_dir_all(&output_dir) {
-                        self.notification = Some(format!("Failed to create output dir: {}", e));
-                    }
-                    let filename = format!(
-                        "{}.{}",
-                        self.compile_options.title.replace(' ', "_"),
-                        self.compile_options.format.extension()
-                    );
-                    let output_path = output_dir.join(&filename);
-
+                    self.last_export_dir = output_path.parent().map(Path::to_path_buf);
                     match Compiler::save_to_file(&project.binder, &self.compile_options, &output_path) {
                         Ok(_) => {
-                            self.notification = Some(format!("Compiled to {:?}", output_path));
+                            self.notification = Some(format!("Compiled to {}", output_path.display()));
                             self.show_compile_dialog = false;
                         }
                         Err(e) => {
@@ -878,6 +885,8 @@ impl ScrineverApp {
                     }
                 }
             }
+
+            Message::CompileTo(None) => {}
 
             // ========== Snapshot operations ==========
             Message::CreateSnapshot => {
@@ -1105,18 +1114,7 @@ impl ScrineverApp {
 
             Message::HideSettings | Message::CloseSettingsWindow => {
                 // Persist settings by saving the project
-                if let Some(ref mut project) = self.project {
-                    if let Some(parent) = project
-                        .path
-                        .as_deref()
-                        .and_then(|p| p.parent())
-                        .map(|p| p.to_path_buf())
-                    {
-                        if let Err(e) = project.save(&parent) {
-                            self.notification = Some(format!("Settings save failed: {}", e));
-                        }
-                    }
-                }
+                self.save_settings();
                 if let Some(id) = self.settings_window.take() {
                     return window::close(id);
                 }
@@ -1151,15 +1149,7 @@ impl ScrineverApp {
                 if Some(id) == self.settings_window {
                     self.settings_window = None;
                     // Save settings on close
-                    if let Some(ref mut project) = self.project {
-                        if let Some(path) = project.path.clone() {
-                            if let Some(parent) = path.parent() {
-                                if let Err(e) = project.save(parent) {
-                                    self.notification = Some(format!("Settings save failed: {}", e));
-                                }
-                            }
-                        }
-                    }
+                    self.save_settings();
                 } else if Some(id) == self.about_window {
                     self.about_window = None;
                 } else if id == self.main_window {
@@ -1428,180 +1418,22 @@ impl ScrineverApp {
 
             // ========== Import ==========
             Message::ImportFiles => {
-                if let Some(ref mut project) = self.project {
-                    let home = crate::core::home_dir_or_cwd();
-                    let import_dir = home.join(IMPORT_DIR_NAME);
-                    if import_dir.exists() {
-                        let mut count = 0;
-                        if let Ok(entries) = std::fs::read_dir(&import_dir) {
-                            for entry in entries.flatten() {
-                                let path = entry.path();
-                                if path.is_file() {
-                                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-                                    let title = path
-                                        .file_stem()
-                                        .and_then(|s| s.to_str())
-                                        .unwrap_or("Imported")
-                                        .to_string();
-                                    match ext.as_str() {
-                                        "md" | "markdown" => {
-                                            if let Ok(content) = std::fs::read_to_string(&path) {
-                                                // Use structured Markdown import (headings -> folders/docs)
-                                                match crate::export::markdown_import::import_markdown(&content, &title)
-                                                {
-                                                    Ok(items) => {
-                                                        for item in items {
-                                                            project.binder.draft.add_child(item);
-                                                            count += 1;
-                                                        }
-                                                    }
-                                                    Err(_) => {
-                                                        // Fallback to plain import
-                                                        let mut item = BinderItem::new_text(&title);
-                                                        if let Some(ref mut doc) = item.document {
-                                                            doc.content = content;
-                                                        }
-                                                        project.binder.draft.add_child(item);
-                                                        count += 1;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        "txt" | "rtf" => {
-                                            if let Ok(content) = std::fs::read_to_string(&path) {
-                                                let mut item = BinderItem::new_text(&title);
-                                                if let Some(ref mut doc) = item.document {
-                                                    doc.content = content;
-                                                }
-                                                project.binder.draft.add_child(item);
-                                                count += 1;
-                                            }
-                                        }
-                                        "html" | "htm" => {
-                                            if let Ok(content) = std::fs::read_to_string(&path) {
-                                                // Use structured HTML import (headings -> folders/docs)
-                                                match crate::export::web_import::import_html_content(&content, &title) {
-                                                    Ok(items) if !items.is_empty() => {
-                                                        for item in items {
-                                                            project.binder.draft.add_child(item);
-                                                            count += 1;
-                                                        }
-                                                    }
-                                                    _ => {
-                                                        // Fallback to plain text conversion
-                                                        let plain =
-                                                            crate::export::web_import::html_to_plain_text(&content);
-                                                        let mut item = BinderItem::new_text(&title);
-                                                        if let Some(ref mut doc) = item.document {
-                                                            doc.content = plain;
-                                                        }
-                                                        project.binder.draft.add_child(item);
-                                                        count += 1;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        "tex" | "latex" => {
-                                            if let Ok(content) = std::fs::read_to_string(&path) {
-                                                let plain = helpers::strip_latex_commands(&content);
-                                                let mut item = BinderItem::new_text(&title);
-                                                if let Some(ref mut doc) = item.document {
-                                                    doc.content = plain;
-                                                }
-                                                project.binder.draft.add_child(item);
-                                                count += 1;
-                                            }
-                                        }
-                                        "fountain" => {
-                                            if let Ok(content) = std::fs::read_to_string(&path) {
-                                                let sections = crate::export::fountain::parse_fountain(&content);
-                                                for (sec_title, text) in sections {
-                                                    let mut item = BinderItem::new_text(&sec_title);
-                                                    if let Some(ref mut doc) = item.document {
-                                                        doc.content = text;
-                                                    }
-                                                    project.binder.draft.add_child(item);
-                                                    count += 1;
-                                                }
-                                            }
-                                        }
-                                        "opml" => {
-                                            if let Ok(content) = std::fs::read_to_string(&path) {
-                                                match crate::export::opml::import_opml(&content) {
-                                                    Ok(items) => {
-                                                        for item in items {
-                                                            project.binder.draft.add_child(item);
-                                                            count += 1;
-                                                        }
-                                                    }
-                                                    Err(e) => {
-                                                        self.notification = Some(format!("OPML parse error: {}", e));
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        "docx" => {
-                                            // Use structured DOCX import (headings -> folders/docs)
-                                            match crate::export::docx_import::import_docx(&path) {
-                                                Ok(items) => {
-                                                    for item in items {
-                                                        project.binder.draft.add_child(item);
-                                                        count += 1;
-                                                    }
-                                                }
-                                                Err(e) => {
-                                                    // Fallback: create a plain text item with error note
-                                                    let mut item = BinderItem::new_text(&title);
-                                                    if let Some(ref mut doc) = item.document {
-                                                        doc.content = String::new();
-                                                        doc.notes = format!("DOCX import failed: {}", e);
-                                                    }
-                                                    project.binder.draft.add_child(item);
-                                                    count += 1;
-                                                    self.notification =
-                                                        Some(format!("DOCX import error for '{}': {}", title, e));
-                                                }
-                                            }
-                                        }
-                                        _ => {}
-                                    }
-                                } else if path.is_dir() {
-                                    // Handle directory-based formats (e.g. Scrivener .scriv packages)
-                                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-                                    if ext.as_str() == "scriv" {
-                                        match crate::export::scriv_import::import_scriv(&path) {
-                                            Ok((_info, items)) => {
-                                                for item in items {
-                                                    project.binder.draft.add_child(item);
-                                                    count += 1;
-                                                }
-                                            }
-                                            Err(e) => {
-                                                self.notification = Some(format!("Scrivener import error: {}", e));
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        if count > 0 {
-                            self.notification = Some(format!("Imported {} file(s) from ~/{}/", count, IMPORT_DIR_NAME));
-                        } else {
-                            self.notification = Some(format!("No importable files found in ~/{}/. Supported: txt, md, html, docx, tex, fountain, opml, scriv", IMPORT_DIR_NAME));
-                        }
-                    } else {
-                        match std::fs::create_dir_all(&import_dir) {
-                            Ok(_) => {
-                                self.notification = Some(format!(
-                                    "Created ~/{0}/ — place files there and import again.",
-                                    IMPORT_DIR_NAME
-                                ))
-                            }
-                            Err(e) => self.notification = Some(format!("Failed to create import dir: {}", e)),
-                        }
-                    }
-                } else {
+                if self.project.is_none() {
                     self.notification = Some("Create or open a project first.".to_string());
+                } else {
+                    return IcedTask::perform(
+                        pick_import_paths(self.last_import_dir.clone(), "Supported files", IMPORT_EXTENSIONS),
+                        Message::ImportPaths,
+                    );
+                }
+            }
+
+            Message::ImportPaths(paths) => {
+                if let Some(dir) = paths.first().and_then(|p| p.parent()) {
+                    self.last_import_dir = Some(dir.to_path_buf());
+                }
+                if !paths.is_empty() {
+                    self.import_files(paths);
                 }
             }
 
@@ -1865,21 +1697,11 @@ impl ScrineverApp {
             }
 
             // ========== Recent projects ==========
-            Message::OpenRecentProject(path) => match Project::load(&path) {
-                Ok(p) => {
-                    self.compile_options.title = p.title.clone();
-                    self.project_notes_text = p.project_notes.clone();
-                    self.generated_names.clear();
-                    self.recent_projects.add(&p.title, path);
-                    self.recent_projects.save();
-                    self.project = Some(p);
-                    self.selected_item = None;
-                    self.editor = EditorState::new();
-                }
-                Err(e) => {
-                    self.notification = Some(format!("Load error: {}", e));
-                }
-            },
+            Message::OpenRecentProject(path) => {
+                return IcedTask::perform(load_project(path), |loaded| {
+                    Message::ProjectLoaded(Box::new(Some(loaded)))
+                });
+            }
 
             // ========== Keywords ==========
             Message::SetItemKeywords(id, keywords_str) => {
@@ -2378,78 +2200,11 @@ impl ScrineverApp {
 
             // ========== OPML Import ==========
             Message::ImportOpml => {
-                if let Some(ref mut project) = self.project {
-                    let home = crate::core::home_dir_or_cwd();
-                    let import_dir = home.join(IMPORT_DIR_NAME);
-                    if import_dir.exists() {
-                        let mut count = 0;
-                        if let Ok(entries) = std::fs::read_dir(&import_dir) {
-                            for entry in entries.flatten() {
-                                let path = entry.path();
-                                if path.is_file() {
-                                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
-                                    if ext == "opml" {
-                                        if let Ok(content) = std::fs::read_to_string(&path) {
-                                            match crate::export::opml::import_opml(&content) {
-                                                Ok(items) => {
-                                                    for item in items {
-                                                        project.binder.draft.add_child(item);
-                                                        count += 1;
-                                                    }
-                                                }
-                                                Err(e) => {
-                                                    self.notification = Some(format!("OPML parse error: {}", e));
-                                                }
-                                            }
-                                        }
-                                    } else if ext == "fountain" {
-                                        if let Ok(content) = std::fs::read_to_string(&path) {
-                                            let sections = crate::export::fountain::parse_fountain(&content);
-                                            for (title, text) in sections {
-                                                let mut item = BinderItem::new_text(&title);
-                                                if let Some(ref mut doc) = item.document {
-                                                    doc.content = text;
-                                                }
-                                                project.binder.draft.add_child(item);
-                                                count += 1;
-                                            }
-                                        }
-                                    } else if ext == "html" || ext == "htm" {
-                                        if let Ok(content) = std::fs::read_to_string(&path) {
-                                            let title = path
-                                                .file_stem()
-                                                .and_then(|s| s.to_str())
-                                                .unwrap_or("Imported HTML")
-                                                .to_string();
-                                            // Strip HTML tags for plain text import
-                                            let plain = helpers::strip_html_tags(&content);
-                                            let mut item = BinderItem::new_text(&title);
-                                            if let Some(ref mut doc) = item.document {
-                                                doc.content = plain;
-                                            }
-                                            project.binder.draft.add_child(item);
-                                            count += 1;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        if count > 0 {
-                            self.notification = Some(format!("Imported {} item(s)", count));
-                        } else {
-                            self.notification = Some(format!("No importable files found in ~/{}/", IMPORT_DIR_NAME));
-                        }
-                    } else {
-                        match std::fs::create_dir_all(&import_dir) {
-                            Ok(_) => {
-                                self.notification = Some(format!(
-                                    "Created ~/{0}/ — place files there and import again.",
-                                    IMPORT_DIR_NAME
-                                ))
-                            }
-                            Err(e) => self.notification = Some(format!("Failed to create import dir: {}", e)),
-                        }
-                    }
+                if self.project.is_some() {
+                    return IcedTask::perform(
+                        pick_import_paths(self.last_import_dir.clone(), "OPML outlines", &["opml"]),
+                        Message::ImportPaths,
+                    );
                 }
             }
 
@@ -2483,20 +2238,23 @@ impl ScrineverApp {
 
             // ========== Export OPML ==========
             Message::ExportOpml => {
+                if let Some(ref project) = self.project {
+                    let file_name = format!("{}.opml", crate::core::project::dir_name_for_title(&project.title));
+                    return IcedTask::perform(
+                        pick_save_path("Export OPML", self.last_export_dir.clone(), file_name),
+                        Message::ExportOpmlTo,
+                    );
+                }
+            }
+
+            Message::ExportOpmlTo(Some(output_path)) => {
                 self.sync_editor_to_project();
                 if let Some(ref project) = self.project {
-                    let home = crate::core::home_dir_or_cwd();
-                    let output_dir = home.join(OUTPUT_DIR_NAME);
-                    if let Err(e) = std::fs::create_dir_all(&output_dir) {
-                        log::warn!("Failed to create output directory: {}", e);
-                    }
-                    let filename = format!("{}.opml", project.title.replace(' ', "_"));
-                    let output_path = output_dir.join(&filename);
-
+                    self.last_export_dir = output_path.parent().map(Path::to_path_buf);
                     match crate::export::opml::export_opml(&project.binder, &project.title) {
                         Ok(opml_content) => match std::fs::write(&output_path, opml_content) {
                             Ok(_) => {
-                                self.notification = Some(format!("OPML exported to {:?}", output_path));
+                                self.notification = Some(format!("OPML exported to {}", output_path.display()));
                             }
                             Err(e) => {
                                 self.notification = Some(format!("Export error: {}", e));
@@ -2508,6 +2266,8 @@ impl ScrineverApp {
                     }
                 }
             }
+
+            Message::ExportOpmlTo(None) => {}
 
             // ========== Print ==========
             Message::PrintCurrent => {
@@ -2554,9 +2314,10 @@ impl ScrineverApp {
                     let mut opts = self.compile_options.clone();
                     opts.format = crate::export::compiler::OutputFormat::Pdf;
                     let home = crate::core::home_dir_or_cwd();
-                    let print_path = home
-                        .join(PROJECTS_DIR_NAME)
-                        .join(format!("{}_print.pdf", project.title));
+                    let print_path = home.join(PROJECTS_DIR_NAME).join(format!(
+                        "{}_print.pdf",
+                        crate::core::project::dir_name_for_title(&project.title)
+                    ));
                     if let Some(parent) = print_path.parent() {
                         if let Err(e) = std::fs::create_dir_all(parent) {
                             log::warn!("Failed to create directory {:?}: {}", parent, e);
@@ -3828,6 +3589,203 @@ impl ScrineverApp {
 
     // ========== Extracted handler methods (reduce update() size) ==========
 
+    /// Save the open project into its own folder or, the first time it is
+    /// saved, into `new_dir`, and record the folder in the recent projects.
+    fn save_project(&mut self, new_dir: Option<&Path>) {
+        let Some(project) = self.project.as_mut() else {
+            return;
+        };
+        let result = match new_dir {
+            Some(dir) => project.save_as(dir),
+            None => project.save(),
+        };
+        match (result, &project.path) {
+            (Ok(()), Some(path)) => {
+                self.editor.mark_clean();
+                self.recent_projects.add(&project.title, path.clone());
+                self.recent_projects.save();
+                self.notification = Some(format!("Project saved to {}", path.display()));
+            }
+            (Ok(()), None) => {}
+            (Err(e), _) => {
+                self.notification = Some(format!("Save error: {:#}", e));
+            }
+        }
+    }
+
+    /// Save the project after its settings changed, if it already has a folder.
+    fn save_settings(&mut self) {
+        if let Some(project) = self.project.as_mut().filter(|p| p.path.is_some()) {
+            if let Err(e) = project.save() {
+                self.notification = Some(format!("Settings save failed: {:#}", e));
+            }
+        }
+    }
+
+    /// Add the files in `paths` to the draft folder of the open project.
+    fn import_files(&mut self, paths: Vec<PathBuf>) {
+        let Some(project) = self.project.as_mut() else {
+            self.notification = Some("Create or open a project first.".to_string());
+            return;
+        };
+        self.notification = None;
+        let mut count = 0;
+        for path in paths {
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+
+            // A Scrivener project is a .scriv folder. On most systems the file
+            // dialog cannot pick a folder, so it picks the .scrivx file inside.
+            let scriv_package = match ext.as_str() {
+                "scriv" if path.is_dir() => Some(path.as_path()),
+                "scrivx" => path.parent(),
+                _ => None,
+            };
+            if let Some(package) = scriv_package {
+                match crate::export::scriv_import::import_scriv(package) {
+                    Ok((_info, items)) => {
+                        for item in items {
+                            project.binder.draft.add_child(item);
+                            count += 1;
+                        }
+                    }
+                    Err(e) => {
+                        self.notification = Some(format!("Scrivener import error: {}", e));
+                    }
+                }
+                continue;
+            }
+            let title = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("Imported")
+                .to_string();
+            match ext.as_str() {
+                "md" | "markdown" => {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        // Use structured Markdown import (headings -> folders/docs)
+                        match crate::export::markdown_import::import_markdown(&content, &title) {
+                            Ok(items) => {
+                                for item in items {
+                                    project.binder.draft.add_child(item);
+                                    count += 1;
+                                }
+                            }
+                            Err(_) => {
+                                // Fallback to plain import
+                                let mut item = BinderItem::new_text(&title);
+                                if let Some(ref mut doc) = item.document {
+                                    doc.content = content;
+                                }
+                                project.binder.draft.add_child(item);
+                                count += 1;
+                            }
+                        }
+                    }
+                }
+                "txt" | "rtf" => {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        let mut item = BinderItem::new_text(&title);
+                        if let Some(ref mut doc) = item.document {
+                            doc.content = content;
+                        }
+                        project.binder.draft.add_child(item);
+                        count += 1;
+                    }
+                }
+                "html" | "htm" => {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        // Use structured HTML import (headings -> folders/docs)
+                        match crate::export::web_import::import_html_content(&content, &title) {
+                            Ok(items) if !items.is_empty() => {
+                                for item in items {
+                                    project.binder.draft.add_child(item);
+                                    count += 1;
+                                }
+                            }
+                            _ => {
+                                // Fallback to plain text conversion
+                                let plain = crate::export::web_import::html_to_plain_text(&content);
+                                let mut item = BinderItem::new_text(&title);
+                                if let Some(ref mut doc) = item.document {
+                                    doc.content = plain;
+                                }
+                                project.binder.draft.add_child(item);
+                                count += 1;
+                            }
+                        }
+                    }
+                }
+                "tex" | "latex" => {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        let plain = helpers::strip_latex_commands(&content);
+                        let mut item = BinderItem::new_text(&title);
+                        if let Some(ref mut doc) = item.document {
+                            doc.content = plain;
+                        }
+                        project.binder.draft.add_child(item);
+                        count += 1;
+                    }
+                }
+                "fountain" => {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        let sections = crate::export::fountain::parse_fountain(&content);
+                        for (sec_title, text) in sections {
+                            let mut item = BinderItem::new_text(&sec_title);
+                            if let Some(ref mut doc) = item.document {
+                                doc.content = text;
+                            }
+                            project.binder.draft.add_child(item);
+                            count += 1;
+                        }
+                    }
+                }
+                "opml" => {
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        match crate::export::opml::import_opml(&content) {
+                            Ok(items) => {
+                                for item in items {
+                                    project.binder.draft.add_child(item);
+                                    count += 1;
+                                }
+                            }
+                            Err(e) => {
+                                self.notification = Some(format!("OPML parse error: {}", e));
+                            }
+                        }
+                    }
+                }
+                "docx" => {
+                    // Use structured DOCX import (headings -> folders/docs)
+                    match crate::export::docx_import::import_docx(&path) {
+                        Ok(items) => {
+                            for item in items {
+                                project.binder.draft.add_child(item);
+                                count += 1;
+                            }
+                        }
+                        Err(e) => {
+                            // Fallback: create a plain text item with error note
+                            let mut item = BinderItem::new_text(&title);
+                            if let Some(ref mut doc) = item.document {
+                                doc.content = String::new();
+                                doc.notes = format!("DOCX import failed: {}", e);
+                            }
+                            project.binder.draft.add_child(item);
+                            count += 1;
+                            self.notification = Some(format!("DOCX import error for '{}': {}", title, e));
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        if count > 0 {
+            self.notification = Some(format!("Imported {} item(s)", count));
+        } else if self.notification.is_none() {
+            self.notification = Some("Nothing could be imported from the selected files".to_string());
+        }
+    }
+
     /// Handle the per-second tick: auto-save, milestones, session timers,
     /// collection refresh, external change polling, and notification dismissal.
     fn handle_tick(&mut self) {
@@ -3843,13 +3801,22 @@ impl ScrineverApp {
                 self.auto_save_counter = 0;
                 self.sync_editor_to_project();
                 if let Some(ref mut project) = self.project {
-                    let home = crate::core::home_dir_or_cwd();
-                    let save_dir = home.join(PROJECTS_DIR_NAME);
-                    if project.save(&save_dir).is_ok() {
-                        self.editor.mark_clean();
-                        if let Some(ref path) = project.path {
-                            if let Err(e) = crate::core::backup::BackupManager::create_backup(path) {
-                                log::warn!("Auto-backup failed: {}", e);
+                    // A project that was never saved has no folder yet, and
+                    // only the save dialog may choose one.
+                    if project.path.is_none() {
+                        self.notification = Some("Save the project once to turn on autosave".to_string());
+                    } else {
+                        match project.save() {
+                            Ok(()) => {
+                                self.editor.mark_clean();
+                                if let Some(ref path) = project.path {
+                                    if let Err(e) = crate::core::backup::BackupManager::create_backup(path) {
+                                        log::warn!("Auto-backup failed: {}", e);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                self.notification = Some(format!("Autosave failed: {:#}", e));
                             }
                         }
                     }
@@ -3985,5 +3952,46 @@ impl ScrineverApp {
     }
 }
 
-// Free functions (title_case, strip_html_tags, strip_latex_commands)
-// have been moved to gui/helpers.rs
+// Free functions (title_case, strip_latex_commands) live in gui/helpers.rs
+
+/// File extensions the Import dialog offers. A `.scriv` package is a folder,
+/// so on most systems it is picked through the `.scrivx` file inside it.
+const IMPORT_EXTENSIONS: &[&str] = &[
+    "txt", "rtf", "md", "markdown", "html", "htm", "tex", "latex", "fountain", "opml", "docx", "scrivx", "scriv",
+];
+
+/// Load the project in `dir` off the GUI thread.
+async fn load_project(dir: PathBuf) -> Result<Project, String> {
+    Project::load_async(dir).await.map_err(|e| format!("{:#}", e))
+}
+
+/// Ask where to write a file, starting in `dir` when there is one.
+async fn pick_save_path(title: &'static str, dir: Option<PathBuf>, file_name: String) -> Option<PathBuf> {
+    let mut dialog = rfd::AsyncFileDialog::new().set_title(title).set_file_name(file_name);
+    if let Some(dir) = dir {
+        dialog = dialog.set_directory(dir);
+    }
+    dialog.save_file().await.map(|file| file.path().to_path_buf())
+}
+
+/// Ask which files to import, starting in `dir` when there is one. Returns
+/// an empty list when the dialog is cancelled.
+async fn pick_import_paths(
+    dir: Option<PathBuf>,
+    filter: &'static str,
+    extensions: &'static [&'static str],
+) -> Vec<PathBuf> {
+    let mut dialog = rfd::AsyncFileDialog::new()
+        .set_title("Import")
+        .add_filter(filter, extensions);
+    if let Some(dir) = dir {
+        dialog = dialog.set_directory(dir);
+    }
+    dialog
+        .pick_files()
+        .await
+        .unwrap_or_default()
+        .iter()
+        .map(|file| file.path().to_path_buf())
+        .collect()
+}
