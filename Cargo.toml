@@ -28,7 +28,7 @@ pulldown-cmark = "0.12.2"
 pulldown-cmark-to-cmark = "17.0.0"
 
 # Export formats
-printpdf = "0.7.0"
+printpdf = "0.12.8"
 docx-rs = "0.4.22"
 zip = "2.4.2"
 
