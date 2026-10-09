@@ -2,7 +2,7 @@
 use std::io::{Cursor, Read};
 use std::path::Path;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use zip::ZipArchive;
 
 use crate::core::binder::BinderItem;
@@ -20,16 +20,48 @@ struct DocxParagraph {
     heading_level: u8,
 }
 
-/// Extract the raw XML from `word/document.xml` inside a ZIP archive that has
-/// already been opened.
-fn read_document_xml<R: Read + std::io::Seek>(archive: &mut ZipArchive<R>) -> Result<String> {
-    let mut file = archive
+/// Largest `word/document.xml` we inflate. A long novel is a few MiB of XML;
+/// the cap stops a zip bomb from exhausting memory.
+const MAX_DOCUMENT_XML_BYTES: u64 = 64 * 1024 * 1024;
+
+/// Most entries a DOCX archive may list. Real files hold a few dozen, a few
+/// hundred with many images.
+const MAX_ARCHIVE_ENTRIES: usize = 10_000;
+
+/// Open DOCX bytes as a ZIP archive and extract the raw XML of
+/// `word/document.xml`.
+fn read_document_xml(data: &[u8]) -> Result<String> {
+    read_document_xml_capped(data, MAX_DOCUMENT_XML_BYTES)
+}
+
+/// [`read_document_xml`] with the size cap as a parameter, so tests can hit it
+/// without building a 64 MiB archive.
+fn read_document_xml_capped(data: &[u8], max_bytes: u64) -> Result<String> {
+    let mut archive = ZipArchive::new(Cursor::new(data))
+        .context("Failed to open data as a ZIP archive (is this a valid DOCX file?)")?;
+    if archive.len() > MAX_ARCHIVE_ENTRIES {
+        bail!(
+            "DOCX archive lists {} entries, more than the {} allowed",
+            archive.len(),
+            MAX_ARCHIVE_ENTRIES
+        );
+    }
+
+    let file = archive
         .by_name("word/document.xml")
         .context("DOCX archive does not contain word/document.xml")?;
-    let mut xml = String::new();
-    file.read_to_string(&mut xml)
+    // Read one byte past the cap: the declared size can lie, the byte count cannot.
+    let mut xml = Vec::new();
+    file.take(max_bytes + 1)
+        .read_to_end(&mut xml)
         .context("Failed to read word/document.xml")?;
-    Ok(xml)
+    if xml.len() as u64 > max_bytes {
+        bail!(
+            "word/document.xml is larger than {}",
+            crate::core::format_bytes(max_bytes)
+        );
+    }
+    String::from_utf8(xml).context("word/document.xml is not valid UTF-8")
 }
 
 /// Extract all text content between `<w:t ...>` and `</w:t>` tags in a single
@@ -345,11 +377,7 @@ pub fn import_docx(path: &Path) -> Result<Vec<BinderItem>> {
 /// instead of a file path.  The `title` is used as the default document name
 /// when the file contains no headings.
 pub fn import_docx_bytes(data: &[u8], title: &str) -> Result<Vec<BinderItem>> {
-    let cursor = Cursor::new(data);
-    let mut archive =
-        ZipArchive::new(cursor).context("Failed to open data as a ZIP archive (is this a valid DOCX file?)")?;
-
-    let xml = read_document_xml(&mut archive)?;
+    let xml = read_document_xml(data)?;
     let paragraphs = parse_paragraphs(&xml);
     let items = paragraphs_to_binder_items(&paragraphs, title);
 
@@ -367,11 +395,7 @@ pub fn extract_text_from_docx(path: &Path) -> Result<String> {
 /// Extract all text content from `.docx` file bytes and return it as a
 /// single string with paragraphs separated by newlines.
 pub fn extract_text_from_docx_bytes(data: &[u8]) -> Result<String> {
-    let cursor = Cursor::new(data);
-    let mut archive =
-        ZipArchive::new(cursor).context("Failed to open data as a ZIP archive (is this a valid DOCX file?)")?;
-
-    let xml = read_document_xml(&mut archive)?;
+    let xml = read_document_xml(data)?;
     let paragraphs = parse_paragraphs(&xml);
     let text = paragraphs_to_text(&paragraphs);
 
@@ -381,3 +405,46 @@ pub fn extract_text_from_docx_bytes(data: &[u8]) -> Result<String> {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use zip::write::SimpleFileOptions;
+    use zip::ZipWriter;
+
+    fn docx_with_document(xml: &str) -> Vec<u8> {
+        let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
+        zip.start_file("word/document.xml", SimpleFileOptions::default())
+            .unwrap();
+        zip.write_all(xml.as_bytes()).unwrap();
+        zip.finish().unwrap().into_inner()
+    }
+
+    const BODY: &str = "<w:document><w:body><w:p><w:r><w:t>Hello</w:t></w:r></w:p></w:body></w:document>";
+
+    #[test]
+    fn reads_document_within_the_cap() {
+        let data = docx_with_document(BODY);
+        assert_eq!(read_document_xml_capped(&data, BODY.len() as u64).unwrap(), BODY);
+        assert_eq!(extract_text_from_docx_bytes(&data).unwrap(), "Hello");
+    }
+
+    #[test]
+    fn rejects_document_over_the_cap() {
+        let data = docx_with_document(BODY);
+        let err = read_document_xml_capped(&data, BODY.len() as u64 - 1).unwrap_err();
+        assert!(err.to_string().contains("larger than"), "{err}");
+    }
+
+    #[test]
+    fn rejects_archive_with_too_many_entries() {
+        let mut zip = ZipWriter::new(Cursor::new(Vec::new()));
+        for i in 0..=MAX_ARCHIVE_ENTRIES {
+            zip.start_file(format!("{i}"), SimpleFileOptions::default()).unwrap();
+        }
+        let data = zip.finish().unwrap().into_inner();
+        let err = read_document_xml(&data).unwrap_err();
+        assert!(err.to_string().contains("entries"), "{err}");
+    }
+}

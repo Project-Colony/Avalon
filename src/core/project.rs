@@ -1,8 +1,8 @@
-use anyhow::{Context, Result};
+use anyhow::{ensure, Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use uuid::Uuid;
 
 use super::binder::Binder;
@@ -12,7 +12,64 @@ use super::document::Document;
 use super::history::WritingHistory;
 use super::metadata::ProjectSettings;
 use super::snapshot::Snapshot;
+use super::write_atomic;
 use crate::export::compiler::CompileOptions;
+
+/// Longest directory name, in bytes, derived from a project title. It leaves
+/// room for the extension under the usual 255-byte file name limit.
+const MAX_DIR_NAME_BYTES: usize = 200;
+
+/// Turn a project title into a directory name that is a single plain path
+/// component on every platform.
+///
+/// Path separators, characters Windows forbids and control characters become
+/// `_`. Leading dots (hidden files, `..`) and surrounding whitespace go, as do
+/// trailing dots and spaces, which Windows drops silently. The result is capped
+/// at [`MAX_DIR_NAME_BYTES`], Windows device names such as `CON` or `COM1` get
+/// a `_` prefix, and an empty result becomes `Untitled`.
+fn dir_name_for_title(title: &str) -> String {
+    let replaced: String = title
+        .chars()
+        .map(|c| {
+            if c.is_control() || matches!(c, '/' | '\\' | '<' | '>' | ':' | '"' | '|' | '?' | '*') {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let trimmed = replaced.trim_start_matches(|c: char| c == '.' || c.is_whitespace());
+
+    let mut name = String::new();
+    for c in trimmed.chars() {
+        if name.len() + c.len_utf8() > MAX_DIR_NAME_BYTES {
+            break;
+        }
+        name.push(c);
+    }
+    let name = name.trim_end_matches(|c: char| c == '.' || c.is_whitespace());
+
+    if name.is_empty() {
+        "Untitled".to_string()
+    } else if is_windows_device_name(name) {
+        format!("_{name}")
+    } else {
+        name.to_string()
+    }
+}
+
+/// Whether Windows reserves `name` for a device. The check applies to the part
+/// before the first dot, so `CON.scriv` is reserved too.
+fn is_windows_device_name(name: &str) -> bool {
+    let stem = name.split('.').next().unwrap_or(name).trim_end().to_ascii_uppercase();
+    match (stem.get(..3), stem.get(3..)) {
+        (Some("CON" | "PRN" | "AUX" | "NUL"), Some("")) => true,
+        (Some("COM" | "LPT"), Some(n)) => {
+            (n.len() == 1 && n.as_bytes()[0].is_ascii_digit()) || matches!(n, "\u{b9}" | "\u{b2}" | "\u{b3}")
+        }
+        _ => false,
+    }
+}
 
 /// A Scrinever project — the top-level container for all writing data.
 /// Stored as a directory with structured JSON files inside.
@@ -70,16 +127,31 @@ impl Project {
         project
     }
 
-    /// Save the project to disk
+    /// Save the project to disk, in a `<title>.scriv` directory directly under
+    /// `base_path`. The title is sanitized first (see [`dir_name_for_title`]),
+    /// so no title can place the project anywhere else.
     pub fn save(&mut self, base_path: &Path) -> Result<()> {
-        let project_dir = base_path.join(format!("{}.{}", self.title, super::PROJECT_EXTENSION));
+        let dir_name = format!("{}.{}", dir_name_for_title(&self.title), super::PROJECT_EXTENSION);
+        // Path::join replaces the base with an absolute or prefixed path, so
+        // only accept a name that is exactly one plain component.
+        let mut components = Path::new(&dir_name).components();
+        ensure!(
+            matches!(
+                (components.next(), components.next()),
+                (Some(Component::Normal(_)), None)
+            ),
+            "Project directory name {:?} would leave {}",
+            dir_name,
+            base_path.display()
+        );
+        let project_dir = base_path.join(&dir_name);
         fs::create_dir_all(&project_dir).context("Failed to create project directory")?;
 
         // Save project metadata
         let meta_path = project_dir.join("project.json");
         self.modified_at = Utc::now();
         let json = serde_json::to_string_pretty(self).context("Failed to serialize project")?;
-        fs::write(&meta_path, json).context("Failed to write project metadata")?;
+        write_atomic(&meta_path, json.as_bytes()).context("Failed to write project metadata")?;
 
         // Save documents
         let docs_dir = project_dir.join("docs");
@@ -95,7 +167,7 @@ impl Project {
         let presets_path = project_dir.join("compile_presets.json");
         match serde_json::to_string_pretty(&self.compile_presets) {
             Ok(json) => {
-                if let Err(e) = fs::write(&presets_path, json) {
+                if let Err(e) = write_atomic(&presets_path, json.as_bytes()) {
                     log::warn!("Failed to write compile presets: {}", e);
                 }
             }
@@ -148,7 +220,7 @@ impl Project {
             if let Some(doc) = &item.document {
                 let doc_path = docs_dir.join(format!("{}.json", item.id));
                 let json = serde_json::to_string_pretty(doc)?;
-                fs::write(doc_path, json)?;
+                write_atomic(&doc_path, json.as_bytes())?;
             }
         }
         Ok(())
@@ -174,7 +246,7 @@ impl Project {
             if !item.snapshots.is_empty() {
                 let snap_path = snaps_dir.join(format!("{}.json", item.id));
                 let json = serde_json::to_string_pretty(&item.snapshots)?;
-                fs::write(snap_path, json)?;
+                write_atomic(&snap_path, json.as_bytes())?;
             }
         }
         Ok(())
@@ -853,6 +925,93 @@ mod tests {
         assert!(matches!(loaded.compile_presets[0].1.format, OutputFormat::Html));
         assert_eq!(loaded.compile_presets[1].0, "LaTeX Export");
         assert!((loaded.compile_presets[1].1.font_size - 14.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_dir_name_for_title() {
+        assert_eq!(dir_name_for_title("My Novel"), "My Novel");
+        assert_eq!(dir_name_for_title("../x"), "_x");
+        assert_eq!(dir_name_for_title("/abs/x"), "_abs_x");
+        assert_eq!(dir_name_for_title("a/b"), "a_b");
+        assert_eq!(dir_name_for_title("a\\b"), "a_b");
+        assert_eq!(dir_name_for_title("C:evil"), "C_evil");
+        assert_eq!(dir_name_for_title("Chapter\nOne"), "Chapter_One");
+        assert_eq!(dir_name_for_title(""), "Untitled");
+        assert_eq!(dir_name_for_title(".."), "Untitled");
+        assert_eq!(dir_name_for_title("  . "), "Untitled");
+        assert_eq!(dir_name_for_title(".hidden"), "hidden");
+        assert_eq!(dir_name_for_title("Draft. . "), "Draft");
+        assert_eq!(dir_name_for_title("CON"), "_CON");
+        assert_eq!(dir_name_for_title("nul.txt"), "_nul.txt");
+        assert_eq!(dir_name_for_title("com1"), "_com1");
+        assert_eq!(dir_name_for_title("COM10"), "COM10");
+        assert_eq!(dir_name_for_title("Console"), "Console");
+
+        let long = dir_name_for_title(&"é".repeat(300));
+        assert!(long.len() <= MAX_DIR_NAME_BYTES);
+        assert_eq!(long, "é".repeat(MAX_DIR_NAME_BYTES / 2));
+    }
+
+    #[test]
+    fn test_save_keeps_hostile_titles_inside_base_path() {
+        use tempfile::tempdir;
+
+        let root = tempdir().unwrap();
+        let base = root.path().join("projects");
+        for title in ["../x", "/abs/x", "a/b", "CON", "", "..", "C:\\evil"] {
+            let mut project = Project::new(title);
+            project.save(&base).unwrap();
+            let dir = project.path.clone().unwrap();
+            assert_eq!(
+                dir.parent(),
+                Some(base.as_path()),
+                "{title:?} saved to {}",
+                dir.display()
+            );
+            assert!(dir.join("project.json").is_file());
+        }
+
+        // Nothing was written next to the base directory.
+        let siblings: Vec<_> = fs::read_dir(root.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(siblings, ["projects"]);
+    }
+
+    #[test]
+    fn test_save_leaves_no_temporary_files() {
+        use crate::core::binder::BinderItem;
+        use tempfile::tempdir;
+
+        let dir = tempdir().unwrap();
+        let mut project = Project::new("AtomicTest");
+        let mut item = BinderItem::new_text("Chapter 1");
+        if let Some(doc) = &mut item.document {
+            doc.content = "First version".to_string();
+        }
+        project.binder.draft.children.push(item);
+        let item_id = project.binder.draft.children.last().unwrap().id;
+        project.create_snapshot(&item_id, "Snap").unwrap();
+
+        // The second save replaces every file the first one wrote.
+        project.save(dir.path()).unwrap();
+        if let Some(doc) = &mut project.binder.find_item_mut(&item_id).unwrap().document {
+            doc.content = "Second version".to_string();
+        }
+        project.save(dir.path()).unwrap();
+
+        let project_dir = project.path.clone().unwrap();
+        for sub in ["", "docs", "snapshots"] {
+            for entry in fs::read_dir(project_dir.join(sub)).unwrap() {
+                let name = entry.unwrap().file_name();
+                assert!(!name.to_string_lossy().ends_with(".tmp"), "left behind {name:?}");
+            }
+        }
+
+        let loaded = Project::load(&project_dir).unwrap();
+        let doc = loaded.binder.find_item(&item_id).unwrap().document.as_ref().unwrap();
+        assert_eq!(doc.content, "Second version");
     }
 
     #[test]
