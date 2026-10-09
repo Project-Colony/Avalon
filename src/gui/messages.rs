@@ -1,5 +1,6 @@
 use iced::widget::text_editor;
 use iced::window;
+use std::path::PathBuf;
 use uuid::Uuid;
 
 use crate::core::project::Project;
@@ -78,7 +79,11 @@ pub enum Message {
     NewFromTemplate(String),
     OpenProject,
     SaveProject,
-    ProjectLoaded(Box<Option<Project>>),
+    /// The folder chosen for a project saved for the first time, or `None`
+    /// when the save dialog was cancelled.
+    SaveProjectAs(Option<PathBuf>),
+    /// A project read from disk, or `None` when the open dialog was cancelled.
+    ProjectLoaded(Box<Option<Result<Project, String>>>),
 
     // Binder operations
     SelectBinderItem(Uuid),
@@ -124,6 +129,7 @@ pub enum Message {
     CompileSetFontSize(String),
     CompileSetSeparator(String),
     DoCompile,
+    CompileTo(Option<PathBuf>),
 
     // Snapshot operations
     CreateSnapshot,
@@ -201,6 +207,8 @@ pub enum Message {
 
     // Import
     ImportFiles,
+    /// Files chosen in an import dialog; empty when it was cancelled.
+    ImportPaths(Vec<PathBuf>),
 
     // Name generator
     GenerateName(String),
@@ -245,7 +253,7 @@ pub enum Message {
     Redo,
 
     // Recent projects
-    OpenRecentProject(std::path::PathBuf),
+    OpenRecentProject(PathBuf),
 
     // Split editor
     OpenInSplitEditor(Uuid),
@@ -313,7 +321,7 @@ pub enum Message {
 
     // Backup
     CreateBackup,
-    RestoreBackup(std::path::PathBuf),
+    RestoreBackup(PathBuf),
 
     // OPML import
     ImportOpml,
@@ -331,6 +339,7 @@ pub enum Message {
 
     // Export OPML
     ExportOpml,
+    ExportOpmlTo(Option<PathBuf>),
 
     // Print
     PrintCurrent,

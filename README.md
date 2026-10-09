@@ -27,6 +27,21 @@ project and is not affiliated with Literature & Latte.
 - Compile and export to PDF, DOCX, EPUB, HTML, LaTeX, RTF, Fountain, Markdown, OPML and plain text
 - Import from `.scriv`, `.docx`, RTF, HTML and Markdown
 
+## Projects and files
+
+A project is a folder holding `project.json`, a `docs/` folder with the text of
+each document and a `snapshots/` folder. **Open** asks for that folder. The
+first **Save** of a new project asks where to create it, starting in
+`~/Scrinever Projects`. From then on, saving, autosave and settings changes
+write to that same folder, even after you rename the project. Autosave starts
+once a project has been saved for the first time.
+
+**Import** asks for the files to add to the draft. For a Scrivener project,
+pick the `.scrivx` file inside its `.scriv` folder. **Compile** and **Export
+OPML** ask where to write the result. These dialogs start in the folder you
+used last during the session. On Linux they come from the XDG desktop portal,
+or from `zenity` when no portal is running.
+
 ## Build from source
 
 ```bash
@@ -41,8 +56,9 @@ Requires a recent stable Rust toolchain. On Debian or Ubuntu, install
 ## Privacy
 
 Avalon makes no network connections and collects no telemetry. It reads and
-writes only your project files, its configuration and backup folders, and the
-system clipboard when you copy or paste.
+writes only your project files, the files you choose to import or export, its
+configuration and backup folders, and the system clipboard when you copy or
+paste.
 
 ## License
 
