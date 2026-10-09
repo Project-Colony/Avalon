@@ -54,7 +54,7 @@ pub fn view(backups: &[BackupEntry], project_name: &str, auto_backup_every: Opti
             container(column![
                 text("No backups found.").size(12).color(Theme::TEXT_MUTED),
                 Space::new().height(4),
-                text("Click 'Create Backup' to save a snapshot of your entire project.")
+                text("Click 'Create Backup' to zip the project text into the backup folder.")
                     .size(10)
                     .color(Theme::TEXT_MUTED),
             ])
