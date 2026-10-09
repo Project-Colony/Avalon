@@ -5,8 +5,9 @@ use crate::core::backup::BackupEntry;
 use crate::gui::app::Message;
 use crate::gui::theme::{self, Theme};
 
-/// Render the backup management panel
-pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Message> {
+/// Render the backup management panel. `auto_backup_every` is the number of
+/// saves between automatic backups, or `None` when they are off.
+pub fn view(backups: &[BackupEntry], project_name: &str, auto_backup_every: Option<u32>) -> Element<'static, Message> {
     let backup_count = backups.len();
     let total_size: u64 = backups.iter().map(|b| b.size_bytes).sum();
     let total_size_str = crate::core::format_bytes(total_size);
@@ -33,9 +34,17 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
             .size(10)
             .color(Theme::TEXT_MUTED),
         Space::new().width(Length::Fill),
-        text("Auto-backup on save | Last 20 kept")
-            .size(9)
-            .color(Theme::TEXT_MUTED),
+        text(format!(
+            "{} | Last {} kept",
+            match auto_backup_every {
+                Some(1) => "Auto-backup on every save".to_string(),
+                Some(n) => format!("Auto-backup every {n} saves"),
+                None => "Auto-backup off".to_string(),
+            },
+            crate::core::backup::KEEP_BACKUPS
+        ))
+        .size(9)
+        .color(Theme::TEXT_MUTED),
     ];
 
     let mut list = column![].spacing(2);
@@ -92,7 +101,7 @@ pub fn view(backups: &[BackupEntry], project_name: &str) -> Element<'static, Mes
                     .size(10)
                     .color(Theme::TEXT_MUTED)
                     .width(Length::Fixed(60.0)),
-                button(text("Restore").size(10).color(Theme::WARNING),)
+                button(text("Restore as copy").size(10).color(Theme::WARNING),)
                     .on_press(Message::RestoreBackup(path))
                     .padding(Padding::from([2, 6])),
             ]
