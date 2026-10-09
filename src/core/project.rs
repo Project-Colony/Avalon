@@ -127,14 +127,30 @@ impl Project {
         project
     }
 
-    /// Save the project to disk, in a `<title>.scriv` directory directly under
-    /// `base_path`. The title is sanitized first (see [`dir_name_for_title`]),
-    /// so no title can place the project anywhere else.
+    /// Save the project to disk, in a directory directly under `base_path`.
+    ///
+    /// A project already stored directly under `base_path` keeps its folder,
+    /// so a title rename or an older folder name the sanitizer would change
+    /// does not fork it into a second copy. Otherwise the folder is
+    /// `<title>.scriv`, with the title sanitized first (see
+    /// [`dir_name_for_title`]), so no title can place the project anywhere else.
     pub fn save(&mut self, base_path: &Path) -> Result<()> {
-        let dir_name = format!("{}.{}", dir_name_for_title(&self.title), super::PROJECT_EXTENSION);
+        let dir_name = match self
+            .path
+            .as_deref()
+            .filter(|path| path.parent() == Some(base_path))
+            .and_then(Path::file_name)
+        {
+            Some(existing) => PathBuf::from(existing),
+            None => PathBuf::from(format!(
+                "{}.{}",
+                dir_name_for_title(&self.title),
+                super::PROJECT_EXTENSION
+            )),
+        };
         // Path::join replaces the base with an absolute or prefixed path, so
         // only accept a name that is exactly one plain component.
-        let mut components = Path::new(&dir_name).components();
+        let mut components = dir_name.components();
         ensure!(
             matches!(
                 (components.next(), components.next()),
@@ -977,6 +993,34 @@ mod tests {
             .map(|entry| entry.unwrap().file_name())
             .collect();
         assert_eq!(siblings, ["projects"]);
+    }
+
+    #[test]
+    fn test_save_keeps_existing_folder() {
+        use tempfile::tempdir;
+
+        let base = tempdir().unwrap();
+        // A folder name the sanitizer would change, as an older save wrote it.
+        let legacy = base.path().join(".notes.scriv");
+        let mut project = Project::new(".notes");
+        project.save(base.path()).unwrap();
+        fs::rename(project.path.take().unwrap(), &legacy).unwrap();
+
+        let mut project = Project::load(&legacy).unwrap();
+        project.title = "Renamed".to_string();
+        project.save(base.path()).unwrap();
+        assert_eq!(project.path.as_deref(), Some(legacy.as_path()));
+
+        // Saving somewhere else still derives the folder from the title.
+        let other = tempdir().unwrap();
+        project.save(other.path()).unwrap();
+        assert_eq!(project.path, Some(other.path().join("Renamed.scriv")));
+
+        let folders: Vec<_> = fs::read_dir(base.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(folders, [".notes.scriv"]);
     }
 
     #[test]
