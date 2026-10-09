@@ -24,6 +24,8 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install system dependencies
         if: runner.os == 'Linux'
@@ -56,6 +58,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install system dependencies
         run: |
@@ -84,13 +88,6 @@ jobs:
   # RustSec publishes some that never get one, so cargo audit reads the
   # RustSec database directly. Vulnerabilities fail the job; unmaintained
   # and unsound notices are printed as warnings.
-  #
-  # Ignored by id, with the reason:
-  # RUSTSEC-2026-0187 (lopdf 0.31, stack overflow on a deeply nested PDF).
-  # lopdf comes in through printpdf 0.7, which only parses a PDF in its svg
-  # module, behind a feature Avalon does not enable. Avalon writes PDFs and
-  # never reads one. The fixed lopdf needs printpdf 0.8 or later, a rewrite
-  # of the API src/export/pdf.rs uses. Drop the ignore with that upgrade.
   audit:
     name: Advisories
     runs-on: ubuntu-latest
@@ -99,16 +96,19 @@ jobs:
       checks: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          ignore: RUSTSEC-2026-0187
 
   coverage:
     name: Code Coverage
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Install system dependencies
         run: |
@@ -120,7 +120,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
 
       - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin
+        run: cargo install cargo-tarpaulin --version 0.37.5 --locked
 
       - name: Generate coverage
         run: cargo tarpaulin --out xml --skip-clean

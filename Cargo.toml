@@ -16,21 +16,19 @@ iced = { version = "0.14.0", features = ["tokio"] }
 # Serialization
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
-toml = "0.8.23"
 
 # File system
-dirs = "5.0.1"
-walkdir = "2.5.0"
-notify = "7.0.0"
+dirs = "7.0.0"
+notify = "8.2.0"
 
 # Rich text / document processing
-pulldown-cmark = "0.12.2"
-pulldown-cmark-to-cmark = "17.0.0"
+pulldown-cmark = "0.13.4"
 
 # Export formats
-printpdf = "0.7.0"
+# Without the default html feature: Avalon lays out the pages itself.
+printpdf = { version = "0.12.8", default-features = false }
 docx-rs = "0.4.22"
-zip = "2.4.2"
+zip = "9.0.0"
 
 # Spell checking
 # hunspell-rs requires system libhunspell — disabled by default
@@ -47,7 +45,6 @@ log = "0.4.34"
 env_logger = "0.11.11"
 
 # Error handling
-thiserror = "2.0.21"
 anyhow = "1.0.104"
 
 # Async runtime (for iced)
@@ -63,10 +60,8 @@ arboard = "3.6.1"
 # to D-Bus through libdbus loaded at run time, so the build needs no GTK.
 rfd = { version = "0.17.2", default-features = false, features = ["xdg-portal"] }
 
-# Temp files (used by print module)
-tempfile = "3.27.0"
-
 [dev-dependencies]
+tempfile = "3.27.0"
 
 [profile.release]
 opt-level = 3
