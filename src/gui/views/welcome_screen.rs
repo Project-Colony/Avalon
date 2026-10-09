@@ -305,7 +305,7 @@ fn build_footer() -> Element<'static, Message> {
         "The Writing Timer (Ctrl+J) has Pomodoro, Sprint, and custom presets.",
         "Ctrl+Shift+S shows comprehensive project statistics with readability scores.",
         "Use the Name Generator (Ctrl+Shift+N) for character and place names.",
-        "Auto-backup creates safety copies every time your project is saved.",
+        "Auto-backup zips your project every few saves; Restore opens a backup as a copy.",
         "F8 runs project validation to find broken links, empty docs, and orphans.",
     ];
     let tip_index = {

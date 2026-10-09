@@ -613,7 +613,7 @@ fn tab_backup(settings: &ProjectSettings) -> Element<'static, Message> {
         toggle_setting(
             settings.auto_backup,
             "Back up on save",
-            "Create a backup copy each time the project is saved",
+            "Zip the project text into the backup folder as you save",
             Message::SettingsToggleAutoBackup,
         ),
         setting_label("Keep a backup every"),

@@ -36,6 +36,17 @@ first **Save** of a new project asks where to create it, starting in
 write to that same folder, even after you rename the project. Autosave starts
 once a project has been saved for the first time.
 
+**Backups** are zip archives of `project.json`, the `docs/` folder and the
+compile presets, written to `~/Scrinever Backups` as
+`<project folder>_<UTC timestamp>.zip`. Snapshots are left out to keep them
+small. With automatic backups on (Settings, Backup), a backup is made every 10
+saves by default; manual saves and autosaves both count, and the interval is a
+project setting. **Create Backup** in the Backups panel (`Ctrl+8`), or
+`Ctrl+Shift+B`, makes one at once. The 20 newest backups of each project are
+kept. **Restore as copy** unpacks a backup into a new folder next to the
+project, named `<project> restored <timestamp>`, and opens it; the project
+folder itself is never overwritten.
+
 **Import** asks for the files to add to the draft. For a Scrivener project,
 pick the `.scrivx` file inside its `.scriv` folder. **Compile** and **Export
 OPML** ask where to write the result. These dialogs start in the folder you
