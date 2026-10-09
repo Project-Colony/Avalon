@@ -79,9 +79,9 @@ pub enum Message {
     NewFromTemplate(String),
     OpenProject,
     SaveProject,
-    /// The folder chosen for a project saved for the first time, or `None`
-    /// when the save dialog was cancelled.
-    SaveProjectAs(Option<PathBuf>),
+    /// The folder chosen for the project with this id, saved for the first
+    /// time, or `None` when the save dialog was cancelled.
+    SaveProjectAs(Uuid, Option<PathBuf>),
     /// A project read from disk, or `None` when the open dialog was cancelled.
     ProjectLoaded(Box<Option<Result<Project, String>>>),
 
@@ -129,7 +129,8 @@ pub enum Message {
     CompileSetFontSize(String),
     CompileSetSeparator(String),
     DoCompile,
-    CompileTo(Option<PathBuf>),
+    /// The output file chosen for the project with this id.
+    CompileTo(Uuid, Option<PathBuf>),
 
     // Snapshot operations
     CreateSnapshot,
@@ -207,8 +208,9 @@ pub enum Message {
 
     // Import
     ImportFiles,
-    /// Files chosen in an import dialog; empty when it was cancelled.
-    ImportPaths(Vec<PathBuf>),
+    /// Files chosen in an import dialog for the project with this id; empty
+    /// when it was cancelled.
+    ImportPaths(Uuid, Vec<PathBuf>),
 
     // Name generator
     GenerateName(String),
@@ -339,7 +341,8 @@ pub enum Message {
 
     // Export OPML
     ExportOpml,
-    ExportOpmlTo(Option<PathBuf>),
+    /// The output file chosen for the project with this id.
+    ExportOpmlTo(Uuid, Option<PathBuf>),
 
     // Print
     PrintCurrent,

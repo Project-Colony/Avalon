@@ -286,6 +286,13 @@ impl ScrineverApp {
         }
     }
 
+    /// Whether the project with this id is still the open one. File dialogs
+    /// do not block the main window, so the user can switch projects while
+    /// one is open; its result is dropped when that happened.
+    fn is_open_project(&self, id: Uuid) -> bool {
+        self.project.as_ref().is_some_and(|p| p.id == id)
+    }
+
     /// Sync the current editor content back to the project's document
     fn sync_editor_to_project(&mut self) {
         if let (Some(ref mut project), Some(item_id)) = (&mut self.project, self.selected_item) {
@@ -372,9 +379,10 @@ impl ScrineverApp {
                         if let Err(e) = std::fs::create_dir_all(&projects_dir) {
                             log::warn!("Failed to create {}: {}", projects_dir.display(), e);
                         }
+                        let id = project.id;
                         return IcedTask::perform(
                             pick_save_path("Save project", Some(projects_dir), project.default_dir_name()),
-                            Message::SaveProjectAs,
+                            move |dir| Message::SaveProjectAs(id, dir),
                         );
                     }
                     Some(_) => self.save_project(None),
@@ -382,15 +390,15 @@ impl ScrineverApp {
                 }
             }
 
-            Message::SaveProjectAs(Some(project_dir)) => {
-                // Only a project that still has no folder takes the chosen one.
-                if self.project.as_ref().is_some_and(|p| p.path.is_none()) {
+            Message::SaveProjectAs(id, Some(project_dir)) => {
+                // Only the same project, still without a folder, takes the chosen one.
+                if self.project.as_ref().is_some_and(|p| p.id == id && p.path.is_none()) {
                     self.sync_editor_to_project();
                     self.save_project(Some(&project_dir));
                 }
             }
 
-            Message::SaveProjectAs(None) => {}
+            Message::SaveProjectAs(_, None) => {}
 
             Message::ProjectLoaded(loaded) => match *loaded {
                 Some(Ok(p)) => {
@@ -845,7 +853,7 @@ impl ScrineverApp {
             }
 
             Message::DoCompile => {
-                if self.project.is_some() {
+                if let Some(id) = self.project.as_ref().map(|p| p.id) {
                     let file_name = format!(
                         "{}.{}",
                         crate::core::project::dir_name_for_title(&self.compile_options.title),
@@ -853,12 +861,12 @@ impl ScrineverApp {
                     );
                     return IcedTask::perform(
                         pick_save_path("Compile to", self.last_export_dir.clone(), file_name),
-                        Message::CompileTo,
+                        move |path| Message::CompileTo(id, path),
                     );
                 }
             }
 
-            Message::CompileTo(Some(output_path)) => {
+            Message::CompileTo(id, Some(output_path)) if self.is_open_project(id) => {
                 self.sync_editor_to_project();
                 if let Some(ref project) = self.project {
                     use crate::export::compiler::Compiler;
@@ -886,7 +894,7 @@ impl ScrineverApp {
                 }
             }
 
-            Message::CompileTo(None) => {}
+            Message::CompileTo(..) => {}
 
             // ========== Snapshot operations ==========
             Message::CreateSnapshot => {
@@ -1417,22 +1425,21 @@ impl ScrineverApp {
             }
 
             // ========== Import ==========
-            Message::ImportFiles => {
-                if self.project.is_none() {
-                    self.notification = Some("Create or open a project first.".to_string());
-                } else {
+            Message::ImportFiles => match self.project.as_ref().map(|p| p.id) {
+                None => self.notification = Some("Create or open a project first.".to_string()),
+                Some(id) => {
                     return IcedTask::perform(
                         pick_import_paths(self.last_import_dir.clone(), "Supported files", IMPORT_EXTENSIONS),
-                        Message::ImportPaths,
+                        move |paths| Message::ImportPaths(id, paths),
                     );
                 }
-            }
+            },
 
-            Message::ImportPaths(paths) => {
+            Message::ImportPaths(id, paths) => {
                 if let Some(dir) = paths.first().and_then(|p| p.parent()) {
                     self.last_import_dir = Some(dir.to_path_buf());
                 }
-                if !paths.is_empty() {
+                if !paths.is_empty() && self.is_open_project(id) {
                     self.import_files(paths);
                 }
             }
@@ -2200,10 +2207,10 @@ impl ScrineverApp {
 
             // ========== OPML Import ==========
             Message::ImportOpml => {
-                if self.project.is_some() {
+                if let Some(id) = self.project.as_ref().map(|p| p.id) {
                     return IcedTask::perform(
                         pick_import_paths(self.last_import_dir.clone(), "OPML outlines", &["opml"]),
-                        Message::ImportPaths,
+                        move |paths| Message::ImportPaths(id, paths),
                     );
                 }
             }
@@ -2240,14 +2247,15 @@ impl ScrineverApp {
             Message::ExportOpml => {
                 if let Some(ref project) = self.project {
                     let file_name = format!("{}.opml", crate::core::project::dir_name_for_title(&project.title));
+                    let id = project.id;
                     return IcedTask::perform(
                         pick_save_path("Export OPML", self.last_export_dir.clone(), file_name),
-                        Message::ExportOpmlTo,
+                        move |path| Message::ExportOpmlTo(id, path),
                     );
                 }
             }
 
-            Message::ExportOpmlTo(Some(output_path)) => {
+            Message::ExportOpmlTo(id, Some(output_path)) if self.is_open_project(id) => {
                 self.sync_editor_to_project();
                 if let Some(ref project) = self.project {
                     self.last_export_dir = output_path.parent().map(Path::to_path_buf);
@@ -2267,7 +2275,7 @@ impl ScrineverApp {
                 }
             }
 
-            Message::ExportOpmlTo(None) => {}
+            Message::ExportOpmlTo(..) => {}
 
             // ========== Print ==========
             Message::PrintCurrent => {
