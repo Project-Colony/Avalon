@@ -285,7 +285,7 @@ impl TextAnalysis {
             .into_iter()
             .filter(|(w, _): &(String, usize)| w.len() > 3)
             .collect();
-        word_list.sort_by(|a, b| b.1.cmp(&a.1));
+        word_list.sort_by_key(|w| std::cmp::Reverse(w.1));
         word_list.truncate(20);
 
         let avg_word_length = if word_count > 0 {
@@ -591,7 +591,7 @@ impl WordFrequencyAnalysis {
         let hapax_count = freq_map.values().filter(|&&c| c == 1).count();
 
         let mut frequencies: Vec<(String, usize)> = freq_map.into_iter().map(|(k, v)| (k.to_string(), v)).collect();
-        frequencies.sort_by(|a, b| b.1.cmp(&a.1));
+        frequencies.sort_by_key(|f| std::cmp::Reverse(f.1));
 
         // Bigrams
         let mut bigram_map = HashMap::new();
@@ -600,7 +600,7 @@ impl WordFrequencyAnalysis {
             *bigram_map.entry(bigram).or_insert(0usize) += 1;
         }
         let mut top_bigrams: Vec<(String, usize)> = bigram_map.into_iter().filter(|(_, count)| *count > 1).collect();
-        top_bigrams.sort_by(|a, b| b.1.cmp(&a.1));
+        top_bigrams.sort_by_key(|b| std::cmp::Reverse(b.1));
         top_bigrams.truncate(15);
 
         let type_token_ratio = if total_count > 0 {

@@ -324,7 +324,7 @@ impl CollectionManager {
     /// Get collections sorted by name
     pub fn sorted_by_name(&self) -> Vec<&Collection> {
         let mut sorted: Vec<&Collection> = self.collections.iter().collect();
-        sorted.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        sorted.sort_by_key(|a| a.name.to_lowercase());
         sorted
     }
 

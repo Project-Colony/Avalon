@@ -454,7 +454,7 @@ pub fn average_sentence_length(text: &str) -> f64 {
 /// Return the N longest sentences, sorted by word count descending.
 pub fn longest_sentences(text: &str, n: usize) -> Vec<SentenceInfo> {
     let mut infos = sentence_lengths(text);
-    infos.sort_by(|a, b| b.word_count.cmp(&a.word_count));
+    infos.sort_by_key(|i| std::cmp::Reverse(i.word_count));
     infos.truncate(n);
     infos
 }

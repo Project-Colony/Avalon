@@ -340,7 +340,7 @@ impl CommentManager {
     /// Comments sorted by creation date (newest first).
     pub fn sorted_by_date(&self) -> Vec<&Comment> {
         let mut sorted: Vec<&Comment> = self.comments.iter().collect();
-        sorted.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        sorted.sort_by_key(|c| std::cmp::Reverse(c.created_at));
         sorted
     }
 
