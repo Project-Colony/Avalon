@@ -59,7 +59,7 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
         column![
             row![
                 text("Manuscript Target:").size(12).color(Theme::TEXT_MUTED),
-                Space::with_width(8),
+                Space::new().width(8),
                 text(format!(
                     "{} / {} words ({} remaining)",
                     format_number(data.current_words),
@@ -106,7 +106,7 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
         column![
             row![
                 text("Session:").size(11).color(Theme::TEXT_MUTED),
-                Space::with_width(4),
+                Space::new().width(4),
                 text(format!(
                     "{}/{} words ({} left)",
                     data.session_words.max(0),
@@ -121,14 +121,14 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
         .spacing(1)
         .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Deadline info
     let deadline_info: Element<'static, Message> = if !data.deadline.is_empty() {
         let deadline_row = row![
             text("\u{f073} Deadline:").size(11).color(Theme::TEXT_MUTED),
-            Space::with_width(4),
+            Space::new().width(4),
             text(data.deadline.clone()).size(11).color(Theme::TEXT_PRIMARY),
         ];
 
@@ -152,11 +152,11 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
 
                 row![
                     text(time_str).size(11).color(urgency_color),
-                    Space::with_width(8),
+                    Space::new().width(8),
                     text(format!("{} words/day needed", format_number(wpd)))
                         .size(11)
                         .color(Theme::WARNING),
-                    Space::with_width(8),
+                    Space::new().width(8),
                     text(format!("(~{} pages/day)", (wpd / crate::core::WORDS_PER_PAGE).max(1)))
                         .size(10)
                         .color(Theme::TEXT_MUTED),
@@ -167,18 +167,18 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
                 .size(11)
                 .color(Theme::ERROR)
                 .into(),
-            _ => Space::with_height(0).into(),
+            _ => Space::new().height(0).into(),
         };
 
         column![deadline_row, pace_info].spacing(2).into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Deadline input
     let deadline_input_row = row![
         text("Set deadline:").size(11).color(Theme::TEXT_MUTED),
-        Space::with_width(4),
+        Space::new().width(4),
         text_input("YYYY-MM-DD", &data.deadline)
             .on_input(Message::SettingsSetDeadline)
             .size(11)
@@ -205,28 +205,28 @@ pub fn view(data: &TargetsData) -> Element<'static, Message> {
                     .size(10)
                     .color(Theme::TEXT_PRIMARY)
                     .width(Length::Fixed(120.0)),
-                Space::with_width(4),
+                Space::new().width(4),
                 text(bar).size(10).color(status_color),
-                Space::with_width(4),
+                Space::new().width(4),
                 text(progress.compact_display()).size(10).color(Theme::TEXT_MUTED),
             ]);
         }
         scrollable(doc_list).height(Length::Fixed(80.0)).into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     let content = column![
         header,
-        Space::with_height(4),
+        Space::new().height(4),
         project_progress,
-        Space::with_height(4),
+        Space::new().height(4),
         session_progress,
-        Space::with_height(6),
+        Space::new().height(6),
         deadline_info,
-        Space::with_height(4),
+        Space::new().height(4),
         deadline_input_row,
-        Space::with_height(6),
+        Space::new().height(6),
         doc_targets_section,
     ]
     .padding(Padding::from([8, 12]));

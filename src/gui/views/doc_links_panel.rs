@@ -36,9 +36,9 @@ pub fn view(
     let total_links = outgoing_links.len() + incoming_links.len() + broken_links.len();
     let header = row![
         text("DOCUMENT LINKS").size(11).color(Theme::TEXT_SECONDARY),
-        Space::with_width(4),
+        Space::new().width(4),
         text("\u{f0c1}").size(10),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text(format!(
             "{} total link{}",
             total_links,
@@ -46,7 +46,7 @@ pub fn view(
         ))
         .size(10)
         .color(Theme::TEXT_MUTED),
-        Space::with_width(8),
+        Space::new().width(8),
         if broken_links.is_empty() {
             text("\u{f00c} healthy").size(10).color(Theme::SUCCESS)
         } else {
@@ -115,17 +115,17 @@ pub fn view(
 
             let mut link_row = row![
                 text("\u{f00d}").size(10).color(Theme::ERROR),
-                Space::with_width(4),
+                Space::new().width(4),
                 text(format!("[[{}]]", blink.link_text)).size(11).color(Theme::ERROR),
-                Space::with_width(4),
+                Space::new().width(4),
                 text(status_text).size(9).color(Theme::TEXT_MUTED),
             ];
 
             if !blink.suggestions.is_empty() {
-                link_row = link_row.push(Space::with_width(8));
+                link_row = link_row.push(Space::new().width(8));
                 link_row = link_row.push(text("Did you mean:").size(9).color(Theme::TEXT_MUTED));
                 for suggestion in &blink.suggestions {
-                    link_row = link_row.push(Space::with_width(4));
+                    link_row = link_row.push(Space::new().width(4));
                     link_row = link_row.push(text(format!("\"{}\"", suggestion)).size(9).color(Theme::TEXT_ACCENT));
                 }
             }
@@ -135,7 +135,7 @@ pub fn view(
 
         broken_col.into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Incoming links (backlinks to current document)
@@ -213,7 +213,7 @@ pub fn view(
         text("Syntax: [[Document Title]] or [[Title|display text]]")
             .size(9)
             .color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text(format!(
             "{}\u{f061} {}\u{f060}",
             outgoing_links.len(),
@@ -225,14 +225,14 @@ pub fn view(
 
     let content = column![
         header,
-        Space::with_height(4),
+        Space::new().height(4),
         outgoing_col,
         broken_section,
-        Space::with_height(6),
+        Space::new().height(6),
         incoming_col,
-        Space::with_height(6),
+        Space::new().height(6),
         scrollable(insert_col).height(Length::Fixed(60.0)),
-        Space::with_height(2),
+        Space::new().height(2),
         hint,
     ]
     .padding(Padding::from([8, 12]));

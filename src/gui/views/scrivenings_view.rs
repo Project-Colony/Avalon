@@ -38,7 +38,7 @@ pub fn view<'a>(items: &[&BinderItem], parent_title: &str) -> Element<'a, Messag
             text(format!("\u{f02d} Scrivenings: {}", parent_title))
                 .size(14)
                 .color(Theme::TEXT_SECONDARY),
-            Space::with_width(Length::Fill),
+            Space::new().width(Length::Fill),
             text(format!(
                 "{} docs | {} words | {:.1} pg | {}",
                 items.len(),
@@ -59,11 +59,11 @@ pub fn view<'a>(items: &[&BinderItem], parent_title: &str) -> Element<'a, Messag
         content_col = content_col.push(
             container(
                 column![
-                    Space::with_height(40),
+                    Space::new().height(40),
                     text("Select a folder to view its documents in Scrivenings mode.")
                         .size(14)
                         .color(Theme::TEXT_MUTED),
-                    Space::with_height(8),
+                    Space::new().height(8),
                     text("Scrivenings stitches multiple documents together for seamless reading.")
                         .size(12)
                         .color(Theme::TEXT_MUTED),
@@ -114,11 +114,11 @@ pub fn view<'a>(items: &[&BinderItem], parent_title: &str) -> Element<'a, Messag
             let doc_header = container(
                 row![
                     text(section_marker).size(12).color(Theme::TEXT_ACCENT),
-                    Space::with_width(6),
+                    Space::new().width(6),
                     text(item.title.clone()).size(13).color(label_color),
-                    Space::with_width(8),
+                    Space::new().width(8),
                     text(label_indicator).size(10).color(label_color),
-                    Space::with_width(Length::Fill),
+                    Space::new().width(Length::Fill),
                     text(format!("{} w | {} ch{}", words, chars, status_text))
                         .size(10)
                         .color(Theme::TEXT_MUTED),
@@ -133,9 +133,9 @@ pub fn view<'a>(items: &[&BinderItem], parent_title: &str) -> Element<'a, Messag
             // Synopsis (if any)
             if !item.synopsis.is_empty() {
                 let synopsis = container(row![
-                    Space::with_width(28),
+                    Space::new().width(28),
                     text("\u{f0da}").size(10).color(Theme::TEXT_MUTED),
-                    Space::with_width(4),
+                    Space::new().width(4),
                     text(item.synopsis.clone()).size(10).color(Theme::TEXT_MUTED),
                 ])
                 .padding(Padding::from([0, 24]))
@@ -146,7 +146,7 @@ pub fn view<'a>(items: &[&BinderItem], parent_title: &str) -> Element<'a, Messag
             // Snapshot indicator
             if item.has_snapshots() {
                 let snap_text = container(row![
-                    Space::with_width(28),
+                    Space::new().width(28),
                     text(format!(
                         "\u{f030} {} snapshot{}",
                         item.snapshot_count(),
@@ -179,20 +179,20 @@ pub fn view<'a>(items: &[&BinderItem], parent_title: &str) -> Element<'a, Messag
 
                 let separator = container(
                     row![
-                        Space::with_width(24),
+                        Space::new().width(24),
                         text(bar).size(8).color(Theme::BORDER),
-                        Space::with_width(8),
+                        Space::new().width(8),
                         text(format!(
                             "{}% | {} of {} words",
                             progress_pct, cumulative_words, total_words
                         ))
                         .size(9)
                         .color(Theme::TEXT_MUTED),
-                        Space::with_width(Length::Fill),
+                        Space::new().width(Length::Fill),
                         text(format!("{} of {} docs", i + 1, items.len()))
                             .size(9)
                             .color(Theme::TEXT_MUTED),
-                        Space::with_width(24),
+                        Space::new().width(24),
                     ]
                     .align_y(iced::Alignment::Center),
                 )
@@ -223,7 +223,7 @@ pub fn view<'a>(items: &[&BinderItem], parent_title: &str) -> Element<'a, Messag
             ))
             .size(10)
             .color(Theme::TEXT_MUTED),
-            Space::with_width(Length::Fill),
+            Space::new().width(Length::Fill),
             text(format!("Avg: {} words/doc", avg_words))
                 .size(10)
                 .color(Theme::TEXT_MUTED),

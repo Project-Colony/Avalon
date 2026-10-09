@@ -52,9 +52,9 @@ impl FindReplaceData {
 pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
     let header = row![
         text("FIND & REPLACE").size(11).color(Theme::TEXT_SECONDARY),
-        Space::with_width(4),
+        Space::new().width(4),
         text("\u{f002}").size(10),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text("Ctrl+F: find | Ctrl+H: replace | Esc: close")
             .size(9)
             .color(Theme::TEXT_MUTED),
@@ -93,13 +93,13 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
 
     let find_row = row![
         find_input,
-        Space::with_width(4),
+        Space::new().width(4),
         text(match_icon).size(12).color(match_color),
-        Space::with_width(4),
+        Space::new().width(4),
         button(text("\u{f062} Prev").size(10).color(Theme::TEXT_ACCENT))
             .on_press(Message::DocFindPrev)
             .padding(Padding::from([4, 8])),
-        Space::with_width(2),
+        Space::new().width(2),
         button(text("Next \u{f063}").size(10).color(Theme::TEXT_ACCENT))
             .on_press(Message::DocFindNext)
             .padding(Padding::from([4, 8])),
@@ -108,13 +108,13 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
 
     let replace_row = row![
         replace_input,
-        Space::with_width(4),
-        Space::with_width(14),
-        Space::with_width(4),
+        Space::new().width(4),
+        Space::new().width(14),
+        Space::new().width(4),
         button(text("Replace").size(10).color(Theme::TEXT_ACCENT))
             .on_press(Message::DocReplaceCurrent)
             .padding(Padding::from([4, 8])),
-        Space::with_width(2),
+        Space::new().width(2),
         button(text("Replace All").size(10).color(Theme::WARNING))
             .on_press(Message::DocReplaceAll)
             .padding(Padding::from([4, 8])),
@@ -150,31 +150,31 @@ pub fn view(data: &FindReplaceData) -> Element<'static, Message> {
 
     let info = row![
         text(match_info).size(10).color(match_color),
-        Space::with_width(12),
+        Space::new().width(12),
         button(text(case_label).size(11).color(case_color))
             .on_press(Message::DocFindToggleCase)
             .padding(Padding::from([2, 6])),
-        Space::with_width(4),
+        Space::new().width(4),
         button(text(word_label).size(11).color(word_color))
             .on_press(Message::DocFindToggleWholeWord)
             .padding(Padding::from([2, 6])),
-        Space::with_width(4),
+        Space::new().width(4),
         button(text(regex_label).size(11).color(regex_color))
             .on_press(Message::DocFindToggleRegex)
             .padding(Padding::from([2, 6])),
-        Space::with_width(8),
+        Space::new().width(8),
         text(mode_hint).size(9).color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text("Enter: next | Shift+Enter: prev").size(9).color(Theme::TEXT_MUTED),
     ];
 
     let content = column![
         header,
-        Space::with_height(4),
+        Space::new().height(4),
         find_row,
-        Space::with_height(4),
+        Space::new().height(4),
         replace_row,
-        Space::with_height(4),
+        Space::new().height(4),
         info,
     ]
     .padding(Padding::from([8, 12]));

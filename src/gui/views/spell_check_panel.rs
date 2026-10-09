@@ -17,7 +17,7 @@ pub fn view(
 
     let header_row = row![
         text("SPELL CHECK").size(11).color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
+        Space::new().width(8),
         text(format!("{} {}", status_icon, status_text))
             .size(10)
             .color(if spell_active {
@@ -25,15 +25,15 @@ pub fn view(
             } else {
                 Theme::TEXT_MUTED
             }),
-        Space::with_width(8),
+        Space::new().width(8),
         text(format!("Dictionary: {} words", format_number(dict_size)))
             .size(10)
             .color(Theme::TEXT_MUTED),
-        Space::with_width(4),
+        Space::new().width(4),
         text(format!("User: {} words", user_dict_words.len()))
             .size(10)
             .color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         button(
             text(if spell_active { "Disable" } else { "Enable" })
                 .size(10)
@@ -41,7 +41,7 @@ pub fn view(
         )
         .on_press(Message::ToggleSpellChecker)
         .padding(Padding::from([2, 8])),
-        Space::with_width(4),
+        Space::new().width(4),
         button(text("\u{f021} Re-check").size(10).color(Theme::TEXT_ACCENT),)
             .on_press(Message::RunSpellCheck)
             .padding(Padding::from([2, 8])),
@@ -92,11 +92,11 @@ pub fn view(
             text(format!("\"{}\"", result.word))
                 .size(12)
                 .color(iced::Color::from_rgb(0.9, 0.3, 0.3)),
-            Space::with_width(2),
+            Space::new().width(2),
             text(format!("@{}", position)).size(9).color(Theme::TEXT_MUTED),
-            Space::with_width(4),
+            Space::new().width(4),
             text("\u{f061}").size(11).color(Theme::TEXT_MUTED),
-            Space::with_width(4),
+            Space::new().width(4),
         ]
         .spacing(4);
 
@@ -113,7 +113,7 @@ pub fn view(
             }
         }
 
-        result_row = result_row.push(Space::with_width(Length::Fill));
+        result_row = result_row.push(Space::new().width(Length::Fill));
         result_row = result_row.push(
             button(text("+ Dict").size(10).color(Theme::TEXT_SECONDARY))
                 .on_press(Message::SpellCheckAddWord(word))
@@ -127,7 +127,7 @@ pub fn view(
     let user_dict_section: Element<'static, Message> = if !user_dict_words.is_empty() {
         let mut dict_row = row![
             text("User dict:").size(9).color(Theme::TEXT_MUTED),
-            Space::with_width(4),
+            Space::new().width(4),
         ]
         .spacing(2);
 
@@ -148,7 +148,7 @@ pub fn view(
             );
         }
 
-        dict_row = dict_row.push(Space::with_width(Length::Fill));
+        dict_row = dict_row.push(Space::new().width(Length::Fill));
         dict_row = dict_row.push(
             button(text("Clear all").size(9).color(Theme::ERROR))
                 .on_press(Message::SpellCheckClearDict)
@@ -157,26 +157,26 @@ pub fn view(
 
         dict_row.into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     let footer = row![
         text("Click a suggestion to replace the word in the document")
             .size(9)
             .color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text("Shortcut: F7").size(9).color(Theme::TEXT_MUTED),
     ];
 
     let content = column![
         header_row,
-        Space::with_height(4),
+        Space::new().height(4),
         summary,
-        Space::with_height(4),
+        Space::new().height(4),
         scrollable(result_list).height(Length::Fixed(100.0)),
-        Space::with_height(4),
+        Space::new().height(4),
         user_dict_section,
-        Space::with_height(2),
+        Space::new().height(2),
         footer,
     ]
     .padding(Padding::from([8, 12]));

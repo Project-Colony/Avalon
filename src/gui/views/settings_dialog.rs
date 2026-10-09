@@ -45,16 +45,16 @@ fn tab_button(icon: &str, label: &str, tab: SettingsTab, active: &SettingsTab) -
 fn section_header(label: &str) -> Element<'static, Message> {
     column![
         text(label.to_string()).size(15).color(Theme::TEXT_ACCENT),
-        Space::with_height(6),
+        Space::new().height(6),
     ]
     .into()
 }
 
 fn subsection_header(label: &str) -> Element<'static, Message> {
     column![
-        Space::with_height(2),
+        Space::new().height(2),
         text(label.to_string()).size(13).color(Theme::TEXT_SECONDARY),
-        Space::with_height(4),
+        Space::new().height(4),
     ]
     .into()
 }
@@ -69,7 +69,7 @@ fn setting_description(desc: &str) -> Element<'static, Message> {
 
 fn divider() -> Element<'static, Message> {
     container(
-        container(Space::with_height(1))
+        container(Space::new().height(1))
             .style(|_theme: &iced::Theme| container::Style {
                 background: Some(iced::Background::Color(Theme::BORDER_SUBTLE)),
                 ..Default::default()
@@ -90,7 +90,7 @@ fn toggle_setting(
     column![
         toggler(enabled).label(label).on_toggle(msg),
         setting_description(desc),
-        Space::with_height(6),
+        Space::new().height(6),
     ]
     .spacing(1)
     .into()
@@ -110,7 +110,7 @@ fn shortcut_row(keys: &str, desc: &str) -> Element<'static, Message> {
                 ..Default::default()
             })
             .padding(Padding::from([3, 8])),
-        Space::with_width(12),
+        Space::new().width(12),
         text(desc.to_string()).size(12).color(Theme::TEXT_SECONDARY),
     ]
     .align_y(iced::Alignment::Center)
@@ -131,19 +131,19 @@ pub fn view(
     let sidebar = container(
         column![
             text("Settings").size(17).color(Theme::TEXT_PRIMARY),
-            Space::with_height(20),
+            Space::new().height(20),
             tab_button("\u{f013}", "General", SettingsTab::General, active_tab),
-            Space::with_height(2),
+            Space::new().height(2),
             tab_button("\u{f040}", "Editor", SettingsTab::Editor, active_tab),
-            Space::with_height(2),
+            Space::new().height(2),
             tab_button("\u{f00c}", "Corrections", SettingsTab::Corrections, active_tab),
-            Space::with_height(2),
+            Space::new().height(2),
             tab_button("\u{f1fc}", "Appearance", SettingsTab::Appearance, active_tab),
-            Space::with_height(2),
+            Space::new().height(2),
             tab_button("\u{f0c7}", "Backup", SettingsTab::Backup, active_tab),
-            Space::with_height(2),
+            Space::new().height(2),
             tab_button("\u{f11c}", "Shortcuts", SettingsTab::Shortcuts, active_tab),
-            Space::with_height(Length::Fill),
+            Space::new().height(Length::Fill),
             button(text("  Done  ").size(13).color(Theme::TEXT_PRIMARY),)
                 .on_press(Message::CloseSettingsWindow)
                 .padding(Padding::from([8, 20]))
@@ -246,9 +246,9 @@ fn tab_general(settings: &ProjectSettings, project_title: &str) -> Element<'stat
         labels_col = labels_col.push(
             row![
                 text("\u{f111}").size(10).color(color),
-                Space::with_width(8),
+                Space::new().width(8),
                 text(lbl.name.clone()).size(12).color(Theme::TEXT_PRIMARY),
-                Space::with_width(Length::Fill),
+                Space::new().width(Length::Fill),
                 container(text(format!("{:?}", lbl.color)).size(9).color(Theme::TEXT_MUTED))
                     .style(|_theme: &iced::Theme| container::Style {
                         background: Some(iced::Background::Color(Theme::BG_TERTIARY)),
@@ -272,7 +272,7 @@ fn tab_general(settings: &ProjectSettings, project_title: &str) -> Element<'stat
         statuses_col = statuses_col.push(
             row![
                 container(text(format!("{}", idx + 1)).size(10).color(Theme::TEXT_MUTED)).width(Length::Fixed(20.0)),
-                container(Space::new(8, 8)).style(move |_theme: &iced::Theme| container::Style {
+                container(Space::new().width(8).height(8)).style(move |_theme: &iced::Theme| container::Style {
                     background: Some(iced::Background::Color(status_color)),
                     border: Border {
                         color: iced::Color::TRANSPARENT,
@@ -281,7 +281,7 @@ fn tab_general(settings: &ProjectSettings, project_title: &str) -> Element<'stat
                     },
                     ..Default::default()
                 }),
-                Space::with_width(8),
+                Space::new().width(8),
                 text(st.name.clone()).size(12).color(Theme::TEXT_PRIMARY),
             ]
             .align_y(iced::Alignment::Center),
@@ -292,18 +292,18 @@ fn tab_general(settings: &ProjectSettings, project_title: &str) -> Element<'stat
         section_header("Project"),
         setting_label("Title"),
         title_input,
-        Space::with_height(10),
+        Space::new().height(10),
         row![
             column![
                 setting_label("Word Count Target"),
-                Space::with_height(4),
+                Space::new().height(4),
                 target_input,
                 setting_description("Leave empty for no target"),
             ],
-            Space::with_width(24),
+            Space::new().width(24),
             column![
                 setting_label("Deadline"),
-                Space::with_height(4),
+                Space::new().height(4),
                 deadline_input,
                 setting_description("Format: YYYY-MM-DD"),
             ],
@@ -311,10 +311,10 @@ fn tab_general(settings: &ProjectSettings, project_title: &str) -> Element<'stat
         divider(),
         section_header("Saving"),
         setting_label("Auto-save interval"),
-        Space::with_height(4),
+        Space::new().height(4),
         row![
             autosave_input,
-            Space::with_width(6),
+            Space::new().width(6),
             text("seconds").size(12).color(Theme::TEXT_MUTED),
         ]
         .align_y(iced::Alignment::Center),
@@ -322,10 +322,10 @@ fn tab_general(settings: &ProjectSettings, project_title: &str) -> Element<'stat
         divider(),
         section_header("New Documents"),
         setting_label("Default type for new documents"),
-        Space::with_height(4),
+        Space::new().height(4),
         doc_type_picker,
         setting_description("Pre-selected type when creating a new binder item"),
-        Space::with_height(8),
+        Space::new().height(8),
         toggle_setting(
             settings.show_synopsis_in_binder,
             "Show synopses in binder",
@@ -335,12 +335,12 @@ fn tab_general(settings: &ProjectSettings, project_title: &str) -> Element<'stat
         divider(),
         section_header("Labels"),
         setting_description("Color-coded tags for organizing binder items"),
-        Space::with_height(6),
+        Space::new().height(6),
         labels_col,
         divider(),
         section_header("Statuses"),
         setting_description("Track document progress through your workflow"),
-        Space::with_height(6),
+        Space::new().height(6),
         statuses_col,
     ]
     .spacing(2)
@@ -381,12 +381,12 @@ fn tab_editor(settings: &ProjectSettings, script_mode: bool) -> Element<'static,
             "Distraction-free writing environment. \
              Toggle with F5 or Ctrl+Shift+F."
         ),
-        Space::with_height(8),
+        Space::new().height(8),
         setting_label("Text width"),
-        Space::with_height(4),
+        Space::new().height(4),
         row![
             comp_width_input,
-            Space::with_width(6),
+            Space::new().width(6),
             text("% of screen").size(12).color(Theme::TEXT_MUTED),
         ]
         .align_y(iced::Alignment::Center),
@@ -396,13 +396,13 @@ fn tab_editor(settings: &ProjectSettings, script_mode: bool) -> Element<'static,
         toggler(script_mode)
             .label("Enable script mode")
             .on_toggle(|_| Message::ToggleScriptMode),
-        Space::with_height(2),
+        Space::new().height(2),
         setting_description(
             "Format documents with scene headings, action, character names, \
              dialogue, parentheticals, and transitions following standard \
              screenplay formatting rules."
         ),
-        Space::with_height(8),
+        Space::new().height(8),
         toggle_setting(
             settings.auto_numbering,
             "Auto-number scenes on compile",
@@ -443,23 +443,23 @@ fn tab_corrections(
         divider(),
         section_header("Substitutions"),
         setting_description("Individual text replacement rules applied as you type"),
-        Space::with_height(8),
+        Space::new().height(8),
         toggler(auto_correction.smart_quotes)
             .label("Curly quotes   \"...\"  \u{2192}  \u{201c}...\u{201d}")
             .on_toggle(|_| Message::ToggleAutoCorrectSmartQuotes),
-        Space::with_height(2),
+        Space::new().height(2),
         setting_description("Replace straight quotes with directional quotation marks"),
-        Space::with_height(8),
+        Space::new().height(8),
         toggler(auto_correction.em_dashes)
             .label("Em dash   --  \u{2192}  \u{2014}")
             .on_toggle(|_| Message::ToggleAutoCorrectEmDashes),
-        Space::with_height(2),
+        Space::new().height(2),
         setting_description("Convert double hyphens into a proper em dash"),
-        Space::with_height(8),
+        Space::new().height(8),
         toggler(auto_correction.ellipsis)
             .label("Ellipsis   ...  \u{2192}  \u{2026}")
             .on_toggle(|_| Message::ToggleAutoCorrectEllipsis),
-        Space::with_height(2),
+        Space::new().height(2),
         setting_description("Convert three consecutive dots into a single ellipsis character"),
     ]
     .spacing(2)
@@ -554,23 +554,23 @@ fn tab_appearance(settings: &ProjectSettings) -> Element<'static, Message> {
     column![
         section_header("Font"),
         row![
-            column![setting_label("Font Family"), Space::with_height(4), font_picker,],
-            Space::with_width(24),
-            column![setting_label("Size (pt)"), Space::with_height(4), font_size_input,],
+            column![setting_label("Font Family"), Space::new().height(4), font_picker,],
+            Space::new().width(24),
+            column![setting_label("Size (pt)"), Space::new().height(4), font_size_input,],
         ],
-        Space::with_height(12),
+        Space::new().height(12),
         row![
-            column![setting_label("Line Spacing"), Space::with_height(4), spacing_picker,],
-            Space::with_width(24),
-            column![setting_label("Zoom"), Space::with_height(4), zoom_row,],
+            column![setting_label("Line Spacing"), Space::new().height(4), spacing_picker,],
+            Space::new().width(24),
+            column![setting_label("Zoom"), Space::new().height(4), zoom_row,],
         ],
         divider(),
         section_header("Layout"),
         setting_label("Editor text width"),
-        Space::with_height(4),
+        Space::new().height(4),
         row![
             editor_width_input,
-            Space::with_width(6),
+            Space::new().width(6),
             text("% of panel width").size(12).color(Theme::TEXT_MUTED),
         ]
         .align_y(iced::Alignment::Center),
@@ -579,10 +579,10 @@ fn tab_appearance(settings: &ProjectSettings) -> Element<'static, Message> {
         section_header("Interface"),
         subsection_header("Scale"),
         setting_label("UI Scale"),
-        Space::with_height(4),
+        Space::new().height(4),
         ui_scale_picker,
         setting_description("Scale all interface elements proportionally"),
-        Space::with_height(12),
+        Space::new().height(12),
         toggle_setting(
             settings.show_word_count,
             "Word count in status bar",
@@ -617,10 +617,10 @@ fn tab_backup(settings: &ProjectSettings) -> Element<'static, Message> {
             Message::SettingsToggleAutoBackup,
         ),
         setting_label("Keep a backup every"),
-        Space::with_height(4),
+        Space::new().height(4),
         row![
             backup_interval_input,
-            Space::with_width(6),
+            Space::new().width(6),
             text("saves").size(12).color(Theme::TEXT_MUTED),
         ]
         .align_y(iced::Alignment::Center),

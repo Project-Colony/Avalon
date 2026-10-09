@@ -28,7 +28,7 @@ pub fn view(
             ))
             .size(12)
             .color(Theme::TEXT_SECONDARY),
-            Space::with_width(Length::Fill),
+            Space::new().width(Length::Fill),
         ]
         .padding(Padding::from([4, 16])),
     )
@@ -234,7 +234,7 @@ fn collect_outline_rows(
         Message::SelectBinderItem(id)
     };
     let title_btn = button(row![
-        Space::with_width(indent),
+        Space::new().width(f32::from(indent)),
         text(title_text).size(13).color(Theme::TEXT_PRIMARY),
     ])
     .on_press(click_msg)

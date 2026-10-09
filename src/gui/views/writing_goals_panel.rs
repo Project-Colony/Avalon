@@ -132,7 +132,7 @@ pub fn view(data: &WritingGoalsData) -> Element<'static, Message> {
     let streak_row = row![
         text("Streak: ").size(10).color(Theme::TEXT_MUTED),
         text(streak_vis).size(10).color(streak_color),
-        Space::with_width(8),
+        Space::new().width(8),
         if data.streak >= 7 {
             text("On fire!").size(10).color(Theme::SUCCESS)
         } else if data.streak >= 3 {
@@ -149,17 +149,17 @@ pub fn view(data: &WritingGoalsData) -> Element<'static, Message> {
 
     let content = column![
         header,
-        Space::with_height(4),
-        row![daily_label, Space::with_width(8), daily_input].align_y(iced::Alignment::Center),
+        Space::new().height(4),
+        row![daily_label, Space::new().width(8), daily_input].align_y(iced::Alignment::Center),
         daily_progress,
-        Space::with_height(6),
-        row![weekly_label, Space::with_width(8), weekly_input].align_y(iced::Alignment::Center),
+        Space::new().height(6),
+        row![weekly_label, Space::new().width(8), weekly_input].align_y(iced::Alignment::Center),
         weekly_progress,
-        Space::with_height(6),
+        Space::new().height(6),
         streak_row,
-        Space::with_height(4),
+        Space::new().height(4),
         stats,
-        Space::with_height(4),
+        Space::new().height(4),
         reset_btn,
     ]
     .padding(Padding::from([8, 12]));

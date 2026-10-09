@@ -79,18 +79,18 @@ pub fn view(data: &QuickRefData) -> Element<'static, Message> {
         text(format!("QUICK REF: {}", data.title))
             .size(11)
             .color(Theme::TEXT_ACCENT),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text(format!(
             "{} words | {} chars | {} para | ~{:.0}m read",
             data.word_count, data.char_count, data.paragraph_count, data.reading_time
         ))
         .size(9)
         .color(Theme::TEXT_MUTED),
-        Space::with_width(8),
+        Space::new().width(8),
         button(text("Open").size(10).color(Theme::TEXT_ACCENT),)
             .on_press(Message::SelectBinderItem(data.item_id))
             .padding(Padding::from([2, 6])),
-        Space::with_width(4),
+        Space::new().width(4),
         button(text("Split").size(10).color(Theme::TEXT_SECONDARY),)
             .on_press(Message::OpenInSplitEditor(data.item_id))
             .padding(Padding::from([2, 6])),
@@ -129,7 +129,7 @@ pub fn view(data: &QuickRefData) -> Element<'static, Message> {
         }
         r.into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Synopsis
@@ -137,11 +137,11 @@ pub fn view(data: &QuickRefData) -> Element<'static, Message> {
         column![
             text("Synopsis".to_string()).size(10).color(Theme::TEXT_MUTED),
             text(data.synopsis.clone()).size(11).color(Theme::TEXT_SECONDARY),
-            Space::with_height(4),
+            Space::new().height(4),
         ]
         .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Content preview with truncation indicator
@@ -156,26 +156,26 @@ pub fn view(data: &QuickRefData) -> Element<'static, Message> {
             .color(Theme::TEXT_MUTED)
             .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Notes
     let notes_section: Element<'static, Message> = if !data.notes.is_empty() {
         column![
-            Space::with_height(4),
+            Space::new().height(4),
             text("Notes".to_string()).size(10).color(Theme::TEXT_MUTED),
             text(data.notes.clone()).size(11).color(Theme::TEXT_SECONDARY),
         ]
         .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     let content = column![
         header,
-        Space::with_height(2),
+        Space::new().height(2),
         meta_row,
-        Space::with_height(4),
+        Space::new().height(4),
         synopsis_section,
         scrollable(column![content_preview, truncation_hint, notes_section].padding(Padding::from([4, 0])))
             .height(Length::Fixed(120.0)),

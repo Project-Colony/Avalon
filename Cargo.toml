@@ -10,7 +10,7 @@ readme = "README.md"
 
 [dependencies]
 # GUI Framework
-iced = { version = "0.13", features = ["canvas", "tokio", "svg", "image", "advanced"] }
+iced = { version = "0.14.0", features = ["canvas", "tokio", "svg", "image", "advanced"] }
 
 # Serialization
 serde = { version = "1", features = ["derive"] }

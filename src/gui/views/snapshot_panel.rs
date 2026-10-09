@@ -13,13 +13,13 @@ pub fn view(
 ) -> Element<'static, Message> {
     let header_row = row![
         text("SNAPSHOTS").size(11).color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
+        Space::new().width(8),
         text(format!("{} snapshot(s)", snapshots.len()))
             .size(10)
             .color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text("Shortcut: Ctrl+5").size(9).color(Theme::TEXT_MUTED),
-        Space::with_width(8),
+        Space::new().width(8),
         button(text("\u{f030} Take Snapshot").size(12).color(Theme::TEXT_ACCENT),)
             .on_press(Message::CreateSnapshot)
             .padding(Padding::from([4, 12])),
@@ -84,19 +84,19 @@ pub fn view(
                 } else {
                     text("").size(9)
                 },
-                Space::with_width(8),
+                Space::new().width(8),
                 text(date).size(10).color(Theme::TEXT_MUTED),
-                Space::with_width(4),
+                Space::new().width(4),
                 text(format!("({})", age)).size(9).color(Theme::TEXT_MUTED),
-                Space::with_width(8),
+                Space::new().width(8),
                 text(words).size(10).color(Theme::TEXT_MUTED),
-                Space::with_width(4),
+                Space::new().width(4),
                 text(sim_text).size(9).color(sim_color),
-                Space::with_width(8),
+                Space::new().width(8),
                 button(text("\u{f0e2} Restore").size(10).color(Theme::TEXT_ACCENT),)
                     .on_press(Message::RestoreSnapshot(i))
                     .padding(Padding::from([2, 6])),
-                Space::with_width(4),
+                Space::new().width(4),
                 button(text("\u{f07e} Diff").size(10).color(Theme::WARNING),)
                     .on_press(Message::CompareSnapshot(i))
                     .padding(Padding::from([2, 6])),
@@ -120,7 +120,7 @@ pub fn view(
                 text(format!("Comparing: \"{}\" vs Current", snapshot.title))
                     .size(11)
                     .color(Theme::TEXT_SECONDARY),
-                Space::with_width(Length::Fill),
+                Space::new().width(Length::Fill),
                 text(format!(
                     "Snapshot: {} words | Current: {} words",
                     snapshot.word_count, current_words
@@ -182,7 +182,7 @@ pub fn view(
 
             diff_col = diff_col.push(row![
                 text(stats.summary()).size(10).color(Theme::TEXT_SECONDARY),
-                Space::with_width(8),
+                Space::new().width(8),
                 text(format!("{:.0}% changed", stats.change_percentage()))
                     .size(10)
                     .color(if stats.change_percentage() > 50.0 {
@@ -194,17 +194,17 @@ pub fn view(
 
             scrollable(diff_col).height(Length::Fixed(80.0)).into()
         } else {
-            Space::with_height(0).into()
+            Space::new().height(0).into()
         }
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     let content = column![
         header_row,
-        Space::with_height(4),
+        Space::new().height(4),
         scrollable(list).height(Length::Fixed(100.0)),
-        Space::with_height(4),
+        Space::new().height(4),
         diff_view,
     ]
     .padding(Padding::from([8, 12]));

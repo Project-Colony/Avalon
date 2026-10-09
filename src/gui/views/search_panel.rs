@@ -35,9 +35,9 @@ pub fn view(
 
     let search_row = row![
         search_input,
-        Space::with_width(4),
+        Space::new().width(4),
         search_btn,
-        Space::with_width(8),
+        Space::new().width(8),
         case_btn,
         word_btn,
         regex_btn,
@@ -56,7 +56,7 @@ pub fn view(
         .on_press(Message::DoReplaceAll)
         .padding(Padding::from([4, 12]));
 
-    let replace_row = row![replace_input, Space::with_width(4), replace_all_btn,]
+    let replace_row = row![replace_input, Space::new().width(4), replace_all_btn,]
         .spacing(2)
         .align_y(iced::Alignment::Center);
 
@@ -74,7 +74,7 @@ pub fn view(
             column![
                 row![
                     text(title).size(12).color(Theme::TEXT_PRIMARY),
-                    Space::with_width(Length::Fill),
+                    Space::new().width(Length::Fill),
                     text(format!("{} match(es)", match_count))
                         .size(10)
                         .color(Theme::TEXT_MUTED),
@@ -97,7 +97,7 @@ pub fn view(
             .padding(Padding::from([2, 8]))
             .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Smart collection button
@@ -107,19 +107,19 @@ pub fn view(
             .padding(Padding::from([2, 8]))
             .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
-    let actions_row = row![save_coll_btn, Space::with_width(4), smart_coll_btn,].spacing(2);
+    let actions_row = row![save_coll_btn, Space::new().width(4), smart_coll_btn,].spacing(2);
 
     let content = column![
         header,
-        Space::with_height(4),
+        Space::new().height(4),
         search_row,
-        Space::with_height(4),
+        Space::new().height(4),
         replace_row,
-        Space::with_height(4),
-        row![result_header, Space::with_width(Length::Fill), actions_row],
+        Space::new().height(4),
+        row![result_header, Space::new().width(Length::Fill), actions_row],
         scrollable(result_list).height(Length::Fixed(120.0)),
     ]
     .padding(Padding::from([8, 12]));

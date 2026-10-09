@@ -37,11 +37,11 @@ pub fn view<'a>(
         text(format!("{}{}", notes_indicator, title))
             .size(14)
             .color(Theme::TEXT_SECONDARY),
-        Space::with_width(8),
+        Space::new().width(8),
         text(format!("{}{}", annotation_text, footnote_text))
             .size(10)
             .color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         if script_mode {
             text(format!("[Script: {}]", script_element.unwrap_or("Action")))
                 .size(11)
@@ -66,7 +66,7 @@ pub fn view<'a>(
                 script_el_btn("Trans", "Transition", script_element),
                 script_el_btn("Shot", "Shot", script_element),
                 script_el_btn("Note", "Note", script_element),
-                Space::with_width(8),
+                Space::new().width(8),
                 text("Tab: cycle element").size(9).color(Theme::TEXT_MUTED),
             ]
             .spacing(3),
@@ -74,7 +74,7 @@ pub fn view<'a>(
         .padding(Padding::from([2, 16]))
         .into()
     } else {
-        Space::with_height(0).into()
+        Space::new().height(0).into()
     };
 
     // Formatting toolbar
@@ -85,36 +85,36 @@ pub fn view<'a>(
                 fmt_btn("I", Message::InsertItalic),
                 fmt_btn("U", Message::InsertUnderline),
                 fmt_btn("S", Message::InsertStrikethrough),
-                Space::with_width(6),
+                Space::new().width(6),
                 fmt_btn("H1", Message::InsertHeading(1)),
                 fmt_btn("H2", Message::InsertHeading(2)),
                 fmt_btn("H3", Message::InsertHeading(3)),
-                Space::with_width(6),
+                Space::new().width(6),
                 fmt_btn(">", Message::InsertBlockQuote),
                 fmt_btn("Fn", Message::InsertFootnote),
                 fmt_btn("--", Message::InsertHRule),
                 fmt_btn("```", Message::InsertCodeBlock(String::new())),
                 fmt_btn("PgBrk", Message::InsertPageBreak),
                 fmt_btn("<!--", Message::InsertComment),
-                Space::with_width(6),
+                Space::new().width(6),
                 fmt_btn("Link", Message::InsertLink),
                 fmt_btn("Img", Message::InsertImage),
-                Space::with_width(6),
+                Space::new().width(6),
                 fmt_btn("List", Message::InsertListItem("bullet".to_string())),
                 fmt_btn("1.", Message::InsertListItem("numbered".to_string())),
                 fmt_btn("[ ]", Message::InsertListItem("checkbox".to_string())),
                 fmt_btn("Table", Message::InsertTable(3, 3)),
                 fmt_btn("Date", Message::InsertDateTime("date".to_string())),
-                Space::with_width(6),
+                Space::new().width(6),
                 fmt_btn("Dup", Message::DuplicateLine),
                 fmt_btn("Del", Message::DeleteLine),
                 fmt_btn("Join", Message::JoinLines),
                 fmt_btn("Sort", Message::SortLines),
-                Space::with_width(12),
+                Space::new().width(12),
                 fmt_btn("UPPER", Message::TextToUppercase),
                 fmt_btn("lower", Message::TextToLowercase),
                 fmt_btn("Title", Message::TextToTitleCase),
-                Space::with_width(6),
+                Space::new().width(6),
                 fmt_btn("CpMD", Message::CopyAsMarkdown),
                 fmt_btn("CpHTML", Message::CopyAsHtml),
                 fmt_btn("CpTxt", Message::CopyAsPlainText),
@@ -161,7 +161,7 @@ pub fn view<'a>(
     );
     let stats_bar = container(row![
         text(stats_text).size(11).color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text(format!(
             "Ln {}, Col {}",
             editor_state.current_line(),
@@ -219,9 +219,9 @@ pub fn view_composition<'a>(
     let reading_min = word_count as f64 / crate::core::READING_WPM;
 
     let header = container(row![
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         title_text,
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
     ])
     .padding(Padding::from([8, 80]))
     .width(Length::Fill);
@@ -243,7 +243,7 @@ pub fn view_composition<'a>(
     let para_count = editor_state.document.paragraph_count();
 
     let footer = container(row![
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text(format!(
             "{} words  |  {} para  |  ~{:.1} pages  |  ~{:.0} min read{}",
             word_count,
@@ -254,15 +254,15 @@ pub fn view_composition<'a>(
         ))
         .size(11)
         .color(iced::Color::from_rgba(1.0, 1.0, 1.0, 0.4)),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
     ])
     .padding(Padding::from([4, 80]))
     .width(Length::Fill);
 
     let bottom = container(row![
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         exit_hint,
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
     ])
     .padding(Padding::from([2, 80]));
 
@@ -280,9 +280,9 @@ pub fn view_fullscreen<'a>(editor_state: &'a EditorState, title: &str) -> Elemen
 
     let header = container(
         row![
-            Space::with_width(Length::Fill),
+            Space::new().width(Length::Fill),
             text(title.to_string()).size(14).color(Theme::TEXT_SECONDARY),
-            Space::with_width(Length::Fill),
+            Space::new().width(Length::Fill),
             exit_btn,
         ]
         .padding(Padding::from([4, 16])),
@@ -306,7 +306,7 @@ pub fn view_fullscreen<'a>(editor_state: &'a EditorState, title: &str) -> Elemen
         ))
         .size(11)
         .color(Theme::TEXT_MUTED),
-        Space::with_width(Length::Fill),
+        Space::new().width(Length::Fill),
         text(format!("Ln {}", editor_state.cursor_line() + 1))
             .size(10)
             .color(Theme::TEXT_MUTED),

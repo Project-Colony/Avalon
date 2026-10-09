@@ -3656,7 +3656,7 @@ impl ScrineverApp {
             container(
                 row![
                     text(msg.clone()).size(12).color(Theme::WARNING),
-                    iced::widget::Space::with_width(Length::Fill),
+                    iced::widget::Space::new().width(Length::Fill),
                     iced::widget::button(text("x").size(12).color(Theme::TEXT_MUTED),)
                         .on_press(Message::DismissNotification)
                         .padding(Padding::from([2, 8])),
@@ -3689,7 +3689,7 @@ impl ScrineverApp {
             // then the dropdown floating over the rest of the content
             let floating = column![
                 // Spacer matching the menu bar height (~33px)
-                Space::with_height(33),
+                Space::new().height(33),
                 overlay,
             ];
 
@@ -3707,7 +3707,10 @@ impl ScrineverApp {
 
     /// Keyboard shortcuts and auto-save timer
     pub fn subscription(&self) -> Subscription<Message> {
-        let key_sub = keyboard::on_key_press(|key, modifiers| {
+        let key_sub = keyboard::listen().filter_map(|event| {
+            let keyboard::Event::KeyPressed { key, modifiers, .. } = event else {
+                return None;
+            };
             let ctrl = modifiers.control() || modifiers.command();
             let shift = modifiers.shift();
 

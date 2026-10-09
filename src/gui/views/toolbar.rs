@@ -59,10 +59,11 @@ pub fn dropdown_overlay(
     };
 
     // The floating dropdown: positioned with a left offset to align under its header
-    let positioned_dropdown = row![Space::with_width(left_offset), dropdown_content,];
+    let positioned_dropdown = row![Space::new().width(left_offset), dropdown_content,];
 
     // Full-screen click-away layer (behind the dropdown)
-    let click_away = mouse_area(Space::new(Length::Fill, Length::Fill)).on_press(Message::CloseToolbarMenu);
+    let click_away =
+        mouse_area(Space::new().width(Length::Fill).height(Length::Fill)).on_press(Message::CloseToolbarMenu);
 
     // Stack: click-away fills the whole screen, dropdown floats on top
     // at its natural width
@@ -209,7 +210,7 @@ fn section_label(label: &str) -> Element<'static, Message> {
 /// Horizontal separator line
 fn dropdown_separator() -> Element<'static, Message> {
     container(
-        container(Space::with_height(1)).style(|_theme: &iced::Theme| container::Style {
+        container(Space::new().height(1)).style(|_theme: &iced::Theme| container::Style {
             background: Some(iced::Background::Color(Theme::BORDER_SUBTLE)),
             ..Default::default()
         }),
