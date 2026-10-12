@@ -49,8 +49,10 @@ pub fn extract_text_from_rtf(rtf: &str) -> String {
                         | "\\footer"
                         | "\\headerl"
                         | "\\headerr"
+                        | "\\headerf"
                         | "\\footerl"
                         | "\\footerr"
+                        | "\\footerf"
                 ) && skip_depth.is_none()
                 {
                     skip_depth = Some(depth);
@@ -209,20 +211,17 @@ pub fn extract_text_from_rtf(rtf: &str) -> String {
         result.push('\u{FFFD}');
     }
 
-    // Clean up: collapse excessive blank lines
+    // Clean up: keep at most one blank line between paragraphs
     let mut cleaned = String::new();
-    let mut blank_count = 0;
+    let mut blank = false;
     for line in result.split('\n') {
         if line.trim().is_empty() {
-            blank_count += 1;
-            if blank_count <= 2 {
-                cleaned.push('\n');
-            }
+            blank = true;
         } else {
-            blank_count = 0;
-            if !cleaned.is_empty() && !cleaned.ends_with('\n') {
-                cleaned.push('\n');
+            if !cleaned.is_empty() {
+                cleaned.push_str(if blank { "\n\n" } else { "\n" });
             }
+            blank = false;
             cleaned.push_str(line);
         }
     }
@@ -232,8 +231,9 @@ pub fn extract_text_from_rtf(rtf: &str) -> String {
 
 /// Decode a byte of Windows-1252, the code page of `\ansi` RTF. It matches
 /// Latin-1 except for the punctuation stored in 0x80-0x9F.
-// ponytail: \ansicpgN is not read, so `\'xx` escapes in other code pages
-// (Cyrillic, Greek, CJK) decode wrongly; decode with encoding_rs if needed.
+///
+/// Limitation: `\ansicpgN` is not read, so `\'xx` escapes in other code pages
+/// (Cyrillic, Greek, CJK) decode wrongly; decode with encoding_rs if needed.
 fn cp1252_char(byte: u8) -> char {
     const HIGH: [char; 32] = [
         '\u{20ac}', '\u{81}', '\u{201a}', '\u{192}', '\u{201e}', '\u{2026}', '\u{2020}', '\u{2021}', '\u{2c6}',
@@ -384,6 +384,19 @@ mod tests {
             extract_text_from_rtf(rtf),
             "Mr.\u{a0}Smith, cooperate, well\u{2011}known"
         );
+    }
+
+    #[test]
+    fn test_extract_keeps_one_blank_line() {
+        assert_eq!(extract_text_from_rtf(r"{\rtf1 a\par\par b}"), "a\n\nb");
+        assert_eq!(extract_text_from_rtf(r"{\rtf1 a\par\par\par\par b\par c}"), "a\n\nb\nc");
+        assert_eq!(extract_text_from_rtf("{\\rtf1 a\\\n\\\nb}"), "a\n\nb");
+    }
+
+    #[test]
+    fn test_extract_first_page_header_and_footer_skipped() {
+        let rtf = r"{\rtf1{\headerf Title page}{\footerf Page one}Body}";
+        assert_eq!(extract_text_from_rtf(rtf), "Body");
     }
 
     #[test]
