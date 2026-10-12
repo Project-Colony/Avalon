@@ -69,6 +69,6 @@ tempfile = "3.27.0"
 [dev-dependencies]
 
 [profile.release]
-opt-level = 3
-lto = true
-strip = true
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
