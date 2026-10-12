@@ -125,8 +125,9 @@ impl Thesaurus {
     }
 
     /// Look up a word in the thesaurus (returns a slice to avoid cloning).
+    /// Case and surrounding whitespace are ignored.
     pub fn lookup(&self, word: &str) -> &[ThesaurusEntry] {
-        let key = word.to_lowercase();
+        let key = word.trim().to_lowercase();
         self.entries.get(&key).map(|v| v.as_slice()).unwrap_or(&[])
     }
 

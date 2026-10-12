@@ -3,7 +3,7 @@
 /// Extract plain text from RTF content by stripping all RTF control words and formatting.
 /// This is a best-effort parser that handles common RTF constructs.
 pub fn extract_text_from_rtf(rtf: &str) -> String {
-    if !rtf.starts_with('{') {
+    if !rtf.trim_start().starts_with('{') {
         return rtf.to_string();
     }
 
@@ -14,6 +14,8 @@ pub fn extract_text_from_rtf(rtf: &str) -> String {
     let mut depth = 0;
     // Track whether we are inside a group we should skip (e.g., fonttbl, colortbl, stylesheet, etc.)
     let mut skip_depth: Option<usize> = None;
+    // Number of fallback characters written after each \uN character (set by \ucN).
+    let mut unicode_fallback_len = 1;
 
     while i < len {
         let ch = chars[i];
@@ -47,7 +49,8 @@ pub fn extract_text_from_rtf(rtf: &str) -> String {
                 if skip_depth == Some(depth) {
                     skip_depth = None;
                 }
-                depth -= 1;
+                // A stray closing brace must not underflow the depth.
+                depth = depth.saturating_sub(1);
                 i += 1;
             }
             _ if skip_depth.is_some() => {
@@ -69,7 +72,7 @@ pub fn extract_text_from_rtf(rtf: &str) -> String {
                     if i + 1 < len {
                         let hex: String = chars[i..i + 2].iter().collect();
                         if let Ok(byte) = u8::from_str_radix(&hex, 16) {
-                            result.push(byte as char);
+                            result.push(cp1252_char(byte));
                         }
                         i += 2;
                     }
@@ -90,12 +93,35 @@ pub fn extract_text_from_rtf(rtf: &str) -> String {
                             result.push(c);
                         }
                     }
-                    // Skip the replacement character (usually '?')
-                    if i < len && chars[i] != '\\' && chars[i] != '{' && chars[i] != '}' {
+                    // The space after the number delimits the control word.
+                    if i < len && chars[i] == ' ' {
                         i += 1;
                     }
+                    // Skip the fallback for readers without Unicode support:
+                    // usually '?' or a \'xx escape, one per \ucN count.
+                    for _ in 0..unicode_fallback_len {
+                        if chars.get(i) == Some(&'\\') && chars.get(i + 1) == Some(&'\'') {
+                            i += 4;
+                        } else if i < len && !matches!(chars[i], '\\' | '{' | '}') {
+                            i += 1;
+                        } else {
+                            break;
+                        }
+                    }
                 } else if next == '\n' || next == '\r' {
-                    // Line break after backslash — ignore
+                    // A backslash before a line break is a paragraph break,
+                    // which is how TextEdit writes every new line.
+                    result.push('\n');
+                    i += 1;
+                } else if !next.is_ascii_alphabetic() {
+                    // Control symbol: \~ is a non-breaking space, \_ a
+                    // non-breaking hyphen; the others (\- optional hyphen,
+                    // \* and so on) add no text.
+                    match next {
+                        '~' => result.push('\u{a0}'),
+                        '_' => result.push('\u{2011}'),
+                        _ => {}
+                    }
                     i += 1;
                 } else {
                     // Control word: \wordN or \word-N or \word followed by space/delimiter
@@ -104,12 +130,14 @@ pub fn extract_text_from_rtf(rtf: &str) -> String {
                         word.push(chars[i]);
                         i += 1;
                     }
-                    // Skip optional numeric parameter
+                    // Optional numeric parameter
+                    let param_start = i;
                     if i < len && (chars[i].is_ascii_digit() || chars[i] == '-') {
                         while i < len && (chars[i].is_ascii_digit() || chars[i] == '-') {
                             i += 1;
                         }
                     }
+                    let param: String = chars[param_start..i].iter().collect();
                     // A space delimiter is consumed as part of the control word
                     if i < len && chars[i] == ' ' {
                         i += 1;
@@ -117,9 +145,10 @@ pub fn extract_text_from_rtf(rtf: &str) -> String {
 
                     // Translate known control words
                     match word.as_str() {
-                        "par" | "line" => result.push('\n'),
-                        "tab" => result.push('\t'),
-                        "page" => {
+                        "par" | "line" | "row" => result.push('\n'),
+                        "tab" | "cell" => result.push('\t'),
+                        "uc" => unicode_fallback_len = param.parse().unwrap_or(1),
+                        "page" | "sect" => {
                             result.push('\n');
                             result.push('\n');
                         }
@@ -164,6 +193,23 @@ pub fn extract_text_from_rtf(rtf: &str) -> String {
     }
 
     cleaned.trim().to_string()
+}
+
+/// Decode a byte of Windows-1252, the code page of `\ansi` RTF. It matches
+/// Latin-1 except for the punctuation stored in 0x80-0x9F.
+// ponytail: \ansicpgN is not read, so `\'xx` escapes in other code pages
+// (Cyrillic, Greek, CJK) decode wrongly; decode with encoding_rs if needed.
+fn cp1252_char(byte: u8) -> char {
+    const HIGH: [char; 32] = [
+        '\u{20ac}', '\u{81}', '\u{201a}', '\u{192}', '\u{201e}', '\u{2026}', '\u{2020}', '\u{2021}', '\u{2c6}',
+        '\u{2030}', '\u{160}', '\u{2039}', '\u{152}', '\u{8d}', '\u{17d}', '\u{8f}', '\u{90}', '\u{2018}', '\u{2019}',
+        '\u{201c}', '\u{201d}', '\u{2022}', '\u{2013}', '\u{2014}', '\u{2dc}', '\u{2122}', '\u{161}', '\u{203a}',
+        '\u{153}', '\u{9d}', '\u{17e}', '\u{178}',
+    ];
+    match byte {
+        0x80..=0x9f => HIGH[usize::from(byte - 0x80)],
+        _ => char::from(byte),
+    }
 }
 
 /// Peek ahead to read a control word starting at position `i` in the char array.
@@ -261,5 +307,52 @@ mod tests {
         let rtf = r"{\rtf1\ansi caf\'e9}";
         let text = extract_text_from_rtf(rtf);
         assert!(text.contains("caf\u{00E9}"));
+    }
+
+    #[test]
+    fn test_extract_cp1252_punctuation() {
+        let rtf = r"{\rtf1\ansi it\'92s \'93fine\'94}";
+        assert_eq!(extract_text_from_rtf(rtf), "it\u{2019}s \u{201C}fine\u{201D}");
+    }
+
+    #[test]
+    fn test_extract_word_unicode_with_hex_fallback() {
+        // Word and LibreOffice follow each \uN with a \'xx fallback.
+        let rtf = "{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0\\froman Times New Roman;}}\
+                   {\\*\\generator Riched20 10.0.19041}\\viewkind4\\uc1 \r\n\
+                   \\pard\\sa200\\f0\\fs22\\lang9 Chapter One\\par\r\n\
+                   She said \\ldblquote hi\\rdblquote  and it\\u8217\\'92s fine.\\par\r\n}";
+        assert_eq!(
+            extract_text_from_rtf(rtf),
+            "Chapter One\nShe said \u{201C}hi\u{201D} and it\u{2019}s fine."
+        );
+    }
+
+    #[test]
+    fn test_extract_textedit_line_breaks_and_uc0() {
+        // TextEdit ends each line with a backslash and writes \uc0 before \uN.
+        let rtf = "{\\rtf1\\ansi\\ansicpg1252\\cocoartf2761\n\
+                   \\cocoatextscaling0\\cocoaplatform0{\\fonttbl\\f0\\fswiss\\fcharset0 Helvetica;}\n\
+                   {\\colortbl;\\red255\\green255\\blue255;}\n\
+                   {\\*\\expandedcolortbl;;}\n\
+                   \\pard\\tx566\\pardirnatural\\partightenfactor0\n\
+                   \n\
+                   \\f0\\fs24 \\cf0 First line\\\n\
+                   Price: \\uc0\\u8364 5}";
+        assert_eq!(extract_text_from_rtf(rtf), "First line\nPrice: \u{20AC}5");
+    }
+
+    #[test]
+    fn test_extract_control_symbols() {
+        let rtf = r"{\rtf1\ansi Mr.\~Smith, co\-operate, well\_known}";
+        assert_eq!(
+            extract_text_from_rtf(rtf),
+            "Mr.\u{a0}Smith, cooperate, well\u{2011}known"
+        );
+    }
+
+    #[test]
+    fn test_extract_stray_closing_brace() {
+        assert_eq!(extract_text_from_rtf(r"{\rtf1 a}}b"), "ab");
     }
 }
