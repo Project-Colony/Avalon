@@ -321,7 +321,9 @@ fn build_footer() -> Element<'static, Message> {
             Space::new().width(6),
             text(tips[tip_index]).size(11).color(Theme::TEXT_SECONDARY),
             Space::new().width(Length::Fill),
-            text("Avalon v0.1.0").size(10).color(Theme::TEXT_MUTED),
+            text(concat!("Avalon v", env!("CARGO_PKG_VERSION")))
+                .size(10)
+                .color(Theme::TEXT_MUTED),
         ]
         .align_y(iced::Alignment::Center),
     )

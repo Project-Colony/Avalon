@@ -46,6 +46,18 @@ jobs:
       - name: Build
         run: cargo build --locked --release
 
+      # The release workflow smoke-tests every artifact with --version, after
+      # the release tag exists. This catches a binary that no longer answers it,
+      # or answers with another version, while it is still a pull request. On
+      # Windows it also covers the windowed release build printing to a pipe.
+      - name: Check --version
+        shell: bash
+        run: |
+          expected="avalon $(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)"
+          actual=$(target/release/avalon --version)
+          [ "$actual" = "$expected" ] \
+            || { echo "::error::avalon --version printed '$actual', expected '$expected'"; exit 1; }
+
       - name: Test
         run: cargo test --locked
 
