@@ -33,7 +33,7 @@ docx-rs = "0.4.22"
 zip = "2.4.2"
 
 # Spell checking
-# hunspell-rs requires system libhunspell — disabled by default
+# hunspell-rs requires system libhunspell, disabled by default
 # hunspell-rs = "0.4"
 
 # Date/time
