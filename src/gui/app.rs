@@ -190,6 +190,9 @@ impl ScrineverApp {
         spell_checker.try_init();
         spell_checker.load_user_dictionary();
 
+        let mut thesaurus = Thesaurus::new();
+        thesaurus.load_builtin();
+
         // Open the main window explicitly (daemon mode)
         let (main_id, open_main) = window::open(window::Settings {
             size: iced::Size::new(1280.0, 800.0),
@@ -218,7 +221,7 @@ impl ScrineverApp {
             search_regex: false,
             replace_text: String::new(),
             spell_checker,
-            thesaurus: Thesaurus::new(),
+            thesaurus,
             thesaurus_query: String::new(),
             thesaurus_results: Vec::new(),
             notes_text: String::new(),
@@ -3713,7 +3716,11 @@ impl ScrineverApp {
                     if let Ok(content) = std::fs::read_to_string(&path) {
                         let mut item = BinderItem::new_text(&title);
                         if let Some(ref mut doc) = item.document {
-                            doc.content = content;
+                            doc.content = if ext == "rtf" {
+                                crate::export::rtf_import::extract_text_from_rtf(&content)
+                            } else {
+                                content
+                            };
                         }
                         project.binder.draft.add_child(item);
                         count += 1;
@@ -4017,4 +4024,36 @@ async fn pick_import_paths(
         .iter()
         .map(|file| file.path().to_path_buf())
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn thesaurus_lookup_finds_common_words() {
+        let (mut app, _) = ScrineverApp::new();
+        let _ = app.update(Message::ThesaurusQueryChanged("Good ".to_string()));
+        let _ = app.update(Message::DoThesaurusLookup);
+        assert!(app
+            .thesaurus_results
+            .iter()
+            .any(|entry| entry.synonyms.iter().any(|s| s == "great")));
+    }
+
+    #[test]
+    fn rtf_import_adds_the_text_without_markup() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("Chapter.rtf");
+        let rtf = r"{\rtf1\ansi{\fonttbl\f0\fswiss Helvetica;}\f0 Hello \b world\b0 .\par}";
+        std::fs::write(&path, rtf).unwrap();
+
+        let (mut app, _) = ScrineverApp::new();
+        app.project = Some(Project::new("Test"));
+        app.import_files(vec![path]);
+
+        let draft = &app.project.as_ref().unwrap().binder.draft;
+        let item = draft.children.iter().find(|i| i.title == "Chapter").unwrap();
+        assert_eq!(item.document.as_ref().unwrap().content, "Hello world.");
+    }
 }

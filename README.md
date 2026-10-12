@@ -22,7 +22,8 @@ project and is not affiliated with Literature & Latte.
 ## What it does
 
 - Binder with documents, folders, labels, status and keywords
-- Markdown editor with find and replace, spell check, thesaurus and name generator
+- Markdown editor with find and replace, spell check, a small built-in thesaurus of
+  common English words and a name generator
 - Snapshots, automatic backups and session or project word targets
 - Compile and export to PDF, DOCX, EPUB, HTML, LaTeX, RTF, Fountain, Markdown, OPML and plain text
 - Import from `.scriv`, `.docx`, RTF, HTML and Markdown
@@ -48,10 +49,11 @@ project, named `<project> restored <timestamp>`, and opens it; the project
 folder itself is never overwritten.
 
 **Import** asks for the files to add to the draft. For a Scrivener project,
-pick the `.scrivx` file inside its `.scriv` folder. **Compile** and **Export
-OPML** ask where to write the result. These dialogs start in the folder you
-used last during the session. On Linux they come from the XDG desktop portal,
-or from `zenity` when no portal is running.
+pick the `.scrivx` file inside its `.scriv` folder. RTF files come in as plain
+text: formatting, images and headers are dropped, and table cells are separated
+by tabs. **Compile** and **Export OPML** ask where to write the result. These
+dialogs start in the folder you used last during the session. On Linux they
+come from the XDG desktop portal, or from `zenity` when no portal is running.
 
 ## Build from source
 
