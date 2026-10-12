@@ -15,14 +15,25 @@ pub fn extract_text_from_rtf(rtf: &str) -> String {
     // Track whether we are inside a group we should skip (e.g., fonttbl, colortbl, stylesheet, etc.)
     let mut skip_depth: Option<usize> = None;
     // Number of fallback characters written after each \uN character (set by \ucN).
+    // \ucN is scoped to its group, so each '{' saves the value its '}' restores.
     let mut unicode_fallback_len = 1;
+    let mut saved_fallback_lens: Vec<usize> = Vec::new();
+    // High half of a UTF-16 surrogate pair, waiting for its \uN low half.
+    let mut pending_high: Option<u32> = None;
 
     while i < len {
         let ch = chars[i];
 
+        // A high surrogate with no \uN straight after it is an error.
+        if pending_high.is_some() && !(ch == '\\' && chars.get(i + 1) == Some(&'u')) {
+            pending_high = None;
+            result.push('\u{FFFD}');
+        }
+
         match ch {
             '{' => {
                 depth += 1;
+                saved_fallback_lens.push(unicode_fallback_len);
                 i += 1;
                 // Check if this group starts with a known skip-group control word
                 let rest = peek_control_word(&chars, i);
@@ -51,6 +62,9 @@ pub fn extract_text_from_rtf(rtf: &str) -> String {
                 }
                 // A stray closing brace must not underflow the depth.
                 depth = depth.saturating_sub(1);
+                if let Some(len) = saved_fallback_lens.pop() {
+                    unicode_fallback_len = len;
+                }
                 i += 1;
             }
             _ if skip_depth.is_some() => {
@@ -89,8 +103,25 @@ pub fn extract_text_from_rtf(rtf: &str) -> String {
                     let num_str: String = chars[start..i].iter().collect();
                     if let Ok(code) = num_str.parse::<i32>() {
                         let code = if code < 0 { (code + 65536) as u32 } else { code as u32 };
-                        if let Some(c) = char::from_u32(code) {
-                            result.push(c);
+                        // Characters outside the BMP come as two \uN halves.
+                        match code {
+                            0xD800..=0xDBFF => {
+                                if pending_high.replace(code).is_some() {
+                                    result.push('\u{FFFD}');
+                                }
+                            }
+                            0xDC00..=0xDFFF => match pending_high.take() {
+                                Some(high) => {
+                                    result.extend(char::from_u32(0x10000 + ((high - 0xD800) << 10) + (code - 0xDC00)))
+                                }
+                                None => result.push('\u{FFFD}'),
+                            },
+                            _ => {
+                                if pending_high.take().is_some() {
+                                    result.push('\u{FFFD}');
+                                }
+                                result.extend(char::from_u32(code));
+                            }
                         }
                     }
                     // The space after the number delimits the control word.
@@ -172,6 +203,10 @@ pub fn extract_text_from_rtf(rtf: &str) -> String {
                 i += 1;
             }
         }
+    }
+
+    if pending_high.is_some() {
+        result.push('\u{FFFD}');
     }
 
     // Clean up: collapse excessive blank lines
@@ -354,5 +389,19 @@ mod tests {
     #[test]
     fn test_extract_stray_closing_brace() {
         assert_eq!(extract_text_from_rtf(r"{\rtf1 a}}b"), "ab");
+    }
+
+    #[test]
+    fn test_extract_uc_is_group_scoped() {
+        // Word sets \uc2 inside the run of East Asian text only.
+        let rtf = r"{\rtf1\uc1{\uc2\u12354\'82\'a0}x\u322\'6cab}";
+        assert_eq!(extract_text_from_rtf(rtf), "\u{3042}x\u{142}ab");
+    }
+
+    #[test]
+    fn test_extract_surrogate_pairs() {
+        // Word writes characters outside the BMP as two \uN halves.
+        let rtf = r"{\rtf1\uc1 a\u-10179\'3f\u-8704\'3fb\u-10179\'3fc}";
+        assert_eq!(extract_text_from_rtf(rtf), "a\u{1F600}b\u{FFFD}c");
     }
 }
