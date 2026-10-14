@@ -39,10 +39,7 @@ fn main() -> iced::Result {
         .theme(ScrineverApp::theme)
         .font(JETBRAINS_MONO_REGULAR)
         .font(JETBRAINS_MONO_BOLD)
-        .default_font(iced::Font {
-            family: iced::font::Family::Name("JetBrainsMono Nerd Font"),
-            ..iced::Font::DEFAULT
-        })
+        .default_font(gui::theme::APP_FONT)
         .run()
 }
 

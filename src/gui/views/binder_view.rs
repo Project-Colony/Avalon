@@ -1,4 +1,4 @@
-use iced::widget::{button, column, container, row, scrollable, text, Space};
+use iced::widget::{button, column, container, row, scrollable, text, tooltip, Space};
 use iced::{Color, Element, Length, Padding};
 use uuid::Uuid;
 
@@ -17,6 +17,7 @@ pub fn view(
     research: &BinderItem,
     trash: &BinderItem,
     selected_id: Option<Uuid>,
+    show_synopsis: bool,
 ) -> Element<'static, Message> {
     // ── Header ──────────────────────────────────────────
     let header = container(
@@ -32,9 +33,23 @@ pub fn view(
     .width(Length::Fill);
 
     // ── Section trees ───────────────────────────────────
-    let draft_tree = render_section("Draft", Icons::PENCIL_SQUARE, DRAFT_ACCENT, draft, selected_id);
-    let research_tree = render_section("Research", Icons::SEARCH, RESEARCH_ACCENT, research, selected_id);
-    let trash_tree = render_section("Trash", Icons::BAN, TRASH_ACCENT, trash, selected_id);
+    let draft_tree = render_section(
+        "Draft",
+        Icons::PENCIL_SQUARE,
+        DRAFT_ACCENT,
+        draft,
+        selected_id,
+        show_synopsis,
+    );
+    let research_tree = render_section(
+        "Research",
+        Icons::SEARCH,
+        RESEARCH_ACCENT,
+        research,
+        selected_id,
+        show_synopsis,
+    );
+    let trash_tree = render_section("Trash", Icons::BAN, TRASH_ACCENT, trash, selected_id, show_synopsis);
 
     // ── Empty trash button ──────────────────────────────
     let trash_actions: Element<'static, Message> = if !trash.children.is_empty() {
@@ -105,6 +120,7 @@ fn render_section(
     accent: Color,
     item: &BinderItem,
     selected_id: Option<Uuid>,
+    show_synopsis: bool,
 ) -> Element<'static, Message> {
     let mut col = column![];
 
@@ -170,7 +186,7 @@ fn render_section(
     if item.expanded {
         let mut items_col = column![].spacing(1).padding(Padding::from([2, 0]));
         for child in &item.children {
-            items_col = items_col.push(render_item(child, selected_id, 1));
+            items_col = items_col.push(render_item(child, selected_id, 1, show_synopsis));
         }
         col = col.push(items_col);
     }
@@ -185,7 +201,12 @@ fn count_docs(item: &BinderItem) -> usize {
 }
 
 /// Render a single binder item and its children
-fn render_item(item: &BinderItem, selected_id: Option<Uuid>, depth: usize) -> Element<'static, Message> {
+fn render_item(
+    item: &BinderItem,
+    selected_id: Option<Uuid>,
+    depth: usize,
+    show_synopsis: bool,
+) -> Element<'static, Message> {
     let mut col = column![];
 
     let is_selected = selected_id == Some(item.id);
@@ -318,18 +339,37 @@ fn render_item(item: &BinderItem, selected_id: Option<Uuid>, depth: usize) -> El
         .padding(Padding::from([4, 4]))
         .width(Length::Fill);
 
+    let item_btn: Element<'static, Message> = match hover_synopsis(item, show_synopsis) {
+        Some(synopsis) => tooltip(item_btn, synopsis_tooltip(synopsis), tooltip::Position::Right).into(),
+        None => item_btn.into(),
+    };
+
     col = col.push(container(item_btn).padding(Padding::from([0, 4])));
 
     // ── Render children if expanded ─────────────────────
     if item.expanded && !item.children.is_empty() {
         let mut children_col = column![].spacing(1);
         for child in &item.children {
-            children_col = children_col.push(render_item(child, selected_id, depth + 1));
+            children_col = children_col.push(render_item(child, selected_id, depth + 1, show_synopsis));
         }
         col = col.push(children_col);
     }
 
     col.into()
+}
+
+/// The synopsis to show when the pointer rests on `item`, if synopses are
+/// shown and it has one.
+fn hover_synopsis(item: &BinderItem, show_synopsis: bool) -> Option<&str> {
+    Some(item.synopsis.trim()).filter(|synopsis| show_synopsis && !synopsis.is_empty())
+}
+
+fn synopsis_tooltip(synopsis: &str) -> Element<'static, Message> {
+    container(text(synopsis.to_string()).size(11).color(Theme::TEXT_PRIMARY))
+        .style(theme::card_style)
+        .padding(Padding::from([6, 10]))
+        .max_width(280)
+        .into()
 }
 
 /// Build the bottom action bar
@@ -401,4 +441,18 @@ fn danger_icon_btn(icon: &str, message: Message) -> Element<'static, Message> {
         .style(theme::binder_danger_btn_style)
         .padding(Padding::from([4, 7]))
         .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn synopsis_shows_on_hover_only_when_enabled() {
+        let mut item = BinderItem::new_text("Scene");
+        assert_eq!(hover_synopsis(&item, true), None);
+        item.synopsis = "  The heist goes wrong. ".to_string();
+        assert_eq!(hover_synopsis(&item, true), Some("The heist goes wrong."));
+        assert_eq!(hover_synopsis(&item, false), None);
+    }
 }

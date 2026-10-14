@@ -48,6 +48,8 @@ not affiliated with Literature & Latte.
 - Binder with documents, folders, labels, status and keywords
 - Markdown editor with find and replace, spell check with a personal dictionary,
   a small built-in thesaurus of common English words and a name generator
+- Per-project editor font, size, zoom, line spacing and text width, and smart
+  punctuation as you type: curly quotes, em dashes and ellipses
 - Snapshots (`F9`), automatic backups and session or project word targets
 - Compile and export to PDF, DOCX, EPUB, HTML, LaTeX, RTF, Fountain, Markdown,
   OPML and plain text
@@ -61,7 +63,9 @@ each document and a `snapshots/` folder. **Open** asks for that folder. The
 first **Save** of a new project asks where to create it, starting in
 `~/Scrinever Projects`. From then on, saving, autosave and settings changes
 write to that same folder, even after you rename the project. Autosave starts
-once a project has been saved for the first time.
+once a project has been saved for the first time. A setting is saved the moment
+you change it, with the Settings window still open; a project that was never
+saved keeps its settings until its first save.
 
 **Backups** are zip archives of `project.json`, the `docs/` folder and the
 compile presets, written to `~/Scrinever Backups` as
@@ -167,7 +171,7 @@ same paths on every platform.
 
 | Data | Stored or sent | Where, and why |
 |---|---|---|
-| Projects | stored | the folder you choose on the first **Save**, suggested inside `~/Scrinever Projects`; holds the text, notes, snapshots and the project's settings (targets, backup interval) |
+| Projects | stored | the folder you choose on the first **Save**, suggested inside `~/Scrinever Projects`; holds the text, notes, snapshots and the project's settings (editor font and layout, smart punctuation, targets, backup interval) |
 | Backups | stored | `~/Scrinever Backups`, zip archives of your projects, made automatically every few saves when automatic backups are on, or when you ask for one |
 | Recent projects | stored | `~/.config/scrinever/recent.json`: the title, folder and last-opened time of the 20 projects you opened last, for the welcome screen |
 | Personal dictionary | stored | `~/.avalon/user_dictionary.txt`: the words you add to spell check |

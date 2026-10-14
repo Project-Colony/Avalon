@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use super::script::AutoCorrection;
+
 /// Metadata associated with a binder item
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Metadata {
@@ -105,34 +107,26 @@ pub struct ProjectSettings {
     #[serde(default)]
     pub target_deadline: Option<String>,
     pub auto_save_seconds: u32,
-    #[serde(default = "default_fullscreen_bg")]
-    pub fullscreen_bg_color: String,
+    /// Width of the text column in composition mode, in percent of the window.
     #[serde(default = "default_fullscreen_width")]
     pub fullscreen_text_width: f32,
-    #[serde(default)]
-    pub composition_bg_color: Option<String>,
+    /// Line height of the editor text, as a multiple of the font size.
     #[serde(default = "default_line_spacing")]
     pub line_spacing: f32,
 
     // --- Appearance ---
+    /// Width of the text column in the main editor, in percent of the panel.
     #[serde(default = "default_editor_width")]
     pub editor_width: f32,
 
     // --- Editor behavior ---
-    #[serde(default)]
-    pub typewriter_scroll: bool,
-    #[serde(default)]
-    pub show_paragraph_marks: bool,
-    #[serde(default = "default_true")]
-    pub spell_check_enabled: bool,
+    /// Apply the `auto_correction` substitutions as you type.
     #[serde(default = "default_true")]
     pub smart_punctuation: bool,
     #[serde(default)]
-    pub default_doc_type: String,
+    pub auto_correction: AutoCorrection,
     #[serde(default = "default_true")]
     pub show_synopsis_in_binder: bool,
-    #[serde(default)]
-    pub auto_numbering: bool,
 
     // --- Accessibility ---
     #[serde(default)]
@@ -151,10 +145,6 @@ pub struct ProjectSettings {
     pub auto_backup: bool,
     #[serde(default = "default_backup_interval")]
     pub backup_interval_saves: u32,
-}
-
-fn default_fullscreen_bg() -> String {
-    "#1a1a1e".to_string()
 }
 
 fn default_fullscreen_width() -> f32 {
@@ -218,18 +208,12 @@ impl Default for ProjectSettings {
             target_word_count: None,
             target_deadline: None,
             auto_save_seconds: 30,
-            fullscreen_bg_color: default_fullscreen_bg(),
             fullscreen_text_width: default_fullscreen_width(),
-            composition_bg_color: None,
             line_spacing: default_line_spacing(),
             editor_width: default_editor_width(),
-            typewriter_scroll: false,
-            show_paragraph_marks: false,
-            spell_check_enabled: true,
             smart_punctuation: true,
-            default_doc_type: String::new(),
+            auto_correction: AutoCorrection::default(),
             show_synopsis_in_binder: true,
-            auto_numbering: false,
             high_contrast: false,
             large_ui: false,
             reduce_motion: false,
@@ -314,7 +298,6 @@ mod tests {
     #[test]
     fn test_project_settings_fullscreen_defaults() {
         let settings = ProjectSettings::default();
-        assert_eq!(settings.fullscreen_bg_color, "#1a1a1e");
         assert!((settings.fullscreen_text_width - 60.0).abs() < 0.01);
     }
 }

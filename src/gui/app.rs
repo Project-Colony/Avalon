@@ -141,7 +141,6 @@ pub struct ScrineverApp {
     // === Script mode ===
     pub script_mode: bool,
     pub current_script_element: Option<crate::core::script::ScriptElement>,
-    pub auto_correction: crate::core::script::AutoCorrection,
 
     // === Compile presets ===
     pub compile_presets: Vec<(String, CompileOptions)>,
@@ -257,7 +256,6 @@ impl ScrineverApp {
             quick_ref_item: None,
             script_mode: false,
             current_script_element: None,
-            auto_correction: crate::core::script::AutoCorrection::default(),
             compile_presets: Vec::new(),
             footnote_counter: 0,
             show_project_stats: false,
@@ -326,6 +324,15 @@ impl ScrineverApp {
     }
 
     pub fn update(&mut self, message: Message) -> IcedTask<Message> {
+        let changes_settings = message.changes_project_settings();
+        let task = self.dispatch(message);
+        if changes_settings {
+            self.save_settings();
+        }
+        task
+    }
+
+    fn dispatch(&mut self, message: Message) -> IcedTask<Message> {
         // Close toolbar menu on any action except menu toggle itself and ticks
         if !matches!(
             message,
@@ -706,9 +713,18 @@ impl ScrineverApp {
             // ========== Editor operations ==========
             Message::EditorAction(action) => {
                 let is_edit = action.is_edit();
+                let typed = matches!(
+                    action,
+                    iced::widget::text_editor::Action::Edit(iced::widget::text_editor::Edit::Insert(_))
+                );
                 let old_len = self.editor.content.text().len();
                 let cursor_before = self.editor.cursor;
                 self.editor.content.perform(action);
+                if let Some(settings) = self.project.as_ref().map(|p| &p.settings) {
+                    if typed && settings.smart_punctuation {
+                        self.editor.correct_typed(&settings.auto_correction);
+                    }
+                }
                 if is_edit {
                     self.editor.mark_dirty();
                     let new_text = self.editor.content.text().to_string();
@@ -736,11 +752,11 @@ impl ScrineverApp {
 
                             // Record revision marks when revision mode is active
                             if delta > 0 {
-                                self.project_state.record_insertion(
-                                    cursor_before,
-                                    cursor_before + delta as usize,
-                                    &new_text[cursor_before..cursor_before + delta as usize],
-                                );
+                                let end = cursor_before + delta as usize;
+                                // The cursor is not tracked while typing, so the
+                                // range can fall inside a multi-byte character.
+                                let inserted = new_text.get(cursor_before..end).unwrap_or_default();
+                                self.project_state.record_insertion(cursor_before, end, inserted);
                             } else if delta < 0 {
                                 self.project_state.record_deletion(
                                     cursor_before,
@@ -1129,8 +1145,6 @@ impl ScrineverApp {
             }
 
             Message::HideSettings | Message::CloseSettingsWindow => {
-                // Persist settings by saving the project
-                self.save_settings();
                 if let Some(id) = self.settings_window.take() {
                     return window::close(id);
                 }
@@ -1164,8 +1178,6 @@ impl ScrineverApp {
                 // Clean up state when a window is closed externally (e.g. X button)
                 if Some(id) == self.settings_window {
                     self.settings_window = None;
-                    // Save settings on close
-                    self.save_settings();
                 } else if Some(id) == self.about_window {
                     self.about_window = None;
                 } else if id == self.main_window {
@@ -1282,24 +1294,6 @@ impl ScrineverApp {
                 }
             }
 
-            Message::SettingsToggleSpellCheck(val) => {
-                if let Some(ref mut project) = self.project {
-                    project.settings.spell_check_enabled = val;
-                }
-            }
-
-            Message::SettingsToggleTypewriterScroll(val) => {
-                if let Some(ref mut project) = self.project {
-                    project.settings.typewriter_scroll = val;
-                }
-            }
-
-            Message::SettingsToggleShowParagraphMarks(val) => {
-                if let Some(ref mut project) = self.project {
-                    project.settings.show_paragraph_marks = val;
-                }
-            }
-
             Message::SettingsToggleHighContrast(val) => {
                 if let Some(ref mut project) = self.project {
                     project.settings.high_contrast = val;
@@ -1358,21 +1352,9 @@ impl ScrineverApp {
                 }
             }
 
-            Message::SettingsSetDefaultDocType(val) => {
-                if let Some(ref mut project) = self.project {
-                    project.settings.default_doc_type = val;
-                }
-            }
-
             Message::SettingsToggleShowSynopsis(val) => {
                 if let Some(ref mut project) = self.project {
                     project.settings.show_synopsis_in_binder = val;
-                }
-            }
-
-            Message::SettingsToggleAutoNumbering(val) => {
-                if let Some(ref mut project) = self.project {
-                    project.settings.auto_numbering = val;
                 }
             }
 
@@ -1939,15 +1921,24 @@ impl ScrineverApp {
 
             // ========== Auto-correction ==========
             Message::ToggleAutoCorrectSmartQuotes => {
-                self.auto_correction.smart_quotes = !self.auto_correction.smart_quotes;
+                if let Some(ref mut project) = self.project {
+                    let rules = &mut project.settings.auto_correction;
+                    rules.smart_quotes = !rules.smart_quotes;
+                }
             }
 
             Message::ToggleAutoCorrectEmDashes => {
-                self.auto_correction.em_dashes = !self.auto_correction.em_dashes;
+                if let Some(ref mut project) = self.project {
+                    let rules = &mut project.settings.auto_correction;
+                    rules.em_dashes = !rules.em_dashes;
+                }
             }
 
             Message::ToggleAutoCorrectEllipsis => {
-                self.auto_correction.ellipsis = !self.auto_correction.ellipsis;
+                if let Some(ref mut project) = self.project {
+                    let rules = &mut project.settings.auto_correction;
+                    rules.ellipsis = !rules.ellipsis;
+                }
             }
 
             // ========== Document links ==========
@@ -2875,7 +2866,6 @@ impl ScrineverApp {
                     &project.settings,
                     &project.title,
                     self.script_mode,
-                    &self.auto_correction,
                     &self.settings_active_tab,
                 );
             }
@@ -2986,7 +2976,13 @@ impl ScrineverApp {
             } else {
                 0
             };
-            return views::editor_view::view_composition(&self.editor, title, word_count, session_words);
+            return views::editor_view::view_composition(
+                &self.editor,
+                title,
+                word_count,
+                session_words,
+                &project.settings,
+            );
         }
 
         // Fullscreen editor mode
@@ -2996,7 +2992,7 @@ impl ScrineverApp {
                 .and_then(|id| project.binder.find_item(&id))
                 .map(|item| item.title.as_str())
                 .unwrap_or("");
-            return views::editor_view::view_fullscreen(&self.editor, title);
+            return views::editor_view::view_fullscreen(&self.editor, title, &project.settings);
         }
 
         // Menu bar
@@ -3017,6 +3013,7 @@ impl ScrineverApp {
             &project.binder.research,
             &project.binder.trash,
             self.selected_item,
+            project.settings.show_synopsis_in_binder,
         );
 
         // Main content area
@@ -3041,10 +3038,16 @@ impl ScrineverApp {
                         .find_item(&split_id)
                         .map(|item| item.title.as_str())
                         .unwrap_or("Reference");
-                    views::split_editor_view::view(&self.editor, title, secondary_content, secondary_title)
+                    views::split_editor_view::view(
+                        &self.editor,
+                        title,
+                        secondary_content,
+                        secondary_title,
+                        &project.settings,
+                    )
                 } else {
                     let script_el = self.current_script_element.as_ref().map(|e| e.label());
-                    views::editor_view::view(&self.editor, title, self.script_mode, script_el)
+                    views::editor_view::view(&self.editor, title, self.script_mode, script_el, &project.settings)
                 }
             }
             ViewMode::Corkboard => {
@@ -3412,6 +3415,7 @@ impl ScrineverApp {
         let streak = project.writing_history.current_streak();
         let status_bar = views::status_bar::view(&views::status_bar::StatusBarParams {
             stats: &stats,
+            show_word_count: project.settings.show_word_count,
             target_words: project.settings.target_word_count,
             is_dirty: self.editor.dirty,
             project_title: &project.title,
@@ -3643,10 +3647,12 @@ impl ScrineverApp {
         }
     }
 
-    /// Save the project after its settings changed, if it already has a folder.
+    /// Write the title and settings to the project folder after one of them
+    /// changed. A project that was never saved has no folder yet; its first
+    /// save writes them.
     fn save_settings(&mut self) {
-        if let Some(project) = self.project.as_mut().filter(|p| p.path.is_some()) {
-            if let Err(e) = project.save() {
+        if let Some(project) = self.project.as_ref().filter(|p| p.path.is_some()) {
+            if let Err(e) = project.save_settings() {
                 self.notification = Some(format!("Settings save failed: {:#}", e));
             }
         }
@@ -4055,5 +4061,49 @@ mod tests {
         let draft = &app.project.as_ref().unwrap().binder.draft;
         let item = draft.children.iter().find(|i| i.title == "Chapter").unwrap();
         assert_eq!(item.document.as_ref().unwrap().content, "Hello world.");
+    }
+
+    #[test]
+    fn a_settings_change_is_saved_while_the_window_stays_open() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_dir = dir.path().join("Test.scriv");
+        let mut project = Project::new("Test");
+        project.save_as(&project_dir).unwrap();
+
+        let (mut app, _) = ScrineverApp::new();
+        app.project = Some(project);
+        let _ = app.update(Message::SettingsSetFontSize("20".to_string()));
+        let _ = app.update(Message::ToggleAutoCorrectEmDashes);
+        let _ = app.update(Message::SettingsToggleShowSynopsis(false));
+
+        let saved = Project::load(&project_dir).unwrap();
+        assert_eq!(saved.settings.editor_font_size, 20.0);
+        assert!(!saved.settings.auto_correction.em_dashes);
+        assert!(!saved.settings.show_synopsis_in_binder);
+        assert!(app.notification.is_none());
+    }
+
+    #[test]
+    fn typing_uses_the_smart_punctuation_settings() {
+        use iced::widget::text_editor::{Action, Edit};
+
+        fn type_text(app: &mut ScrineverApp, typed: &str) {
+            for c in typed.chars() {
+                let _ = app.update(Message::EditorAction(Action::Edit(Edit::Insert(c))));
+            }
+        }
+
+        let (mut app, _) = ScrineverApp::new();
+        app.project = Some(Project::new("Test"));
+        type_text(&mut app, "\"Wait... it's -- here\"");
+        assert_eq!(
+            app.editor.text().trim_end(),
+            "\u{201C}Wait\u{2026} it\u{2019}s \u{2014} here\u{201D}"
+        );
+
+        let _ = app.update(Message::SettingsToggleSmartPunctuation(false));
+        app.editor = EditorState::new();
+        type_text(&mut app, "\"a--b\"");
+        assert_eq!(app.editor.text().trim_end(), "\"a--b\"");
     }
 }

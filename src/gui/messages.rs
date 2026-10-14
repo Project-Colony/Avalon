@@ -55,8 +55,8 @@ pub enum ToolbarMenu {
 ///
 /// Inspired by Scrivener (7 panes), Word (10 categories), Ulysses (7 tabs):
 /// - General: project identity, saving, labels/statuses
-/// - Editor: typing behavior, navigation, composition, script mode
-/// - Corrections: proofing, auto-correct substitutions, spell check
+/// - Editor: composition mode, script mode
+/// - Corrections: smart punctuation and its substitutions
 /// - Appearance: font, layout, display toggles, UI scale
 /// - Backup: auto-backup, frequency, accessibility
 /// - Shortcuts: complete keyboard reference
@@ -186,9 +186,6 @@ pub enum Message {
     SettingsSetLineSpacing(String),
     SettingsSetLineSpacingPreset(String),
     SettingsSetEditorWidth(String),
-    SettingsToggleSpellCheck(bool),
-    SettingsToggleTypewriterScroll(bool),
-    SettingsToggleShowParagraphMarks(bool),
     SettingsToggleHighContrast(bool),
     SettingsToggleLargeUI(bool),
     SettingsToggleReduceMotion(bool),
@@ -197,9 +194,7 @@ pub enum Message {
     SettingsToggleAutoBackup(bool),
     SettingsSetBackupInterval(String),
     SettingsToggleSmartPunctuation(bool),
-    SettingsSetDefaultDocType(String),
     SettingsToggleShowSynopsis(bool),
-    SettingsToggleAutoNumbering(bool),
 
     // Writing session
     SessionToggle,
@@ -425,4 +420,39 @@ pub enum Message {
     Tick,
     DismissNotification,
     EscapePressed,
+}
+
+impl Message {
+    /// Whether this message changes a project setting. The settings are saved
+    /// as soon as one changes, so closing the Settings window loses nothing.
+    pub fn changes_project_settings(&self) -> bool {
+        matches!(
+            self,
+            Message::SettingsSetProjectTitle(_)
+                | Message::SettingsSetFont(_)
+                | Message::SettingsSetFontSize(_)
+                | Message::SettingsZoomIn
+                | Message::SettingsZoomOut
+                | Message::SettingsSetTarget(_)
+                | Message::SettingsSetDeadline(_)
+                | Message::SettingsSetAutoSave(_)
+                | Message::SettingsToggleWordCount(_)
+                | Message::SettingsSetLineSpacing(_)
+                | Message::SettingsSetLineSpacingPreset(_)
+                | Message::SettingsSetEditorWidth(_)
+                | Message::SettingsSetCompWidth(_)
+                | Message::SettingsToggleHighContrast(_)
+                | Message::SettingsToggleLargeUI(_)
+                | Message::SettingsToggleReduceMotion(_)
+                | Message::SettingsToggleScreenReaderHints(_)
+                | Message::SettingsSetUIScale(_)
+                | Message::SettingsToggleAutoBackup(_)
+                | Message::SettingsSetBackupInterval(_)
+                | Message::SettingsToggleSmartPunctuation(_)
+                | Message::SettingsToggleShowSynopsis(_)
+                | Message::ToggleAutoCorrectSmartQuotes
+                | Message::ToggleAutoCorrectEmDashes
+                | Message::ToggleAutoCorrectEllipsis
+        )
+    }
 }

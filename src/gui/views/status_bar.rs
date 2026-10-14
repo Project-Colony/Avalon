@@ -20,6 +20,8 @@ pub fn view_mode_label(mode: &str) -> &str {
 /// Parameters for the status bar view, bundled to avoid too many function arguments.
 pub struct StatusBarParams<'a> {
     pub stats: &'a Statistics,
+    /// Whether to show the word, character and page counts.
+    pub show_word_count: bool,
     pub target_words: Option<usize>,
     pub is_dirty: bool,
     pub project_title: &'a str,
@@ -35,6 +37,7 @@ pub struct StatusBarParams<'a> {
 pub fn view(params: &StatusBarParams<'_>) -> Element<'static, Message> {
     let StatusBarParams {
         stats,
+        show_word_count,
         target_words,
         is_dirty,
         project_title,
@@ -56,26 +59,10 @@ pub fn view(params: &StatusBarParams<'_>) -> Element<'static, Message> {
 
     let progress = stats.progress_string(*target_words);
 
-    // Reading time estimate
-    let reading_min = stats.word_count as f64 / crate::core::READING_WPM;
-    let reading_display = if reading_min < 1.0 {
-        "<1m read".to_string()
-    } else if reading_min < 60.0 {
-        format!("~{:.0}m read", reading_min)
-    } else {
-        format!("~{:.1}h read", reading_min / 60.0)
+    let stats_info: Element<'static, Message> = match counts_text(stats, *show_word_count) {
+        Some(counts) => row![Space::new().width(12), text(counts).size(10).color(Theme::TEXT_MUTED),].into(),
+        None => Space::new().width(0).into(),
     };
-
-    // Compact stats with formatting
-    let stats_text = format!(
-        "W:{} | Ch:{} | S:{} | P:{} | Pg:{:.1} | {}",
-        format_stat(stats.word_count),
-        format_stat(stats.char_count),
-        format_stat(stats.sentence_count),
-        stats.paragraph_count,
-        stats.page_count,
-        reading_display
-    );
 
     // Session indicator
     let session_indicator: Element<'static, Message> = if *session_active {
@@ -181,8 +168,7 @@ pub fn view(params: &StatusBarParams<'_>) -> Element<'static, Message> {
         Space::new().width(Length::Fill),
         text(progress).size(10).color(Theme::TEXT_PRIMARY),
         target_info,
-        Space::new().width(12),
-        text(stats_text).size(10).color(Theme::TEXT_MUTED),
+        stats_info,
         Space::new().width(8),
         text(docs_text).size(10).color(Theme::TEXT_MUTED),
         Space::new().width(8),
@@ -198,7 +184,46 @@ pub fn view(params: &StatusBarParams<'_>) -> Element<'static, Message> {
         .into()
 }
 
+/// The word, character and page counts, or `None` when the project hides them.
+fn counts_text(stats: &Statistics, show_word_count: bool) -> Option<String> {
+    if !show_word_count {
+        return None;
+    }
+    let reading_min = stats.word_count as f64 / crate::core::READING_WPM;
+    let reading_display = if reading_min < 1.0 {
+        "<1m read".to_string()
+    } else if reading_min < 60.0 {
+        format!("~{:.0}m read", reading_min)
+    } else {
+        format!("~{:.1}h read", reading_min / 60.0)
+    };
+    Some(format!(
+        "W:{} | Ch:{} | S:{} | P:{} | Pg:{:.1} | {}",
+        format_stat(stats.word_count),
+        format_stat(stats.char_count),
+        format_stat(stats.sentence_count),
+        stats.paragraph_count,
+        stats.page_count,
+        reading_display
+    ))
+}
+
 /// Format a number with comma separators for large values
 fn format_stat(n: usize) -> String {
     theme::format_compact(n)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn word_count_setting_shows_or_hides_the_counts() {
+        let stats = Statistics {
+            word_count: 1200,
+            ..Default::default()
+        };
+        assert!(counts_text(&stats, true).unwrap().starts_with("W:"));
+        assert_eq!(counts_text(&stats, false), None);
+    }
 }

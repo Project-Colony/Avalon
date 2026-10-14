@@ -147,6 +147,32 @@ impl AutoCorrection {
         result
     }
 
+    /// The correction to make as a character is typed. `before` is the text of
+    /// the line up to the cursor, ending with the character just typed. The
+    /// result is how many characters to remove before the cursor and the
+    /// character that replaces them.
+    ///
+    /// Double hyphens at the start of a line or after punctuation, as in a
+    /// Markdown rule `---` or a comment `<!--`, are left alone.
+    pub fn correct_typed(&self, before: &str) -> Option<(usize, char)> {
+        let mut previous = before.chars().rev();
+        let typed = previous.next()?;
+        let last = previous.next();
+        // A quote opens at the start of a line, after a space or after an
+        // opening bracket or dash, and closes everywhere else.
+        let opens = last.is_none_or(|c| c.is_whitespace() || "([{\u{2014}".contains(c));
+        match typed {
+            '-' if self.em_dashes && last == Some('-') => previous
+                .next()
+                .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+                .map(|_| (2, '\u{2014}')),
+            '.' if self.ellipsis && last == Some('.') && previous.next() == Some('.') => Some((3, '\u{2026}')),
+            '"' if self.smart_quotes => Some((1, if opens { '\u{201C}' } else { '\u{201D}' })),
+            '\'' if self.smart_quotes => Some((1, if opens { '\u{2018}' } else { '\u{2019}' })),
+            _ => None,
+        }
+    }
+
     /// Check if any correction is enabled
     pub fn any_enabled(&self) -> bool {
         self.smart_quotes || self.em_dashes || self.ellipsis || self.capitalize_sentences || self.superscript_ordinals
@@ -534,5 +560,42 @@ mod tests {
             ScriptElement::Parenthetical.next_element_on_enter(),
             ScriptElement::Dialogue
         ));
+    }
+
+    #[test]
+    fn correct_typed_replaces_punctuation_as_you_type() {
+        let ac = AutoCorrection::default();
+        assert_eq!(ac.correct_typed("word--"), Some((2, '\u{2014}')));
+        assert_eq!(ac.correct_typed("word --"), Some((2, '\u{2014}')));
+        assert_eq!(ac.correct_typed("Wait..."), Some((3, '\u{2026}')));
+        assert_eq!(ac.correct_typed("\""), Some((1, '\u{201C}')));
+        assert_eq!(ac.correct_typed("said \""), Some((1, '\u{201C}')));
+        assert_eq!(ac.correct_typed("\u{201C}Hi\""), Some((1, '\u{201D}')));
+        assert_eq!(ac.correct_typed("don'"), Some((1, '\u{2019}')));
+        assert_eq!(ac.correct_typed("('"), Some((1, '\u{2018}')));
+    }
+
+    #[test]
+    fn correct_typed_keeps_markdown_and_plain_text() {
+        let ac = AutoCorrection::default();
+        assert_eq!(ac.correct_typed("--"), None);
+        assert_eq!(ac.correct_typed("<!--"), None);
+        assert_eq!(ac.correct_typed("|--"), None);
+        assert_eq!(ac.correct_typed("word-"), None);
+        assert_eq!(ac.correct_typed("end.."), None);
+        assert_eq!(ac.correct_typed("abc"), None);
+        assert_eq!(ac.correct_typed(""), None);
+    }
+
+    #[test]
+    fn correct_typed_follows_each_substitution_toggle() {
+        let mut ac = AutoCorrection::default();
+        ac.disable_all();
+        assert_eq!(ac.correct_typed("word--"), None);
+        assert_eq!(ac.correct_typed("Wait..."), None);
+        assert_eq!(ac.correct_typed("\""), None);
+        ac.ellipsis = true;
+        assert_eq!(ac.correct_typed("Wait..."), Some((3, '\u{2026}')));
+        assert_eq!(ac.correct_typed("word--"), None);
     }
 }

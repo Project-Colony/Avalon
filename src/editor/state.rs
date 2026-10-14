@@ -66,6 +66,25 @@ impl EditorState {
         self.document.content = self.text();
     }
 
+    /// Apply the smart punctuation `rules` to the character just typed before
+    /// the cursor, such as turning `--` into an em dash.
+    pub fn correct_typed(&mut self, rules: &crate::core::script::AutoCorrection) {
+        use iced::widget::text_editor::{Action, Edit};
+
+        let cursor = self.content.cursor().position;
+        let correction = self.content.line(cursor.line).and_then(|line| {
+            line.text
+                .get(..cursor.column)
+                .and_then(|before| rules.correct_typed(before))
+        });
+        if let Some((remove, replacement)) = correction {
+            for _ in 0..remove {
+                self.content.perform(Action::Edit(Edit::Backspace));
+            }
+            self.content.perform(Action::Edit(Edit::Insert(replacement)));
+        }
+    }
+
     /// Mark the document as saved
     pub fn mark_clean(&mut self) {
         self.dirty = false;
