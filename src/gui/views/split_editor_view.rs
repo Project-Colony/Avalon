@@ -1,6 +1,7 @@
-use iced::widget::{button, column, container, row, text, text_editor, Space};
+use iced::widget::{button, column, container, row, text, Space};
 use iced::{Element, Length, Padding};
 
+use crate::core::metadata::ProjectSettings;
 use crate::editor::EditorState;
 use crate::gui::app::Message;
 use crate::gui::theme::Theme;
@@ -11,6 +12,7 @@ pub fn view<'a>(
     primary_title: &str,
     secondary_content: &str,
     secondary_title: &str,
+    settings: &ProjectSettings,
 ) -> Element<'a, Message> {
     // Primary editor (left) - editable
     let primary_words = primary_editor.document.word_count();
@@ -29,10 +31,7 @@ pub fn view<'a>(
     )
     .width(Length::Fill);
 
-    let primary = text_editor(&primary_editor.content)
-        .on_action(Message::EditorAction)
-        .padding(Padding::from([12, 16]))
-        .height(Length::Fill);
+    let primary = super::editor_view::writing_area(primary_editor, settings, Padding::from([12, 16]));
 
     let dirty_marker = if primary_editor.dirty { " \u{2022}" } else { "" };
     let primary_footer = container(row![

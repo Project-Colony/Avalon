@@ -1,9 +1,81 @@
+use iced::font::Family;
+use iced::widget::text::LineHeight;
 use iced::widget::{button, column, container, row, scrollable, text, text_editor, Space};
-use iced::{Element, Length, Padding};
+use iced::{Element, Font, Length, Padding};
 
+use crate::core::metadata::ProjectSettings;
 use crate::editor::EditorState;
 use crate::gui::app::Message;
 use crate::gui::theme::{self, Theme};
+
+/// How the editor sets its text, from the project's appearance settings.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TextLook {
+    pub font: Font,
+    /// The font size times the zoom.
+    pub size: f32,
+    /// The line height, as a multiple of the size.
+    pub line_height: f32,
+}
+
+impl TextLook {
+    pub fn new(settings: &ProjectSettings) -> Self {
+        let family = match settings.editor_font.as_str() {
+            "serif" => Some(Family::Serif),
+            "sans-serif" => Some(Family::SansSerif),
+            _ => None,
+        };
+        Self {
+            // "monospace" keeps the bundled JetBrains Mono the rest of the app uses.
+            font: family.map_or(theme::APP_FONT, |family| Font {
+                family,
+                ..Font::DEFAULT
+            }),
+            size: settings.editor_font_size * settings.editor_zoom,
+            line_height: settings.line_spacing,
+        }
+    }
+}
+
+/// The editable text, set in the project's font, size, zoom and line spacing.
+pub fn writing_area<'a>(
+    editor_state: &'a EditorState,
+    settings: &ProjectSettings,
+    padding: Padding,
+) -> Element<'a, Message> {
+    let look = TextLook::new(settings);
+    text_editor(&editor_state.content)
+        .on_action(Message::EditorAction)
+        .font(look.font)
+        .size(look.size)
+        .line_height(LineHeight::Relative(look.line_height))
+        .padding(padding)
+        .height(Length::Fill)
+        .into()
+}
+
+/// Centre `content` in a column `percent` of the available width wide.
+fn text_column(content: Element<'_, Message>, percent: f32) -> Element<'_, Message> {
+    let Some((margin, middle)) = column_portions(percent) else {
+        return content;
+    };
+    row![
+        Space::new().width(Length::FillPortion(margin)),
+        container(content)
+            .width(Length::FillPortion(middle))
+            .height(Length::Fill),
+        Space::new().width(Length::FillPortion(margin)),
+    ]
+    .height(Length::Fill)
+    .into()
+}
+
+/// The fill portions of each margin and of the text for a text column
+/// `percent` wide, or `None` when the text takes the whole width.
+fn column_portions(percent: f32) -> Option<(u16, u16)> {
+    let percent = percent.round().clamp(10.0, 100.0) as u16;
+    (percent < 100).then(|| (100 - percent, 2 * percent))
+}
 
 /// Render the main text editor view
 pub fn view<'a>(
@@ -11,6 +83,7 @@ pub fn view<'a>(
     title: &str,
     script_mode: bool,
     script_element: Option<&str>,
+    settings: &ProjectSettings,
 ) -> Element<'a, Message> {
     // Document annotations/notes indicator
     let notes_indicator = if editor_state.document.has_notes() {
@@ -127,10 +200,10 @@ pub fn view<'a>(
     .padding(Padding::from([4, 16]))
     .width(Length::Fill);
 
-    let editor = text_editor(&editor_state.content)
-        .on_action(Message::EditorAction)
-        .padding(Padding::from([16, 24]))
-        .height(Length::Fill);
+    let editor = text_column(
+        writing_area(editor_state, settings, Padding::from([16, 24])),
+        settings.editor_width,
+    );
 
     let word_count = editor_state.document.word_count();
     let page_est = word_count as f64 / crate::core::WORDS_PER_PAGE as f64;
@@ -206,6 +279,7 @@ pub fn view_composition<'a>(
     title: &str,
     word_count: usize,
     session_words: i64,
+    settings: &ProjectSettings,
 ) -> Element<'a, Message> {
     let exit_hint = text("Esc: exit  |  F5: toggle  |  Ctrl+S: save")
         .size(10)
@@ -226,10 +300,10 @@ pub fn view_composition<'a>(
     .padding(Padding::from([8, 80]))
     .width(Length::Fill);
 
-    let editor = text_editor(&editor_state.content)
-        .on_action(Message::EditorAction)
-        .padding(Padding::from([32, 120]))
-        .height(Length::Fill);
+    let editor = text_column(
+        writing_area(editor_state, settings, Padding::from([32, 24])),
+        settings.fullscreen_text_width,
+    );
 
     // Session progress
     let session_str = if session_words != 0 {
@@ -273,7 +347,11 @@ pub fn view_composition<'a>(
 }
 
 /// Render fullscreen (distraction-free) editor mode
-pub fn view_fullscreen<'a>(editor_state: &'a EditorState, title: &str) -> Element<'a, Message> {
+pub fn view_fullscreen<'a>(
+    editor_state: &'a EditorState,
+    title: &str,
+    settings: &ProjectSettings,
+) -> Element<'a, Message> {
     let exit_btn = button(text("Exit Focus Mode").size(12).color(Theme::TEXT_MUTED))
         .on_press(Message::ToggleFullscreen)
         .padding(Padding::from([4, 12]));
@@ -289,10 +367,7 @@ pub fn view_fullscreen<'a>(editor_state: &'a EditorState, title: &str) -> Elemen
     )
     .width(Length::Fill);
 
-    let editor = text_editor(&editor_state.content)
-        .on_action(Message::EditorAction)
-        .padding(Padding::from([24, 80]))
-        .height(Length::Fill);
+    let editor = writing_area(editor_state, settings, Padding::from([24, 80]));
 
     let word_count = editor_state.document.word_count();
     let char_count = editor_state.document.char_count();
@@ -318,4 +393,40 @@ pub fn view_fullscreen<'a>(editor_state: &'a EditorState, title: &str) -> Elemen
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn text_look_follows_the_appearance_settings() {
+        let mut settings = ProjectSettings::default();
+        let default = TextLook::new(&settings);
+        assert_eq!(default.font, theme::APP_FONT);
+        assert_eq!(default.size, 16.0);
+        assert_eq!(default.line_height, 1.5);
+
+        settings.editor_font = "serif".to_string();
+        assert_eq!(TextLook::new(&settings).font.family, Family::Serif);
+        settings.editor_font = "sans-serif".to_string();
+        assert_eq!(TextLook::new(&settings).font.family, Family::SansSerif);
+
+        settings.editor_font_size = 20.0;
+        assert_eq!(TextLook::new(&settings).size, 20.0);
+        settings.editor_zoom = 1.5;
+        assert_eq!(TextLook::new(&settings).size, 30.0);
+
+        settings.line_spacing = 2.0;
+        assert_eq!(TextLook::new(&settings).line_height, 2.0);
+    }
+
+    #[test]
+    fn column_portions_give_the_text_its_share_of_the_width() {
+        // Margins of 20 and a text of 160 out of 200: the text takes 80%.
+        assert_eq!(column_portions(80.0), Some((20, 160)));
+        assert_eq!(column_portions(60.0), Some((40, 120)));
+        assert_eq!(column_portions(100.0), None);
+        assert_eq!(column_portions(5.0), Some((90, 20)));
+    }
 }

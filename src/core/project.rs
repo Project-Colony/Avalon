@@ -164,6 +164,27 @@ impl Project {
         self.write_to(project_dir)
     }
 
+    /// Write the title and settings into the saved `project.json` and leave
+    /// the rest of the saved project as it is.
+    ///
+    /// Settings are saved as soon as one changes. A full [`Project::save`]
+    /// would also rewrite every document, and could write binder entries
+    /// whose documents are not on disk yet.
+    pub fn save_settings(&self) -> Result<()> {
+        let meta_path = self
+            .path
+            .as_ref()
+            .context("The project has no folder yet; choose where to save it first")?
+            .join("project.json");
+        let json = fs::read_to_string(&meta_path).context("Failed to read project metadata")?;
+        let mut saved: serde_json::Value = serde_json::from_str(&json).context("Failed to parse project metadata")?;
+        let fields = saved.as_object_mut().context("project.json does not hold a project")?;
+        fields.insert("title".to_string(), serde_json::Value::String(self.title.clone()));
+        fields.insert("settings".to_string(), serde_json::to_value(&self.settings)?);
+        let json = serde_json::to_string_pretty(&saved).context("Failed to serialize project")?;
+        write_atomic(&meta_path, json.as_bytes()).context("Failed to write project metadata")
+    }
+
     /// Write every project file into `project_dir`.
     fn write_to(&mut self, project_dir: &Path) -> Result<()> {
         let project_dir = project_dir.to_path_buf();
@@ -1135,5 +1156,67 @@ mod tests {
         assert_eq!(doc.annotations[0].start, 4);
         assert_eq!(doc.annotations[0].end, 19);
         assert_eq!(doc.annotations[1].text, "Consider stronger word");
+    }
+
+    #[test]
+    fn save_settings_writes_only_the_title_and_settings() {
+        use crate::core::binder::BinderItem;
+
+        let dir = tempfile::tempdir().unwrap();
+        let project_dir = dir.path().join("Settings.scriv");
+        let mut project = Project::new("Settings");
+        project.save_as(&project_dir).unwrap();
+
+        // A document added since the last save stays out of project.json.
+        project.binder.draft.add_child(BinderItem::new_text("Unsaved"));
+        project.title = "Renamed".to_string();
+        project.settings.editor_font_size = 21.0;
+        project.settings.auto_correction.em_dashes = false;
+        project.save_settings().unwrap();
+
+        let loaded = Project::load(&project_dir).unwrap();
+        assert_eq!(loaded.title, "Renamed");
+        assert_eq!(loaded.settings.editor_font_size, 21.0);
+        assert!(!loaded.settings.auto_correction.em_dashes);
+        assert!(loaded.binder.draft.children.iter().all(|item| item.title != "Unsaved"));
+    }
+
+    #[test]
+    fn save_settings_needs_a_saved_project() {
+        assert!(Project::new("Never saved").save_settings().is_err());
+    }
+
+    #[test]
+    fn a_project_saved_with_the_removed_settings_still_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_dir = dir.path().join("Legacy.scriv");
+        Project::new("Legacy").save_as(&project_dir).unwrap();
+
+        // Rewrite the settings as an older Avalon saved them: preferences
+        // that did nothing then, and no auto-correction rules.
+        let meta_path = project_dir.join("project.json");
+        let mut json: serde_json::Value = serde_json::from_str(&fs::read_to_string(&meta_path).unwrap()).unwrap();
+        let settings = json["settings"].as_object_mut().unwrap();
+        settings.remove("auto_correction");
+        for (key, value) in [
+            ("fullscreen_bg_color", serde_json::json!("#1a1a1e")),
+            ("composition_bg_color", serde_json::json!(null)),
+            ("typewriter_scroll", serde_json::json!(true)),
+            ("show_paragraph_marks", serde_json::json!(true)),
+            ("spell_check_enabled", serde_json::json!(false)),
+            ("default_doc_type", serde_json::json!("Scene")),
+            ("auto_numbering", serde_json::json!(true)),
+            ("smart_punctuation", serde_json::json!(false)),
+            ("editor_font", serde_json::json!("serif")),
+        ] {
+            settings.insert(key.to_string(), value);
+        }
+        fs::write(&meta_path, serde_json::to_string_pretty(&json).unwrap()).unwrap();
+
+        let loaded = Project::load(&project_dir).unwrap();
+        assert_eq!(loaded.title, "Legacy");
+        assert_eq!(loaded.settings.editor_font, "serif");
+        assert!(!loaded.settings.smart_punctuation);
+        assert!(loaded.settings.auto_correction.smart_quotes);
     }
 }

@@ -124,7 +124,6 @@ pub fn view(
     settings: &ProjectSettings,
     project_title: &str,
     script_mode: bool,
-    auto_correction: &crate::core::script::AutoCorrection,
     active_tab: &SettingsTab,
 ) -> Element<'static, Message> {
     // ── Sidebar ──
@@ -167,7 +166,7 @@ pub fn view(
     let content: Element<'_, Message> = match active_tab {
         SettingsTab::General => tab_general(settings, project_title),
         SettingsTab::Editor => tab_editor(settings, script_mode),
-        SettingsTab::Corrections => tab_corrections(settings, auto_correction),
+        SettingsTab::Corrections => tab_corrections(settings),
         SettingsTab::Appearance => tab_appearance(settings),
         SettingsTab::Backup => tab_backup(settings),
         SettingsTab::Shortcuts => tab_shortcuts(),
@@ -218,26 +217,6 @@ fn tab_general(settings: &ProjectSettings, project_title: &str) -> Element<'stat
         .size(13)
         .padding(6)
         .width(Length::Fixed(80.0));
-
-    let doc_type_options = vec![
-        "".to_string(),
-        "Scene".to_string(),
-        "Chapter".to_string(),
-        "Part".to_string(),
-        "Note".to_string(),
-    ];
-    let current_doc_type = if settings.default_doc_type.is_empty() {
-        "".to_string()
-    } else {
-        settings.default_doc_type.clone()
-    };
-    let doc_type_picker = pick_list(
-        doc_type_options,
-        Some(current_doc_type),
-        Message::SettingsSetDefaultDocType,
-    )
-    .width(Length::Fixed(160.0))
-    .placeholder("None (default)");
 
     // Labels
     let mut labels_col = column![].spacing(4);
@@ -320,12 +299,7 @@ fn tab_general(settings: &ProjectSettings, project_title: &str) -> Element<'stat
         .align_y(iced::Alignment::Center),
         setting_description("How often unsaved changes are written to disk"),
         divider(),
-        section_header("New Documents"),
-        setting_label("Default type for new documents"),
-        Space::new().height(4),
-        doc_type_picker,
-        setting_description("Pre-selected type when creating a new binder item"),
-        Space::new().height(8),
+        section_header("Binder"),
         toggle_setting(
             settings.show_synopsis_in_binder,
             "Show synopses in binder",
@@ -362,20 +336,6 @@ fn tab_editor(settings: &ProjectSettings, script_mode: bool) -> Element<'static,
         .width(Length::Fixed(80.0));
 
     column![
-        section_header("Typing"),
-        toggle_setting(
-            settings.typewriter_scroll,
-            "Typewriter scrolling",
-            "Keep the active line vertically centered while typing",
-            Message::SettingsToggleTypewriterScroll,
-        ),
-        toggle_setting(
-            settings.show_paragraph_marks,
-            "Show paragraph marks",
-            "Display invisible formatting characters in the editor",
-            Message::SettingsToggleShowParagraphMarks,
-        ),
-        divider(),
         section_header("Composition Mode"),
         setting_description(
             "Distraction-free writing environment. \
@@ -402,13 +362,6 @@ fn tab_editor(settings: &ProjectSettings, script_mode: bool) -> Element<'static,
              dialogue, parentheticals, and transitions following standard \
              screenplay formatting rules."
         ),
-        Space::new().height(8),
-        toggle_setting(
-            settings.auto_numbering,
-            "Auto-number scenes on compile",
-            "Prepend sequential scene numbers when compiling",
-            Message::SettingsToggleAutoNumbering,
-        ),
     ]
     .spacing(2)
     .max_width(540)
@@ -420,24 +373,18 @@ fn tab_editor(settings: &ProjectSettings, script_mode: bool) -> Element<'static,
 //  (cf. Scrivener "Corrections" + Word "Proofing")
 // ═══════════════════════════════════════════════════════════════════════
 
-fn tab_corrections(
-    settings: &ProjectSettings,
-    auto_correction: &crate::core::script::AutoCorrection,
-) -> Element<'static, Message> {
+fn tab_corrections(settings: &ProjectSettings) -> Element<'static, Message> {
+    let auto_correction = &settings.auto_correction;
     column![
         section_header("Spelling"),
-        toggle_setting(
-            settings.spell_check_enabled,
-            "Check spelling while typing",
-            "Underline misspelled words in real time (F7 for full check)",
-            Message::SettingsToggleSpellCheck,
-        ),
+        setting_description("Press F7 to check the spelling of the open document"),
         divider(),
         section_header("Auto-Correct"),
         toggle_setting(
             settings.smart_punctuation,
             "Smart punctuation",
-            "Automatically replace straight quotes and hyphens with typographic equivalents",
+            "Replace straight quotes, double hyphens and three dots with typographic \
+             characters as you type, using the substitutions below",
             Message::SettingsToggleSmartPunctuation,
         ),
         divider(),
@@ -454,7 +401,10 @@ fn tab_corrections(
             .label("Em dash   --  \u{2192}  \u{2014}")
             .on_toggle(|_| Message::ToggleAutoCorrectEmDashes),
         Space::new().height(2),
-        setting_description("Convert double hyphens into a proper em dash"),
+        setting_description(
+            "Convert double hyphens after a word or a space into a proper em dash; \
+             Markdown rules and comments are left alone"
+        ),
         Space::new().height(8),
         toggler(auto_correction.ellipsis)
             .label("Ellipsis   ...  \u{2192}  \u{2026}")

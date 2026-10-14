@@ -1,4 +1,6 @@
 use crate::core::document::Document;
+use crate::core::script::AutoCorrection;
+use iced::widget::text_editor::{Action, Cursor, Edit};
 use std::collections::{HashSet, VecDeque};
 
 /// The state of the text editor
@@ -20,6 +22,9 @@ pub struct EditorState {
     pub scroll_offset: f32,
     /// The iced text editor content
     pub content: iced::widget::text_editor::Content,
+    /// The cursor right after the last smart punctuation correction and the
+    /// characters it replaced, so a Backspace there can put them back.
+    pub last_correction: Option<(Cursor, String)>,
 }
 
 /// An entry in the undo/redo stack
@@ -40,6 +45,7 @@ impl EditorState {
             dirty: false,
             scroll_offset: 0.0,
             content: iced::widget::text_editor::Content::new(),
+            last_correction: None,
         }
     }
 
@@ -53,6 +59,7 @@ impl EditorState {
         self.redo_stack.clear();
         self.dirty = false;
         self.scroll_offset = 0.0;
+        self.last_correction = None;
     }
 
     /// Get the current text content from the iced editor
@@ -64,6 +71,45 @@ impl EditorState {
     pub fn mark_dirty(&mut self) {
         self.dirty = true;
         self.document.content = self.text();
+    }
+
+    /// Apply an editor action. With smart punctuation `rules`, a typed
+    /// character is corrected as you type, and a Backspace right after a
+    /// correction puts back the characters it replaced instead.
+    pub fn perform(&mut self, action: Action, rules: Option<&AutoCorrection>) {
+        let typed = matches!(action, Action::Edit(Edit::Insert(_)));
+        let backspace = matches!(action, Action::Edit(Edit::Backspace));
+        let undo = self
+            .last_correction
+            .take()
+            .filter(|(cursor, _)| backspace && *cursor == self.content.cursor());
+        self.content.perform(action);
+        if let Some((_, original)) = undo {
+            for c in original.chars() {
+                self.content.perform(Action::Edit(Edit::Insert(c)));
+            }
+        } else if let Some(rules) = rules.filter(|_| typed) {
+            self.correct_typed(rules);
+        }
+    }
+
+    /// Apply the smart punctuation `rules` to the character just typed before
+    /// the cursor, such as turning `--` into an em dash.
+    fn correct_typed(&mut self, rules: &AutoCorrection) {
+        let cursor = self.content.cursor().position;
+        let correction = self.content.line(cursor.line).and_then(|line| {
+            let before = line.text.get(..cursor.column)?;
+            let (remove, replacement) = rules.correct_typed(before)?;
+            let start = before.char_indices().rev().nth(remove - 1)?.0;
+            Some((remove, replacement, before[start..].to_string()))
+        });
+        if let Some((remove, replacement, original)) = correction {
+            for _ in 0..remove {
+                self.content.perform(Action::Edit(Edit::Backspace));
+            }
+            self.content.perform(Action::Edit(Edit::Insert(replacement)));
+            self.last_correction = Some((self.content.cursor(), original));
+        }
     }
 
     /// Mark the document as saved
@@ -536,6 +582,40 @@ mod tests {
 
     // Note: tests use document.content directly because iced Content::with_text()
     // may add a trailing newline in the widget representation.
+
+    #[test]
+    fn backspace_right_after_a_correction_puts_back_the_typed_characters() {
+        use iced::widget::text_editor::Motion;
+
+        let rules = AutoCorrection::default();
+        let mut editor = EditorState::new();
+        let type_text = |editor: &mut EditorState, typed: &str| {
+            for c in typed.chars() {
+                editor.perform(Action::Edit(Edit::Insert(c)), Some(&rules));
+            }
+        };
+        let backspace = |editor: &mut EditorState| editor.perform(Action::Edit(Edit::Backspace), Some(&rules));
+
+        type_text(&mut editor, "a--");
+        assert_eq!(editor.text().trim_end(), "a\u{2014}");
+        backspace(&mut editor);
+        assert_eq!(editor.text().trim_end(), "a--");
+        // The next Backspace deletes as usual.
+        backspace(&mut editor);
+        assert_eq!(editor.text().trim_end(), "a-");
+
+        // So does a Backspace once the cursor has moved.
+        type_text(&mut editor, " \"");
+        assert_eq!(editor.text().trim_end(), "a- \u{201C}");
+        editor.perform(Action::Move(Motion::Left), Some(&rules));
+        editor.perform(Action::Move(Motion::Right), Some(&rules));
+        backspace(&mut editor);
+        assert_eq!(editor.text().trim_end(), "a-");
+
+        // Without rules, nothing is corrected.
+        editor.perform(Action::Edit(Edit::Insert('"')), None);
+        assert_eq!(editor.text().trim_end(), "a- \"");
+    }
 
     #[test]
     fn test_transpose_chars() {

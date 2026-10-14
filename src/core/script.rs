@@ -85,12 +85,11 @@ impl ScriptElement {
 
 /// Auto-correction settings
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct AutoCorrection {
     pub smart_quotes: bool,
     pub em_dashes: bool,
     pub ellipsis: bool,
-    pub capitalize_sentences: bool,
-    pub superscript_ordinals: bool,
 }
 
 impl Default for AutoCorrection {
@@ -99,8 +98,6 @@ impl Default for AutoCorrection {
             smart_quotes: true,
             em_dashes: true,
             ellipsis: true,
-            capitalize_sentences: false,
-            superscript_ordinals: false,
         }
     }
 }
@@ -147,9 +144,40 @@ impl AutoCorrection {
         result
     }
 
+    /// The correction to make as a character is typed. `before` is the text of
+    /// the line up to the cursor, ending with the character just typed. The
+    /// result is how many characters to remove before the cursor and the
+    /// character that replaces them.
+    ///
+    /// Double hyphens at the start of a line, after punctuation or after the
+    /// `|` of a table row, as in a Markdown rule `---`, a comment `<!--` or a
+    /// table rule `| --- |`, are left alone.
+    pub fn correct_typed(&self, before: &str) -> Option<(usize, char)> {
+        let mut previous = before.chars().rev();
+        let typed = previous.next()?;
+        let last = previous.next();
+        // A quote opens at the start of a line, after a space or after an
+        // opening bracket or dash, and closes everywhere else.
+        let opens = last.is_none_or(|c| c.is_whitespace() || "([{\u{2014}".contains(c));
+        match typed {
+            '-' if self.em_dashes && last == Some('-') => {
+                let prose = match previous.next() {
+                    Some(c) if c.is_whitespace() => previous.find(|c| !c.is_whitespace()).is_some_and(|c| c != '|'),
+                    Some(c) => c.is_alphanumeric(),
+                    None => false,
+                };
+                prose.then_some((2, '\u{2014}'))
+            }
+            '.' if self.ellipsis && last == Some('.') && previous.next() == Some('.') => Some((3, '\u{2026}')),
+            '"' if self.smart_quotes => Some((1, if opens { '\u{201C}' } else { '\u{201D}' })),
+            '\'' if self.smart_quotes => Some((1, if opens { '\u{2018}' } else { '\u{2019}' })),
+            _ => None,
+        }
+    }
+
     /// Check if any correction is enabled
     pub fn any_enabled(&self) -> bool {
-        self.smart_quotes || self.em_dashes || self.ellipsis || self.capitalize_sentences || self.superscript_ordinals
+        self.smart_quotes || self.em_dashes || self.ellipsis
     }
 
     /// Get a summary of active corrections
@@ -164,12 +192,6 @@ impl AutoCorrection {
         if self.ellipsis {
             active.push("Ellipsis");
         }
-        if self.capitalize_sentences {
-            active.push("Auto-Capitalize");
-        }
-        if self.superscript_ordinals {
-            active.push("Ordinals");
-        }
         active
     }
 
@@ -178,8 +200,6 @@ impl AutoCorrection {
         self.smart_quotes = false;
         self.em_dashes = false;
         self.ellipsis = false;
-        self.capitalize_sentences = false;
-        self.superscript_ordinals = false;
     }
 
     /// Enable all corrections
@@ -187,8 +207,6 @@ impl AutoCorrection {
         self.smart_quotes = true;
         self.em_dashes = true;
         self.ellipsis = true;
-        self.capitalize_sentences = true;
-        self.superscript_ordinals = true;
     }
 }
 
@@ -328,7 +346,7 @@ mod tests {
         ac.disable_all();
         ac.enable_all();
         assert!(ac.any_enabled());
-        assert_eq!(ac.active_list().len(), 5);
+        assert_eq!(ac.active_list().len(), 3);
     }
 
     #[test]
@@ -366,8 +384,6 @@ mod tests {
             em_dashes: true,
             smart_quotes: false,
             ellipsis: false,
-            capitalize_sentences: false,
-            superscript_ordinals: false,
         };
         let result = ac.apply("He said -- and left");
         assert!(result.contains('\u{2014}'));
@@ -380,8 +396,6 @@ mod tests {
             em_dashes: false,
             smart_quotes: false,
             ellipsis: true,
-            capitalize_sentences: false,
-            superscript_ordinals: false,
         };
         let result = ac.apply("Wait for it...");
         assert!(result.contains('\u{2026}'));
@@ -394,8 +408,6 @@ mod tests {
             em_dashes: false,
             smart_quotes: true,
             ellipsis: false,
-            capitalize_sentences: false,
-            superscript_ordinals: false,
         };
         let result = ac.apply("He said \"hello\" today");
         assert!(result.contains('\u{201C}')); // left double quote
@@ -409,8 +421,6 @@ mod tests {
             em_dashes: false,
             smart_quotes: true,
             ellipsis: false,
-            capitalize_sentences: false,
-            superscript_ordinals: false,
         };
         let result = ac.apply("It's a test");
         assert!(result.contains('\u{2019}')); // right single quote (apostrophe)
@@ -422,8 +432,6 @@ mod tests {
             em_dashes: false,
             smart_quotes: true,
             ellipsis: false,
-            capitalize_sentences: false,
-            superscript_ordinals: false,
         };
         let result = ac.apply("'Hello' he said");
         assert!(result.contains('\u{2018}')); // left single quote
@@ -435,8 +443,6 @@ mod tests {
             em_dashes: false,
             smart_quotes: false,
             ellipsis: false,
-            capitalize_sentences: false,
-            superscript_ordinals: false,
         };
         let input = "Hello -- world... \"test\"";
         assert_eq!(ac.apply(input), input);
@@ -448,8 +454,6 @@ mod tests {
             em_dashes: true,
             smart_quotes: false,
             ellipsis: true,
-            capitalize_sentences: false,
-            superscript_ordinals: false,
         };
         let active = ac.active_list();
         assert_eq!(active.len(), 2);
@@ -534,5 +538,46 @@ mod tests {
             ScriptElement::Parenthetical.next_element_on_enter(),
             ScriptElement::Dialogue
         ));
+    }
+
+    #[test]
+    fn correct_typed_replaces_punctuation_as_you_type() {
+        let ac = AutoCorrection::default();
+        assert_eq!(ac.correct_typed("word--"), Some((2, '\u{2014}')));
+        assert_eq!(ac.correct_typed("word --"), Some((2, '\u{2014}')));
+        assert_eq!(ac.correct_typed("Wait..."), Some((3, '\u{2026}')));
+        assert_eq!(ac.correct_typed("\""), Some((1, '\u{201C}')));
+        assert_eq!(ac.correct_typed("said \""), Some((1, '\u{201C}')));
+        assert_eq!(ac.correct_typed("\u{201C}Hi\""), Some((1, '\u{201D}')));
+        assert_eq!(ac.correct_typed("don'"), Some((1, '\u{2019}')));
+        assert_eq!(ac.correct_typed("('"), Some((1, '\u{2018}')));
+    }
+
+    #[test]
+    fn correct_typed_keeps_markdown_and_plain_text() {
+        let ac = AutoCorrection::default();
+        assert_eq!(ac.correct_typed("--"), None);
+        assert_eq!(ac.correct_typed("<!--"), None);
+        assert_eq!(ac.correct_typed("|--"), None);
+        assert_eq!(ac.correct_typed("| --"), None);
+        assert_eq!(ac.correct_typed("| --- | --"), None);
+        assert_eq!(ac.correct_typed("Name | --"), None);
+        assert_eq!(ac.correct_typed("  --"), None);
+        assert_eq!(ac.correct_typed("word-"), None);
+        assert_eq!(ac.correct_typed("end.."), None);
+        assert_eq!(ac.correct_typed("abc"), None);
+        assert_eq!(ac.correct_typed(""), None);
+    }
+
+    #[test]
+    fn correct_typed_follows_each_substitution_toggle() {
+        let mut ac = AutoCorrection::default();
+        ac.disable_all();
+        assert_eq!(ac.correct_typed("word--"), None);
+        assert_eq!(ac.correct_typed("Wait..."), None);
+        assert_eq!(ac.correct_typed("\""), None);
+        ac.ellipsis = true;
+        assert_eq!(ac.correct_typed("Wait..."), Some((3, '\u{2026}')));
+        assert_eq!(ac.correct_typed("word--"), None);
     }
 }

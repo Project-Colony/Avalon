@@ -24,7 +24,7 @@ fn main() -> iced::Result {
     // Answered before anything opens a window: the release workflow
     // smoke-tests every built artifact with `--version` on runners that have
     // no display.
-    if std::env::args().skip(1).any(|arg| arg == "--version" || arg == "-V") {
+    if std::env::args_os().skip(1).any(|arg| arg == "--version" || arg == "-V") {
         #[cfg(windows)]
         attach_parent_console();
         println!("{} {}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
@@ -39,10 +39,7 @@ fn main() -> iced::Result {
         .theme(ScrineverApp::theme)
         .font(JETBRAINS_MONO_REGULAR)
         .font(JETBRAINS_MONO_BOLD)
-        .default_font(iced::Font {
-            family: iced::font::Family::Name("JetBrainsMono Nerd Font"),
-            ..iced::Font::DEFAULT
-        })
+        .default_font(gui::theme::APP_FONT)
         .run()
 }
 

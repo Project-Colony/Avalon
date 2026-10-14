@@ -2,6 +2,12 @@
 use iced::widget::{button, container};
 use iced::{Background, Border, Color, Shadow, Vector};
 
+/// The bundled JetBrains Mono Nerd Font, the default font of every window.
+pub const APP_FONT: iced::Font = iced::Font {
+    family: iced::font::Family::Name("JetBrainsMono Nerd Font"),
+    ..iced::Font::DEFAULT
+};
+
 /// Nerd Font icon constants (JetBrains Mono Nerd Font)
 ///
 /// All icons use codepoints from Font Awesome (nf-fa-*) and other ranges
