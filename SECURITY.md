@@ -38,6 +38,10 @@ interest:
   projects. Avalon saves a project only into the folder it was opened from or
   the one chosen in the save dialog, and a project title never changes where
   files go; a way around that is in scope.
+- **Backup archives**: the `.zip` files in the backup folder that **Restore as
+  copy** unpacks. A restore writes only `project.json`, `compile_presets.json`
+  and `docs/<document id>.json` into a new folder next to the project; an
+  archive that writes anywhere else, or exhausts memory or disk, is in scope.
 
 Out of scope: attacks that need someone who can already run code as you or
 edit Avalon's own configuration, and bugs in the operating system or in the

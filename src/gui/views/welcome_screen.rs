@@ -305,7 +305,7 @@ fn build_footer() -> Element<'static, Message> {
         "The Writing Timer (Ctrl+J) has Pomodoro, Sprint, and custom presets.",
         "Ctrl+Shift+S shows comprehensive project statistics with readability scores.",
         "Use the Name Generator (Ctrl+Shift+N) for character and place names.",
-        "Auto-backup creates safety copies every time your project is saved.",
+        "Auto-backup zips your project every few saves; Restore opens a backup as a copy.",
         "F8 runs project validation to find broken links, empty docs, and orphans.",
     ];
     let tip_index = {
@@ -321,7 +321,9 @@ fn build_footer() -> Element<'static, Message> {
             Space::new().width(6),
             text(tips[tip_index]).size(11).color(Theme::TEXT_SECONDARY),
             Space::new().width(Length::Fill),
-            text("Avalon v0.1.0").size(10).color(Theme::TEXT_MUTED),
+            text(concat!("Avalon v", env!("CARGO_PKG_VERSION")))
+                .size(10)
+                .color(Theme::TEXT_MUTED),
         ]
         .align_y(iced::Alignment::Center),
     )

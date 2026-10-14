@@ -19,7 +19,7 @@ pub fn view(query: &str, results: &[ThesaurusEntry]) -> Element<'static, Message
         Space::new().width(8),
         text(result_count).size(10).color(Theme::TEXT_MUTED),
         Space::new().width(Length::Fill),
-        text("Tip: Select a word in the editor, then open Thesaurus")
+        text("Tip: Type a word and press Enter")
             .size(9)
             .color(Theme::TEXT_MUTED),
     ];

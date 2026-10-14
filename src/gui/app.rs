@@ -8,6 +8,7 @@ use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
+use crate::core::backup::BackupManager;
 use crate::core::binder::{BinderItem, BinderItemKind};
 use crate::core::find_replace::{self, FindReplaceOptions};
 use crate::core::integrations::ProjectState;
@@ -89,6 +90,8 @@ pub struct ScrineverApp {
 
     // === Auto-save ===
     pub auto_save_counter: u32,
+    /// Saves of the open project since its last automatic backup.
+    pub saves_since_backup: u32,
 
     // === Writing session ===
     pub session_active: bool,
@@ -187,6 +190,9 @@ impl ScrineverApp {
         spell_checker.try_init();
         spell_checker.load_user_dictionary();
 
+        let mut thesaurus = Thesaurus::new();
+        thesaurus.load_builtin();
+
         // Open the main window explicitly (daemon mode)
         let (main_id, open_main) = window::open(window::Settings {
             size: iced::Size::new(1280.0, 800.0),
@@ -215,7 +221,7 @@ impl ScrineverApp {
             search_regex: false,
             replace_text: String::new(),
             spell_checker,
-            thesaurus: Thesaurus::new(),
+            thesaurus,
             thesaurus_query: String::new(),
             thesaurus_results: Vec::new(),
             notes_text: String::new(),
@@ -223,6 +229,7 @@ impl ScrineverApp {
             notification: None,
             notification_timer: 0,
             auto_save_counter: 0,
+            saves_since_backup: 0,
             session_active: false,
             session_stats: SessionStats::new(),
             session_start_word_count: 0,
@@ -424,6 +431,7 @@ impl ScrineverApp {
                     }
                     let title = p.title.clone();
                     self.project = Some(p);
+                    self.saves_since_backup = 0;
                     self.selected_item = None;
                     self.editor = EditorState::new();
                     self.linguistic_result = None;
@@ -2160,7 +2168,7 @@ impl ScrineverApp {
             Message::CreateBackup => {
                 if let Some(ref project) = self.project {
                     if let Some(ref path) = project.path {
-                        match crate::core::backup::BackupManager::create_backup(path) {
+                        match BackupManager::default_root().and_then(|root| BackupManager::create_backup(path, &root)) {
                             Ok(backup_path) => {
                                 self.notification = Some(format!(
                                     "Backup created: {:?}",
@@ -2168,7 +2176,7 @@ impl ScrineverApp {
                                 ));
                             }
                             Err(e) => {
-                                self.notification = Some(format!("Backup error: {}", e));
+                                self.notification = Some(format!("Backup error: {:#}", e));
                             }
                         }
                     } else {
@@ -2178,28 +2186,17 @@ impl ScrineverApp {
             }
 
             Message::RestoreBackup(path) => {
-                if let Some(ref project) = self.project {
-                    if let Some(ref proj_path) = project.path {
-                        match crate::core::backup::BackupManager::restore_backup(&path, proj_path) {
-                            Ok(_) => {
-                                // Reload the project
-                                match crate::core::project::Project::load(proj_path) {
-                                    Ok(p) => {
-                                        self.compile_options.title = p.title.clone();
-                                        self.project_notes_text = p.project_notes.clone();
-                                        self.project = Some(p);
-                                        self.selected_item = None;
-                                        self.editor = EditorState::new();
-                                        self.notification = Some("Backup restored successfully".to_string());
-                                    }
-                                    Err(e) => {
-                                        self.notification = Some(format!("Restore error: {}", e));
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                self.notification = Some(format!("Restore error: {}", e));
-                            }
+                // The backup is unpacked into a new folder next to the project,
+                // which is then opened; the current project folder stays as is.
+                if let Some(proj_path) = self.project.as_ref().and_then(|p| p.path.clone()) {
+                    match BackupManager::restore_backup(&path, &proj_path) {
+                        Ok(restored) => {
+                            return IcedTask::perform(load_project(restored), |loaded| {
+                                Message::ProjectLoaded(Box::new(Some(loaded)))
+                            });
+                        }
+                        Err(e) => {
+                            self.notification = Some(format!("Restore error: {:#}", e));
                         }
                     }
                 }
@@ -3376,9 +3373,15 @@ impl ScrineverApp {
                 Some(views::doc_links_panel::view(&outgoing, &incoming, &broken, &available))
             }
             BottomPanel::Backups => {
-                let backups = crate::core::backup::BackupManager::list_backups(&project.title.replace(' ', "_"))
-                    .unwrap_or_default();
-                Some(views::backup_panel::view(&backups, &project.title))
+                let backups = match (&project.path, BackupManager::default_root()) {
+                    (Some(path), Ok(root)) => BackupManager::list_backups(&root, path).unwrap_or_default(),
+                    _ => Vec::new(),
+                };
+                let auto_backup_every = project
+                    .settings
+                    .auto_backup
+                    .then_some(project.settings.backup_interval_saves.max(1));
+                Some(views::backup_panel::view(&backups, &project.title, auto_backup_every))
             }
             BottomPanel::SpellCheck => Some(views::spell_check_panel::view(
                 &self.spell_check_results,
@@ -3613,11 +3616,30 @@ impl ScrineverApp {
                 self.recent_projects.add(&project.title, path.clone());
                 self.recent_projects.save();
                 self.notification = Some(format!("Project saved to {}", path.display()));
+                self.auto_backup();
             }
             (Ok(()), None) => {}
             (Err(e), _) => {
                 self.notification = Some(format!("Save error: {:#}", e));
             }
+        }
+    }
+
+    /// Count a save of the open project and back it up when its settings
+    /// (automatic backups on, every `backup_interval_saves` saves) say so.
+    fn auto_backup(&mut self) {
+        let Some(project) = &self.project else {
+            return;
+        };
+        let Some(dir) = &project.path else {
+            return;
+        };
+        let result = BackupManager::default_root().and_then(|root| {
+            BackupManager::backup_after_save(dir, &root, &project.settings, &mut self.saves_since_backup)
+        });
+        if let Err(e) = result {
+            log::warn!("Auto-backup failed: {:#}", e);
+            self.notification = Some(format!("Automatic backup failed: {:#}", e));
         }
     }
 
@@ -3694,7 +3716,11 @@ impl ScrineverApp {
                     if let Ok(content) = std::fs::read_to_string(&path) {
                         let mut item = BinderItem::new_text(&title);
                         if let Some(ref mut doc) = item.document {
-                            doc.content = content;
+                            doc.content = if ext == "rtf" {
+                                crate::export::rtf_import::extract_text_from_rtf(&content)
+                            } else {
+                                content
+                            };
                         }
                         project.binder.draft.add_child(item);
                         count += 1;
@@ -3817,11 +3843,7 @@ impl ScrineverApp {
                         match project.save() {
                             Ok(()) => {
                                 self.editor.mark_clean();
-                                if let Some(ref path) = project.path {
-                                    if let Err(e) = crate::core::backup::BackupManager::create_backup(path) {
-                                        log::warn!("Auto-backup failed: {}", e);
-                                    }
-                                }
+                                self.auto_backup();
                             }
                             Err(e) => {
                                 self.notification = Some(format!("Autosave failed: {:#}", e));
@@ -4002,4 +4024,36 @@ async fn pick_import_paths(
         .iter()
         .map(|file| file.path().to_path_buf())
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn thesaurus_lookup_finds_common_words() {
+        let (mut app, _) = ScrineverApp::new();
+        let _ = app.update(Message::ThesaurusQueryChanged("Good ".to_string()));
+        let _ = app.update(Message::DoThesaurusLookup);
+        assert!(app
+            .thesaurus_results
+            .iter()
+            .any(|entry| entry.synonyms.iter().any(|s| s == "great")));
+    }
+
+    #[test]
+    fn rtf_import_adds_the_text_without_markup() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("Chapter.rtf");
+        let rtf = r"{\rtf1\ansi{\fonttbl\f0\fswiss Helvetica;}\f0 Hello \b world\b0 .\par}";
+        std::fs::write(&path, rtf).unwrap();
+
+        let (mut app, _) = ScrineverApp::new();
+        app.project = Some(Project::new("Test"));
+        app.import_files(vec![path]);
+
+        let draft = &app.project.as_ref().unwrap().binder.draft;
+        let item = draft.children.iter().find(|i| i.title == "Chapter").unwrap();
+        assert_eq!(item.document.as_ref().unwrap().content, "Hello world.");
+    }
 }

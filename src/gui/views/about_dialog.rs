@@ -40,7 +40,7 @@ pub fn view() -> Element<'static, Message> {
     .size(11)
     .color(Theme::TEXT_PRIMARY);
 
-    let copyright = text("\u{00A9} 2024-2026 Avalon Contributors")
+    let copyright = text("\u{00A9} 2024-2026 MotherSphere and contributors")
         .size(10)
         .color(Theme::TEXT_MUTED);
 
