@@ -713,18 +713,15 @@ impl ScrineverApp {
             // ========== Editor operations ==========
             Message::EditorAction(action) => {
                 let is_edit = action.is_edit();
-                let typed = matches!(
-                    action,
-                    iced::widget::text_editor::Action::Edit(iced::widget::text_editor::Edit::Insert(_))
-                );
                 let old_len = self.editor.content.text().len();
                 let cursor_before = self.editor.cursor;
-                self.editor.content.perform(action);
-                if let Some(settings) = self.project.as_ref().map(|p| &p.settings) {
-                    if typed && settings.smart_punctuation {
-                        self.editor.correct_typed(&settings.auto_correction);
-                    }
-                }
+                let rules = self
+                    .project
+                    .as_ref()
+                    .map(|p| &p.settings)
+                    .filter(|s| s.smart_punctuation)
+                    .map(|s| &s.auto_correction);
+                self.editor.perform(action, rules);
                 if is_edit {
                     self.editor.mark_dirty();
                     let new_text = self.editor.content.text().to_string();

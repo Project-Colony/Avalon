@@ -49,7 +49,8 @@ not affiliated with Literature & Latte.
 - Markdown editor with find and replace, spell check with a personal dictionary,
   a small built-in thesaurus of common English words and a name generator
 - Per-project editor font, size, zoom, line spacing and text width, and smart
-  punctuation as you type: curly quotes, em dashes and ellipses
+  punctuation as you type, on by default: curly quotes, em dashes and ellipses.
+  A Backspace right after a correction puts back what you typed
 - Snapshots (`F9`), automatic backups and session or project word targets
 - Compile and export to PDF, DOCX, EPUB, HTML, LaTeX, RTF, Fountain, Markdown,
   OPML and plain text
