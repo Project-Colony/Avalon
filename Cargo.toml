@@ -15,7 +15,7 @@ iced = { version = "0.14.0", features = ["tokio"] }
 
 # Serialization
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.151"
+serde_json = "1.0.154"
 
 # File system
 dirs = "7.0.0"
@@ -28,17 +28,17 @@ pulldown-cmark = "0.13.4"
 # Without the default html feature: Avalon lays out the pages itself.
 printpdf = { version = "0.12.8", default-features = false }
 docx-rs = "0.4.22"
-zip = "9.0.0"
+zip = "9.0.3"
 
 # Spell checking
-# hunspell-rs requires system libhunspell — disabled by default
+# hunspell-rs requires system libhunspell, disabled by default
 # hunspell-rs = "0.4"
 
 # Date/time
 chrono = { version = "0.4.45", features = ["serde"] }
 
 # Unique IDs
-uuid = { version = "1.27.0", features = ["v4", "serde"] }
+uuid = { version = "1.28.0", features = ["v4", "serde"] }
 
 # Logging
 log = "0.4.34"
@@ -48,7 +48,7 @@ env_logger = "0.11.11"
 anyhow = "1.0.104"
 
 # Async runtime (for iced)
-tokio = { version = "1.53.2", features = ["full"] }
+tokio = { version = "1.53.3", features = ["full"] }
 
 # Regex for search
 regex = "1.13.1"
