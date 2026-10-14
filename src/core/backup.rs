@@ -198,7 +198,7 @@ impl BackupManager {
         let mut budget = MAX_TOTAL_BYTES;
         for i in 0..archive.len() {
             let entry = archive.by_index(i).context("Failed to read the backup archive")?;
-            let name = entry.name().to_string();
+            let name = entry.name().context("Failed to read the backup archive")?.into_owned();
             let Some(path) = entry_path(&name) else {
                 bail!("The backup holds {:?}, which is not part of a project", name);
             };
