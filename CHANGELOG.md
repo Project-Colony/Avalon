@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/Project-Colony/Avalon/compare/v0.2.0...v0.2.1) (2026-11-09)
+
+
+### Fixes
+
+* **deps:** update dependencies, Rust 1.99 and zip 9.5.0 ([#28](https://github.com/Project-Colony/Avalon/issues/28)) ([d1a9c4b](https://github.com/Project-Colony/Avalon/commit/d1a9c4bd08cde2640e3e97380fac41b72424d62d))
+
 ## [0.2.0](https://github.com/Project-Colony/Avalon/compare/v0.1.0...v0.2.0) (2026-10-14)
 
 
