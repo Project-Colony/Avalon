@@ -2,7 +2,7 @@
 name = "avalon"
 version = "0.2.0"
 edition = "2021"
-rust-version = "1.91"
+rust-version = "1.99"
 authors = ["MotherSphere"]
 description = "A writing studio for novels and long-form projects, built in Rust with iced"
 license = "GPL-3.0-or-later"
@@ -19,16 +19,16 @@ serde_json = "1.0.154"
 
 # File system
 dirs = "7.0.0"
-notify = "8.2.0"
+notify = "8.2.2"
 
 # Rich text / document processing
-pulldown-cmark = "0.13.4"
+pulldown-cmark = "0.13.6"
 
 # Export formats
 # Without the default html feature: Avalon lays out the pages itself.
 printpdf = { version = "0.12.8", default-features = false }
 docx-rs = "0.4.22"
-zip = "9.0.3"
+zip = "9.5.0"
 
 # Spell checking
 # hunspell-rs requires system libhunspell, disabled by default
@@ -38,27 +38,27 @@ zip = "9.0.3"
 chrono = { version = "0.4.45", features = ["serde"] }
 
 # Unique IDs
-uuid = { version = "1.28.0", features = ["v4", "serde"] }
+uuid = { version = "1.29.2", features = ["v4", "serde"] }
 
 # Logging
-log = "0.4.34"
+log = "0.4.35"
 env_logger = "0.11.11"
 
 # Error handling
 anyhow = "1.0.104"
 
 # Async runtime (for iced)
-tokio = { version = "1.53.3", features = ["full"] }
+tokio = { version = "1.54.1", features = ["full"] }
 
 # Regex for search
 regex = "1.13.1"
 
 # Clipboard
-arboard = "3.6.1"
+arboard = "3.7.0"
 
 # Native open and save dialogs. On Linux the XDG desktop portal backend talks
 # to D-Bus through libdbus loaded at run time, so the build needs no GTK.
-rfd = { version = "0.17.2", default-features = false, features = ["xdg-portal"] }
+rfd = { version = "0.18.0", default-features = false, features = ["xdg-portal"] }
 
 [dev-dependencies]
 tempfile = "3.27.0"

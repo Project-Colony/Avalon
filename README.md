@@ -124,7 +124,7 @@ cd Avalon
 cargo build --release
 ```
 
-Requires Rust 1.91 or newer. On Debian or Ubuntu, install `libfontconfig1-dev`
+Requires Rust 1.99 or newer. On Debian or Ubuntu, install `libfontconfig1-dev`
 and `pkg-config` first. Avalon is written in Rust with the
 [iced](https://iced.rs) GUI toolkit.
 
