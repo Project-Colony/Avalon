@@ -33,11 +33,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libfontconfig1-dev pkg-config
 
-      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable branch
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch
         with:
           components: clippy, rustfmt
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -85,11 +85,11 @@ jobs:
           [ -n "$version" ] || { echo "::error::could not read rust-version from Cargo.toml"; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable branch
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch
         with:
           toolchain: ${{ steps.msrv.outputs.version }}
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: msrv-${{ steps.msrv.outputs.version }}
 
@@ -113,6 +113,13 @@ jobs:
       - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          # These four zip advisories only match zip 8.6.0, which docx-rs
+          # 0.4.22 (its latest release) requires as ^8.6. No patched 8.x
+          # exists. They all concern ZipArchive::extract and stream
+          # extraction; docx-rs never calls either, and Avalon uses docx-rs
+          # only to write files. Avalon's own zip dependency is 9.5.0, which
+          # is patched. Remove this list once docx-rs moves to zip 9.
+          ignore: RUSTSEC-2026-0367,RUSTSEC-2026-0368,RUSTSEC-2026-0369,RUSTSEC-2026-0429
 
   coverage:
     name: Code Coverage
@@ -127,12 +134,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libfontconfig1-dev pkg-config
 
-      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable branch
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch
 
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
       - name: Install cargo-tarpaulin
-        run: cargo install cargo-tarpaulin --version 0.37.5 --locked
+        run: cargo install cargo-tarpaulin --version 0.37.6 --locked
 
       - name: Generate coverage
         run: cargo tarpaulin --out xml --skip-clean
