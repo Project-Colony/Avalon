@@ -17,7 +17,7 @@ macOS that keeps each chapter or scene as its own document in a binder, with
 notes, snapshots, word targets and a compiler that exports the whole project
 in one step.
 
-> **Status:** early, and not released yet. Writing, organising the binder,
+> **Status:** early. Writing, organising the binder,
 > saving, snapshots, backups, import and compile all work and have unit tests,
 > and CI builds and tests Avalon on Linux, Windows and macOS. Not checked yet:
 > importing real Scrivener projects (the importer is only tested on small
@@ -25,7 +25,7 @@ in one step.
 > knows 4,812 English words plus the ones you add, so it flags many correct
 > words, and the thesaurus is a small list of common English words. Some
 > folders still carry the working name Scrinever (see [Privacy](#privacy)).
-> Until the first signed release is published, build from source.
+> Signed builds are on the [latest release](../../releases/latest) page.
 
 ## Why Avalon
 
