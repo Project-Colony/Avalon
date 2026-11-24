@@ -2,7 +2,7 @@
 name = "avalon"
 version = "0.2.1"
 edition = "2021"
-rust-version = "1.99"
+rust-version = "1.100"
 authors = ["MotherSphere"]
 description = "A writing studio for novels and long-form projects, built in Rust with iced"
 license = "GPL-3.0-or-later"
@@ -19,16 +19,16 @@ serde_json = "1.0.154"
 
 # File system
 dirs = "7.0.0"
-notify = "8.2.2"
+notify = "9.0.0"
 
 # Rich text / document processing
 pulldown-cmark = "0.13.6"
 
 # Export formats
 # Without the default html feature: Avalon lays out the pages itself.
-printpdf = { version = "0.12.8", default-features = false }
+printpdf = { version = "0.12.14", default-features = false }
 docx-rs = "0.4.22"
-zip = "9.5.0"
+zip = "9.8.2"
 
 # Spell checking
 # hunspell-rs requires system libhunspell, disabled by default
@@ -38,20 +38,20 @@ zip = "9.5.0"
 chrono = { version = "0.4.45", features = ["serde"] }
 
 # Unique IDs
-uuid = { version = "1.29.2", features = ["v4", "serde"] }
+uuid = { version = "1.29.3", features = ["v4", "serde"] }
 
 # Logging
 log = "0.4.35"
-env_logger = "0.11.11"
+env_logger = "0.11.12"
 
 # Error handling
-anyhow = "1.0.104"
+anyhow = "1.0.105"
 
 # Async runtime (for iced)
 tokio = { version = "1.54.1", features = ["full"] }
 
 # Regex for search
-regex = "1.13.1"
+regex = "1.13.2"
 
 # Clipboard
 arboard = "3.7.0"
