@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/Project-Colony/Avalon/compare/v0.2.1...v0.2.2) (2026-11-24)
+
+
+### Fixes
+
+* **deps:** update dependencies and Rust to 1.100 ([#34](https://github.com/Project-Colony/Avalon/issues/34)) ([81ee303](https://github.com/Project-Colony/Avalon/commit/81ee303f071cbfe61053268dfb78234f0947a454))
+
 ## [0.2.1](https://github.com/Project-Colony/Avalon/compare/v0.2.0...v0.2.1) (2026-11-09)
 
 
