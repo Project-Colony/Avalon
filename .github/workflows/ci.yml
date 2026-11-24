@@ -33,7 +33,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libfontconfig1-dev pkg-config
 
-      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable branch
         with:
           components: clippy, rustfmt
 
@@ -85,7 +85,7 @@ jobs:
           [ -n "$version" ] || { echo "::error::could not read rust-version from Cargo.toml"; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable branch
         with:
           toolchain: ${{ steps.msrv.outputs.version }}
 
@@ -113,13 +113,16 @@ jobs:
       - uses: rustsec/audit-check@69366f33c96575abad1ee0dba8212993eecbe998 # v2.0.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          # These four zip advisories only match zip 8.6.0, which docx-rs
+          # These eight zip advisories only match zip 8.6.0, which docx-rs
           # 0.4.22 (its latest release) requires as ^8.6. No patched 8.x
-          # exists. They all concern ZipArchive::extract and stream
-          # extraction; docx-rs never calls either, and Avalon uses docx-rs
-          # only to write files. Avalon's own zip dependency is 9.5.0, which
-          # is patched. Remove this list once docx-rs moves to zip 9.
-          ignore: RUSTSEC-2026-0367,RUSTSEC-2026-0368,RUSTSEC-2026-0369,RUSTSEC-2026-0429
+          # exists. docx-rs builds zip with only the deflate feature, so the
+          # AES (RUSTSEC-2026-0545) and legacy-zip (RUSTSEC-2026-0547) code is
+          # not compiled. The others concern ZipArchive::extract and stream
+          # extraction (ZipStreamReader); docx-rs never calls either, and
+          # Avalon uses docx-rs only to write files. Avalon's own zip
+          # dependency is 9.8.2, which is patched. Remove this list once a
+          # docx-rs release moves to zip 9.
+          ignore: RUSTSEC-2026-0367,RUSTSEC-2026-0368,RUSTSEC-2026-0369,RUSTSEC-2026-0429,RUSTSEC-2026-0545,RUSTSEC-2026-0546,RUSTSEC-2026-0547,RUSTSEC-2026-0548
 
   coverage:
     name: Code Coverage
@@ -134,7 +137,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libfontconfig1-dev pkg-config
 
-      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable branch
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable branch
 
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
 
